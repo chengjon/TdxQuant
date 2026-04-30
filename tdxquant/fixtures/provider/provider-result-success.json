@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "code": "ok",
+  "message": "ok",
+  "capability": "formula.screen",
+  "capability_version": "v1",
+  "schema_version": "2026-04-28",
+  "request_id": "req-success",
+  "started_at": "2026-04-28T12:00:00Z",
+  "finished_at": "2026-04-28T12:00:01Z",
+  "elapsed_ms": 1000.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "bridge"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "000001.SZ"
+      }
+    ]
+  },
+  "artifacts": []
+}

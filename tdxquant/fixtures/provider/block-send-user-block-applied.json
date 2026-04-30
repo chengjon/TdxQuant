@@ -1,0 +1,43 @@
+{
+  "success": true,
+  "code": "ok",
+  "message": "updated TongDaXin user block",
+  "capability": "block.send_user_block",
+  "capability_version": "v1",
+  "schema_version": "2026-04-28",
+  "request_id": "fixture-block-send-user-block-applied",
+  "started_at": "2026-04-28T12:00:00Z",
+  "finished_at": "2026-04-28T12:00:01Z",
+  "elapsed_ms": 1000.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "block_mutation": {
+      "schema_version": "2026-04-28",
+      "mutation_id": "fixture-block-mutation-001",
+      "mutation_key": "watchlist-sync-20260428-01",
+      "operation": "send_user_block",
+      "status": "applied",
+      "block_code": "ZXG",
+      "requested_stocks": [
+        "000001.SZ",
+        "600519.SH"
+      ],
+      "requested_stock_count": 2,
+      "show": true
+    },
+    "artifacts": {
+      "audit_log_path": "runtime/block-mutations/fixture-block-mutation-001.json"
+    }
+  },
+  "artifacts": [
+    {
+      "kind": "block_mutation_audit",
+      "path": "runtime/block-mutations/fixture-block-mutation-001.json"
+    }
+  ]
+}

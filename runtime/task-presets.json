@@ -1,0 +1,77 @@
+{
+  "refresh-default": {
+    "command": "refresh-environment",
+    "description": "默认环境刷新模板。",
+    "profile": "maintenance",
+    "api_profile": "safe_read",
+    "options": {
+      "market": "AG",
+      "force": false
+    }
+  },
+  "guarded-default": {
+    "command": "guarded-trade-buy",
+    "description": "受保护买入模板，固定串口和 workflow 环境参数，保留 code/price/quantity 动态输入。",
+    "profile": "guarded_trade_buy",
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  },
+  "task-buy-default": {
+    "command": "trade-buy",
+    "description": "常规 task 买入模板。",
+    "profile": "trade_buy",
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  },
+  "submit-once-default": {
+    "command": "trade-submit-once",
+    "description": "完整提交 task 模板。",
+    "profile": "trade_submit_once",
+    "api_profile": "safe_read",
+    "trade_profile": "submit_once",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  },
+  "submit-ready-default": {
+    "command": "trade-submit-ready",
+    "description": "分步提交前边界 task 模板，固定串口和 workflow 环境参数。",
+    "profile": "trade_submit_ready",
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12
+    }
+  },
+  "confirm-current-default": {
+    "command": "trade-confirm-current",
+    "description": "推进当前确认框并回到主界面的 task 模板。",
+    "profile": "trade_confirm_current",
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "options": {
+      "close_result_dialog": true
+    }
+  }
+}

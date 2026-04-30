@@ -1,0 +1,62 @@
+{
+  "stable": {
+    "hid_pre_delay": 0.5,
+    "post_delay": 0.5,
+    "dialog_timeout": 3.0,
+    "confirm_timeout": 2.5,
+    "confirm_post_delay": 0.3,
+    "result_timeout": 2.5,
+    "result_close_pre_delay": 0.0,
+    "capture_final_uia": false,
+    "price_quantity_input_mode": "uia",
+    "dialog_lookup_mode": "uia"
+  },
+  "balanced": {
+    "hid_pre_delay": 0.2,
+    "post_delay": 0.2,
+    "dialog_timeout": 2.0,
+    "confirm_timeout": 1.5,
+    "confirm_post_delay": 0.1,
+    "result_timeout": 1.5,
+    "result_close_pre_delay": 0.0,
+    "capture_final_uia": false,
+    "price_quantity_input_mode": "uia",
+    "dialog_lookup_mode": "uia"
+  },
+  "fast": {
+    "hid_pre_delay": 0.0,
+    "post_delay": 0.1,
+    "dialog_timeout": 1.2,
+    "confirm_timeout": 1.0,
+    "confirm_post_delay": 0.0,
+    "result_timeout": 1.0,
+    "result_close_pre_delay": 0.0,
+    "capture_final_uia": false,
+    "price_quantity_input_mode": "uia",
+    "dialog_lookup_mode": "uia"
+  },
+  "turbo": {
+    "hid_pre_delay": 0.2,
+    "post_delay": 0.2,
+    "dialog_timeout": 2.0,
+    "confirm_timeout": 1.5,
+    "confirm_post_delay": 0.1,
+    "result_timeout": 1.5,
+    "result_close_pre_delay": 0.0,
+    "capture_final_uia": false,
+    "price_quantity_input_mode": "hybrid_win32",
+    "dialog_lookup_mode": "win32_experimental"
+  },
+  "submit_once": {
+    "hid_pre_delay": 0.0,
+    "post_delay": 1.0,
+    "dialog_timeout": 2.5,
+    "confirm_timeout": 3.0,
+    "confirm_post_delay": 1.0,
+    "result_timeout": 3.0,
+    "result_close_pre_delay": 0.0,
+    "capture_final_uia": true,
+    "price_quantity_input_mode": "uia",
+    "dialog_lookup_mode": "uia"
+  }
+}

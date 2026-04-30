@@ -1,0 +1,1323 @@
+from __future__ import annotations
+
+import importlib
+from dataclasses import replace
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
+from uuid import uuid4
+
+from ..block_mutation import apply_block_mutation_safety
+from ..desktop.inspect import find_main_window
+from ..formula_screen import build_formula_screen_payload
+from ..models import ErrorCode, Result
+from ..provider_discovery import build_capability_discovery_payload
+from ..serialization import serialize_value
+from ..desktop.win32 import IS_WINDOWS
+
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover
+    np = None
+
+try:
+    import pandas as pd
+except ImportError:  # pragma: no cover
+    pd = None
+
+try:
+    from serial.tools import list_ports
+except ImportError:  # pragma: no cover
+    list_ports = None
+
+
+def _unsupported_result(action: str) -> Result | None:
+    if IS_WINDOWS:
+        return None
+    return Result(
+        ok=False,
+        code=ErrorCode.UNSUPPORTED_PLATFORM,
+        message=f"{action} is only available from native Windows Python",
+        next_action="Run the command from Windows Python instead of WSL/Linux.",
+    )
+
+
+def _default_strategy_path() -> str:
+    return str(Path(__file__).resolve())
+
+
+def _list_serial_ports() -> list[dict[str, Any]]:
+    if list_ports is None:
+        return []
+    ports = []
+    for port in list_ports.comports():
+        ports.append(
+            {
+                "device": port.device,
+                "name": port.name,
+                "description": port.description,
+                "hwid": port.hwid,
+            }
+        )
+    return ports
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for item in values:
+        normalized = item.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _build_probe_check(
+    status: str,
+    summary: str,
+    *,
+    detail: Any | None = None,
+    recommended_action: str | None = None,
+    critical: bool = False,
+) -> dict[str, Any]:
+    payload = {
+        "status": status,
+        "summary": summary,
+        "critical": critical,
+    }
+    if detail is not None:
+        payload["detail"] = serialize_value(detail)
+    if recommended_action:
+        payload["recommended_action"] = recommended_action
+    return payload
+
+
+def _probe_platform() -> dict[str, Any]:
+    if IS_WINDOWS:
+        return _build_probe_check("ok", "native Windows Python is available", detail={"platform": "Windows"}, critical=True)
+    return _build_probe_check(
+        "failed",
+        "native Windows Python is unavailable",
+        detail={"platform": "non_windows"},
+        recommended_action="Run the provider from native Windows Python instead of WSL/Linux.",
+        critical=True,
+    )
+
+
+def _probe_tqcenter_module() -> dict[str, Any]:
+    tq_class, info = _load_tqcenter()
+    if tq_class is None:
+        return _build_probe_check(
+            "failed",
+            "tqcenter module is unavailable",
+            detail=info,
+            recommended_action="Verify tqcenter, TPythClient.dll, and TongDaXin runtime dependencies are installed.",
+            critical=True,
+        )
+    return _build_probe_check("ok", "tqcenter module is available", detail=info, critical=True)
+
+
+def _probe_query_runtime(strategy_path: str | None = None) -> dict[str, Any]:
+    if not IS_WINDOWS:
+        return _build_probe_check(
+            "failed",
+            "query runtime requires native Windows Python",
+            detail={"strategy_path": strategy_path or _default_strategy_path()},
+            recommended_action="Run the provider from native Windows Python instead of WSL/Linux.",
+            critical=True,
+        )
+    tq_class, info = _init_tqcenter(strategy_path)
+    if tq_class is None:
+        return _build_probe_check(
+            "failed",
+            "query runtime initialization failed",
+            detail=info,
+            recommended_action="Confirm TongDaXin is running and the Windows TdxQuant runtime initializes successfully.",
+            critical=True,
+        )
+    try:
+        return _build_probe_check("ok", "query runtime initialized successfully", detail=info, critical=True)
+    finally:
+        try:
+            tq_class.close()
+        except Exception:
+            pass
+
+
+def _probe_subscription_runtime(strategy_path: str | None = None) -> dict[str, Any]:
+    session = TdxRuntimeSubscriptionSession(strategy_path=strategy_path)
+    try:
+        if session._initial_error is not None or session._tq_class is None:
+            initial_error = session._initial_error.to_dict() if session._initial_error is not None else None
+            return _build_probe_check(
+                "failed",
+                "subscription runtime initialization failed",
+                detail={
+                    "runtime_info": session._runtime_info,
+                    "initial_error": initial_error,
+                    "strategy_path": session.strategy_path,
+                },
+                recommended_action=(
+                    session._initial_error.next_action
+                    if session._initial_error is not None
+                    else "Confirm TongDaXin runtime subscription support is available."
+                ),
+                critical=True,
+            )
+        return _build_probe_check(
+            "ok",
+            "subscription runtime initialized successfully",
+            detail={"strategy_path": session.strategy_path, "runtime_info": session._runtime_info},
+            critical=True,
+        )
+    finally:
+        session.close()
+
+
+def _probe_desktop_window(window_key: str) -> dict[str, Any]:
+    if not IS_WINDOWS:
+        return _build_probe_check(
+            "unsupported",
+            "desktop window probing is only available from native Windows Python",
+            detail={"window_key": window_key},
+        )
+    result = find_main_window(window_key)
+    if result.ok:
+        return _build_probe_check("ok", "desktop window probe succeeded", detail=result.to_dict())
+    return _build_probe_check(
+        "failed",
+        "desktop window probe failed",
+        detail=result.to_dict(),
+        recommended_action=result.next_action,
+    )
+
+
+def _probe_hid(requested_port: str | None = None) -> dict[str, Any]:
+    if list_ports is None:
+        return _build_probe_check(
+            "unsupported",
+            "serial port enumeration is unavailable",
+            detail={"requested_port": requested_port},
+            recommended_action="Install pyserial if HID probing is required.",
+        )
+    ports = _list_serial_ports()
+    detail = {
+        "requested_port": requested_port,
+        "ports": ports,
+    }
+    if requested_port:
+        requested_found = any(str(port.get("device", "")).lower() == requested_port.lower() for port in ports)
+        detail["requested_port_found"] = requested_found
+        if not requested_found:
+            return _build_probe_check(
+                "warning",
+                f"requested HID port {requested_port} was not found",
+                detail=detail,
+                recommended_action=f"Connect the HID device and confirm that serial port {requested_port} is visible.",
+            )
+        return _build_probe_check("ok", f"requested HID port {requested_port} is available", detail=detail)
+    if not ports:
+        return _build_probe_check(
+            "warning",
+            "no serial ports are currently enumerated",
+            detail=detail,
+            recommended_action="Connect the HID device if desktop trade automation is needed.",
+        )
+    return _build_probe_check("ok", "serial ports are available", detail=detail)
+
+
+def _derive_provider_overall_status(checks: dict[str, dict[str, Any]]) -> str:
+    critical_failure = any(
+        check.get("critical") and check.get("status") in {"failed", "unsupported"} for check in checks.values()
+    )
+    if critical_failure:
+        return "unavailable"
+    any_issue = any(check.get("status") != "ok" for check in checks.values())
+    if any_issue:
+        return "degraded"
+    return "ok"
+
+
+def _collect_provider_warnings_and_actions(checks: dict[str, dict[str, Any]]) -> tuple[list[str], list[str]]:
+    warnings: list[str] = []
+    actions: list[str] = []
+    for check_name, payload in checks.items():
+        status = str(payload.get("status", ""))
+        if status == "ok":
+            continue
+        warnings.append(f"{check_name}: {payload.get('summary', '')}")
+        action = payload.get("recommended_action")
+        if isinstance(action, str) and action:
+            actions.append(action)
+    return warnings, _dedupe_strings(actions)
+
+
+def _collect_provider_probe_snapshot(window_key: str, strategy_path: str | None = None, hid_port: str | None = None) -> dict[str, Any]:
+    resolved_strategy_path = strategy_path or _default_strategy_path()
+    checks = {
+        "platform": _probe_platform(),
+        "tqcenter_module": _probe_tqcenter_module(),
+        "query_runtime": _probe_query_runtime(strategy_path),
+        "subscription_runtime": _probe_subscription_runtime(strategy_path),
+        "desktop_window": _probe_desktop_window(window_key),
+        "hid": _probe_hid(hid_port),
+    }
+    warnings, recommended_actions = _collect_provider_warnings_and_actions(checks)
+    return {
+        "overall_status": _derive_provider_overall_status(checks),
+        "context": {
+            "window_key": window_key,
+            "strategy_path": resolved_strategy_path,
+            "requested_hid_port": hid_port,
+        },
+        "checks": checks,
+        "recommended_actions": recommended_actions,
+        "warning_count": len(warnings),
+        "warnings": warnings,
+    }
+
+
+def _build_provider_doctor_findings(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    severity_map = {
+        "ok": "info",
+        "warning": "warning",
+        "failed": "error",
+        "unsupported": "error",
+    }
+    findings: list[dict[str, Any]] = []
+    checks = snapshot.get("checks", {})
+    if isinstance(checks, dict):
+        for check_name, payload in checks.items():
+            if not isinstance(payload, dict):
+                continue
+            status = str(payload.get("status", ""))
+            if status == "ok":
+                continue
+            findings.append(
+                {
+                    "id": check_name,
+                    "severity": severity_map.get(status, "error"),
+                    "status": status,
+                    "summary": payload.get("summary"),
+                    "critical": bool(payload.get("critical", False)),
+                    "recommended_action": payload.get("recommended_action"),
+                }
+            )
+    if findings:
+        return findings
+    return [
+        {
+            "id": "provider-ready",
+            "severity": "info",
+            "status": "ok",
+            "summary": "All provider health checks passed.",
+            "critical": False,
+        }
+    ]
+
+
+def _load_tqcenter() -> tuple[Any | None, dict[str, Any]]:
+    try:
+        module = importlib.import_module("tqcenter")
+    except Exception as exc:
+        return None, {"available": False, "error": str(exc), "module": "tqcenter"}
+    tq_class = getattr(module, "tq", None)
+    if tq_class is None:
+        return None, {"available": False, "error": "tqcenter.tq is unavailable", "module": "tqcenter"}
+    return tq_class, {"available": True, "module": "tqcenter"}
+
+
+def _init_tqcenter(strategy_path: str | None = None) -> tuple[Any | None, dict[str, Any]]:
+    tq_class, info = _load_tqcenter()
+    if tq_class is None:
+        return None, info
+    selected_path = strategy_path or _default_strategy_path()
+    try:
+        tq_class.initialize(selected_path)
+    except Exception as exc:
+        return None, {"available": False, "error": str(exc), "strategy_path": selected_path, "module": "tqcenter"}
+    return tq_class, {"available": True, "strategy_path": selected_path, "module": "tqcenter"}
+
+
+def _run_tq_call(action: str, callback, strategy_path: str | None = None) -> Result:
+    guard = _unsupported_result(action)
+    if guard:
+        return guard
+    tq_class, info = _init_tqcenter(strategy_path)
+    if tq_class is None:
+        return Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message=f"{action} could not initialize TdxQuant runtime",
+            data={"tdx_api": info},
+            next_action="Verify the Windows TdxQuant runtime, TPythClient.dll, and TongDaXin client are installed and running.",
+        )
+    try:
+        payload = callback(tq_class)
+        return Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message=action,
+            data={"tdx_api": info, "result": serialize_value(payload)},
+        )
+    except ValueError as exc:
+        return Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message=str(exc),
+            data={"tdx_api": info},
+        )
+    except Exception as exc:
+        return Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message=f"{action} failed: {exc}",
+            data={"tdx_api": info},
+        )
+    finally:
+        try:
+            tq_class.close()
+        except Exception:
+            pass
+
+
+def _require_tq_method(tq_class, method_name: str):
+    method = getattr(tq_class, method_name, None)
+    if method is None:
+        raise RuntimeError(f"TdxQuant runtime does not expose `{method_name}` in the current environment")
+    return method
+
+
+def _attach_runtime_hints(result: Result, **hints: Any) -> Result:
+    runtime_hints = result.data.setdefault("runtime_hints", {})
+    runtime_hints.update(hints)
+    return result
+
+
+class TdxRuntimeSubscriptionSession:
+    __slots__ = ("session_id", "strategy_path", "_tq_class", "_runtime_info", "_initial_error", "closed")
+
+    def __init__(self, strategy_path: str | None = None) -> None:
+        self.session_id = uuid4().hex
+        self.strategy_path = strategy_path or _default_strategy_path()
+        self._tq_class = None
+        self._runtime_info: dict[str, Any] = {}
+        self._initial_error: Result | None = None
+        self.closed = False
+
+        guard = _unsupported_result("opened TongDaXin runtime subscription session")
+        if guard is not None:
+            self._initial_error = guard
+            self._runtime_info = {"available": False, "strategy_path": self.strategy_path}
+            return
+
+        tq_class, info = _init_tqcenter(self.strategy_path)
+        self._runtime_info = dict(info)
+        if tq_class is None:
+            self._initial_error = Result(
+                ok=False,
+                code=ErrorCode.EXECUTION_FAILED,
+                message="opened TongDaXin runtime subscription session could not initialize TdxQuant runtime",
+                data={"tdx_api": info},
+                next_action="Verify the Windows TdxQuant runtime, TPythClient.dll, and TongDaXin client are installed and running.",
+            )
+            return
+        self._tq_class = tq_class
+
+    def __enter__(self) -> "TdxRuntimeSubscriptionSession":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def _session_metadata(self) -> dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "strategy_path": self.strategy_path,
+            "closed": self.closed,
+        }
+
+    def _finalize_result(self, result: Result) -> Result:
+        result.data["runtime_session"] = self._session_metadata()
+        if self._runtime_info:
+            result.data.setdefault("tdx_api", dict(self._runtime_info))
+        return result
+
+    def _closed_result(self, action: str) -> Result:
+        return self._finalize_result(
+            Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message=f"{action} failed: runtime subscription session is already closed",
+            )
+        )
+
+    def _run(self, action: str, callback) -> Result:
+        if self._initial_error is not None:
+            return self._finalize_result(replace(self._initial_error, data=dict(self._initial_error.data)))
+        if self.closed:
+            return self._closed_result(action)
+        try:
+            payload = callback(self._tq_class)
+            return self._finalize_result(
+                Result(
+                    ok=True,
+                    code=ErrorCode.OK,
+                    message=action,
+                    data={"result": serialize_value(payload)},
+                )
+            )
+        except ValueError as exc:
+            return self._finalize_result(
+                Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=str(exc),
+                )
+            )
+        except Exception as exc:
+            return self._finalize_result(
+                Result(
+                    ok=False,
+                    code=ErrorCode.EXECUTION_FAILED,
+                    message=f"{action} failed: {exc}",
+                )
+            )
+
+    def subscribe_hq(self, stock_list: list[str], callback) -> Result:
+        def invoke(tq_class):
+            method = _require_tq_method(tq_class, "subscribe_hq")
+            return method(stock_list=stock_list, callback=callback)
+
+        return self._run("subscribed TongDaXin runtime行情 updates", invoke)
+
+    def unsubscribe_hq(self, stock_list: list[str]) -> Result:
+        def invoke(tq_class):
+            method = _require_tq_method(tq_class, "unsubscribe_hq")
+            return method(stock_list=stock_list)
+
+        return self._run("unsubscribed TongDaXin runtime行情 updates", invoke)
+
+    def get_subscribe_hq_stock_list(self) -> Result:
+        def invoke(tq_class):
+            method = _require_tq_method(tq_class, "get_subscribe_hq_stock_list")
+            return method()
+
+        return self._run("listed TongDaXin runtime subscribed stocks", invoke)
+
+    def close(self) -> None:
+        if self.closed:
+            return
+        self.closed = True
+        if self._tq_class is None:
+            return
+        try:
+            self._tq_class.close()
+        except Exception:
+            pass
+
+
+def run_tdx_open_subscription_session(strategy_path: str | None = None) -> TdxRuntimeSubscriptionSession:
+    return TdxRuntimeSubscriptionSession(strategy_path=strategy_path)
+
+
+def run_tdx_provider_capabilities() -> Result:
+    payload = build_capability_discovery_payload()
+    return Result(
+        ok=True,
+        code=ErrorCode.OK,
+        message="listed provider capabilities",
+        data=payload,
+    )
+
+
+def run_tdx_provider_health(
+    window_key: str,
+    strategy_path: str | None = None,
+    hid_port: str | None = None,
+) -> Result:
+    snapshot = _collect_provider_probe_snapshot(window_key=window_key, strategy_path=strategy_path, hid_port=hid_port)
+    warnings = list(snapshot.get("warnings", []))
+    return Result(
+        ok=True,
+        code=ErrorCode.OK,
+        message="collected provider health diagnostics",
+        data=snapshot,
+        warnings=warnings,
+        next_action=snapshot["recommended_actions"][0] if snapshot.get("recommended_actions") else None,
+    )
+
+
+def run_tdx_provider_doctor(
+    window_key: str,
+    strategy_path: str | None = None,
+    hid_port: str | None = None,
+) -> Result:
+    snapshot = _collect_provider_probe_snapshot(window_key=window_key, strategy_path=strategy_path, hid_port=hid_port)
+    doctor_payload = dict(snapshot)
+    doctor_payload["findings"] = _build_provider_doctor_findings(snapshot)
+    warnings = list(snapshot.get("warnings", []))
+    return Result(
+        ok=True,
+        code=ErrorCode.OK,
+        message="collected provider doctor diagnostics",
+        data=doctor_payload,
+        warnings=warnings,
+        next_action=snapshot["recommended_actions"][0] if snapshot.get("recommended_actions") else None,
+    )
+
+
+def run_tdx_bridge_health(
+    window_key: str,
+    strategy_path: str | None = None,
+    hid_port: str | None = None,
+    main_window_result: Result | None = None,
+) -> Result:
+    guard = _unsupported_result("tdx-bridge-health")
+    if guard:
+        return guard
+
+    tq_class, tdx_info = _init_tqcenter(strategy_path)
+    tdx_runtime_ok = tq_class is not None
+    if tq_class is not None:
+        try:
+            tq_class.close()
+        except Exception:
+            pass
+
+    windows_result = main_window_result or Result(
+        ok=False,
+        code=ErrorCode.WINDOW_NOT_FOUND,
+        message="TongDaXin main window check was not provided",
+    )
+    serial_ports = _list_serial_ports()
+    hid_status = {
+        "available": list_ports is not None,
+        "ports": serial_ports,
+        "requested_port": hid_port,
+        "requested_port_found": any(port["device"].lower() == hid_port.lower() for port in serial_ports) if hid_port else None,
+    }
+    warnings: list[str] = []
+    if not windows_result.ok:
+        warnings.append("当前未确认 TongDaXin 主窗口可用；桌面交易与 HID 输入链路可能无法执行。")
+    if hid_port and not hid_status["requested_port_found"]:
+        warnings.append(f"未找到指定 HID 串口 {hid_port}。")
+    if not hid_status["ports"]:
+        warnings.append("当前未发现可枚举串口；如果要继续 HID 路线，请确认硬件已连接。")
+
+    ok = tdx_runtime_ok
+    return Result(
+        ok=ok,
+        code=ErrorCode.OK if ok else ErrorCode.EXECUTION_FAILED,
+        message="checked TongDaXin bridge health" if ok else "TongDaXin bridge health check failed",
+        data={
+            "platform": "Windows",
+            "window_key": window_key,
+            "tdx_api": tdx_info,
+            "desktop_window": windows_result.to_dict(),
+            "hid": hid_status,
+        },
+        warnings=warnings,
+        next_action=None if ok else "Verify TongDaXin is running and the TdxQuant Python runtime can initialize successfully.",
+    )
+
+
+def run_tdx_full_tick(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        payload = tq_class.get_full_tick(stock_code=stock_code)
+        if field_list:
+            payload = tq_class.filter_dict_by_fields(payload, field_list)
+        return payload
+
+    return _run_tq_call("fetched TongDaXin full tick data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_data_snapshot(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
+    return run_tdx_full_tick(stock_code=stock_code, field_list=field_list, strategy_path=strategy_path)
+
+
+def run_tdx_market_snapshot(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_market_snapshot")
+        return method(stock_code=stock_code, field_list=field_list)
+
+    return _run_tq_call("fetched TongDaXin market snapshot via get_market_snapshot", callback, strategy_path=strategy_path)
+
+
+def run_tdx_data_kline(
+    stock_list: list[str],
+    period: str,
+    start_time: str,
+    end_time: str,
+    count: int,
+    dividend_type: str,
+    field_list: list[str],
+    fill_data: bool,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        return tq_class.get_market_data(
+            field_list=field_list,
+            stock_list=stock_list,
+            period=period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+            fill_data=fill_data,
+        )
+
+    return _run_tq_call("fetched TongDaXin kline data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_data_stock_info(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        return tq_class.get_stock_info(stock_code=stock_code, field_list=field_list)
+
+    return _run_tq_call("fetched TongDaXin stock info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_divid_factors(
+    stock_code: str,
+    start_time: str,
+    end_time: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_divid_factors")
+        return method(stock_code=stock_code, start_time=start_time, end_time=end_time)
+
+    return _run_tq_call("fetched TongDaXin dividend factors", callback, strategy_path=strategy_path)
+
+
+def run_tdx_ipo_info(
+    ipo_type: int,
+    ipo_date: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_ipo_info")
+        return method(ipo_type=ipo_type, ipo_date=ipo_date)
+
+    return _run_tq_call("fetched TongDaXin IPO info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_stock_list(market: str | None, list_type: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_stock_list")
+        return method(market=market, list_type=list_type)
+
+    return _run_tq_call("fetched TongDaXin stock list", callback, strategy_path=strategy_path)
+
+
+def run_tdx_more_info(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_more_info")
+        return method(stock_code=stock_code, field_list=field_list)
+
+    return _run_tq_call("fetched TongDaXin more stock info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_cb_info(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_cb_info")
+        return method(stock_code=stock_code, field_list=field_list)
+
+    return _run_tq_call("fetched TongDaXin convertible bond info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_gb_info(stock_code: str, date_list: list[str], count: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_gb_info")
+        return method(stock_code=stock_code, date_list=date_list, count=count)
+
+    return _run_tq_call("fetched TongDaXin equity structure info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_gp_one_data(stock_list: list[str], field_list: list[str], strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_gp_one_data")
+        return method(stock_list=stock_list, field_list=field_list)
+
+    return _run_tq_call("fetched TongDaXin gp one data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_financial_data(
+    stock_list: list[str],
+    field_list: list[str],
+    start_time: str,
+    end_time: str,
+    report_type: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_financial_data")
+        return method(
+            stock_list=stock_list,
+            field_list=field_list,
+            start_time=start_time,
+            end_time=end_time,
+            report_type=report_type,
+        )
+
+    return _run_tq_call("fetched TongDaXin professional financial data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_financial_data_by_date(
+    stock_list: list[str],
+    field_list: list[str],
+    year: int,
+    mmdd: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_financial_data_by_date")
+        return method(
+            stock_list=stock_list,
+            field_list=field_list,
+            year=year,
+            mmdd=mmdd,
+        )
+
+    return _run_tq_call("fetched TongDaXin dated professional financial data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_stock_transaction_data(
+    stock_list: list[str],
+    field_list: list[str],
+    start_time: str,
+    end_time: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_gpjy_value")
+        return method(
+            stock_list=stock_list,
+            field_list=field_list,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+    return _run_tq_call("fetched TongDaXin stock transaction data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_stock_transaction_data_by_date(
+    stock_list: list[str],
+    field_list: list[str],
+    year: int,
+    mmdd: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_gpjy_value_by_date")
+        return method(
+            stock_list=stock_list,
+            field_list=field_list,
+            year=year,
+            mmdd=mmdd,
+        )
+
+    return _run_tq_call("fetched TongDaXin dated stock transaction data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_sector_transaction_data(
+    stock_list: list[str],
+    field_list: list[str],
+    start_time: str,
+    end_time: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_bkjy_value")
+        return method(
+            stock_list=stock_list,
+            field_list=field_list,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+    return _run_tq_call("fetched TongDaXin sector transaction data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_sector_transaction_data_by_date(
+    stock_list: list[str],
+    field_list: list[str],
+    year: int,
+    mmdd: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_bkjy_value_by_date")
+        return method(
+            stock_list=stock_list,
+            field_list=field_list,
+            year=year,
+            mmdd=mmdd,
+        )
+
+    return _run_tq_call("fetched TongDaXin dated sector transaction data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_market_transaction_data(
+    field_list: list[str],
+    start_time: str,
+    end_time: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_scjy_value")
+        return method(
+            field_list=field_list,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+    return _run_tq_call("fetched TongDaXin market transaction data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_market_transaction_data_by_date(
+    field_list: list[str],
+    year: int,
+    mmdd: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_scjy_value_by_date")
+        return method(
+            field_list=field_list,
+            year=year,
+            mmdd=mmdd,
+        )
+
+    return _run_tq_call("fetched TongDaXin dated market transaction data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_data_sector_list(list_type: int = 0, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_sector_list")
+        return method(list_type=list_type)
+
+    return _run_tq_call("fetched TongDaXin sector list", callback, strategy_path=strategy_path)
+
+
+def run_tdx_data_sector_stocks(
+    block_code: str,
+    block_type: int,
+    list_type: int = 0,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_stock_list_in_sector")
+        return method(block_code=block_code, block_type=block_type, list_type=list_type)
+
+    return _run_tq_call("fetched TongDaXin sector constituents", callback, strategy_path=strategy_path)
+
+
+def run_tdx_refresh_cache(market: str, force: bool, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "refresh_cache")
+        return method(market=market, force=force)
+
+    return _run_tq_call("refreshed TongDaXin market cache", callback, strategy_path=strategy_path)
+
+
+def run_tdx_get_trading_dates(
+    market: str,
+    start_time: str,
+    end_time: str,
+    count: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_trading_dates")
+        return method(market=market, start_time=start_time, end_time=end_time, count=count)
+
+    return _run_tq_call("fetched TongDaXin trading dates", callback, strategy_path=strategy_path)
+
+
+def run_tdx_refresh_kline(
+    stock_list: list[str],
+    period: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "refresh_kline")
+        return method(stock_list=stock_list, period=period)
+
+    return _run_tq_call("refreshed TongDaXin historical kline cache", callback, strategy_path=strategy_path)
+
+
+def run_tdx_download_file(
+    stock_code: str,
+    down_time: str,
+    down_type: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "download_file")
+        return method(stock_code=stock_code, down_time=down_time, down_type=down_type)
+
+    result = _run_tq_call("downloaded TongDaXin runtime data file", callback, strategy_path=strategy_path)
+    return _attach_runtime_hints(
+        result,
+        download_dir=r".\PYPlugins\data",
+        download_dir_host="Windows TdxQuant client workspace",
+    )
+
+
+def run_tdx_send_warn(
+    stock_list: list[str],
+    time_list: list[str],
+    price_list: list[str],
+    close_list: list[str],
+    volume_list: list[str],
+    bs_flag_list: list[str],
+    warn_type_list: list[str],
+    reason_list: list[str],
+    count: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_warn")
+        return method(
+            stock_list=stock_list,
+            time_list=time_list,
+            price_list=price_list,
+            close_list=close_list,
+            volum_list=volume_list,
+            bs_flag_list=bs_flag_list,
+            warn_type_list=warn_type_list,
+            reason_list=reason_list,
+            count=count,
+        )
+
+    return _run_tq_call("sent TongDaXin client warn payload", callback, strategy_path=strategy_path)
+
+
+def run_tdx_get_user_sector(strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_user_sector")
+        return method()
+
+    return _run_tq_call("fetched TongDaXin custom sector list", callback, strategy_path=strategy_path)
+
+
+def run_tdx_create_sector(
+    block_code: str,
+    block_name: str,
+    mutation_key: str | None = None,
+    audit_dir: str | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "create_sector")
+        return method(block_code=block_code, block_name=block_name)
+
+    result = _run_tq_call("created TongDaXin custom sector", callback, strategy_path=strategy_path)
+    return apply_block_mutation_safety(
+        result,
+        operation="create_sector",
+        block_code=block_code,
+        block_name=block_name,
+        mutation_key=mutation_key,
+        audit_dir=audit_dir,
+    )
+
+
+def run_tdx_delete_sector(
+    block_code: str,
+    mutation_key: str | None = None,
+    audit_dir: str | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "delete_sector")
+        return method(block_code=block_code)
+
+    result = _run_tq_call("deleted TongDaXin custom sector", callback, strategy_path=strategy_path)
+    return apply_block_mutation_safety(
+        result,
+        operation="delete_sector",
+        block_code=block_code,
+        mutation_key=mutation_key,
+        audit_dir=audit_dir,
+    )
+
+
+def run_tdx_rename_sector(
+    block_code: str,
+    block_name: str,
+    mutation_key: str | None = None,
+    audit_dir: str | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "rename_sector")
+        return method(block_code=block_code, block_name=block_name)
+
+    result = _run_tq_call("renamed TongDaXin custom sector", callback, strategy_path=strategy_path)
+    return apply_block_mutation_safety(
+        result,
+        operation="rename_sector",
+        block_code=block_code,
+        block_name=block_name,
+        mutation_key=mutation_key,
+        audit_dir=audit_dir,
+    )
+
+
+def run_tdx_clear_sector(
+    block_code: str,
+    mutation_key: str | None = None,
+    audit_dir: str | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "clear_sector")
+        return method(block_code=block_code)
+
+    result = _run_tq_call("cleared TongDaXin custom sector members", callback, strategy_path=strategy_path)
+    return apply_block_mutation_safety(
+        result,
+        operation="clear_sector",
+        block_code=block_code,
+        mutation_key=mutation_key,
+        audit_dir=audit_dir,
+    )
+
+
+def run_tdx_send_user_block(
+    block_code: str,
+    stocks: list[str],
+    show: bool,
+    mutation_key: str | None = None,
+    audit_dir: str | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_user_block")
+        return method(block_code=block_code, stocks=stocks, show=show)
+
+    result = _run_tq_call("updated TongDaXin user block", callback, strategy_path=strategy_path)
+    return apply_block_mutation_safety(
+        result,
+        operation="send_user_block",
+        block_code=block_code,
+        stocks=stocks,
+        show=show,
+        mutation_key=mutation_key,
+        audit_dir=audit_dir,
+    )
+
+
+def run_tdx_formula_format_data(kline_payload: dict[str, Any], strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_format_data")
+        return method(data_dict=kline_payload)
+
+    return _run_tq_call("formatted TongDaXin formula input data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_set_data(
+    stock_code: str,
+    stock_period: str,
+    stock_data: list[Any],
+    count: int,
+    dividend_type: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_set_data")
+        return method(
+            stock_code=stock_code,
+            stock_period=stock_period,
+            stock_data=stock_data,
+            count=count,
+            dividend_type=dividend_type,
+        )
+
+    return _run_tq_call("set TongDaXin formula data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_set_data_info(
+    stock_code: str,
+    stock_period: str,
+    start_time: str,
+    end_time: str,
+    count: int,
+    dividend_type: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_set_data_info")
+        return method(
+            stock_code=stock_code,
+            stock_period=stock_period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+        )
+
+    return _run_tq_call("set TongDaXin formula data info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_get_data(strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_get_data")
+        return method()
+
+    return _run_tq_call("fetched TongDaXin formula data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_zb(formula_name: str, formula_arg: str, xsflag: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_zb")
+        return method(formula_name=formula_name, formula_arg=formula_arg, xsflag=xsflag)
+
+    return _run_tq_call("executed TongDaXin indicator formula", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_xg(formula_name: str, formula_arg: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_xg")
+        return method(formula_name=formula_name, formula_arg=formula_arg)
+
+    return _run_tq_call("executed TongDaXin stock-picking formula", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_exp(formula_name: str, formula_arg: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_exp")
+        return method(formula_name=formula_name, formula_arg=formula_arg)
+
+    return _run_tq_call("executed TongDaXin expert formula", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_process_mul_xg(
+    formula_name: str,
+    formula_arg: str,
+    return_count: int,
+    return_date: bool,
+    stock_list: list[str],
+    stock_period: str,
+    start_time: str,
+    end_time: str,
+    count: int,
+    dividend_type: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_process_mul_xg")
+        return method(
+            formula_name=formula_name,
+            formula_arg=formula_arg,
+            return_count=return_count,
+            return_date=return_date,
+            stock_list=stock_list,
+            stock_period=stock_period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+        )
+
+    return _run_tq_call("executed TongDaXin batch stock-picking formula", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_screen(
+    formula_name: str,
+    stock_list: list[str],
+    *,
+    formula_arg: str = "",
+    return_count: int = 1,
+    return_date: bool = False,
+    stock_period: str = "1d",
+    start_time: str = "",
+    end_time: str = "",
+    count: int = 0,
+    dividend_type: int = 0,
+    strategy_path: str | None = None,
+) -> Result:
+    raw_result = run_tdx_formula_process_mul_xg(
+        formula_name=formula_name,
+        formula_arg=formula_arg,
+        return_count=return_count,
+        return_date=return_date,
+        stock_list=stock_list,
+        stock_period=stock_period,
+        start_time=start_time,
+        end_time=end_time,
+        count=count,
+        dividend_type=dividend_type,
+        strategy_path=strategy_path,
+    )
+    if not raw_result.ok:
+        return raw_result
+    raw_payload = raw_result.data.get("result")
+    try:
+        normalized = build_formula_screen_payload(
+            raw_payload,
+            formula_name=formula_name,
+            stock_list=stock_list,
+            formula_arg=formula_arg,
+            return_count=return_count,
+            return_date=return_date,
+            stock_period=stock_period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+        )
+    except ValueError as exc:
+        return Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message=f"formula screen normalization failed: {exc}",
+            data={"raw_result": raw_result.to_dict()},
+            warnings=list(raw_result.warnings),
+            next_action="Inspect the raw formula_process_mul_xg payload shape and refine the formula screen normalization rules.",
+        )
+    return Result(
+        ok=True,
+        code=ErrorCode.OK,
+        message="executed TongDaXin formula screen",
+        data=normalized,
+        warnings=list(raw_result.warnings),
+        next_action=raw_result.next_action,
+    )
+
+
+def run_tdx_formula_process_mul_zb(
+    formula_name: str,
+    formula_arg: str,
+    xsflag: int,
+    return_count: int,
+    return_date: bool,
+    stock_list: list[str],
+    stock_period: str,
+    start_time: str,
+    end_time: str,
+    count: int,
+    dividend_type: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_process_mul_zb")
+        return method(
+            formula_name=formula_name,
+            formula_arg=formula_arg,
+            xsflag=xsflag,
+            return_count=return_count,
+            return_date=return_date,
+            stock_list=stock_list,
+            stock_period=stock_period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+        )
+
+    return _run_tq_call("executed TongDaXin batch indicator formula", callback, strategy_path=strategy_path)

@@ -1,0 +1,277 @@
+{
+  "daily-review": {
+    "command": "daily",
+    "description": "当日交易日报，保留最近 20 条成交明细。",
+    "profile": "daily_trade_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20
+    }
+  },
+  "daily-success": {
+    "command": "daily",
+    "description": "当日成功成交日报。",
+    "profile": "daily_trade_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "trade_ok": true
+    }
+  },
+  "recent-ledger": {
+    "command": "ledger",
+    "description": "最近 20 笔台账摘要。",
+    "profile": "ledger_summary",
+    "options": {
+      "limit": 20
+    }
+  },
+  "recent-failures": {
+    "command": "ledger",
+    "description": "最近失败订单台账摘要。",
+    "profile": "ledger_summary",
+    "options": {
+      "limit": 20,
+      "trade_ok": false
+    }
+  },
+  "period-review": {
+    "command": "period",
+    "description": "区间复盘模板，适合配合 --start-date/--end-date 覆盖日期范围。",
+    "profile": "trade_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50
+    }
+  },
+  "audit-daily-review": {
+    "command": "audit-daily",
+    "description": "当日 trade_audit 复盘，保留最近 20 条审计摘要。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20
+    }
+  },
+  "audit-daily-confirmed": {
+    "command": "audit-daily",
+    "description": "当日已确认 trade_audit 复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "status": "confirmed"
+    }
+  },
+  "audit-daily-rejected": {
+    "command": "audit-daily",
+    "description": "当日拒单 trade_audit 诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "status": "rejected"
+    }
+  },
+  "audit-daily-replayed": {
+    "command": "audit-daily",
+    "description": "当日 replayed trade_audit 复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "status": "replayed"
+    }
+  },
+  "audit-daily-failed": {
+    "command": "audit-daily",
+    "description": "当日 failed trade_audit 诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "status": "failed"
+    }
+  },
+  "audit-daily-exceptions": {
+    "command": "audit-daily",
+    "description": "当日 rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-daily-confirm-exceptions": {
+    "command": "audit-daily",
+    "description": "当日 confirm_current rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "method": "confirm_current",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-daily-submit-once-exceptions": {
+    "command": "audit-daily",
+    "description": "当日 buy_submit_once rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "method": "buy_submit_once",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-daily-buy-exceptions": {
+    "command": "audit-daily",
+    "description": "当日 buy rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "method": "buy",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-daily-submit-path-exceptions": {
+    "command": "audit-daily",
+    "description": "当日 buy_submit_once + confirm_current rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "methods": ["buy_submit_once", "confirm_current"],
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-daily-pingan-submit-path-exceptions": {
+    "command": "audit-daily",
+    "description": "当日平安券商 buy_submit_once + confirm_current rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
+      "methods": ["buy_submit_once", "confirm_current"],
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-review": {
+    "command": "audit-period",
+    "description": "区间 trade_audit 复盘模板，适合配合 --start-date/--end-date 覆盖日期范围。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50
+    }
+  },
+  "audit-period-confirmed": {
+    "command": "audit-period",
+    "description": "区间已确认 trade_audit 复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "status": "confirmed"
+    }
+  },
+  "audit-period-rejected": {
+    "command": "audit-period",
+    "description": "区间拒单 trade_audit 诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "status": "rejected"
+    }
+  },
+  "audit-period-replayed": {
+    "command": "audit-period",
+    "description": "区间 replayed trade_audit 复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "status": "replayed"
+    }
+  },
+  "audit-period-failed": {
+    "command": "audit-period",
+    "description": "区间 failed trade_audit 诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "status": "failed"
+    }
+  },
+  "audit-period-exceptions": {
+    "command": "audit-period",
+    "description": "区间 rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-confirm-exceptions": {
+    "command": "audit-period",
+    "description": "区间 confirm_current rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "method": "confirm_current",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-submit-once-exceptions": {
+    "command": "audit-period",
+    "description": "区间 buy_submit_once rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "method": "buy_submit_once",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-buy-exceptions": {
+    "command": "audit-period",
+    "description": "区间 buy rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "method": "buy",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-submit-path-exceptions": {
+    "command": "audit-period",
+    "description": "区间 buy_submit_once + confirm_current rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "methods": ["buy_submit_once", "confirm_current"],
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-pingan-submit-path-exceptions": {
+    "command": "audit-period",
+    "description": "区间平安券商 buy_submit_once + confirm_current rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
+      "methods": ["buy_submit_once", "confirm_current"],
+      "statuses": ["rejected", "failed"]
+    }
+  }
+}

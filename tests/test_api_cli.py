@@ -1,0 +1,5015 @@
+import json
+import unittest
+from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock, mock_open, patch
+
+from tdxquant.cli import (
+    _handle_api_subcommand,
+    _handle_catalog_subcommand,
+    _handle_report_subcommand,
+    _handle_task_subcommand,
+    _handle_trade_subcommand,
+    _run_trade_buy,
+    _run_trade_confirm_current,
+    _run_trade_submit_ready,
+    _run_trade_dialog_readiness,
+    _run_trade_health,
+    _run_trade_preflight,
+    _run_trade_submit_once,
+    build_parser,
+    main,
+)
+from tdxquant.models import ErrorCode, Result
+from tdxquant.trader.models import OrderSide, OrderStatus, SecurityOrderSnapshot
+
+
+def _trader_ts(value: str = "2026-04-30T10:00:00+00:00") -> datetime:
+    return datetime.fromisoformat(value).astimezone(UTC)
+
+
+def _snapshot(
+    *,
+    gateway_order_id: str,
+    status: OrderStatus = OrderStatus.SUBMITTED,
+    reject_reason: str = "",
+) -> SecurityOrderSnapshot:
+    return SecurityOrderSnapshot(
+        gateway_order_id=gateway_order_id,
+        client_order_id=f"client-{gateway_order_id}",
+        broker_order_id=f"broker-{gateway_order_id}" if status == OrderStatus.SUBMITTED else None,
+        broker="pingan_desktop",
+        symbol="000001",
+        market="SZ",
+        side=OrderSide.BUY,
+        status=status,
+        requested_quantity=100,
+        filled_quantity=0,
+        remaining_quantity=100,
+        limit_price=Decimal("10.00"),
+        avg_fill_price=Decimal("0"),
+        reject_reason=reject_reason,
+        placed_at=_trader_ts(),
+        updated_at=_trader_ts(),
+        source="live",
+    )
+
+
+class ApiCliParserTests(unittest.TestCase):
+    def test_api_capabilities_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "capabilities"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "capabilities")
+
+    def test_api_health_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "health", "--window-key", "平安证券", "--hid-port", "COM3"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "health")
+        self.assertEqual(args.window_key, "平安证券")
+        self.assertEqual(args.hid_port, "COM3")
+
+    def test_api_doctor_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "doctor", "--window-key", "通达信金融终端"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "doctor")
+        self.assertEqual(args.window_key, "通达信金融终端")
+
+    def test_api_snapshot_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "snapshot", "--code", "688260.SH"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "snapshot")
+        self.assertEqual(args.code, "688260.SH")
+        self.assertEqual(args.profile, "default")
+
+    def test_api_sector_stocks_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "sector-stocks", "--sector", "钛金属", "--list-type", "1"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "sector-stocks")
+        self.assertEqual(args.sector, "钛金属")
+        self.assertEqual(args.list_type, 1)
+
+    def test_api_formula_xg_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "formula-xg", "--formula-name", "MY_FORMULA"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "formula-xg")
+        self.assertEqual(args.formula_name, "MY_FORMULA")
+
+    def test_api_formula_screen_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "formula-screen",
+                "--formula-name",
+                "UPN",
+                "--code",
+                "000001.SZ",
+                "--return-count",
+                "3",
+                "--return-date",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "formula-screen")
+        self.assertEqual(args.formula_name, "UPN")
+        self.assertEqual(args.code, ["000001.SZ"])
+        self.assertEqual(args.return_count, 3)
+        self.assertTrue(args.return_date)
+
+    def test_api_kline_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "kline", "--code", "688260.SH", "--period", "1d", "--fill-data"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "kline")
+        self.assertEqual(args.code, ["688260.SH"])
+        self.assertEqual(args.period, "1d")
+        self.assertTrue(args.fill_data)
+
+    def test_api_full_tick_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "full-tick", "--code", "688260.SH"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "full-tick")
+        self.assertEqual(args.code, "688260.SH")
+
+    def test_api_trading_dates_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "trading-dates", "--market", "SH", "--count", "10"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "trading-dates")
+        self.assertEqual(args.market, "SH")
+        self.assertEqual(args.count, 10)
+
+    def test_api_refresh_kline_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "refresh-kline", "--code", "688260.SH", "--period", "1d"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "refresh-kline")
+        self.assertEqual(args.code, ["688260.SH"])
+        self.assertEqual(args.period, "1d")
+
+    def test_api_download_file_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "download-file", "--code", "688318.SH", "--down-time", "20250101", "--down-type", "2"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "download-file")
+        self.assertEqual(args.code, "688318.SH")
+        self.assertEqual(args.down_time, "20250101")
+        self.assertEqual(args.down_type, 2)
+
+    def test_api_send_warn_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "send-warn",
+                "--code",
+                "688318.SH",
+                "--code",
+                "600519.SH",
+                "--time",
+                "20251215141115",
+                "--time",
+                "20251215142100",
+                "--price",
+                "123.45",
+                "--close",
+                "122.50",
+                "--volume",
+                "1000",
+                "--bs-flag",
+                "0",
+                "--warn-type",
+                "0",
+                "--reason",
+                "价格突破预警线",
+                "--count",
+                "2",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "send-warn")
+        self.assertEqual(args.code, ["688318.SH", "600519.SH"])
+        self.assertEqual(args.time, ["20251215141115", "20251215142100"])
+        self.assertEqual(args.price, ["123.45"])
+        self.assertEqual(args.close, ["122.50"])
+        self.assertEqual(args.volume, ["1000"])
+        self.assertEqual(args.bs_flag, ["0"])
+        self.assertEqual(args.warn_type, ["0"])
+        self.assertEqual(args.reason, ["价格突破预警线"])
+        self.assertEqual(args.count, 2)
+
+    def test_api_send_warn_command_requires_time(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["api", "send-warn", "--code", "688318.SH"])
+
+    def test_tdx_send_warn_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-send-warn",
+                "--code",
+                "688318.SH",
+                "--time",
+                "20251215141115",
+                "--price",
+                "123.45",
+                "--close",
+                "122.50",
+                "--volume",
+                "1000",
+                "--bs-flag",
+                "0",
+                "--warn-type",
+                "0",
+                "--reason",
+                "价格突破预警线",
+                "--count",
+                "1",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-send-warn")
+        self.assertEqual(args.code, ["688318.SH"])
+        self.assertEqual(args.time, ["20251215141115"])
+        self.assertEqual(args.price, ["123.45"])
+        self.assertEqual(args.close, ["122.50"])
+        self.assertEqual(args.volume, ["1000"])
+        self.assertEqual(args.bs_flag, ["0"])
+        self.assertEqual(args.warn_type, ["0"])
+        self.assertEqual(args.reason, ["价格突破预警线"])
+        self.assertEqual(args.count, 1)
+
+    def test_tdx_capabilities_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["tdx-capabilities"])
+        self.assertEqual(args.command, "tdx-capabilities")
+
+    def test_tdx_health_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["tdx-health", "--window-key", "平安证券", "--hid-port", "COM5"])
+        self.assertEqual(args.command, "tdx-health")
+        self.assertEqual(args.window_key, "平安证券")
+        self.assertEqual(args.hid_port, "COM5")
+
+    def test_tdx_doctor_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["tdx-doctor", "--window-key", "通达信金融终端"])
+        self.assertEqual(args.command, "tdx-doctor")
+        self.assertEqual(args.window_key, "通达信金融终端")
+
+    def test_tdx_formula_screen_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["tdx-formula-screen", "--formula-name", "UPN", "--code", "000001.SZ"])
+        self.assertEqual(args.command, "tdx-formula-screen")
+        self.assertEqual(args.formula_name, "UPN")
+        self.assertEqual(args.code, ["000001.SZ"])
+
+    def test_api_divid_factors_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "divid-factors", "--code", "688318.SH", "--start-time", "20200101", "--end-time", "20241231"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "divid-factors")
+        self.assertEqual(args.code, "688318.SH")
+        self.assertEqual(args.start_time, "20200101")
+        self.assertEqual(args.end_time, "20241231")
+
+    def test_api_ipo_info_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "ipo-info", "--ipo-type", "2", "--ipo-date", "1"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "ipo-info")
+        self.assertEqual(args.ipo_type, 2)
+        self.assertEqual(args.ipo_date, 1)
+
+    def test_api_financial_data_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "financial-data",
+                "--code",
+                "688318.SH",
+                "--field",
+                "FN1",
+                "--field",
+                "FN2",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+                "--report-type",
+                "announce_time",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "financial-data")
+        self.assertEqual(args.code, ["688318.SH"])
+        self.assertEqual(args.field, ["FN1", "FN2"])
+        self.assertEqual(args.start_time, "20240101")
+        self.assertEqual(args.end_time, "20241231")
+        self.assertEqual(args.report_type, "announce_time")
+
+    def test_api_financial_data_by_date_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "financial-data-by-date",
+                "--code",
+                "688318.SH",
+                "--field",
+                "FN193",
+                "--year",
+                "2025",
+                "--mmdd",
+                "331",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "financial-data-by-date")
+        self.assertEqual(args.code, ["688318.SH"])
+        self.assertEqual(args.field, ["FN193"])
+        self.assertEqual(args.year, 2025)
+        self.assertEqual(args.mmdd, 331)
+
+    def test_api_financial_data_command_requires_field(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["api", "financial-data", "--code", "688318.SH"])
+
+    def test_api_stock_transaction_data_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "stock-transaction-data",
+                "--code",
+                "600519.SH",
+                "--field",
+                "GP01",
+                "--field",
+                "GP02",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "stock-transaction-data")
+        self.assertEqual(args.code, ["600519.SH"])
+        self.assertEqual(args.field, ["GP01", "GP02"])
+        self.assertEqual(args.start_time, "20240101")
+        self.assertEqual(args.end_time, "20241231")
+
+    def test_api_stock_transaction_data_by_date_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "stock-transaction-data-by-date",
+                "--code",
+                "600519.SH",
+                "--field",
+                "GP01",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "stock-transaction-data-by-date")
+        self.assertEqual(args.code, ["600519.SH"])
+        self.assertEqual(args.field, ["GP01"])
+        self.assertEqual(args.year, 0)
+        self.assertEqual(args.mmdd, 0)
+
+    def test_api_stock_transaction_data_command_requires_field(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["api", "stock-transaction-data", "--code", "600519.SH"])
+
+    def test_tdx_data_stock_transaction_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-stock-transaction",
+                "--code",
+                "600519.SH",
+                "--field",
+                "GP01",
+                "--field",
+                "GP02",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-stock-transaction")
+        self.assertEqual(args.code, ["600519.SH"])
+        self.assertEqual(args.field, ["GP01", "GP02"])
+        self.assertEqual(args.start_time, "20240101")
+        self.assertEqual(args.end_time, "20241231")
+
+    def test_tdx_data_stock_transaction_by_date_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-stock-transaction-by-date",
+                "--code",
+                "600519.SH",
+                "--field",
+                "GP01",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-stock-transaction-by-date")
+        self.assertEqual(args.code, ["600519.SH"])
+        self.assertEqual(args.field, ["GP01"])
+        self.assertEqual(args.year, 0)
+        self.assertEqual(args.mmdd, 0)
+
+    def test_api_sector_transaction_data_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "sector-transaction-data",
+                "--code",
+                "880660.SH",
+                "--field",
+                "BK5",
+                "--field",
+                "BK6",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "sector-transaction-data")
+        self.assertEqual(args.code, ["880660.SH"])
+        self.assertEqual(args.field, ["BK5", "BK6"])
+        self.assertEqual(args.start_time, "20240101")
+        self.assertEqual(args.end_time, "20241231")
+
+    def test_api_sector_transaction_data_by_date_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "sector-transaction-data-by-date",
+                "--code",
+                "880660.SH",
+                "--field",
+                "BK9",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "sector-transaction-data-by-date")
+        self.assertEqual(args.code, ["880660.SH"])
+        self.assertEqual(args.field, ["BK9"])
+        self.assertEqual(args.year, 0)
+        self.assertEqual(args.mmdd, 0)
+
+    def test_api_sector_transaction_data_command_requires_field(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["api", "sector-transaction-data", "--code", "880660.SH"])
+
+    def test_tdx_data_sector_transaction_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-sector-transaction",
+                "--code",
+                "880660.SH",
+                "--field",
+                "BK5",
+                "--field",
+                "BK6",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-sector-transaction")
+        self.assertEqual(args.code, ["880660.SH"])
+        self.assertEqual(args.field, ["BK5", "BK6"])
+        self.assertEqual(args.start_time, "20240101")
+        self.assertEqual(args.end_time, "20241231")
+
+    def test_tdx_data_sector_transaction_by_date_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-sector-transaction-by-date",
+                "--code",
+                "880660.SH",
+                "--field",
+                "BK9",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-sector-transaction-by-date")
+        self.assertEqual(args.code, ["880660.SH"])
+        self.assertEqual(args.field, ["BK9"])
+        self.assertEqual(args.year, 0)
+        self.assertEqual(args.mmdd, 0)
+
+    def test_api_market_transaction_data_command_parses_without_code(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "market-transaction-data",
+                "--field",
+                "SC01",
+                "--field",
+                "SC02",
+                "--start-time",
+                "20250101",
+                "--end-time",
+                "20250102",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "market-transaction-data")
+        self.assertEqual(args.field, ["SC01", "SC02"])
+        self.assertFalse(hasattr(args, "code"))
+        self.assertEqual(args.start_time, "20250101")
+        self.assertEqual(args.end_time, "20250102")
+
+    def test_api_market_transaction_data_by_date_command_parses_without_code(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "market-transaction-data-by-date",
+                "--field",
+                "SC06",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "market-transaction-data-by-date")
+        self.assertEqual(args.field, ["SC06"])
+        self.assertFalse(hasattr(args, "code"))
+        self.assertEqual(args.year, 0)
+        self.assertEqual(args.mmdd, 0)
+
+    def test_api_market_transaction_data_command_requires_field(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["api", "market-transaction-data"])
+
+    def test_tdx_data_market_transaction_command_parses_without_code(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-market-transaction",
+                "--field",
+                "SC01",
+                "--field",
+                "SC02",
+                "--start-time",
+                "20250101",
+                "--end-time",
+                "20250102",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-market-transaction")
+        self.assertEqual(args.field, ["SC01", "SC02"])
+        self.assertFalse(hasattr(args, "code"))
+        self.assertEqual(args.start_time, "20250101")
+        self.assertEqual(args.end_time, "20250102")
+
+    def test_tdx_data_market_transaction_by_date_command_parses_without_code(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-market-transaction-by-date",
+                "--field",
+                "SC06",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-market-transaction-by-date")
+        self.assertEqual(args.field, ["SC06"])
+        self.assertFalse(hasattr(args, "code"))
+        self.assertEqual(args.year, 0)
+        self.assertEqual(args.mmdd, 0)
+
+    def test_tdx_data_financial_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-financial",
+                "--code",
+                "688318.SH",
+                "--field",
+                "FN1",
+                "--field",
+                "FN2",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-financial")
+        self.assertEqual(args.code, ["688318.SH"])
+        self.assertEqual(args.field, ["FN1", "FN2"])
+        self.assertEqual(args.start_time, "20240101")
+        self.assertEqual(args.end_time, "20241231")
+        self.assertEqual(args.report_type, "report_time")
+
+    def test_tdx_data_financial_by_date_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-financial-by-date",
+                "--code",
+                "688318.SH",
+                "--field",
+                "FN193",
+                "--year",
+                "2025",
+                "--mmdd",
+                "331",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-financial-by-date")
+        self.assertEqual(args.code, ["688318.SH"])
+        self.assertEqual(args.field, ["FN193"])
+        self.assertEqual(args.year, 2025)
+        self.assertEqual(args.mmdd, 331)
+
+    def test_api_user_sectors_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "user-sectors"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "user-sectors")
+
+    def test_api_create_sector_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "create-sector", "--block-code", "CSBK", "--block-name", "测试板块"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "create-sector")
+        self.assertEqual(args.block_code, "CSBK")
+        self.assertEqual(args.block_name, "测试板块")
+
+    def test_api_create_sector_command_parses_mutation_safety_options(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "create-sector",
+                "--block-code",
+                "CSBK",
+                "--block-name",
+                "测试板块",
+                "--mutation-key",
+                "mk-001",
+                "--audit-dir",
+                "runtime/block-mutations",
+            ]
+        )
+        self.assertEqual(args.mutation_key, "mk-001")
+        self.assertEqual(args.audit_dir, "runtime/block-mutations")
+
+    def test_api_delete_sector_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "delete-sector", "--block-code", "CSBK"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "delete-sector")
+        self.assertEqual(args.block_code, "CSBK")
+
+    def test_api_rename_sector_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "rename-sector", "--block-code", "CSBK", "--block-name", "测试板块重命名"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "rename-sector")
+        self.assertEqual(args.block_code, "CSBK")
+        self.assertEqual(args.block_name, "测试板块重命名")
+
+    def test_api_clear_sector_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "clear-sector", "--block-code", "CSBK"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "clear-sector")
+        self.assertEqual(args.block_code, "CSBK")
+
+    def test_tdx_send_user_block_command_parses_mutation_safety_options(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-send-user-block",
+                "--block-code",
+                "ZXG",
+                "--stock",
+                "000001.SZ",
+                "--mutation-key",
+                "mk-send-1",
+                "--audit-dir",
+                "runtime/block-mutations",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-send-user-block")
+        self.assertEqual(args.mutation_key, "mk-send-1")
+        self.assertEqual(args.audit_dir, "runtime/block-mutations")
+
+    def test_task_sector_research_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "sector-research", "--sector", "钛金属"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "sector-research")
+        self.assertEqual(args.sector, "钛金属")
+
+    def test_task_watchlist_overview_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "watchlist-overview", "--code", "000001"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "watchlist-overview")
+        self.assertEqual(args.code, ["000001"])
+
+    def test_task_watchlist_export_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "watchlist-export", "--code", "000001"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "watchlist-export")
+        self.assertEqual(args.code, ["000001"])
+
+    def test_task_subscription_watch_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "subscription-watch",
+                "--code",
+                "600519.SH",
+                "--code",
+                "000001.SZ",
+                "--max-events",
+                "5",
+                "--max-seconds",
+                "10",
+                "--poll-interval",
+                "0.5",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "subscription-watch")
+        self.assertEqual(args.code, ["600519.SH", "000001.SZ"])
+        self.assertEqual(args.max_events, 5)
+        self.assertEqual(args.max_seconds, 10.0)
+        self.assertEqual(args.poll_interval, 0.5)
+
+    def test_task_ledger_summary_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "ledger-summary", "--code", "000001", "--trade-ok"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "ledger-summary")
+        self.assertEqual(args.code, "000001")
+        self.assertTrue(args.trade_ok)
+
+    def test_task_daily_trade_report_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "daily-trade-report", "--date", "2026-04-26", "--trade-ok"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "daily-trade-report")
+        self.assertEqual(args.date, "2026-04-26")
+        self.assertTrue(args.trade_ok)
+
+    def test_task_trade_report_lookup_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-report-lookup", "--contract-no", "B202604260301"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-report-lookup")
+        self.assertEqual(args.contract_no, "B202604260301")
+
+    def test_task_trade_audit_lookup_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-audit-lookup", "--audit-id", "audit-001", "--status", "confirmed"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-audit-lookup")
+        self.assertEqual(args.audit_id, "audit-001")
+        self.assertEqual(args.status, "confirmed")
+
+    def test_task_trade_audit_daily_report_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-audit-daily-report", "--date", "2026-04-29", "--status", "confirmed"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-audit-daily-report")
+        self.assertEqual(args.date, "2026-04-29")
+        self.assertEqual(args.status, "confirmed")
+
+    def test_task_trade_audit_daily_report_command_parses_multi_status(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["task", "trade-audit-daily-report", "--date", "2026-04-29", "--status-any", "rejected", "--status-any", "failed"]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-audit-daily-report")
+        self.assertEqual(args.statuses, ["rejected", "failed"])
+
+    def test_task_trade_audit_daily_report_command_parses_multi_method(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["task", "trade-audit-daily-report", "--date", "2026-04-29", "--method-any", "buy_submit_once", "--method-any", "confirm_current"]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-audit-daily-report")
+        self.assertEqual(args.methods, ["buy_submit_once", "confirm_current"])
+
+    def test_task_trade_audit_period_report_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-audit-period-report", "--start-date", "2026-04-28", "--end-date", "2026-04-29"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-audit-period-report")
+        self.assertEqual(args.start_date, "2026-04-28")
+        self.assertEqual(args.end_date, "2026-04-29")
+
+    def test_task_trade_period_report_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-period-report", "--start-date", "2026-04-25", "--end-date", "2026-04-26"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-period-report")
+        self.assertEqual(args.start_date, "2026-04-25")
+        self.assertEqual(args.end_date, "2026-04-26")
+
+    def test_task_trade_buy_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "task-buy-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-buy")
+        self.assertIsNone(args.refresh_before_trade)
+        self.assertEqual(args.submission_key, "task-buy-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_task_trade_submit_once_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "task-submit-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-submit-once")
+        self.assertIsNone(args.refresh_before_trade)
+        self.assertEqual(args.submission_key, "task-submit-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_task_trade_submit_ready_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-submit-ready",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--max-price",
+                "10.50",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "2.5",
+                "--refresh-before-trade",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-submit-ready")
+        self.assertEqual(args.max_price, 10.50)
+        self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
+        self.assertEqual(args.confirm_timeout, 2.5)
+        self.assertEqual(args.refresh_before_trade, True)
+
+    def test_task_trade_confirm_current_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-confirm-current",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "2.0",
+                "--result-timeout",
+                "3.0",
+                "--no-close-result-dialog",
+                "--result-close-pre-delay",
+                "0.3",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-confirm-current")
+        self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
+        self.assertEqual(args.confirm_timeout, 2.0)
+        self.assertEqual(args.result_timeout, 3.0)
+        self.assertFalse(args.close_result_dialog)
+        self.assertEqual(args.result_close_pre_delay, 0.3)
+
+    def test_task_guarded_trade_buy_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "guarded-trade-buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--max-snapshot-price",
+                "10.50",
+                "--submission-key",
+                "guarded-task-001",
+                "--max-price",
+                "10.40",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "guarded-trade-buy")
+        self.assertEqual(args.max_snapshot_price, 10.50)
+        self.assertEqual(args.submission_key, "guarded-task-001")
+        self.assertEqual(args.max_price, 10.40)
+        self.assertEqual(args.formula_return_count, 1)
+
+    def test_task_presets_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "presets"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "presets")
+
+    def test_task_run_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "run",
+                "--preset",
+                "guarded-default",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "preset-run-001",
+                "--max-price",
+                "10.30",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "run")
+        self.assertEqual(args.preset, "guarded-default")
+        self.assertEqual(args.code, "000001")
+        self.assertEqual(args.submission_key, "preset-run-001")
+        self.assertEqual(args.max_price, 10.30)
+
+    def test_pingan_buy_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "pingan-buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "buy-20260428-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "pingan-buy")
+        self.assertEqual(args.profile, "balanced")
+        self.assertEqual(args.submission_key, "buy-20260428-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_pingan_buy_submit_once_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "pingan-buy-submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "submit-20260428-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "pingan-buy-submit-once")
+        self.assertTrue(args.close_result_dialog)
+        self.assertEqual(args.submission_key, "submit-20260428-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_trade_buy_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "trade-20260428-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "buy")
+        self.assertEqual(args.profile, "balanced")
+        self.assertEqual(args.submission_key, "trade-20260428-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_trade_submit_once_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "trade-submit-20260428-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "submit-once")
+        self.assertTrue(args.close_result_dialog)
+        self.assertEqual(args.submission_key, "trade-submit-20260428-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_trade_health_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "health",
+                "--port",
+                "COM3",
+                "--baudrate",
+                "9600",
+                "--timeout",
+                "1.5",
+                "--pre-delay",
+                "0.2",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "health")
+        self.assertEqual(args.port, "COM3")
+        self.assertEqual(args.baudrate, 9600)
+        self.assertEqual(args.timeout, 1.5)
+        self.assertEqual(args.pre_delay, 0.2)
+
+    def test_trade_preflight_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "preflight",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "preflight-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "preflight")
+        self.assertEqual(args.port, "COM3")
+        self.assertEqual(args.code, "000001")
+        self.assertEqual(args.submission_key, "preflight-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_trade_dialog_readiness_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "dialog-readiness",
+                "--dialog",
+                "confirm",
+                "--require-visible",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "1.2",
+                "--result-timeout",
+                "1.8",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "dialog-readiness")
+        self.assertEqual(args.dialog, "confirm")
+        self.assertTrue(args.require_visible)
+        self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
+        self.assertEqual(args.confirm_timeout, 1.2)
+        self.assertEqual(args.result_timeout, 1.8)
+
+    def test_trade_submit_ready_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "submit-ready",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--max-price",
+                "10.50",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "1.2",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "submit-ready")
+        self.assertEqual(args.port, "COM3")
+        self.assertEqual(args.max_price, 10.50)
+        self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
+        self.assertEqual(args.confirm_timeout, 1.2)
+
+    def test_trade_confirm_current_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "confirm-current",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "1.2",
+                "--result-timeout",
+                "1.8",
+                "--close-result-dialog",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "confirm-current")
+        self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
+        self.assertEqual(args.confirm_timeout, 1.2)
+        self.assertEqual(args.result_timeout, 1.8)
+        self.assertTrue(args.close_result_dialog)
+
+    def test_trade_presets_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "presets"])
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "presets")
+
+    def test_trade_run_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "run",
+                "--preset",
+                "turbo-buy",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "trade-run-20260428-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "run")
+        self.assertEqual(args.preset, "turbo-buy")
+        self.assertEqual(args.code, "000001")
+        self.assertEqual(args.submission_key, "trade-run-20260428-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_report_daily_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "daily", "--date", "2026-04-26"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "daily")
+        self.assertEqual(args.profile, "daily_trade_report")
+
+    def test_report_lookup_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "lookup", "--contract-no", "B202604260301"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "lookup")
+        self.assertEqual(args.profile, "trade_report_lookup")
+
+    def test_report_audit_lookup_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "audit-lookup", "--submission-key", "submit-001"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "audit-lookup")
+        self.assertEqual(args.profile, "trade_audit_lookup")
+        self.assertEqual(args.submission_key, "submit-001")
+
+    def test_report_audit_daily_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "audit-daily", "--date", "2026-04-29"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "audit-daily")
+        self.assertEqual(args.profile, "trade_audit_daily_report")
+
+    def test_report_audit_period_command_parses_multi_status(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["report", "audit-period", "--start-date", "2026-04-28", "--status-any", "rejected", "--status-any", "failed"]
+        )
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "audit-period")
+        self.assertEqual(args.statuses, ["rejected", "failed"])
+
+    def test_report_audit_period_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "audit-period", "--start-date", "2026-04-28"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "audit-period")
+        self.assertEqual(args.profile, "trade_audit_period_report")
+
+    def test_report_period_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "period", "--start-date", "2026-04-25"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "period")
+        self.assertEqual(args.profile, "trade_period_report")
+
+    def test_report_ledger_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "ledger", "--code", "000001"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "ledger")
+        self.assertEqual(args.profile, "ledger_summary")
+
+    def test_report_presets_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "presets"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "presets")
+
+    def test_report_run_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "daily-review", "--timezone", "UTC"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "run")
+        self.assertEqual(args.preset, "daily-review")
+        self.assertEqual(args.timezone, "UTC")
+
+    def test_catalog_list_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "list")
+
+    def test_catalog_list_summary_view_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--view", "summary"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "list")
+        self.assertEqual(args.view, "summary")
+
+    def test_catalog_bundle_list_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "refresh-review", "--label", "morning"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "list")
+        self.assertEqual(args.kind, "bundle")
+        self.assertEqual(args.bundle, "refresh-review")
+        self.assertEqual(args.label, "morning")
+
+    def test_catalog_run_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--entry", "turbo-buy", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "run")
+        self.assertEqual(args.entry, "turbo-buy")
+        self.assertEqual(args.code, "000001")
+
+    def test_catalog_bundle_run_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "guarded-review-buy", "--code", "000001"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "run")
+        self.assertEqual(args.bundle, "guarded-review-buy")
+        self.assertEqual(args.code, "000001")
+
+    def test_catalog_bundle_run_step_selection_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "run", "--bundle", "guarded-review-buy", "--from-step", "trade", "--to-step", "review"]
+        )
+        self.assertEqual(args.from_step, "trade")
+        self.assertEqual(args.to_step, "review")
+        self.assertIsNone(args.only_step)
+
+    def test_catalog_bundle_run_only_step_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "guarded-review-buy", "--only-step", "2"])
+        self.assertEqual(args.only_step, "2")
+
+    def test_catalog_run_summary_view_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--entry", "daily-review", "--view", "summary"])
+        self.assertEqual(args.view, "summary")
+
+    def test_catalog_plan_entry_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "daily-review", "--timezone", "UTC"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "plan")
+        self.assertEqual(args.entry, "daily-review")
+        self.assertEqual(args.timezone, "UTC")
+
+    def test_catalog_plan_bundle_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--bundle", "guarded-review-buy", "--only-step", "review"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "plan")
+        self.assertEqual(args.bundle, "guarded-review-buy")
+        self.assertEqual(args.only_step, "review")
+
+    def test_catalog_plan_summary_view_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "daily-review", "--view", "summary"])
+        self.assertEqual(args.view, "summary")
+
+
+class ApiCliDispatchTests(unittest.TestCase):
+    def test_handle_api_snapshot_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "snapshot", "--code", "688260.SH"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.market.snapshot.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(profile="default", strategy_path=None)
+        manager.market.snapshot.assert_called_once_with("688260.SH", fields=None)
+
+    def test_handle_api_kline_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "kline", "--code", "688260.SH", "--period", "1d"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.market.kline.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.market.kline.assert_called_once_with(
+            stock_list=["688260.SH"],
+            period="1d",
+            start_time="",
+            end_time="",
+            count=-1,
+            dividend_type=None,
+            fields=None,
+            fill_data=None,
+        )
+
+    def test_handle_api_full_tick_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "full-tick", "--code", "688260.SH"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.market.full_tick.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.market.full_tick.assert_called_once_with("688260.SH", fields=None)
+
+    def test_handle_api_capabilities_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "capabilities"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.capabilities.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.runtime.capabilities.assert_called_once_with()
+
+    def test_handle_api_trading_dates_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "trading-dates", "--market", "SH", "--start-time", "20250101", "--count", "10"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.trading_dates.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.runtime.trading_dates.assert_called_once_with(
+            market="SH",
+            start_time="20250101",
+            end_time="",
+            count=10,
+        )
+
+    def test_handle_api_refresh_kline_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "refresh-kline", "--code", "688260.SH", "--period", "1d"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.refresh_kline.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.runtime.refresh_kline.assert_called_once_with(
+            stock_list=["688260.SH"],
+            period="1d",
+        )
+
+    def test_handle_api_download_file_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "download-file", "--code", "688318.SH", "--down-time", "20250101", "--down-type", "2"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.download_file.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.runtime.download_file.assert_called_once_with(
+            stock_code="688318.SH",
+            down_time="20250101",
+            down_type=2,
+        )
+
+    def test_handle_api_health_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "health", "--window-key", "平安证券", "--hid-port", "COM3"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.health.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.runtime.health.assert_called_once_with(window_key="平安证券", hid_port="COM3")
+
+    def test_handle_api_send_warn_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "send-warn",
+                "--code",
+                "688318.SH",
+                "--code",
+                "600519.SH",
+                "--time",
+                "20251215141115",
+                "--time",
+                "20251215142100",
+                "--price",
+                "123.45",
+                "--close",
+                "122.50",
+                "--volume",
+                "1000",
+                "--bs-flag",
+                "0",
+                "--warn-type",
+                "0",
+                "--reason",
+                "价格突破预警线",
+                "--count",
+                "2",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.send_warn.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.runtime.send_warn.assert_called_once_with(
+            stock_list=["688318.SH", "600519.SH"],
+            time_list=["20251215141115", "20251215142100"],
+            price_list=["123.45"],
+            close_list=["122.50"],
+            volume_list=["1000"],
+            bs_flag_list=["0"],
+            warn_type_list=["0"],
+            reason_list=["价格突破预警线"],
+            count=2,
+        )
+
+    def test_handle_api_doctor_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "doctor", "--window-key", "通达信金融终端"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.doctor.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.runtime.doctor.assert_called_once_with(window_key="通达信金融终端", hid_port=None)
+
+    def test_handle_api_divid_factors_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "divid-factors", "--code", "688318.SH", "--start-time", "20200101", "--end-time", "20241231"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.meta.divid_factors.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.meta.divid_factors.assert_called_once_with(
+            stock_code="688318.SH",
+            start_time="20200101",
+            end_time="20241231",
+        )
+
+    def test_handle_api_ipo_info_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "ipo-info", "--ipo-type", "2", "--ipo-date", "1"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.meta.ipo_info.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.meta.ipo_info.assert_called_once_with(
+            ipo_type=2,
+            ipo_date=1,
+        )
+
+    def test_handle_api_financial_data_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "financial-data",
+                "--code",
+                "688318.SH",
+                "--field",
+                "FN1",
+                "--field",
+                "FN2",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+                "--report-type",
+                "announce_time",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.financial.financial_data.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.financial.financial_data.assert_called_once_with(
+            stock_list=["688318.SH"],
+            fields=["FN1", "FN2"],
+            start_time="20240101",
+            end_time="20241231",
+            report_type="announce_time",
+        )
+
+    def test_handle_api_financial_data_by_date_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "financial-data-by-date",
+                "--code",
+                "688318.SH",
+                "--field",
+                "FN193",
+                "--year",
+                "2025",
+                "--mmdd",
+                "331",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.financial.financial_data_by_date.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.financial.financial_data_by_date.assert_called_once_with(
+            stock_list=["688318.SH"],
+            fields=["FN193"],
+            year=2025,
+            mmdd=331,
+        )
+
+    def test_handle_api_stock_transaction_data_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "stock-transaction-data",
+                "--code",
+                "600519.SH",
+                "--field",
+                "GP01",
+                "--field",
+                "GP02",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.transaction.stock_transaction_data.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.transaction.stock_transaction_data.assert_called_once_with(
+            stock_list=["600519.SH"],
+            fields=["GP01", "GP02"],
+            start_time="20240101",
+            end_time="20241231",
+        )
+
+    def test_handle_api_stock_transaction_data_by_date_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "stock-transaction-data-by-date",
+                "--code",
+                "600519.SH",
+                "--field",
+                "GP01",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.transaction.stock_transaction_data_by_date.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.transaction.stock_transaction_data_by_date.assert_called_once_with(
+            stock_list=["600519.SH"],
+            fields=["GP01"],
+            year=0,
+            mmdd=0,
+        )
+
+    def test_handle_api_sector_transaction_data_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "sector-transaction-data",
+                "--code",
+                "880660.SH",
+                "--field",
+                "BK5",
+                "--field",
+                "BK6",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.transaction.sector_transaction_data.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.transaction.sector_transaction_data.assert_called_once_with(
+            stock_list=["880660.SH"],
+            fields=["BK5", "BK6"],
+            start_time="20240101",
+            end_time="20241231",
+        )
+
+    def test_handle_api_sector_transaction_data_by_date_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "sector-transaction-data-by-date",
+                "--code",
+                "880660.SH",
+                "--field",
+                "BK9",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.transaction.sector_transaction_data_by_date.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.transaction.sector_transaction_data_by_date.assert_called_once_with(
+            stock_list=["880660.SH"],
+            fields=["BK9"],
+            year=0,
+            mmdd=0,
+        )
+
+    def test_handle_api_market_transaction_data_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "market-transaction-data",
+                "--field",
+                "SC01",
+                "--field",
+                "SC02",
+                "--start-time",
+                "20250101",
+                "--end-time",
+                "20250102",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.transaction.market_transaction_data.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.transaction.market_transaction_data.assert_called_once_with(
+            fields=["SC01", "SC02"],
+            start_time="20250101",
+            end_time="20250102",
+        )
+
+    def test_handle_api_market_transaction_data_by_date_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "market-transaction-data-by-date",
+                "--field",
+                "SC06",
+                "--year",
+                "0",
+                "--mmdd",
+                "0",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.transaction.market_transaction_data_by_date.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.transaction.market_transaction_data_by_date.assert_called_once_with(
+            fields=["SC06"],
+            year=0,
+            mmdd=0,
+        )
+
+    def test_handle_api_invalid_profile_returns_invalid_request(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "snapshot", "--code", "688260.SH"])
+        with patch("tdxquant.cli.TdxApiManager", side_effect=ValueError("unsupported api profile: bad")):
+            result = _handle_api_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_api_formula_xg_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "formula-xg", "--formula-name", "SCAN"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.formula.xg.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.formula.xg.assert_called_once_with(formula_name="SCAN", formula_arg="")
+
+    def test_handle_api_formula_screen_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "formula-screen",
+                "--formula-name",
+                "UPN",
+                "--code",
+                "000001.SZ",
+                "--code",
+                "600519.SH",
+                "--formula-arg",
+                "3",
+                "--return-count",
+                "3",
+                "--return-date",
+                "--count",
+                "5",
+                "--dividend-type",
+                "1",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.formula.screen.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.formula.screen.assert_called_once_with(
+            formula_name="UPN",
+            stock_list=["000001.SZ", "600519.SH"],
+            formula_arg="3",
+            return_count=3,
+            return_date=True,
+            stock_period="1d",
+            start_time="",
+            end_time="",
+            count=5,
+            dividend_type=1,
+        )
+
+    def test_handle_api_send_user_block_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "send-user-block", "--block-code", "ZXG", "--stock", "000001"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.send_user_block.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.send_user_block.assert_called_once_with(block_code="ZXG", stocks=["000001"], show=False)
+
+    def test_handle_api_send_user_block_forwards_mutation_safety_options(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "send-user-block",
+                "--block-code",
+                "ZXG",
+                "--stock",
+                "000001",
+                "--show",
+                "--mutation-key",
+                "mk-send-1",
+                "--audit-dir",
+                "runtime/block-mutations",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.send_user_block.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.send_user_block.assert_called_once_with(
+            block_code="ZXG",
+            stocks=["000001"],
+            show=True,
+            mutation_key="mk-send-1",
+            audit_dir="runtime/block-mutations",
+        )
+
+    def test_handle_api_user_sectors_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "user-sectors"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.user_sectors.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.user_sectors.assert_called_once_with()
+
+    def test_handle_api_create_sector_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "create-sector", "--block-code", "CSBK", "--block-name", "测试板块"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.create_sector.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.create_sector.assert_called_once_with(block_code="CSBK", block_name="测试板块")
+
+    def test_handle_api_create_sector_forwards_mutation_safety_options(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "create-sector",
+                "--block-code",
+                "CSBK",
+                "--block-name",
+                "测试板块",
+                "--mutation-key",
+                "mk-001",
+                "--audit-dir",
+                "runtime/block-mutations",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.create_sector.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.create_sector.assert_called_once_with(
+            block_code="CSBK",
+            block_name="测试板块",
+            mutation_key="mk-001",
+            audit_dir="runtime/block-mutations",
+        )
+
+    def test_handle_api_delete_sector_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "delete-sector", "--block-code", "CSBK"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.delete_sector.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.delete_sector.assert_called_once_with(block_code="CSBK")
+
+    def test_handle_api_rename_sector_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "rename-sector", "--block-code", "CSBK", "--block-name", "测试板块重命名"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.rename_sector.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.rename_sector.assert_called_once_with(block_code="CSBK", block_name="测试板块重命名")
+
+    def test_handle_api_clear_sector_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "clear-sector", "--block-code", "CSBK"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block.clear_sector.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.clear_sector.assert_called_once_with(block_code="CSBK")
+
+    def test_handle_catalog_list_returns_resolved_metadata(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--entry", "daily-review"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["selected_entry"], "daily-review")
+        self.assertEqual(result.data["entries"][0]["name"], "daily-review")
+        self.assertEqual(result.data["entries"][0]["source"], "report")
+        self.assertEqual(result.data["entries"][0]["preset"], "daily-review")
+        self.assertEqual(result.data["entries"][0]["command"], "daily")
+        self.assertIsInstance(result.data["entries"][0]["labels"], list)
+        self.assertIn("summary_view", result.data)
+
+    def test_handle_catalog_list_builds_summary_view(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--label", "morning"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        summary_view = result.data["summary_view"]
+        self.assertEqual(summary_view["mode"], "list")
+        self.assertEqual(summary_view["kind"], "bundle")
+        self.assertEqual(summary_view["selected_label"], "morning")
+        self.assertTrue(all("step_names" in row for row in summary_view["bundles"]))
+
+    def test_handle_catalog_bundle_list_returns_resolved_metadata(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "refresh-review"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["selected_bundle"], "refresh-review")
+        self.assertEqual(result.data["bundles"][0]["name"], "refresh-review")
+        self.assertIsInstance(result.data["bundles"][0]["labels"], list)
+        self.assertEqual(result.data["bundles"][0]["steps"][0]["index"], 1)
+        self.assertEqual(result.data["bundles"][0]["steps"][0]["name"], "refresh")
+        self.assertEqual(result.data["bundles"][0]["steps"][0]["entry"], "refresh-env")
+
+    def test_handle_catalog_list_filters_entries_by_label(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "report"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertGreater(len(result.data["entries"]), 0)
+        self.assertTrue(all("report" in row["labels"] for row in result.data["entries"]))
+
+    def test_handle_catalog_list_filters_bundles_by_label(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--label", "diagnostics"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertGreater(len(result.data["bundles"]), 0)
+        self.assertTrue(all("diagnostics" in row["labels"] for row in result.data["bundles"]))
+
+    def test_handle_catalog_list_uses_stable_ordering(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry"])
+        custom_entries = {
+            "alpha": {
+                "source": "report",
+                "preset": "daily-review",
+                "description": "alpha",
+                "labels": ["report"],
+            },
+            "zeta": {
+                "source": "task",
+                "preset": "refresh-default",
+                "description": "zeta",
+                "labels": ["task", "maintenance", "refresh"],
+            },
+            "beta": {
+                "source": "report",
+                "preset": "recent-ledger",
+                "description": "beta",
+                "labels": ["report", "review"],
+            },
+        }
+        with patch("tdxquant.cli.load_command_catalog", return_value=custom_entries), patch(
+            "tdxquant.cli.load_command_bundles", return_value={}
+        ):
+            result = _handle_catalog_subcommand(args)
+        ordered_names = [row["name"] for row in result.data["entries"]]
+        self.assertEqual(ordered_names, ["zeta", "beta", "alpha"])
+
+    def test_handle_catalog_report_entry_dispatches_through_report_subcommand(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--entry", "daily-review"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        with patch("tdxquant.cli._handle_report_subcommand", return_value=expected) as mocked_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertIs(result, expected)
+        self.assertIn("summary_view", result.data)
+        forwarded = mocked_handler.call_args.args[0]
+        self.assertEqual(forwarded.command, "report")
+        self.assertEqual(forwarded.report_command, "run")
+        self.assertEqual(forwarded.preset, "daily-review")
+
+    def test_handle_catalog_run_entry_builds_summary_view(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--entry", "turbo-buy", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result_dialog": {"contract_no": "B123"}, "input": {"code": "000001", "price": "10.00", "quantity": 100}},
+        )
+        with patch("tdxquant.cli._run_trade_buy", return_value=expected):
+            result = _handle_catalog_subcommand(args)
+        summary_view = result.data["summary_view"]
+        self.assertEqual(summary_view["mode"], "run")
+        self.assertEqual(summary_view["target"]["type"], "entry")
+        self.assertEqual(summary_view["target"]["name"], "turbo-buy")
+        self.assertEqual(summary_view["contract_no"], "B123")
+
+    def test_handle_catalog_task_entry_dispatches_through_task_subcommand(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "run", "--entry", "guarded-buy", "--code", "000001", "--price", "10.00", "--quantity", "100"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        with patch("tdxquant.cli._handle_task_subcommand", return_value=expected) as mocked_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertIs(result, expected)
+        forwarded = mocked_handler.call_args.args[0]
+        self.assertEqual(forwarded.command, "task")
+        self.assertEqual(forwarded.task_command, "run")
+        self.assertEqual(forwarded.preset, "guarded-default")
+
+    def test_handle_catalog_trade_entry_preserves_explicit_overrides(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "run",
+                "--entry",
+                "turbo-buy",
+                "--port",
+                "COM9",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        with patch("tdxquant.cli._run_trade_buy", return_value=expected) as mocked_trade_buy:
+            result = _handle_catalog_subcommand(args)
+        self.assertIs(result, expected)
+        forwarded = mocked_trade_buy.call_args.args[0]
+        self.assertEqual(forwarded.trade_command, "buy")
+        self.assertEqual(forwarded.preset, "turbo-buy")
+        self.assertEqual(forwarded.port, "COM9")
+
+    def test_handle_catalog_invalid_source_returns_invalid_request(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--entry", "broken-entry"])
+        with patch(
+            "tdxquant.cli.resolve_command_catalog_entry",
+            return_value={"source": "broken", "preset": "x", "description": ""},
+        ):
+            result = _handle_catalog_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_catalog_plan_entry_returns_resolved_dispatch_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "daily-review", "--timezone", "UTC"])
+        with patch("tdxquant.cli._handle_report_subcommand") as mocked_report_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "daily-review")
+        self.assertEqual(result.data["dispatch"]["source"], "report")
+        self.assertEqual(result.data["dispatch"]["command_group"], "report")
+        self.assertEqual(result.data["dispatch"]["command_name"], "daily")
+        self.assertEqual(result.data["resolved_args"]["timezone"], "UTC")
+        self.assertIn("summary_view", result.data)
+        self.assertEqual(result.data["summary_view"]["mode"], "plan")
+        mocked_report_handler.assert_not_called()
+
+    def test_handle_catalog_plan_bundle_returns_selected_steps_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--bundle", "guarded-review-buy", "--only-step", "review"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "guarded-review-buy")
+        self.assertEqual(result.data["catalog_bundle"]["selected_from_step"], "review")
+        self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 1)
+        self.assertEqual(len(result.data["steps"]), 1)
+        self.assertEqual(result.data["steps"][0]["name"], "review")
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_group"], "report")
+        self.assertEqual(result.data["steps"][0]["resolved_args"]["limit"], 5)
+        self.assertEqual(result.data["summary_view"]["selected_step_count"], 1)
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_bundle_dispatches_steps_sequentially(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "run",
+                "--bundle",
+                "guarded-review-buy",
+                "--port",
+                "COM9",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--output",
+                "bundle.json",
+            ]
+        )
+        bundle = {
+            "description": "Guarded trade then report",
+            "steps": [
+                {
+                    "index": 1,
+                    "name": "trade",
+                    "entry": "guarded-buy",
+                    "source": "task",
+                    "preset": "guarded-default",
+                    "description": "",
+                    "options": {"port": "COM3"},
+                },
+                {
+                    "index": 2,
+                    "name": "review",
+                    "entry": "recent-ledger",
+                    "source": "report",
+                    "preset": "recent-ledger",
+                    "description": "",
+                    "options": {"limit": 5},
+                },
+            ],
+        }
+        step_results = [
+            Result(ok=True, code=ErrorCode.OK, message="trade-ok"),
+            Result(ok=True, code=ErrorCode.OK, message="report-ok"),
+        ]
+        with patch("tdxquant.cli.resolve_command_bundle", return_value=bundle), patch(
+            "tdxquant.cli._dispatch_catalog_resolved_entry",
+            side_effect=step_results,
+        ) as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(mocked_dispatch.call_count, 2)
+        first_args = mocked_dispatch.call_args_list[0].kwargs["args"]
+        second_args = mocked_dispatch.call_args_list[1].kwargs["args"]
+        self.assertEqual(first_args.port, "COM9")
+        self.assertIsNone(first_args.output)
+        self.assertEqual(second_args.limit, 5)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "guarded-review-buy")
+        self.assertEqual(len(result.data["catalog_bundle"]["steps"]), 2)
+        self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 2)
+
+    def test_handle_catalog_bundle_stops_after_failed_step(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "guarded-review-buy"])
+        bundle = {
+            "description": "Guarded trade then report",
+            "steps": [
+                {"index": 1, "name": "trade", "entry": "guarded-buy", "source": "task", "preset": "guarded-default", "description": "", "options": {}},
+                {"index": 2, "name": "review", "entry": "recent-ledger", "source": "report", "preset": "recent-ledger", "description": "", "options": {}},
+            ],
+        }
+        with patch("tdxquant.cli.resolve_command_bundle", return_value=bundle), patch(
+            "tdxquant.cli._dispatch_catalog_resolved_entry",
+            side_effect=[Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message="trade-failed")],
+        ) as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(mocked_dispatch.call_count, 1)
+        self.assertEqual(result.data["catalog_bundle"]["failed_step"]["entry"], "guarded-buy")
+
+    def test_handle_catalog_bundle_only_step_executes_selected_step(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "guarded-review-buy", "--only-step", "review"])
+        bundle = {
+            "description": "Guarded trade then report",
+            "steps": [
+                {"index": 1, "name": "trade", "entry": "guarded-buy", "source": "task", "preset": "guarded-default", "description": "", "options": {}},
+                {"index": 2, "name": "review", "entry": "recent-ledger", "source": "report", "preset": "recent-ledger", "description": "", "options": {"limit": 5}},
+            ],
+        }
+        with patch("tdxquant.cli.resolve_command_bundle", return_value=bundle), patch(
+            "tdxquant.cli._dispatch_catalog_resolved_entry",
+            return_value=Result(ok=True, code=ErrorCode.OK, message="report-ok"),
+        ) as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(mocked_dispatch.call_count, 1)
+        dispatched_args = mocked_dispatch.call_args.kwargs
+        self.assertEqual(dispatched_args["entry_name"], "recent-ledger")
+        self.assertEqual(result.data["catalog_bundle"]["selected_from_step"], "review")
+        self.assertEqual(result.data["catalog_bundle"]["selected_to_step"], "review")
+        self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 1)
+
+    def test_handle_catalog_bundle_rejects_invalid_step_range(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "guarded-review-buy", "--from-step", "review", "--to-step", "trade"])
+        bundle = {
+            "description": "Guarded trade then report",
+            "steps": [
+                {"index": 1, "name": "trade", "entry": "guarded-buy", "source": "task", "preset": "guarded-default", "description": "", "options": {}},
+                {"index": 2, "name": "review", "entry": "recent-ledger", "source": "report", "preset": "recent-ledger", "description": "", "options": {"limit": 5}},
+            ],
+        }
+        with patch("tdxquant.cli.resolve_command_bundle", return_value=bundle):
+            result = _handle_catalog_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_api_formula_set_data_reads_json_file(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            data_path = Path(temp_dir) / "stock-data.json"
+            data_path.write_text(json.dumps([{"close": 1.0}]), encoding="utf-8")
+            args = parser.parse_args(
+                [
+                    "api",
+                    "formula-set-data",
+                    "--code",
+                    "000001",
+                    "--stock-data-file",
+                    str(data_path),
+                    "--count",
+                    "1",
+                ]
+            )
+            expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+            manager = MagicMock()
+            manager.formula.set_data.return_value = expected
+            with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+                result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.formula.set_data.assert_called_once_with(
+            stock_code="000001",
+            stock_period="1d",
+            stock_data=[{"close": 1.0}],
+            count=1,
+            dividend_type=0,
+        )
+
+
+class TaskCliDispatchTests(unittest.TestCase):
+    def test_handle_task_presets_lists_available_presets(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "presets"])
+        with patch(
+            "tdxquant.cli.load_task_presets",
+            return_value={
+                "guarded-default": {
+                    "command": "guarded-trade-buy",
+                    "description": "guarded trade",
+                    "profile": "guarded_trade_buy",
+                    "options": {"port": "COM3"},
+                },
+                "refresh-default": {
+                    "command": "refresh-environment",
+                    "description": "refresh",
+                    "profile": "maintenance",
+                    "options": {"market": "AG"},
+                },
+            },
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["preset_count"], 2)
+        self.assertEqual(result.data["presets"][0]["name"], "guarded-default")
+
+    def test_handle_task_run_uses_guarded_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["task", "run", "--preset", "guarded-default", "--code", "000001", "--price", "10.00", "--quantity", "100"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.guarded_trade_buy.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "guarded-trade-buy",
+                    "profile": "guarded_trade_buy",
+                    "api_profile": "safe_read",
+                    "trade_profile": "balanced",
+                    "strategy_path": None,
+                    "options": {
+                        "port": "COM3",
+                        "timeout": 2.0,
+                        "max_depth": 12,
+                        "close_result_dialog": True,
+                        "submission_key": "preset-submission-key",
+                        "max_price": 10.45,
+                        "required_block_code": "ZXG",
+                        "max_snapshot_price": 10.50,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager) as mocked_manager,
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="guarded_trade_buy",
+            api_profile="safe_read",
+            trade_profile="balanced",
+            strategy_path=None,
+            title_keyword="平安证券",
+            exe_path=None,
+        )
+        manager.guarded_trade_buy.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            close_result_dialog=True,
+            submission_key="preset-submission-key",
+            max_price=10.45,
+            refresh_before_trade=None,
+            refresh_market=None,
+            refresh_force=None,
+            max_snapshot_price=10.50,
+            required_block_code="ZXG",
+            required_block_type=0,
+            required_list_type=None,
+            formula_name=None,
+            formula_arg="",
+            formula_return_count=1,
+            formula_return_date=False,
+            formula_stock_period="1d",
+            formula_start_time="",
+            formula_end_time="",
+            formula_count=0,
+            formula_dividend_type=0,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_run_prefers_explicit_cli_overrides(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "run",
+                "--preset",
+                "guarded-default",
+                "--port",
+                "COM9",
+                "--profile",
+                "trade_buy",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "cli-submission-key",
+                "--max-price",
+                "10.20",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.guarded_trade_buy.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "guarded-trade-buy",
+                    "profile": "guarded_trade_buy",
+                    "api_profile": "safe_read",
+                    "trade_profile": "balanced",
+                    "strategy_path": None,
+                    "options": {"port": "COM3", "submission_key": "preset-submission-key", "max_price": 10.60},
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.guarded_trade_buy.assert_called_once()
+        self.assertEqual(manager.guarded_trade_buy.call_args.kwargs["port"], "COM9")
+        self.assertEqual(manager.guarded_trade_buy.call_args.kwargs["submission_key"], "cli-submission-key")
+        self.assertEqual(manager.guarded_trade_buy.call_args.kwargs["max_price"], 10.20)
+
+    def test_handle_task_run_uses_refresh_preset(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "refresh-default"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.refresh_environment.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "refresh-environment",
+                    "profile": "maintenance",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {"market": "AG", "force": True},
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.refresh_environment.assert_called_once_with(market="AG", force=True)
+
+    def test_handle_task_run_uses_submit_ready_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "submit-ready-default"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_submit_ready.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "trade-submit-ready",
+                    "profile": "trade_submit_ready",
+                    "api_profile": "safe_read",
+                    "trade_profile": "balanced",
+                    "strategy_path": None,
+                    "options": {
+                        "port": "COM3",
+                        "code": "000001",
+                        "price": "10.00",
+                        "quantity": 100,
+                        "max_price": 10.20,
+                        "dialog_lookup_mode": "win32_experimental",
+                        "confirm_timeout": 2.5,
+                        "refresh_before_trade": True,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_submit_ready.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            max_price=10.20,
+            refresh_before_trade=True,
+            refresh_market=None,
+            refresh_force=None,
+            dialog_lookup_mode="win32_experimental",
+            confirm_timeout=2.5,
+        )
+
+    def test_handle_task_run_uses_confirm_current_preset_without_order_fields(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "confirm-current-default", "--result-timeout", "4.0"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_confirm_current.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "trade-confirm-current",
+                    "profile": "trade_confirm_current",
+                    "api_profile": "safe_read",
+                    "trade_profile": "balanced",
+                    "strategy_path": None,
+                    "options": {
+                        "dialog_lookup_mode": "win32_experimental",
+                        "confirm_timeout": 2.0,
+                        "result_timeout": 3.0,
+                        "close_result_dialog": False,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_confirm_current.assert_called_once_with(
+            dialog_lookup_mode="win32_experimental",
+            confirm_timeout=2.0,
+            result_timeout=4.0,
+            close_result_dialog=False,
+            result_close_pre_delay=None,
+        )
+
+    def test_handle_task_run_rejects_unsupported_preset_command(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "bad"])
+        with patch(
+            "tdxquant.cli.resolve_task_preset",
+            return_value={
+                "command": "watchlist-overview",
+                "profile": "watchlist_overview",
+                "api_profile": "brief",
+                "trade_profile": None,
+                "strategy_path": None,
+                "options": {},
+            },
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_task_sector_research_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "sector-research", "--sector", "钛金属"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.sector_research.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager) as mocked_manager:
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            api_profile=None,
+            trade_profile=None,
+            strategy_path=None,
+            title_keyword="平安证券",
+            exe_path=None,
+        )
+        manager.sector_research.assert_called_once_with(block_code="钛金属", block_type=0, list_type=None, fields=None)
+
+    def test_handle_task_invalid_profile_returns_invalid_request(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "refresh-environment"])
+        with patch("tdxquant.cli.TdxTaskManager", side_effect=ValueError("unsupported task profile: bad")):
+            result = _handle_task_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_task_watchlist_overview_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "watchlist-overview", "--code", "000001", "--code", "000002"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.watchlist_overview.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.watchlist_overview.assert_called_once_with(stock_list=["000001", "000002"], fields=None)
+
+    def test_handle_task_sector_formula_scan_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "sector-formula-scan", "--sector", "钛金属", "--formula-name", "SCAN"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.sector_formula_scan.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.sector_formula_scan.assert_called_once_with(
+            block_code="钛金属",
+            formula_name="SCAN",
+            block_type=0,
+            list_type=None,
+            formula_arg="",
+            return_count=1,
+            return_date=False,
+            stock_period="1d",
+            start_time="",
+            end_time="",
+            count=0,
+            dividend_type=0,
+        )
+
+    def test_handle_task_watchlist_export_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "watchlist-export", "--code", "000001"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.watchlist_export.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.watchlist_export.assert_called_once_with(
+            stock_list=["000001"],
+            fields=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_subscription_watch_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "subscription-watch",
+                "--code",
+                "600519.SH",
+                "--max-events",
+                "5",
+                "--max-seconds",
+                "10",
+                "--poll-interval",
+                "0.5",
+                "--jsonl-output-path",
+                "runtime/watch.jsonl",
+                "--csv-output-path",
+                "runtime/watch.csv",
+                "--status-output-path",
+                "runtime/watch-status.json",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.subscription_watch.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.subscription_watch.assert_called_once_with(
+            stock_list=["600519.SH"],
+            max_events=5,
+            max_seconds=10.0,
+            poll_interval=0.5,
+            jsonl_output_path="runtime/watch.jsonl",
+            csv_output_path="runtime/watch.csv",
+            status_output_path="runtime/watch-status.json",
+        )
+
+    def test_handle_task_ledger_summary_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "ledger-summary", "--code", "000001", "--trade-ok"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.ledger_summary.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.ledger_summary.assert_called_once_with(
+            limit=None,
+            code="000001",
+            contract_no=None,
+            trade_ok=True,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_daily_trade_report_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "daily-trade-report", "--date", "2026-04-26", "--trade-ok"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.daily_trade_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.daily_trade_report.assert_called_once_with(
+            report_date="2026-04-26",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            trade_ok=True,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_report_lookup_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-report-lookup", "--contract-no", "B202604260301"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_report_lookup.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_report_lookup.assert_called_once_with(
+            contract_no="B202604260301",
+            code=None,
+            report_date=None,
+            timezone_name=None,
+            limit=None,
+            trade_ok=None,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_audit_lookup_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-audit-lookup", "--audit-id", "audit-001", "--status", "confirmed"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_lookup.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_lookup.assert_called_once_with(
+            audit_id="audit-001",
+            contract_no=None,
+            submission_key=None,
+            code=None,
+            status="confirmed",
+            limit=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_audit_daily_report_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-audit-daily-report", "--date", "2026-04-29", "--status", "confirmed"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date="2026-04-29",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status="confirmed",
+            statuses=None,
+            method=None,
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_audit_daily_report_uses_multi_statuses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["task", "trade-audit-daily-report", "--date", "2026-04-29", "--status-any", "rejected", "--status-any", "failed"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date="2026-04-29",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method=None,
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_audit_daily_report_uses_multi_methods(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["task", "trade-audit-daily-report", "--date", "2026-04-29", "--method-any", "buy_submit_once", "--method-any", "confirm_current"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date="2026-04-29",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status=None,
+            statuses=None,
+            method=None,
+            methods=["buy_submit_once", "confirm_current"],
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_audit_daily_report_rejects_mixed_status_filters(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["task", "trade-audit-daily-report", "--date", "2026-04-29", "--status", "confirmed", "--status-any", "failed"]
+        )
+        manager = MagicMock()
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        manager.trade_audit_daily_report.assert_not_called()
+
+    def test_handle_task_trade_audit_daily_report_rejects_mixed_method_filters(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["task", "trade-audit-daily-report", "--date", "2026-04-29", "--method", "buy_submit_once", "--method-any", "confirm_current"]
+        )
+        manager = MagicMock()
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        manager.trade_audit_daily_report.assert_not_called()
+
+    def test_handle_task_trade_audit_period_report_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-audit-period-report", "--start-date", "2026-04-28", "--end-date", "2026-04-29"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_period_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_period_report.assert_called_once_with(
+            start_date="2026-04-28",
+            end_date="2026-04-29",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status=None,
+            statuses=None,
+            method=None,
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_period_report_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-period-report", "--start-date", "2026-04-25", "--end-date", "2026-04-26"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_period_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_period_report.assert_called_once_with(
+            start_date="2026-04-25",
+            end_date="2026-04-26",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            trade_ok=None,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_sector_research_export_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "sector-research-export", "--sector", "钛金属"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.sector_research_export.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.sector_research_export.assert_called_once_with(
+            block_code="钛金属",
+            block_type=0,
+            list_type=None,
+            fields=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_task_trade_buy_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-buy", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_buy.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager) as mocked_manager:
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            api_profile=None,
+            trade_profile=None,
+            strategy_path=None,
+            title_keyword="平安证券",
+            exe_path=None,
+        )
+        manager.trade_buy.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            close_result_dialog=True,
+            submission_key=None,
+            max_price=None,
+            refresh_before_trade=None,
+            refresh_market=None,
+            refresh_force=None,
+        )
+
+    def test_handle_task_trade_submit_once_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-submit-once", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_submit_once.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_submit_once.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            close_result_dialog=True,
+            submission_key=None,
+            max_price=None,
+            refresh_before_trade=None,
+            refresh_market=None,
+            refresh_force=None,
+        )
+
+    def test_handle_task_trade_submit_ready_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-submit-ready",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--max-price",
+                "10.20",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "2.5",
+                "--refresh-before-trade",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_submit_ready.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_submit_ready.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            max_price=10.20,
+            refresh_before_trade=True,
+            refresh_market=None,
+            refresh_force=None,
+            dialog_lookup_mode="win32_experimental",
+            confirm_timeout=2.5,
+        )
+
+    def test_handle_task_trade_confirm_current_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-confirm-current",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "2.0",
+                "--result-timeout",
+                "3.0",
+                "--no-close-result-dialog",
+                "--result-close-pre-delay",
+                "0.3",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_confirm_current.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_confirm_current.assert_called_once_with(
+            dialog_lookup_mode="win32_experimental",
+            confirm_timeout=2.0,
+            result_timeout=3.0,
+            close_result_dialog=False,
+            result_close_pre_delay=0.3,
+        )
+
+    def test_handle_task_guarded_trade_buy_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "guarded-trade-buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--max-snapshot-price",
+                "10.50",
+                "--required-block-code",
+                "ZXG",
+                "--formula-name",
+                "SCAN",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.guarded_trade_buy.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.guarded_trade_buy.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            close_result_dialog=True,
+            submission_key=None,
+            max_price=None,
+            refresh_before_trade=None,
+            refresh_market=None,
+            refresh_force=None,
+            max_snapshot_price=10.50,
+            required_block_code="ZXG",
+            required_block_type=0,
+            required_list_type=None,
+            formula_name="SCAN",
+            formula_arg="",
+            formula_return_count=1,
+            formula_return_date=False,
+            formula_stock_period="1d",
+            formula_start_time="",
+            formula_end_time="",
+            formula_count=0,
+            formula_dividend_type=0,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+
+class TradeCliDispatchTests(unittest.TestCase):
+    def test_handle_trade_presets_lists_available_presets(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "presets"])
+        with patch(
+            "tdxquant.cli.load_trade_presets",
+            return_value={
+                "turbo-buy": {"command": "buy", "description": "turbo buy", "profile": "turbo", "options": {"port": "COM3"}},
+                "submit-once-default": {
+                    "command": "submit-once",
+                    "description": "submit once",
+                    "profile": "submit_once",
+                    "options": {"port": "COM3"},
+                },
+            },
+        ):
+            result = _handle_trade_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["preset_count"], 2)
+        self.assertEqual(result.data["presets"][0]["name"], "submit-once-default")
+
+    def test_handle_trade_run_uses_buy_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "run", "--preset", "turbo-buy", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with (
+            patch(
+                "tdxquant.cli.resolve_trade_preset",
+                return_value={
+                    "command": "buy",
+                    "profile": "turbo",
+                    "title_key": "平安证券",
+                    "exe_path": None,
+                    "options": {"port": "COM3", "timeout": 2.0, "max_depth": 12, "close_result_dialog": True},
+                },
+            ),
+            patch("tdxquant.cli._run_trade_buy", return_value=expected) as mocked,
+        ):
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        called_args = mocked.call_args.args[0]
+        self.assertEqual(called_args.profile, "turbo")
+        self.assertEqual(called_args.port, "COM3")
+        self.assertEqual(called_args.code, "000001")
+
+    def test_handle_trade_run_prefers_explicit_cli_overrides(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "run",
+                "--preset",
+                "turbo-buy",
+                "--port",
+                "COM9",
+                "--profile",
+                "balanced",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "explicit-key",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with (
+            patch(
+                "tdxquant.cli.resolve_trade_preset",
+                return_value={
+                    "command": "buy",
+                    "profile": "turbo",
+                    "title_key": "平安证券",
+                    "exe_path": None,
+                    "options": {"port": "COM3", "timeout": 2.0, "submission_key": "preset-key", "max_price": 11.0},
+                },
+            ),
+            patch("tdxquant.cli._run_trade_buy", return_value=expected) as mocked,
+        ):
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        called_args = mocked.call_args.args[0]
+        self.assertEqual(called_args.profile, "balanced")
+        self.assertEqual(called_args.port, "COM9")
+        self.assertEqual(called_args.submission_key, "explicit-key")
+        self.assertEqual(called_args.max_price, 10.50)
+
+    def test_handle_trade_run_uses_submit_once_preset(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["trade", "run", "--preset", "submit-once-default", "--code", "000001", "--price", "10.00", "--quantity", "100"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with (
+            patch(
+                "tdxquant.cli.resolve_trade_preset",
+                return_value={
+                    "command": "submit-once",
+                    "profile": "submit_once",
+                    "title_key": "平安证券",
+                    "exe_path": None,
+                    "options": {"port": "COM3", "confirm_timeout": 3.0},
+                },
+            ),
+            patch("tdxquant.cli._run_trade_submit_once", return_value=expected) as mocked,
+        ):
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        called_args = mocked.call_args.args[0]
+        self.assertEqual(called_args.profile, "submit_once")
+        self.assertEqual(called_args.port, "COM3")
+        self.assertEqual(called_args.confirm_timeout, 3.0)
+
+    def test_handle_trade_run_rejects_unsupported_preset_command(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "run", "--preset", "bad", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        with patch(
+            "tdxquant.cli.resolve_trade_preset",
+            return_value={"command": "probe", "profile": "turbo", "title_key": "平安证券", "exe_path": None, "options": {}},
+        ):
+            result = _handle_trade_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_trade_buy_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "buy", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"trade_profile": {"name": "balanced", "options": {}}, "result_dialog": {}})
+        with patch("tdxquant.cli._run_trade_buy", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_submit_once_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "submit-once", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with patch("tdxquant.cli._run_trade_submit_once", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_health_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "health", "--port", "COM3", "--pre-delay", "0.2"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"health": {"overall_status": "ok"}})
+        with patch("tdxquant.cli._run_trade_health", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_preflight_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["trade", "preflight", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"preflight": {"overall_status": "ok"}})
+        with patch("tdxquant.cli._run_trade_preflight", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_dialog_readiness_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "dialog-readiness", "--dialog", "confirm", "--require-visible"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"dialog_readiness": {"overall_status": "ok"}})
+        with patch("tdxquant.cli._run_trade_dialog_readiness", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_submit_ready_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "submit-ready", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"submit_ready": {"overall_status": "ok"}})
+        with patch("tdxquant.cli._run_trade_submit_ready", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_confirm_current_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "confirm-current"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"confirm_current": {"overall_status": "ok"}})
+        with patch("tdxquant.cli._run_trade_confirm_current", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_run_trade_buy_forwards_safety_controls(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "buy-20260428-002",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        snapshot = _snapshot(gateway_order_id="gw-001")
+        service = MagicMock()
+        service.place_order.return_value = snapshot
+        with patch("tdxquant.cli._build_trader_service", return_value=service) as mocked_builder:
+            result = _run_trade_buy(args)
+        mocked_builder.assert_called_once()
+        request = service.place_order.call_args.args[0]
+        self.assertEqual(request.side, OrderSide.BUY)
+        self.assertEqual(request.symbol, "000001")
+        self.assertEqual(request.submission_key, "buy-20260428-002")
+        self.assertEqual(request.limit_price, Decimal("10.00"))
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["order"]["gateway_order_id"], "gw-001")
+        self.assertEqual(result.data["execution_profile"]["name"], "balanced")
+
+    def test_run_trade_submit_once_forwards_safety_controls(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "submit-20260428-002",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        snapshot = _snapshot(gateway_order_id="gw-002")
+        service = MagicMock()
+        service.place_order.return_value = snapshot
+        with patch("tdxquant.cli._build_trader_service", return_value=service) as mocked_builder:
+            result = _run_trade_submit_once(args)
+        self.assertEqual(mocked_builder.call_args.kwargs["execution_mode"], "submit_once")
+        request = service.place_order.call_args.args[0]
+        self.assertEqual(request.side, OrderSide.BUY)
+        self.assertEqual(request.submission_key, "submit-20260428-002")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["order"]["gateway_order_id"], "gw-002")
+        self.assertEqual(result.data["execution_profile"]["name"], "submit_once")
+
+    def test_run_trade_buy_returns_failed_result_when_snapshot_failed(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "buy", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        service = MagicMock()
+        service.place_order.return_value = _snapshot(
+            gateway_order_id="gw-failed",
+            status=OrderStatus.FAILED,
+            reject_reason="desktop execution failed",
+        )
+        with patch("tdxquant.cli._build_trader_service", return_value=service):
+            result = _run_trade_buy(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.EXECUTION_FAILED)
+        self.assertIn("desktop execution failed", result.message)
+
+    def test_run_trade_health_forwards_requested_hid_ping(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "health", "--port", "COM3", "--baudrate", "9600", "--timeout", "1.5", "--pre-delay", "0.2"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"health": {"overall_status": "ok"}})
+        manager = MagicMock()
+        manager.pingan.health.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_health(args)
+        self.assertIs(result, expected)
+        manager.pingan.health.assert_called_once_with(
+            port="COM3",
+            baudrate=9600,
+            timeout=1.5,
+            pre_delay=0.2,
+        )
+
+    def test_run_trade_preflight_forwards_trade_request(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "preflight",
+                "--port",
+                "COM3",
+                "--baudrate",
+                "9600",
+                "--timeout",
+                "1.5",
+                "--pre-delay",
+                "0.2",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "preflight-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"preflight": {"overall_status": "ok"}})
+        manager = MagicMock()
+        manager.pingan.preflight.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_preflight(args)
+        self.assertIs(result, expected)
+        manager.pingan.preflight.assert_called_once_with(
+            port="COM3",
+            baudrate=9600,
+            timeout=1.5,
+            pre_delay=0.2,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            submission_key="preflight-001",
+            max_price=10.50,
+        )
+
+    def test_run_trade_dialog_readiness_forwards_lookup_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "dialog-readiness",
+                "--dialog",
+                "result",
+                "--require-visible",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "1.2",
+                "--result-timeout",
+                "1.8",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"dialog_readiness": {"overall_status": "ok"}})
+        manager = MagicMock()
+        manager.pingan.dialog_readiness.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_dialog_readiness(args)
+        self.assertIs(result, expected)
+        manager.pingan.dialog_readiness.assert_called_once_with(
+            dialog="result",
+            require_visible=True,
+            dialog_lookup_mode="win32_experimental",
+            confirm_timeout=1.2,
+            result_timeout=1.8,
+        )
+
+    def test_run_trade_submit_ready_forwards_boundary_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "submit-ready",
+                "--port",
+                "COM3",
+                "--baudrate",
+                "9600",
+                "--timeout",
+                "1.5",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--max-price",
+                "10.50",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "1.2",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"submit_ready": {"overall_status": "ok"}})
+        manager = MagicMock()
+        manager.pingan.submit_ready.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_submit_ready(args)
+        self.assertIs(result, expected)
+        manager.pingan.submit_ready.assert_called_once_with(
+            port="COM3",
+            baudrate=9600,
+            timeout=1.5,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            max_price=10.50,
+            dialog_lookup_mode="win32_experimental",
+            confirm_timeout=1.2,
+        )
+
+    def test_run_trade_confirm_current_forwards_boundary_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "confirm-current",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--confirm-timeout",
+                "1.2",
+                "--result-timeout",
+                "1.8",
+                "--close-result-dialog",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"confirm_current": {"overall_status": "ok"}})
+        manager = MagicMock()
+        manager.pingan.confirm_current.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_confirm_current(args)
+        self.assertIs(result, expected)
+        manager.pingan.confirm_current.assert_called_once_with(
+            dialog_lookup_mode="win32_experimental",
+            confirm_timeout=1.2,
+            result_timeout=1.8,
+            close_result_dialog=True,
+        )
+
+
+class ReportCliDispatchTests(unittest.TestCase):
+    def test_handle_report_presets_lists_available_presets(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "presets"])
+        with patch(
+            "tdxquant.cli.load_report_presets",
+            return_value={
+                "daily-review": {"command": "daily", "description": "daily report", "options": {"recent_limit": 20}},
+                "success-ledger": {"command": "ledger", "description": "success only", "options": {"trade_ok": True}},
+            },
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["preset_count"], 2)
+        self.assertEqual(result.data["presets"][0]["name"], "daily-review")
+        self.assertEqual(result.data["presets"][0]["command"], "daily")
+
+    def test_handle_report_run_uses_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "daily-review"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.daily_trade_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "daily",
+                    "profile": "daily_trade_report",
+                    "options": {"timezone": "Asia/Shanghai", "recent_limit": 20, "trade_ok": True},
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager) as mocked_manager,
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="daily_trade_report",
+            api_profile=None,
+            trade_profile=None,
+            strategy_path=None,
+            title_keyword="平安证券",
+            exe_path=None,
+        )
+        manager.daily_trade_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="Asia/Shanghai",
+            recent_limit=20,
+            code=None,
+            trade_ok=True,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_uses_audit_exception_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "audit-daily-exceptions"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "audit-daily",
+                    "profile": "trade_audit_daily_report",
+                    "options": {"timezone": "Asia/Shanghai", "recent_limit": 20, "statuses": ["rejected", "failed"]},
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="Asia/Shanghai",
+            recent_limit=20,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method=None,
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_uses_confirm_oriented_audit_exception_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "audit-daily-confirm-exceptions"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "audit-daily",
+                    "profile": "trade_audit_daily_report",
+                    "options": {
+                        "timezone": "Asia/Shanghai",
+                        "recent_limit": 20,
+                        "method": "confirm_current",
+                        "statuses": ["rejected", "failed"],
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="Asia/Shanghai",
+            recent_limit=20,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method="confirm_current",
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_uses_submit_once_audit_exception_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "audit-daily-submit-once-exceptions"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "audit-daily",
+                    "profile": "trade_audit_daily_report",
+                    "options": {
+                        "timezone": "Asia/Shanghai",
+                        "recent_limit": 20,
+                        "method": "buy_submit_once",
+                        "statuses": ["rejected", "failed"],
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="Asia/Shanghai",
+            recent_limit=20,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method="buy_submit_once",
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_uses_buy_audit_exception_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "audit-daily-buy-exceptions"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "audit-daily",
+                    "profile": "trade_audit_daily_report",
+                    "options": {
+                        "timezone": "Asia/Shanghai",
+                        "recent_limit": 20,
+                        "method": "buy",
+                        "statuses": ["rejected", "failed"],
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="Asia/Shanghai",
+            recent_limit=20,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method="buy",
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_uses_submit_path_audit_exception_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "audit-daily-submit-path-exceptions"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "audit-daily",
+                    "profile": "trade_audit_daily_report",
+                    "options": {
+                        "timezone": "Asia/Shanghai",
+                        "recent_limit": 20,
+                        "methods": ["buy_submit_once", "confirm_current"],
+                        "statuses": ["rejected", "failed"],
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="Asia/Shanghai",
+            recent_limit=20,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method=None,
+            methods=["buy_submit_once", "confirm_current"],
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_uses_pingan_submit_path_audit_exception_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "audit-daily-pingan-submit-path-exceptions"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "audit-daily",
+                    "profile": "trade_audit_daily_report",
+                    "options": {
+                        "timezone": "Asia/Shanghai",
+                        "recent_limit": 20,
+                        "broker": "pingan",
+                        "methods": ["buy_submit_once", "confirm_current"],
+                        "statuses": ["rejected", "failed"],
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="Asia/Shanghai",
+            recent_limit=20,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method=None,
+            methods=["buy_submit_once", "confirm_current"],
+            broker="pingan",
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_prefers_explicit_cli_overrides(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["report", "run", "--preset", "daily-review", "--timezone", "UTC", "--recent-limit", "5"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.daily_trade_report.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_report_preset",
+                return_value={
+                    "command": "daily",
+                    "profile": "daily_trade_report",
+                    "options": {"timezone": "Asia/Shanghai", "recent_limit": 20},
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.daily_trade_report.assert_called_once_with(
+            report_date=None,
+            timezone_name="UTC",
+            recent_limit=5,
+            code=None,
+            trade_ok=None,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_run_rejects_unsupported_preset_command(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "run", "--preset", "bad-preset"])
+        with patch(
+            "tdxquant.cli.resolve_report_preset",
+            return_value={"command": "watchlist", "profile": "daily_trade_report", "options": {}},
+        ):
+            result = _handle_report_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_report_daily_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "daily", "--date", "2026-04-26"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.daily_trade_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager) as mocked_manager:
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="daily_trade_report",
+            api_profile=None,
+            trade_profile=None,
+            strategy_path=None,
+            title_keyword="平安证券",
+            exe_path=None,
+        )
+        manager.daily_trade_report.assert_called_once_with(
+            report_date="2026-04-26",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            trade_ok=None,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_lookup_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "lookup", "--contract-no", "B202604260301"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_report_lookup.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_report_lookup.assert_called_once_with(
+            contract_no="B202604260301",
+            code=None,
+            report_date=None,
+            timezone_name=None,
+            limit=None,
+            trade_ok=None,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_audit_lookup_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "audit-lookup", "--submission-key", "submit-001"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_lookup.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_lookup.assert_called_once_with(
+            audit_id=None,
+            contract_no=None,
+            submission_key="submit-001",
+            code=None,
+            status=None,
+            limit=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_audit_daily_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "audit-daily", "--date", "2026-04-29"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_daily_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_daily_report.assert_called_once_with(
+            report_date="2026-04-29",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status=None,
+            statuses=None,
+            method=None,
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_audit_period_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "audit-period", "--start-date", "2026-04-28"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_period_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_period_report.assert_called_once_with(
+            start_date="2026-04-28",
+            end_date=None,
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status=None,
+            statuses=None,
+            method=None,
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_audit_period_uses_multi_statuses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["report", "audit-period", "--start-date", "2026-04-28", "--status-any", "rejected", "--status-any", "failed"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_period_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_period_report.assert_called_once_with(
+            start_date="2026-04-28",
+            end_date=None,
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status=None,
+            statuses=["rejected", "failed"],
+            method=None,
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_audit_period_uses_multi_methods(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["report", "audit-period", "--start-date", "2026-04-28", "--method-any", "buy_submit_once", "--method-any", "confirm_current"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_audit_period_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_audit_period_report.assert_called_once_with(
+            start_date="2026-04-28",
+            end_date=None,
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            status=None,
+            statuses=None,
+            method=None,
+            methods=["buy_submit_once", "confirm_current"],
+            broker=None,
+            submission_key=None,
+            audit_dir=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_period_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "period", "--start-date", "2026-04-25", "--end-date", "2026-04-26"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_period_report.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_period_report.assert_called_once_with(
+            start_date="2026-04-25",
+            end_date="2026-04-26",
+            timezone_name=None,
+            recent_limit=None,
+            code=None,
+            trade_ok=None,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_handle_report_ledger_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "ledger", "--code", "000001"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.ledger_summary.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_report_subcommand(args)
+        self.assertIs(result, expected)
+        manager.ledger_summary.assert_called_once_with(
+            limit=None,
+            code="000001",
+            contract_no=None,
+            trade_ok=None,
+            task_name=None,
+            ledger_jsonl_path=None,
+            ledger_csv_path=None,
+            json_output_path=None,
+            csv_output_path=None,
+        )
+
+    def test_main_pingan_buy_uses_trade_manager(self) -> None:
+        service = MagicMock()
+        service.place_order.return_value = _snapshot(gateway_order_id="gw-main-buy")
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._build_trader_service", return_value=service) as mocked_service_builder,
+            patch("tdxquant.cli._emit_pingan_contract_log"),
+            patch("sys.argv", ["tdxquant", "pingan-buy", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked_service_builder.assert_called_once()
+        service.place_order.assert_called_once()
+
+    def test_main_pingan_buy_submit_once_uses_trade_manager(self) -> None:
+        service = MagicMock()
+        service.place_order.return_value = _snapshot(gateway_order_id="gw-main-submit-once")
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._build_trader_service", return_value=service) as mocked_service_builder,
+            patch("tdxquant.cli._emit_pingan_contract_log"),
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "pingan-buy-submit-once",
+                    "--port",
+                    "COM3",
+                    "--code",
+                    "000001",
+                    "--price",
+                    "10.00",
+                    "--quantity",
+                    "100",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(mocked_service_builder.call_args.kwargs["execution_mode"], "submit_once")
+        service.place_order.assert_called_once()
+
+    def test_main_trade_buy_uses_trade_subcommand_handler(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_trade_subcommand", return_value=expected) as mocked,
+            patch("tdxquant.cli._emit_pingan_contract_log"),
+            patch("sys.argv", ["tdxquant", "trade", "buy", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once()
+
+    def test_main_trade_submit_once_uses_trade_subcommand_handler(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_trade_subcommand", return_value=expected) as mocked,
+            patch("tdxquant.cli._emit_pingan_contract_log"),
+            patch("sys.argv", ["tdxquant", "trade", "submit-once", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once()
+
+    def test_main_report_daily_uses_report_subcommand_handler(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_report_subcommand", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "report", "daily", "--date", "2026-04-26"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once()
+
+    def test_main_tdx_get_trading_dates_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_get_trading_dates", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-get-trading-dates", "--market", "SH", "--count", "10"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            market="SH",
+            start_time="",
+            end_time="",
+            count=10,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_divid_factors_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_divid_factors", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                ["tdxquant", "tdx-data-divid-factors", "--code", "688318.SH", "--start-time", "20200101", "--end-time", "20241231"],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_code="688318.SH",
+            start_time="20200101",
+            end_time="20241231",
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_ipo_info_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_ipo_info", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-data-ipo-info", "--ipo-type", "2", "--ipo-date", "1"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            ipo_type=2,
+            ipo_date=1,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_financial_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_financial_data", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-financial",
+                    "--code",
+                    "688318.SH",
+                    "--field",
+                    "FN1",
+                    "--field",
+                    "FN2",
+                    "--start-time",
+                    "20240101",
+                    "--end-time",
+                    "20241231",
+                    "--report-type",
+                    "announce_time",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["688318.SH"],
+            field_list=["FN1", "FN2"],
+            start_time="20240101",
+            end_time="20241231",
+            report_type="announce_time",
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_financial_by_date_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_financial_data_by_date", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-financial-by-date",
+                    "--code",
+                    "688318.SH",
+                    "--field",
+                    "FN193",
+                    "--year",
+                    "2025",
+                    "--mmdd",
+                    "331",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["688318.SH"],
+            field_list=["FN193"],
+            year=2025,
+            mmdd=331,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_stock_transaction_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_stock_transaction_data", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-stock-transaction",
+                    "--code",
+                    "600519.SH",
+                    "--field",
+                    "GP01",
+                    "--field",
+                    "GP02",
+                    "--start-time",
+                    "20240101",
+                    "--end-time",
+                    "20241231",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["600519.SH"],
+            field_list=["GP01", "GP02"],
+            start_time="20240101",
+            end_time="20241231",
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_stock_transaction_by_date_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_stock_transaction_data_by_date", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-stock-transaction-by-date",
+                    "--code",
+                    "600519.SH",
+                    "--field",
+                    "GP01",
+                    "--year",
+                    "0",
+                    "--mmdd",
+                    "0",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["600519.SH"],
+            field_list=["GP01"],
+            year=0,
+            mmdd=0,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_sector_transaction_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_sector_transaction_data", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-sector-transaction",
+                    "--code",
+                    "880660.SH",
+                    "--field",
+                    "BK5",
+                    "--field",
+                    "BK6",
+                    "--start-time",
+                    "20240101",
+                    "--end-time",
+                    "20241231",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["880660.SH"],
+            field_list=["BK5", "BK6"],
+            start_time="20240101",
+            end_time="20241231",
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_sector_transaction_by_date_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_sector_transaction_data_by_date", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-sector-transaction-by-date",
+                    "--code",
+                    "880660.SH",
+                    "--field",
+                    "BK9",
+                    "--year",
+                    "0",
+                    "--mmdd",
+                    "0",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["880660.SH"],
+            field_list=["BK9"],
+            year=0,
+            mmdd=0,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_market_transaction_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_market_transaction_data", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-market-transaction",
+                    "--field",
+                    "SC01",
+                    "--field",
+                    "SC02",
+                    "--start-time",
+                    "20250101",
+                    "--end-time",
+                    "20250102",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            field_list=["SC01", "SC02"],
+            start_time="20250101",
+            end_time="20250102",
+            strategy_path=None,
+        )
+
+    def test_main_tdx_data_market_transaction_by_date_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_market_transaction_data_by_date", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-data-market-transaction-by-date",
+                    "--field",
+                    "SC06",
+                    "--year",
+                    "0",
+                    "--mmdd",
+                    "0",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            field_list=["SC06"],
+            year=0,
+            mmdd=0,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_refresh_kline_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_refresh_kline", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-refresh-kline", "--code", "688260.SH", "--period", "1d"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["688260.SH"],
+            period="1d",
+            strategy_path=None,
+        )
+
+    def test_main_tdx_download_file_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_download_file", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                ["tdxquant", "tdx-download-file", "--code", "688318.SH", "--down-time", "20250101", "--down-type", "1"],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_code="688318.SH",
+            down_time="20250101",
+            down_type=1,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_send_warn_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_send_warn", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-send-warn",
+                    "--code",
+                    "688318.SH",
+                    "--code",
+                    "600519.SH",
+                    "--time",
+                    "20251215141115",
+                    "--time",
+                    "20251215142100",
+                    "--price",
+                    "123.45",
+                    "--close",
+                    "122.50",
+                    "--volume",
+                    "1000",
+                    "--bs-flag",
+                    "0",
+                    "--warn-type",
+                    "0",
+                    "--reason",
+                    "价格突破预警线",
+                    "--count",
+                    "2",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            stock_list=["688318.SH", "600519.SH"],
+            time_list=["20251215141115", "20251215142100"],
+            price_list=["123.45"],
+            close_list=["122.50"],
+            volume_list=["1000"],
+            bs_flag_list=["0"],
+            warn_type_list=["0"],
+            reason_list=["价格突破预警线"],
+            count=2,
+            strategy_path=None,
+        )
+
+    def test_main_tdx_get_user_sector_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_get_user_sector", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-get-user-sector"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(strategy_path=None)
+
+    def test_main_tdx_create_sector_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_create_sector", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-create-sector", "--block-code", "CSBK", "--block-name", "测试板块"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(block_code="CSBK", block_name="测试板块", strategy_path=None)
+
+    def test_main_tdx_create_sector_forwards_mutation_safety_options(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_create_sector", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-create-sector",
+                    "--block-code",
+                    "CSBK",
+                    "--block-name",
+                    "测试板块",
+                    "--mutation-key",
+                    "mk-001",
+                    "--audit-dir",
+                    "runtime/block-mutations",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            block_code="CSBK",
+            block_name="测试板块",
+            mutation_key="mk-001",
+            audit_dir="runtime/block-mutations",
+            strategy_path=None,
+        )
+
+    def test_main_tdx_delete_sector_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_delete_sector", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-delete-sector", "--block-code", "CSBK"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(block_code="CSBK", strategy_path=None)
+
+    def test_main_tdx_rename_sector_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_rename_sector", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-rename-sector", "--block-code", "CSBK", "--block-name", "测试板块重命名"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(block_code="CSBK", block_name="测试板块重命名", strategy_path=None)
+
+    def test_main_tdx_clear_sector_uses_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_clear_sector", return_value=expected) as mocked,
+            patch("sys.argv", ["tdxquant", "tdx-clear-sector", "--block-code", "CSBK"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(block_code="CSBK", strategy_path=None)
+
+    def test_main_tdx_send_user_block_forwards_mutation_safety_options(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_send_user_block", return_value=expected) as mocked,
+            patch(
+                "sys.argv",
+                [
+                    "tdxquant",
+                    "tdx-send-user-block",
+                    "--block-code",
+                    "ZXG",
+                    "--stock",
+                    "000001.SZ",
+                    "--show",
+                    "--mutation-key",
+                    "mk-send-1",
+                    "--audit-dir",
+                    "runtime/block-mutations",
+                ],
+            ),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with(
+            block_code="ZXG",
+            stocks=["000001.SZ"],
+            show=True,
+            mutation_key="mk-send-1",
+            audit_dir="runtime/block-mutations",
+            strategy_path=None,
+        )
+
+    def test_main_catalog_summary_view_prints_summary_payload(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "summary_view": {
+                    "mode": "run",
+                    "target": {"type": "entry", "name": "daily-review"},
+                    "ok": True,
+                }
+            },
+        )
+        mocked_print = mock_open()
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_catalog_subcommand", return_value=expected),
+            patch("tdxquant.cli._emit_pingan_contract_log"),
+            patch("pathlib.Path.write_text"),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "catalog", "run", "--entry", "daily-review", "--view", "summary"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        printed_payload = mocked_stdout_print.call_args.args[0]
+        parsed = json.loads(printed_payload)
+        self.assertEqual(parsed["mode"], "run")
+        self.assertEqual(parsed["target"]["name"], "daily-review")
+
+    def test_main_api_snapshot_prints_provider_result_envelope(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"symbol": "688260.SH"}]})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_api_subcommand", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "api", "snapshot", "--code", "688260.SH"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["success"])
+        self.assertEqual(parsed["code"], ErrorCode.OK.value)
+        self.assertEqual(parsed["capability"], "api.snapshot")
+        self.assertIn("capability_version", parsed)
+        self.assertIn("schema_version", parsed)
+        self.assertEqual(parsed["runtime"]["provider"], "tdxquant")
+        self.assertEqual(parsed["runtime"]["mode"], "cli")
+        self.assertEqual(parsed["data"]["rows"], [{"symbol": "688260.SH"}])
+        self.assertEqual(parsed["artifacts"], [])
+
+    def test_main_api_snapshot_failure_prints_provider_result_envelope_and_nonzero_exit(self) -> None:
+        expected = Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message="bad request",
+            data={},
+            warnings=["warn"],
+            next_action="fix-input",
+        )
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_api_subcommand", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "api", "snapshot", "--code", "688260.SH"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 1)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertFalse(parsed["success"])
+        self.assertEqual(parsed["code"], ErrorCode.INVALID_REQUEST.value)
+        self.assertEqual(parsed["message"], "bad request")
+        self.assertEqual(parsed["warnings"], ["warn"])
+        self.assertEqual(parsed["data"]["next_action"], "fix-input")
+        self.assertEqual(parsed["capability"], "api.snapshot")
+
+    def test_main_tdx_data_stock_info_prints_provider_result_envelope(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"symbol": "688260.SH"}]})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_data_stock_info", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "tdx-data-stock-info", "--code", "688260.SH"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["success"])
+        self.assertEqual(parsed["capability"], "bridge.stock-info")
+        self.assertEqual(parsed["runtime"]["mode"], "cli")
+        self.assertEqual(parsed["data"]["rows"], [{"symbol": "688260.SH"}])
+
+    def test_main_api_capabilities_prints_provider_result_envelope(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"capabilities": [], "summary": {"total": 0}})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_api_subcommand", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "api", "capabilities"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["success"])
+        self.assertEqual(parsed["capability"], "api.capabilities")
+        self.assertEqual(parsed["runtime"]["mode"], "cli")
+        self.assertEqual(parsed["data"]["summary"]["total"], 0)
+
+    def test_main_tdx_health_prints_provider_result_envelope_and_keeps_structured_success(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"overall_status": "unavailable", "checks": {}})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_provider_health", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "tdx-health", "--window-key", "平安证券"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["success"])
+        self.assertEqual(parsed["capability"], "bridge.health")
+        self.assertEqual(parsed["data"]["overall_status"], "unavailable")
+
+    def test_main_api_formula_screen_prints_provider_result_envelope(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"matched_symbols": ["600519.SH"], "rows": []})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_api_subcommand", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "api", "formula-screen", "--formula-name", "UPN", "--code", "600519.SH"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["success"])
+        self.assertEqual(parsed["capability"], "formula.screen")
+        self.assertEqual(parsed["data"]["matched_symbols"], ["600519.SH"])
+
+    def test_main_tdx_formula_screen_prints_provider_result_envelope(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"matched_symbols": ["600519.SH"], "rows": []})
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.run_tdx_formula_screen", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "tdx-formula-screen", "--formula-name", "UPN", "--code", "600519.SH"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["success"])
+        self.assertEqual(parsed["capability"], "formula.screen")
+        self.assertEqual(parsed["data"]["matched_symbols"], ["600519.SH"])
+
+    def test_main_catalog_list_summary_view_prints_summary_payload(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="listed command catalog entries",
+            data={
+                "summary_view": {
+                    "mode": "list",
+                    "kind": "entry",
+                    "entries": [{"name": "daily-review", "source": "report"}],
+                }
+            },
+        )
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_catalog_subcommand", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "catalog", "list", "--view", "summary"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        printed_payload = mocked_stdout_print.call_args.args[0]
+        parsed = json.loads(printed_payload)
+        self.assertEqual(parsed["mode"], "list")
+        self.assertEqual(parsed["entries"][0]["name"], "daily-review")
+
+
+if __name__ == "__main__":
+    unittest.main()

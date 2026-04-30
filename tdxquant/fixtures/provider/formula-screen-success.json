@@ -1,0 +1,100 @@
+{
+  "success": true,
+  "code": "ok",
+  "message": "screened formula matches",
+  "capability": "formula.screen",
+  "capability_version": "v1",
+  "schema_version": "2026-04-28",
+  "request_id": "fixture-formula-screen-success",
+  "started_at": "2026-04-28T12:00:00Z",
+  "finished_at": "2026-04-28T12:00:01Z",
+  "elapsed_ms": 1000.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "input": {
+      "formula_name": "UPN",
+      "formula_arg": "3",
+      "stock_list": [
+        "000001.SZ",
+        "600519.SH"
+      ],
+      "return_count": 2,
+      "return_date": true,
+      "stock_period": "1d",
+      "start_time": "",
+      "end_time": "",
+      "count": 5,
+      "dividend_type": 1
+    },
+    "summary": {
+      "input_symbol_count": 2,
+      "result_symbol_count": 2,
+      "matched_symbol_count": 1,
+      "unmatched_symbol_count": 1,
+      "match_rate": 0.5
+    },
+    "matched_symbols": [
+      "000001.SZ"
+    ],
+    "unmatched_symbols": [
+      "600519.SH"
+    ],
+    "rows": [
+      {
+        "symbol": "000001.SZ",
+        "matched": true,
+        "field_names": [
+          "UP3"
+        ],
+        "matched_dates": [
+          "20260204"
+        ],
+        "latest_match_date": "20260204",
+        "series": [
+          {
+            "field": "UP3",
+            "points": [
+              {
+                "date": "20260203",
+                "value": "0",
+                "matched": false
+              },
+              {
+                "date": "20260204",
+                "value": "1",
+                "matched": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "symbol": "600519.SH",
+        "matched": false,
+        "field_names": [
+          "UP3"
+        ],
+        "matched_dates": [],
+        "latest_match_date": null,
+        "series": [
+          {
+            "field": "UP3",
+            "points": [
+              {
+                "date": "20260203",
+                "value": "0",
+                "matched": false
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "artifacts": []
+}

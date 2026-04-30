@@ -1,0 +1,218 @@
+{
+  "daily-review": {
+    "source": "report",
+    "preset": "daily-review",
+    "description": "统一入口下的当日交易日报。",
+    "labels": ["report", "daily", "review"]
+  },
+  "daily-success": {
+    "source": "report",
+    "preset": "daily-success",
+    "description": "统一入口下的当日成功成交日报。",
+    "labels": ["report", "daily", "success"]
+  },
+  "recent-ledger": {
+    "source": "report",
+    "preset": "recent-ledger",
+    "description": "统一入口下的最近台账摘要。",
+    "labels": ["report", "ledger", "review"]
+  },
+  "recent-failures": {
+    "source": "report",
+    "preset": "recent-failures",
+    "description": "统一入口下的最近失败台账摘要。",
+    "labels": ["report", "ledger", "diagnostics", "failure"]
+  },
+  "period-review": {
+    "source": "report",
+    "preset": "period-review",
+    "description": "统一入口下的区间复盘模板。",
+    "labels": ["report", "period", "review"]
+  },
+  "audit-daily-review": {
+    "source": "report",
+    "preset": "audit-daily-review",
+    "description": "统一入口下的当日 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "review"]
+  },
+  "audit-daily-confirmed": {
+    "source": "report",
+    "preset": "audit-daily-confirmed",
+    "description": "统一入口下的当日已确认 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "confirmed"]
+  },
+  "audit-daily-rejected": {
+    "source": "report",
+    "preset": "audit-daily-rejected",
+    "description": "统一入口下的当日拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "rejected", "diagnostics"]
+  },
+  "audit-daily-replayed": {
+    "source": "report",
+    "preset": "audit-daily-replayed",
+    "description": "统一入口下的当日 replayed trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "replayed", "review"]
+  },
+  "audit-daily-failed": {
+    "source": "report",
+    "preset": "audit-daily-failed",
+    "description": "统一入口下的当日 failed trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "failed", "diagnostics"]
+  },
+  "audit-daily-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-exceptions",
+    "description": "统一入口下的当日异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "exceptions", "diagnostics"]
+  },
+  "audit-daily-confirm-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-confirm-exceptions",
+    "description": "统一入口下的当日 confirm_current 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "confirm", "exceptions", "diagnostics"]
+  },
+  "audit-daily-submit-once-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-submit-once-exceptions",
+    "description": "统一入口下的当日 buy_submit_once 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "submit-once", "exceptions", "diagnostics"]
+  },
+  "audit-daily-buy-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-buy-exceptions",
+    "description": "统一入口下的当日 buy 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "buy", "exceptions", "diagnostics"]
+  },
+  "audit-daily-submit-path-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-submit-path-exceptions",
+    "description": "统一入口下的当日 submit path 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "submit-path", "exceptions", "diagnostics"]
+  },
+  "audit-daily-pingan-submit-path-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-pingan-submit-path-exceptions",
+    "description": "统一入口下的当日平安券商 submit path 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "submit-path", "exceptions", "diagnostics"]
+  },
+  "audit-period-review": {
+    "source": "report",
+    "preset": "audit-period-review",
+    "description": "统一入口下的区间 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "review"]
+  },
+  "audit-period-confirmed": {
+    "source": "report",
+    "preset": "audit-period-confirmed",
+    "description": "统一入口下的区间已确认 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "confirmed"]
+  },
+  "audit-period-rejected": {
+    "source": "report",
+    "preset": "audit-period-rejected",
+    "description": "统一入口下的区间拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "rejected", "diagnostics"]
+  },
+  "audit-period-replayed": {
+    "source": "report",
+    "preset": "audit-period-replayed",
+    "description": "统一入口下的区间 replayed trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "replayed", "review"]
+  },
+  "audit-period-failed": {
+    "source": "report",
+    "preset": "audit-period-failed",
+    "description": "统一入口下的区间 failed trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "failed", "diagnostics"]
+  },
+  "audit-period-exceptions": {
+    "source": "report",
+    "preset": "audit-period-exceptions",
+    "description": "统一入口下的区间异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "exceptions", "diagnostics"]
+  },
+  "audit-period-confirm-exceptions": {
+    "source": "report",
+    "preset": "audit-period-confirm-exceptions",
+    "description": "统一入口下的区间 confirm_current 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "confirm", "exceptions", "diagnostics"]
+  },
+  "audit-period-submit-once-exceptions": {
+    "source": "report",
+    "preset": "audit-period-submit-once-exceptions",
+    "description": "统一入口下的区间 buy_submit_once 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "submit-once", "exceptions", "diagnostics"]
+  },
+  "audit-period-buy-exceptions": {
+    "source": "report",
+    "preset": "audit-period-buy-exceptions",
+    "description": "统一入口下的区间 buy 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "buy", "exceptions", "diagnostics"]
+  },
+  "audit-period-submit-path-exceptions": {
+    "source": "report",
+    "preset": "audit-period-submit-path-exceptions",
+    "description": "统一入口下的区间 submit path 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "submit-path", "exceptions", "diagnostics"]
+  },
+  "audit-period-pingan-submit-path-exceptions": {
+    "source": "report",
+    "preset": "audit-period-pingan-submit-path-exceptions",
+    "description": "统一入口下的区间平安券商 submit path 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "submit-path", "exceptions", "diagnostics"]
+  },
+  "balanced-buy": {
+    "source": "trade",
+    "preset": "balanced-buy",
+    "description": "统一入口下的常规买入模板。",
+    "labels": ["trade", "buy", "balanced"]
+  },
+  "turbo-buy": {
+    "source": "trade",
+    "preset": "turbo-buy",
+    "description": "统一入口下的快速买入模板。",
+    "labels": ["trade", "buy", "fast"]
+  },
+  "submit-once": {
+    "source": "trade",
+    "preset": "submit-once-default",
+    "description": "统一入口下的完整提交流程模板。",
+    "labels": ["trade", "submit", "full-flow"]
+  },
+  "guarded-buy": {
+    "source": "task",
+    "preset": "guarded-default",
+    "description": "统一入口下的受保护买入任务模板。",
+    "labels": ["task", "trade", "guarded"]
+  },
+  "task-buy": {
+    "source": "task",
+    "preset": "task-buy-default",
+    "description": "统一入口下的 task 常规买入模板。",
+    "labels": ["task", "trade", "buy"]
+  },
+  "task-submit-once": {
+    "source": "task",
+    "preset": "submit-once-default",
+    "description": "统一入口下的 task 完整提交模板。",
+    "labels": ["task", "trade", "submit", "full-flow"]
+  },
+  "task-submit-ready": {
+    "source": "task",
+    "preset": "submit-ready-default",
+    "description": "统一入口下的 task 确认前边界模板。",
+    "labels": ["task", "trade", "split-step", "boundary"]
+  },
+  "task-confirm-current": {
+    "source": "task",
+    "preset": "confirm-current-default",
+    "description": "统一入口下的 task 当前确认推进模板。",
+    "labels": ["task", "trade", "split-step", "confirm"]
+  },
+  "refresh-env": {
+    "source": "task",
+    "preset": "refresh-default",
+    "description": "统一入口下的环境刷新模板。",
+    "labels": ["task", "maintenance", "refresh"]
+  }
+}

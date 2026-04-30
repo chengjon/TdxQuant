@@ -1,0 +1,362 @@
+{
+  "refresh-review": {
+    "description": "先刷新环境，再查看最近台账摘要。",
+    "labels": ["morning", "review", "maintenance"],
+    "steps": [
+      {
+        "name": "refresh",
+        "entry": "refresh-env"
+      },
+      {
+        "name": "review",
+        "entry": "recent-ledger",
+        "options": {
+          "limit": 10
+        }
+      }
+    ]
+  },
+  "guarded-review-buy": {
+    "description": "先执行受保护买入，再查看最近台账摘要。",
+    "labels": ["trading", "trade", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "review",
+        "entry": "recent-ledger",
+        "options": {
+          "limit": 5
+        }
+      }
+    ]
+  },
+  "morning-review": {
+    "description": "开盘前刷新环境并查看当日交易日报。",
+    "labels": ["morning", "review", "daily"],
+    "steps": [
+      {
+        "name": "refresh",
+        "entry": "refresh-env"
+      },
+      {
+        "name": "daily",
+        "entry": "daily-review"
+      }
+    ]
+  },
+  "failure-review": {
+    "description": "先看最近失败台账，再回看当日交易日报。",
+    "labels": ["diagnostics", "failure", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "daily",
+        "entry": "daily-review"
+      }
+    ]
+  },
+  "audit-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 trade_audit 复盘。",
+    "labels": ["diagnostics", "audit", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-review"
+      }
+    ]
+  },
+  "audit-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日拒单 trade_audit 诊断复盘。",
+    "labels": ["diagnostics", "audit", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-rejected"
+      }
+    ]
+  },
+  "audit-confirmed-review": {
+    "description": "查看当日成功成交日报并回看当日已确认 trade_audit 复盘。",
+    "labels": ["audit", "confirmed", "review", "followup"],
+    "steps": [
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirmed"
+      }
+    ]
+  },
+  "audit-replay-review": {
+    "description": "查看最近台账摘要并回看当日 replayed trade_audit 复盘。",
+    "labels": ["audit", "replayed", "review", "followup"],
+    "steps": [
+      {
+        "name": "ledger",
+        "entry": "recent-ledger"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-replayed"
+      }
+    ]
+  },
+  "audit-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 failed trade_audit 诊断复盘。",
+    "labels": ["diagnostics", "audit", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-failed"
+      }
+    ]
+  },
+  "audit-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-exceptions"
+      }
+    ]
+  },
+  "audit-confirm-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 confirm_current rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "confirm", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirm-exceptions"
+      }
+    ]
+  },
+  "audit-submit-once-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 buy_submit_once rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "submit-once", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-once-exceptions"
+      }
+    ]
+  },
+  "audit-buy-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 buy rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "buy", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-buy-exceptions"
+      }
+    ]
+  },
+  "audit-submit-path-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 submit path rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "submit-path", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-path-exceptions"
+      }
+    ]
+  },
+  "audit-pingan-submit-path-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 submit path rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "submit-path", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-path-exceptions"
+      }
+    ]
+  },
+  "guarded-trade-followup": {
+    "description": "受保护买入后继续查看最近台账和当日成功成交日报。",
+    "labels": ["trading", "trade", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "ledger",
+        "entry": "recent-ledger",
+        "options": {
+          "limit": 5
+        }
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      }
+    ]
+  },
+  "submit-once-followup": {
+    "description": "完整提交流程后查看最近台账和当日成功成交日报。",
+    "labels": ["trading", "submit", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "ledger",
+        "entry": "recent-ledger",
+        "options": {
+          "limit": 5
+        }
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      }
+    ]
+  },
+  "confirm-audit-review": {
+    "description": "推进当前确认框后回看当日 trade_audit 复盘。",
+    "labels": ["trading", "confirm", "audit", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-review"
+      }
+    ]
+  },
+  "confirm-complete-review": {
+    "description": "推进当前确认框后继续查看当日成功成交日报和已确认 trade_audit 复盘。",
+    "labels": ["trading", "confirm", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirmed"
+      }
+    ]
+  },
+  "confirm-exception-review": {
+    "description": "推进当前确认框后继续回看当日 confirm_current rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "confirm", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirm-exceptions"
+      }
+    ]
+  },
+  "submit-once-exception-review": {
+    "description": "完整提交流程后继续回看当日 buy_submit_once rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "submit", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-once-exceptions"
+      }
+    ]
+  },
+  "guarded-buy-exception-review": {
+    "description": "受保护买入后继续回看当日 buy rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "buy", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-buy-exceptions"
+      }
+    ]
+  },
+  "confirm-submit-path-exception-review": {
+    "description": "推进当前确认框后继续回看当日 submit path rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "confirm", "submit-path", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-path-exceptions"
+      }
+    ]
+  },
+  "confirm-pingan-submit-path-exception-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 submit path rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "confirm", "pingan", "submit-path", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-path-exceptions"
+      }
+    ]
+  }
+}

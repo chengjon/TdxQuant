@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.benchmarks/
+.claude/
+.omc/
+
+runtime/trader/
+runtime/trade-audits/
+runtime/pingan-last-order.json
+runtime/pingan-order-events.jsonl
+runtime/pingan-submission-ledger.jsonl
+
+test_timing.csv

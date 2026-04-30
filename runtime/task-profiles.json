@@ -1,0 +1,171 @@
+{
+  "default": {
+    "api_profile": "default",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume"],
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "sector_research": {
+    "api_profile": "research",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume", "Amount"],
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "formula_scan": {
+    "api_profile": "research",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume"],
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "watchlist_overview": {
+    "api_profile": "brief",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume"],
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "watchlist_export": {
+    "api_profile": "brief",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume"],
+    "export_dir": "runtime/exports",
+    "export_stem": "watchlist-overview",
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "subscription_watch": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "subscription-watch",
+    "status_stem": "subscription-watch-status",
+    "poll_interval": 0.25
+  },
+  "sector_formula_scan": {
+    "api_profile": "research",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume", "Amount"],
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "sector_research_export": {
+    "api_profile": "research",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume", "Amount"],
+    "export_dir": "runtime/exports",
+    "export_stem": "sector-research",
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "trade_buy": {
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "output_format": "json",
+    "refresh_before_trade": false,
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "trade_submit_once": {
+    "api_profile": "safe_read",
+    "trade_profile": "submit_once",
+    "output_format": "json",
+    "refresh_before_trade": false,
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "trade_submit_ready": {
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "output_format": "json",
+    "refresh_before_trade": false,
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "trade_confirm_current": {
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "output_format": "json"
+  },
+  "guarded_trade_buy": {
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "output_format": "json",
+    "refresh_before_trade": false,
+    "refresh_market": "AG",
+    "refresh_force": false,
+    "export_dir": "runtime/exports",
+    "export_stem": "guarded-trade-buy",
+    "ledger_stem": "guarded-trade-buy-ledger"
+  },
+  "ledger_summary": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "ledger-summary",
+    "ledger_stem": "guarded-trade-buy-ledger",
+    "default_limit": 20
+  },
+  "daily_trade_report": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "daily-trade-report",
+    "ledger_stem": "guarded-trade-buy-ledger",
+    "default_recent_limit": 10,
+    "default_timezone": "Asia/Shanghai"
+  },
+  "trade_report_lookup": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "trade-report-lookup",
+    "ledger_stem": "guarded-trade-buy-ledger",
+    "default_limit": 10,
+    "default_timezone": "Asia/Shanghai"
+  },
+  "trade_audit_lookup": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "trade-audit-lookup",
+    "audit_dir": "runtime/trade-audits",
+    "default_limit": 10
+  },
+  "trade_audit_daily_report": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "trade-audit-daily-report",
+    "audit_dir": "runtime/trade-audits",
+    "default_recent_limit": 10,
+    "default_timezone": "Asia/Shanghai"
+  },
+  "trade_audit_period_report": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "trade-audit-period-report",
+    "audit_dir": "runtime/trade-audits",
+    "default_recent_limit": 20,
+    "default_timezone": "Asia/Shanghai"
+  },
+  "trade_period_report": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "trade-period-report",
+    "ledger_stem": "guarded-trade-buy-ledger",
+    "default_recent_limit": 20,
+    "default_timezone": "Asia/Shanghai"
+  },
+  "maintenance": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "gp_one_fields": ["Now"],
+    "refresh_market": "AG",
+    "refresh_force": false
+  }
+}

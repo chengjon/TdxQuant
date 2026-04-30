@@ -1,0 +1,41 @@
+{
+  "balanced-buy": {
+    "command": "buy",
+    "description": "平安证券常规买入模板，固定环境参数，保留 code/price/quantity 动态输入。",
+    "profile": "balanced",
+    "title_key": "平安证券",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  },
+  "turbo-buy": {
+    "command": "buy",
+    "description": "平安证券快速买入模板，默认使用 turbo profile。",
+    "profile": "turbo",
+    "title_key": "平安证券",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  },
+  "submit-once-default": {
+    "command": "submit-once",
+    "description": "平安证券完整提交模板，固定环境参数，保留 code/price/quantity 动态输入。",
+    "profile": "submit_once",
+    "title_key": "平安证券",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  }
+}

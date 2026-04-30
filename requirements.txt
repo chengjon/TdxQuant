@@ -1,0 +1,3 @@
+pywin32>=308; platform_system == "Windows"
+pywinauto>=0.6.8; platform_system == "Windows"
+pyserial>=3.5

@@ -1,0 +1,69 @@
+{
+  "default": {
+    "include_timing": true,
+    "output_format": "json",
+    "list_type": 0,
+    "default_fields": {},
+    "kline_dividend_type": "none",
+    "kline_fill_data": true,
+    "trading_dates_market": "SH",
+    "trading_dates_count": -1,
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "brief": {
+    "include_timing": true,
+    "output_format": "json",
+    "list_type": 0,
+    "default_fields": {
+      "snapshot": ["Now", "Volume"],
+      "market_snapshot": ["Now", "Volume"]
+    },
+    "kline_dividend_type": "none",
+    "kline_fill_data": true,
+    "trading_dates_market": "SH",
+    "trading_dates_count": -1,
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "named_list": {
+    "include_timing": true,
+    "output_format": "json",
+    "list_type": 1,
+    "default_fields": {},
+    "kline_dividend_type": "none",
+    "kline_fill_data": true,
+    "trading_dates_market": "SH",
+    "trading_dates_count": -1,
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "research": {
+    "include_timing": true,
+    "output_format": "json",
+    "list_type": 1,
+    "default_fields": {
+      "snapshot": ["Now", "Volume", "Amount"],
+      "market_snapshot": ["Now", "Volume", "Amount"]
+    },
+    "kline_dividend_type": "none",
+    "kline_fill_data": true,
+    "trading_dates_market": "SH",
+    "trading_dates_count": -1,
+    "refresh_market": "AG",
+    "refresh_force": false
+  },
+  "safe_read": {
+    "include_timing": true,
+    "output_format": "json",
+    "list_type": 0,
+    "default_fields": {},
+    "kline_dividend_type": "none",
+    "kline_fill_data": true,
+    "trading_dates_market": "SH",
+    "trading_dates_count": -1,
+    "refresh_market": "AG",
+    "refresh_force": false,
+    "timeout_hint": "short-connection"
+  }
+}

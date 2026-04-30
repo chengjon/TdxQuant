@@ -1,0 +1,98 @@
+{
+  "success": true,
+  "code": "ok",
+  "message": "listed provider capabilities",
+  "capability": "runtime.capabilities",
+  "capability_version": "v1",
+  "schema_version": "2026-04-28",
+  "request_id": "fixture-runtime-capabilities-success",
+  "started_at": "2026-04-28T12:00:00Z",
+  "finished_at": "2026-04-28T12:00:00Z",
+  "elapsed_ms": 0.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "summary": {
+      "total": 4,
+      "by_stability": {
+        "stable": 2,
+        "beta": 2
+      },
+      "by_side_effect_level": {
+        "read_only": 2,
+        "local_state_mutating": 2
+      }
+    },
+    "capabilities": [
+      {
+        "name": "runtime.capabilities",
+        "capability_version": "v1",
+        "domain": "runtime",
+        "description": "List provider-facing capabilities and grading metadata.",
+        "stability": "beta",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "runtime.capabilities",
+          "api_command": "capabilities",
+          "flat_command": "tdx-capabilities"
+        },
+        "requires": []
+      },
+      {
+        "name": "runtime.doctor",
+        "capability_version": "v1",
+        "domain": "runtime",
+        "description": "Translate provider health state into findings and recommended actions.",
+        "stability": "beta",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "runtime.doctor",
+          "api_command": "doctor",
+          "flat_command": "tdx-doctor"
+        },
+        "requires": [
+          "windows_runtime_probe"
+        ]
+      },
+      {
+        "name": "formula.screen",
+        "capability_version": "v1",
+        "domain": "formula",
+        "description": "Run normalized formula-based stock screening.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "formula.screen",
+          "api_command": "formula-screen",
+          "flat_command": "tdx-formula-screen"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ]
+      },
+      {
+        "name": "block.send_user_block",
+        "capability_version": "v1",
+        "domain": "block",
+        "description": "Update TongDaXin custom-sector members.",
+        "stability": "stable",
+        "side_effect_level": "local_state_mutating",
+        "entrypoints": {
+          "manager_method": "block.send_user_block",
+          "api_command": "send-user-block",
+          "flat_command": "tdx-send-user-block"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ]
+      }
+    ]
+  },
+  "artifacts": []
+}
