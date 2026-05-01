@@ -1985,29 +1985,42 @@ class TdxTaskManagerTests(unittest.TestCase):
             manager = TdxTaskManager(
                 profile="subscription_watch",
                 strategy_path="strategy.py",
-                profile_overrides={"export_dir": temp_dir, "export_stem": "sub-watch", "status_stem": "sub-watch-status"},
+                profile_overrides={"run_root_dir": temp_dir, "poll_interval": 0.1},
             )
             with patch.object(type(manager.api_manager.runtime), "open_subscription_session", return_value=fake_session):
                 result = manager.subscription_watch(stock_list=["600519.SH"], max_events=1, poll_interval=0.0)
 
-            jsonl_path = Path(result.data["artifacts"]["jsonl_output_path"])
-            csv_path = Path(result.data["artifacts"]["csv_output_path"])
-            status_path = Path(result.data["artifacts"]["status_output_path"])
+            run_dir = Path(result.data["artifacts"]["run_dir"])
+            manifest_path = Path(result.data["artifacts"]["manifest_path"])
+            jsonl_path = Path(result.data["artifacts"]["events_jsonl_path"])
+            csv_path = Path(result.data["artifacts"]["events_csv_path"])
+            status_path = Path(result.data["artifacts"]["status_path"])
+            summary_path = Path(result.data["artifacts"]["summary_path"])
+            manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
             status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
             jsonl_lines = [json.loads(line) for line in jsonl_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
             self.assertTrue(result.ok)
             self.assertEqual(result.data["summary"]["event_count"], 1)
             self.assertEqual(result.data["summary"]["stop_reason"], "max_events")
             self.assertEqual(result.data["task"]["name"], "subscription_watch")
+            self.assertEqual(run_dir.name, result.data["subscription"]["run_id"])
+            self.assertTrue(run_dir.exists())
+            self.assertTrue(manifest_path.exists())
             self.assertTrue(jsonl_path.exists())
             self.assertTrue(csv_path.exists())
             self.assertTrue(status_path.exists())
+            self.assertTrue(summary_path.exists())
+            self.assertEqual(manifest_payload["capability"], "subscription.watch")
             self.assertEqual(jsonl_lines[0]["symbol"], "600519.SH")
+            self.assertEqual(jsonl_lines[0]["run_id"], result.data["subscription"]["run_id"])
             self.assertEqual(jsonl_lines[0]["sequence"], 1)
             self.assertEqual(jsonl_lines[0]["provider_instance_id"], "provider-session-001")
             self.assertEqual(status_payload["state"], "completed")
             self.assertEqual(status_payload["event_count"], 1)
+            self.assertEqual(summary_payload["final_state"], "completed")
+            self.assertEqual(summary_payload["stop_reason"], "max_events")
             self.assertEqual(fake_session.unsubscribe_calls, [["600519.SH"]])
             self.assertEqual(fake_session.close_calls, 1)
 
@@ -2017,7 +2030,7 @@ class TdxTaskManagerTests(unittest.TestCase):
             manager = TdxTaskManager(
                 profile="subscription_watch",
                 strategy_path="strategy.py",
-                profile_overrides={"export_dir": temp_dir, "export_stem": "sub-watch", "status_stem": "sub-watch-status"},
+                profile_overrides={"run_root_dir": temp_dir, "poll_interval": 0.0},
             )
             with (
                 patch.object(type(manager.api_manager.runtime), "open_subscription_session", return_value=fake_session),
@@ -2025,8 +2038,13 @@ class TdxTaskManagerTests(unittest.TestCase):
             ):
                 result = manager.subscription_watch(stock_list=["600519.SH"], poll_interval=0.1)
 
+            summary_path = Path(result.data["artifacts"]["summary_path"])
+            summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+
         self.assertTrue(result.ok)
         self.assertEqual(result.data["summary"]["stop_reason"], "keyboard_interrupt")
+        self.assertEqual(summary_payload["final_state"], "interrupted")
+        self.assertEqual(summary_payload["stop_reason"], "keyboard_interrupt")
         self.assertEqual(fake_session.unsubscribe_calls, [["600519.SH"]])
         self.assertEqual(fake_session.close_calls, 1)
 

@@ -1,0 +1,41 @@
+{
+  "schema_version": "2026-05-01",
+  "capability": "subscription.watch",
+  "run_id": "20260501T080000000000Z",
+  "state": "completed",
+  "started_at": "2026-05-01T08:00:00+00:00",
+  "updated_at": "2026-05-01T08:00:05+00:00",
+  "session_id": "local-session-001",
+  "event_count": 2,
+  "last_sequence": 2,
+  "last_event_ts": "2026-05-01T01:30:01.223456+00:00",
+  "last_symbol": "000001.SZ",
+  "output_paths": {
+    "run_dir": "runtime/subscription-watch/20260501T080000000000Z",
+    "manifest_path": "runtime/subscription-watch/20260501T080000000000Z/manifest.json",
+    "status_path": "runtime/subscription-watch/20260501T080000000000Z/status.json",
+    "summary_path": "runtime/subscription-watch/20260501T080000000000Z/summary.json",
+    "events_jsonl_path": "runtime/subscription-watch/20260501T080000000000Z/events.jsonl",
+    "events_csv_path": "runtime/subscription-watch/20260501T080000000000Z/events.csv"
+  },
+  "warnings": [],
+  "provider_instance_id": "provider-session-001",
+  "subscription_id": "sub-001",
+  "finished_at": "2026-05-01T08:00:05+00:00",
+  "stop_reason": "max_events",
+  "subscribed_symbols": ["600519.SH", "000001.SZ"],
+  "unique_symbols": ["000001.SZ", "600519.SH"],
+  "unique_symbol_count": 2,
+  "last_event_at": "2026-05-01T01:30:01.223456+00:00",
+  "artifacts": {
+    "run_dir": "runtime/subscription-watch/20260501T080000000000Z",
+    "manifest_path": "runtime/subscription-watch/20260501T080000000000Z/manifest.json",
+    "status_path": "runtime/subscription-watch/20260501T080000000000Z/status.json",
+    "summary_path": "runtime/subscription-watch/20260501T080000000000Z/summary.json",
+    "events_jsonl_path": "runtime/subscription-watch/20260501T080000000000Z/events.jsonl",
+    "events_csv_path": "runtime/subscription-watch/20260501T080000000000Z/events.csv",
+    "jsonl_output_path": "runtime/subscription-watch/20260501T080000000000Z/events.jsonl",
+    "csv_output_path": "runtime/subscription-watch/20260501T080000000000Z/events.csv",
+    "status_output_path": "runtime/subscription-watch/20260501T080000000000Z/status.json"
+  }
+}

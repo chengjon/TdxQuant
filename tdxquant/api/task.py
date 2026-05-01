@@ -12,7 +12,17 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..models import ErrorCode, Result
-from ..subscription_event import SUBSCRIPTION_EVENT_SCHEMA_VERSION, normalize_subscription_event_rows
+from ..subscription_event import (
+    SUBSCRIPTION_EVENT_CAPABILITY,
+    SUBSCRIPTION_EVENT_SCHEMA_VERSION,
+    normalize_subscription_event_rows,
+)
+from ..subscription_watch_run import (
+    build_subscription_watch_manifest,
+    build_subscription_watch_run_paths,
+    build_subscription_watch_status_payload,
+    build_subscription_watch_summary_payload,
+)
 from ..trade import TdxTradeManager
 from .manager import TdxApiManager
 
@@ -146,6 +156,13 @@ def _resolve_ledger_stem(profile_options: dict[str, Any], default_stem: str) -> 
 
 def _resolve_status_stem(profile_options: dict[str, Any], default_stem: str) -> str:
     return str(profile_options.get("status_stem", default_stem))
+
+
+def _resolve_subscription_watch_root_dir(profile_options: dict[str, Any]) -> Path:
+    run_root_dir = profile_options.get("run_root_dir")
+    if isinstance(run_root_dir, str) and run_root_dir.strip():
+        return Path(run_root_dir)
+    return Path("runtime/subscription-watch")
 
 
 def _extract_numeric_field(payload: Any, candidate_keys: list[str]) -> float | None:
@@ -1237,12 +1254,13 @@ class TdxTaskManager:
                     next_action="Provide a non-negative --poll-interval value.",
                 )
 
-            export_dir = _resolve_export_dir(self.profile_options)
-            export_stem = _resolve_export_stem(self.profile_options, "subscription-watch")
-            status_stem = _resolve_status_stem(self.profile_options, f"{export_stem}-status")
-            jsonl_path = Path(jsonl_output_path) if jsonl_output_path else export_dir / f"{export_stem}.jsonl"
-            csv_path = Path(csv_output_path) if csv_output_path else export_dir / f"{export_stem}.csv"
-            status_path = Path(status_output_path) if status_output_path else export_dir / f"{status_stem}.json"
+            run_root_dir = _resolve_subscription_watch_root_dir(self.profile_options)
+            run_paths = build_subscription_watch_run_paths(run_root_dir)
+            run_paths.run_dir.mkdir(parents=True, exist_ok=False)
+
+            legacy_jsonl_path = Path(jsonl_output_path) if jsonl_output_path else None
+            legacy_csv_path = Path(csv_output_path) if csv_output_path else None
+            legacy_status_path = Path(status_output_path) if status_output_path else None
 
             session_id = uuid4().hex
             started_at = _now_utc_iso()
@@ -1250,15 +1268,29 @@ class TdxTaskManager:
             state_lock = threading.RLock()
             event_count = 0
             last_event_at: str | None = None
+            last_symbol: str | None = None
             unique_symbols: set[str] = set()
 
             session = self.api_manager.runtime.open_subscription_session()
             provider_instance_id = str(getattr(session, "session_id", "unknown-session"))
             subscribed_symbols = list(stock_list)
+            manifest_payload = build_subscription_watch_manifest(
+                paths=run_paths,
+                provider="tongdaxin",
+                provider_mode="runtime_session",
+                requested_symbols=subscribed_symbols,
+            )
+            _write_json_file(run_paths.manifest_path, manifest_payload)
             artifact_paths = {
-                "jsonl_output_path": str(jsonl_path),
-                "csv_output_path": str(csv_path),
-                "status_output_path": str(status_path),
+                "run_dir": str(run_paths.run_dir),
+                "manifest_path": str(run_paths.manifest_path),
+                "status_path": str(run_paths.status_path),
+                "summary_path": str(run_paths.summary_path),
+                "events_jsonl_path": str(run_paths.events_jsonl_path),
+                "events_csv_path": str(run_paths.events_csv_path),
+                "jsonl_output_path": str(legacy_jsonl_path or run_paths.events_jsonl_path),
+                "csv_output_path": str(legacy_csv_path or run_paths.events_csv_path),
+                "status_output_path": str(legacy_status_path or run_paths.status_path),
             }
 
             def build_status_payload(*, state: str, stop_reason: str | None = None, finished_at: str | None = None) -> dict[str, Any]:
@@ -1266,33 +1298,49 @@ class TdxTaskManager:
                     symbol_rows = sorted(unique_symbols)
                     current_event_count = event_count
                     current_last_event_at = last_event_at
-                return {
-                    "schema_version": SUBSCRIPTION_EVENT_SCHEMA_VERSION,
-                    "state": state,
-                    "session_id": session_id,
-                    "provider_instance_id": provider_instance_id,
-                    "subscription_id": subscription_id,
-                    "started_at": started_at,
-                    "finished_at": finished_at,
-                    "stop_reason": stop_reason,
-                    "subscribed_symbols": subscribed_symbols,
-                    "event_count": current_event_count,
-                    "unique_symbols": symbol_rows,
-                    "unique_symbol_count": len(symbol_rows),
-                    "last_event_at": current_last_event_at,
-                    "artifacts": dict(artifact_paths),
-                }
+                    current_last_symbol = last_symbol
+                payload = build_subscription_watch_status_payload(
+                    paths=run_paths,
+                    state=state,
+                    started_at=started_at,
+                    updated_at=finished_at or _now_utc_iso(),
+                    session_id=session_id,
+                    event_count=current_event_count,
+                    last_sequence=current_event_count,
+                    last_event_ts=current_last_event_at,
+                    last_symbol=current_last_symbol,
+                    warnings=[],
+                )
+                payload.update(
+                    {
+                        "provider_instance_id": provider_instance_id,
+                        "subscription_id": subscription_id,
+                        "finished_at": finished_at,
+                        "stop_reason": stop_reason,
+                        "subscribed_symbols": subscribed_symbols,
+                        "unique_symbols": symbol_rows,
+                        "unique_symbol_count": len(symbol_rows),
+                        "last_event_at": current_last_event_at,
+                        "artifacts": dict(artifact_paths),
+                    }
+                )
+                return payload
 
             def write_status(*, state: str, stop_reason: str | None = None, finished_at: str | None = None) -> None:
-                _write_json_file(status_path, build_status_payload(state=state, stop_reason=stop_reason, finished_at=finished_at))
+                payload = build_status_payload(state=state, stop_reason=stop_reason, finished_at=finished_at)
+                _write_json_file(run_paths.status_path, payload)
+                if legacy_status_path is not None and legacy_status_path != run_paths.status_path:
+                    _write_json_file(legacy_status_path, payload)
 
             def append_event_rows(rows: list[dict[str, Any]]) -> None:
-                nonlocal event_count, last_event_at
+                nonlocal event_count, last_event_at, last_symbol
                 with state_lock:
                     for row in rows:
-                        _append_jsonl_file(jsonl_path, row)
+                        _append_jsonl_file(run_paths.events_jsonl_path, row)
+                        if legacy_jsonl_path is not None and legacy_jsonl_path != run_paths.events_jsonl_path:
+                            _append_jsonl_file(legacy_jsonl_path, row)
                         _append_csv_row(
-                            csv_path,
+                            run_paths.events_csv_path,
                             {
                                 "sequence": row["sequence"],
                                 "symbol": row.get("symbol"),
@@ -1305,10 +1353,26 @@ class TdxTaskManager:
                                 "payload_json": json.dumps(row["payload"], ensure_ascii=False, sort_keys=True),
                             },
                         )
+                        if legacy_csv_path is not None and legacy_csv_path != run_paths.events_csv_path:
+                            _append_csv_row(
+                                legacy_csv_path,
+                                {
+                                    "sequence": row["sequence"],
+                                    "symbol": row.get("symbol"),
+                                    "event_type": row["event_type"],
+                                    "source_ts": row.get("source_ts"),
+                                    "event_ts": row["event_ts"],
+                                    "session_id": row["session_id"],
+                                    "provider_instance_id": row["provider_instance_id"],
+                                    "subscription_id": row["subscription_id"],
+                                    "payload_json": json.dumps(row["payload"], ensure_ascii=False, sort_keys=True),
+                                },
+                            )
                         event_count += 1
                         symbol_value = row.get("symbol")
                         if isinstance(symbol_value, str) and symbol_value:
                             unique_symbols.add(symbol_value)
+                            last_symbol = symbol_value
                         last_event_at = str(row["event_ts"])
                 write_status(state="running")
 
@@ -1322,13 +1386,31 @@ class TdxTaskManager:
                     session_id=session_id,
                     provider_instance_id=provider_instance_id,
                     subscription_id=subscription_id,
+                    run_id=run_paths.run_id,
+                    capability=SUBSCRIPTION_EVENT_CAPABILITY,
                     start_sequence=start_sequence,
                 )
                 append_event_rows(rows)
 
             subscribe_result = session.subscribe_hq(stock_list=subscribed_symbols, callback=on_event)
             if not subscribe_result.ok:
-                write_status(state="failed", stop_reason="subscribe_failed", finished_at=_now_utc_iso())
+                failed_at = _now_utc_iso()
+                write_status(state="failed", stop_reason="subscribe_failed", finished_at=failed_at)
+                _write_json_file(
+                    run_paths.summary_path,
+                    build_subscription_watch_summary_payload(
+                        paths=run_paths,
+                        final_state="failed",
+                        started_at=started_at,
+                        finished_at=failed_at,
+                        elapsed_ms=0.0,
+                        session_id=session_id,
+                        event_count=event_count,
+                        symbol_count=len(unique_symbols),
+                        stop_reason="subscribe_failed",
+                        warning_count=len(subscribe_result.warnings),
+                    ),
+                )
                 session.close()
                 return Result(
                     ok=False,
@@ -1381,6 +1463,20 @@ class TdxTaskManager:
                 stop_reason=stop_reason,
                 finished_at=finished_at,
             )
+            elapsed_ms = round((time.perf_counter() - started_monotonic) * 1000, 3)
+            summary_payload = build_subscription_watch_summary_payload(
+                paths=run_paths,
+                final_state="interrupted" if interrupted else "completed",
+                started_at=started_at,
+                finished_at=finished_at,
+                elapsed_ms=elapsed_ms,
+                session_id=session_id,
+                event_count=final_status["event_count"],
+                symbol_count=final_status["unique_symbol_count"],
+                stop_reason=stop_reason,
+                warning_count=len(subscribe_result.warnings) + len(unsubscribe_result.warnings),
+            )
+            _write_json_file(run_paths.summary_path, summary_payload)
             return Result(
                 ok=True,
                 code=ErrorCode.OK,
@@ -1396,6 +1492,7 @@ class TdxTaskManager:
                         "session_id": session_id,
                         "provider_instance_id": provider_instance_id,
                         "subscription_id": subscription_id,
+                        "run_id": run_paths.run_id,
                     },
                     "summary": {
                         "event_count": final_status["event_count"],
@@ -1405,9 +1502,11 @@ class TdxTaskManager:
                         "interrupted": interrupted,
                         "started_at": started_at,
                         "finished_at": finished_at,
+                        "elapsed_ms": elapsed_ms,
                         "last_event_at": final_status["last_event_at"],
                     },
                     "status": final_status,
+                    "manifest": manifest_payload,
                     "artifacts": dict(artifact_paths),
                     "subscribe_result": subscribe_result.to_dict(),
                     "unsubscribe_result": unsubscribe_result.to_dict(),

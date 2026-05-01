@@ -150,6 +150,13 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 
 当前订阅 session 底层已经完成，但还没有真正变成 provider-ready 的长期契约。
 
+截至 `2026-05-01`，前台 `subscription-watch` 已经进一步收口为 run artifact contract：
+
+- 每次运行创建独立 `run_id` 目录
+- canonical `events.jsonl`
+- `status.json` / `summary.json` / `manifest.json`
+- `CSV` 仅保留兼容导出角色
+
 下一步不应只停留在：
 
 - `open_subscription_session()`

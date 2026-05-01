@@ -39,6 +39,7 @@
   "subscription_watch": {
     "api_profile": "safe_read",
     "output_format": "json",
+    "run_root_dir": "runtime/subscription-watch",
     "export_dir": "runtime/exports",
     "export_stem": "subscription-watch",
     "status_stem": "subscription-watch-status",

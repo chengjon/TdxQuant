@@ -60,6 +60,34 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "description": "Representative normalized subscription event row batch sample.",
         "relative_path": "subscription-event-batch.jsonl",
     },
+    {
+        "name": "subscription-watch-events",
+        "capability": "subscription.watch",
+        "format": "jsonl",
+        "description": "Representative canonical subscription-watch event stream sample.",
+        "relative_path": "subscription-watch-events.jsonl",
+    },
+    {
+        "name": "subscription-watch-status-completed",
+        "capability": "subscription.watch",
+        "format": "json",
+        "description": "Representative completed subscription-watch status snapshot.",
+        "relative_path": "subscription-watch-status-completed.json",
+    },
+    {
+        "name": "subscription-watch-summary-completed",
+        "capability": "subscription.watch",
+        "format": "json",
+        "description": "Representative completed subscription-watch final summary.",
+        "relative_path": "subscription-watch-summary-completed.json",
+    },
+    {
+        "name": "subscription-watch-manifest",
+        "capability": "subscription.watch",
+        "format": "json",
+        "description": "Representative subscription-watch run manifest.",
+        "relative_path": "subscription-watch-manifest.json",
+    },
 ]
 
 
@@ -72,8 +100,6 @@ def _find_provider_replay_fixture_descriptor(name: str) -> dict[str, str]:
         if item["name"] == name:
             return item
     raise ValueError(f"unsupported provider replay fixture: {name}")
-
-
 def get_provider_replay_fixture_path(name: str) -> Path:
     descriptor = _find_provider_replay_fixture_descriptor(name)
     return get_provider_replay_fixture_dir() / descriptor["relative_path"]

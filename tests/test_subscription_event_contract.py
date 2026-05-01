@@ -1,6 +1,7 @@
 import unittest
 
 from tdxquant.subscription_event import (
+    SUBSCRIPTION_EVENT_CAPABILITY,
     SUBSCRIPTION_EVENT_SCHEMA_VERSION,
     extract_subscription_source_ts,
     extract_subscription_symbol,
@@ -18,16 +19,20 @@ class SubscriptionEventContractTests(unittest.TestCase):
             session_id="session-1",
             provider_instance_id="provider-1",
             subscription_id="sub-1",
+            run_id="run-1",
             start_sequence=7,
         )
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["schema_version"], SUBSCRIPTION_EVENT_SCHEMA_VERSION)
+        self.assertEqual(rows[0]["capability"], SUBSCRIPTION_EVENT_CAPABILITY)
+        self.assertEqual(rows[0]["run_id"], "run-1")
         self.assertEqual(rows[0]["sequence"], 7)
         self.assertEqual(rows[1]["sequence"], 8)
         self.assertEqual(rows[0]["symbol"], "600519.SH")
         self.assertEqual(rows[1]["symbol"], "000001.SZ")
         self.assertEqual(rows[0]["source_ts"], "2026-04-28T09:30:01+08:00")
         self.assertEqual(rows[0]["event_type"], "quote_update")
+        self.assertEqual(rows[0]["reconnect_metadata"], {})
         self.assertIn("payload", rows[0])
 
     def test_normalize_payload_with_explicit_symbol_field(self) -> None:
@@ -40,6 +45,7 @@ class SubscriptionEventContractTests(unittest.TestCase):
             session_id="session-1",
             provider_instance_id="provider-1",
             subscription_id="sub-1",
+            run_id="run-1",
             start_sequence=1,
         )
         self.assertEqual(len(rows), 1)
@@ -58,8 +64,8 @@ class SubscriptionEventContractTests(unittest.TestCase):
             session_id="session-1",
             provider_instance_id="provider-1",
             subscription_id="sub-1",
+            run_id="run-1",
             start_sequence=3,
         )
         self.assertEqual(rows[0]["symbol"], None)
         self.assertEqual(rows[0]["payload"], "raw-event")
-

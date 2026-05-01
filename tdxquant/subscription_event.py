@@ -8,6 +8,7 @@ from .serialization import serialize_value
 
 SUBSCRIPTION_EVENT_SCHEMA_VERSION = "2026-04-28"
 SUBSCRIPTION_EVENT_TYPE = "quote_update"
+SUBSCRIPTION_EVENT_CAPABILITY = "subscription.watch"
 
 
 def _now_utc_iso() -> str:
@@ -47,6 +48,8 @@ def build_subscription_event_row(
     session_id: str,
     provider_instance_id: str,
     subscription_id: str,
+    run_id: str,
+    capability: str,
     sequence: int,
     symbol: str | None = None,
     source_ts: str | None = None,
@@ -56,6 +59,8 @@ def build_subscription_event_row(
     resolved_source_ts = source_ts or extract_subscription_source_ts(serialized_payload)
     return {
         "schema_version": SUBSCRIPTION_EVENT_SCHEMA_VERSION,
+        "capability": capability,
+        "run_id": run_id,
         "session_id": session_id,
         "provider_instance_id": provider_instance_id,
         "subscription_id": subscription_id,
@@ -64,7 +69,7 @@ def build_subscription_event_row(
         "symbol": resolved_symbol,
         "source_ts": resolved_source_ts,
         "event_ts": _now_utc_iso(),
-        "reconnect_metadata": None,
+        "reconnect_metadata": {},
         "payload": serialized_payload,
     }
 
@@ -75,6 +80,8 @@ def normalize_subscription_event_rows(
     session_id: str,
     provider_instance_id: str,
     subscription_id: str,
+    run_id: str,
+    capability: str = SUBSCRIPTION_EVENT_CAPABILITY,
     start_sequence: int,
 ) -> list[dict[str, Any]]:
     serialized = serialize_value(raw_payload)
@@ -93,6 +100,8 @@ def normalize_subscription_event_rows(
                         session_id=session_id,
                         provider_instance_id=provider_instance_id,
                         subscription_id=subscription_id,
+                        run_id=run_id,
+                        capability=capability,
                         sequence=next_sequence,
                         symbol=key,
                         source_ts=extract_subscription_source_ts(item_payload, fallback_source_ts),
@@ -109,6 +118,8 @@ def normalize_subscription_event_rows(
                     session_id=session_id,
                     provider_instance_id=provider_instance_id,
                     subscription_id=subscription_id,
+                    run_id=run_id,
+                    capability=capability,
                     sequence=next_sequence,
                     symbol=resolved_symbol,
                 )
@@ -123,6 +134,8 @@ def normalize_subscription_event_rows(
                     session_id=session_id,
                     provider_instance_id=provider_instance_id,
                     subscription_id=subscription_id,
+                    run_id=run_id,
+                    capability=capability,
                     sequence=next_sequence,
                 )
             )
@@ -135,6 +148,8 @@ def normalize_subscription_event_rows(
             session_id=session_id,
             provider_instance_id=provider_instance_id,
             subscription_id=subscription_id,
+            run_id=run_id,
+            capability=capability,
             sequence=next_sequence,
         )
     )

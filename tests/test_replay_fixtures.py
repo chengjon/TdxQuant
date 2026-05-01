@@ -20,6 +20,10 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("subscription-event-batch", names)
         first = fixtures[0]
         self.assertIn("name", first)
+        self.assertIn("subscription-watch-events", names)
+        self.assertIn("subscription-watch-status-completed", names)
+        self.assertIn("subscription-watch-summary-completed", names)
+        self.assertIn("subscription-watch-manifest", names)
         self.assertIn("capability", first)
         self.assertIn("format", first)
         self.assertIn("description", first)
@@ -42,7 +46,15 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["event_type"], "quote_update")
         self.assertEqual(rows[0]["symbol"], "600519.SH")
+        self.assertEqual(rows[0]["capability"], "subscription.watch")
+        self.assertEqual(rows[0]["run_id"], "20260501T080000000000Z")
         self.assertEqual(rows[1]["sequence"], 2)
+
+    def test_load_subscription_watch_summary_fixture(self) -> None:
+        payload = load_provider_replay_fixture("subscription-watch-summary-completed")
+        self.assertEqual(payload["capability"], "subscription.watch")
+        self.assertEqual(payload["final_state"], "completed")
+        self.assertEqual(payload["stop_reason"], "max_events")
 
     def test_load_block_mutation_fixture_returns_provider_artifact_descriptor(self) -> None:
         payload = load_provider_replay_fixture("block-send-user-block-applied")
