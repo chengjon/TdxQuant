@@ -50,6 +50,7 @@
 - 不做完整用户/角色系统。
 - 不做通用任务编排平台。
 - 不做 HTTP artifact 文件代理下载，第一版只返回路径和摘要。
+- 不做按 `run_id` 的完整历史 artifact 浏览 API；第一版只覆盖 active / last_completed / last_failed 的控制与诊断路径。
 
 ## Approaches Considered
 
@@ -150,6 +151,37 @@ Worker bridge 收到 HTTP 请求后，直接后台启动/停止 `tdxquant task s
 - `failed`
 - `stopped`
 
+第一版必须补一张明确的状态转换矩阵：
+
+| Current | Trigger | Next | Notes |
+| --- | --- | --- | --- |
+| `starting` | child process healthy and status file advancing | `running` | happy path |
+| `starting` | start timeout | `failed` | `start_failed_timeout` |
+| `starting` | child process exits unexpectedly | `failed` | `start_failed_process_exit` |
+| `running` | natural completion | `completed` | bounded run reached |
+| `running` | operator stop | `stopping` | begin graceful stop |
+| `running` | child process exits unexpectedly | `failed` | `worker_process_crashed` |
+| `stopping` | process exits within grace period | `stopped` | operator initiated |
+| `stopping` | grace timeout, forced kill succeeds | `stopped` | `forced_stop` |
+| `stopping` | grace timeout, forced kill fails | `failed` | `stop_failed_timeout` |
+| `failed` | fresh start request | `starting` | allowed after cleanup |
+| `completed` | fresh start request | `starting` | allowed after cleanup |
+| `stopped` | fresh start request | `starting` | allowed after cleanup |
+
+补充语义：
+
+- 第一版不允许 `completed` / `failed` / `stopped` 直接复用旧 run，而是每次 fresh start 都创建新 `run_id`
+- `starting` 与 `stopping` 都必须有超时阈值
+- stale detection 必须校验 `active.json` 与 `pid` 是否一致，并在 bridge 启动或 `status` 查询时做状态修正
+
+建议的 stale detection 规则：
+
+- 若 `active.json` 记录 `starting` / `running` / `stopping`，但 pid 不存在或目标进程已死亡，则状态修正为：
+  - `stopping` -> `stopped`（若 stop 由 bridge 发起且进程已退出）
+  - 其余 -> `failed`，reason=`stale_process_state`
+- bridge 启动时必须执行一次 cleanup-on-startup reconciliation
+- `lock` 不应只靠残留文件判定活跃性，必须结合 pid 与当前进程存在性判断
+
 ### 2. Worker HTTP Bridge
 
 bridge 作为 `tdxquant bridge serve` 常驻运行，不单独拆包。
@@ -162,6 +194,14 @@ bridge 作为 `tdxquant bridge serve` 常驻运行，不单独拆包。
 - 返回稳定 JSON result
 
 bridge 不直接重新定义 `subscription-watch` 的业务语义，只包装控制语义。
+
+bridge 自身的运维语义也要固定：
+
+- 推荐部署方式：systemd / Windows Service wrapper / supervisor 之类的外部守护器
+- 第一版不做自带 daemonize
+- bridge 收到 SIGTERM 时默认**不主动终止活跃 watch**
+- bridge 退出后，active watch 可以继续运行；bridge 重启后通过本地后台控制层重新接管状态
+- bridge 自身日志与 `subscription-watch` 任务日志必须分离
 
 ### 3. Master Registry / Controller
 
@@ -194,14 +234,67 @@ Master 第一版不做：
 
 ## HTTP Contract
 
-第一版只暴露 6 个 endpoint。
+第一版只暴露 8 个 endpoint。
 
 - `POST /bridge/v1/watch/start`
 - `POST /bridge/v1/watch/stop`
 - `GET /bridge/v1/watch/status`
 - `GET /bridge/v1/watch/list`
 - `GET /bridge/v1/watch/artifacts`
+- `GET /bridge/v1/watch/events`
+- `GET /bridge/v1/watch/logs`
 - `GET /bridge/v1/health`
+
+所有 endpoint 统一使用同一层响应 envelope：
+
+```json
+{
+  "ok": true,
+  "result": {},
+  "error": null,
+  "meta": {
+    "bridge_version": "v1",
+    "worker_id": "worker-sh-01",
+    "request_id": "..."
+  }
+}
+```
+
+版本策略固定为 URL prefix：
+
+- `v1` 使用 `/bridge/v1/...`
+- 后续 breaking change 通过新 prefix（如 `/bridge/v2/...`）引入
+- 第一版不做 header-based version negotiation
+
+失败时：
+
+```json
+{
+  "ok": false,
+  "result": null,
+  "error": {
+    "code": "ALREADY_RUNNING",
+    "message": "subscription watch is already active",
+    "details": {}
+  },
+  "meta": {
+    "bridge_version": "v1",
+    "worker_id": "worker-sh-01",
+    "request_id": "..."
+  }
+}
+```
+
+错误码第一版固定使用大写稳定命名空间，例如：
+
+- `ALREADY_RUNNING`
+- `NOT_RUNNING`
+- `INVALID_REQUEST`
+- `UNAUTHORIZED`
+- `FORBIDDEN_SOURCE`
+- `WORKER_UNHEALTHY`
+- `START_FAILED`
+- `STOP_FAILED`
 
 ### `POST /bridge/v1/watch/start`
 
@@ -212,22 +305,31 @@ Master 第一版不做：
 - `max_seconds`
 - `poll_interval`
 - 可选 `run_root_dir`
+- 可选 `idempotency_key`
 
 返回：
 
 - 成功：`started`
-- 已有活跃任务：稳定失败 `already_running`
+- 若相同 `idempotency_key` 已成功启动当前 active run，则返回相同 `run_id` 与当前 active task 信息
+- 若存在其他活跃任务且不匹配当前幂等键，则稳定失败 `ALREADY_RUNNING`
+
+原因：
+
+- Master 超时重试时，需要区分“请求未执行”和“上一次已成功启动”
 
 ### `POST /bridge/v1/watch/stop`
 
 输入：
 
 - 可选 `reason`
+- 预留 `grace_period_seconds`
 
 返回：
 
 - 成功停止：`stopped`
 - 没有活跃任务：建议 `noop`
+
+虽然第一版可先使用默认优雅停止窗口，但请求 contract 应预留该字段，避免后续 breaking change。
 
 ### `GET /bridge/v1/watch/status`
 
@@ -261,6 +363,33 @@ Master 第一版不做：
 
 第一版不直接返回文件内容。
 
+但为满足 Master 远程排障，第一版应额外支持 tail 级诊断读取，而不是只返回路径：
+
+### `GET /bridge/v1/watch/events`
+
+输入：
+
+- 可选 `tail`
+
+返回：
+
+- 当前 active 或最近一次任务的 `events.jsonl` 最后 N 条 normalized rows
+
+### `GET /bridge/v1/watch/logs`
+
+输入：
+
+- 可选 `tail`
+
+返回：
+
+- bridge 自身日志或 worker-local watch runner 日志的最后 N 行文本/结构化日志摘要
+
+说明：
+
+- 这不等价于完整 artifact 文件下载
+- 第一版仍然不提供通用文件代理能力
+
 ### `GET /bridge/v1/health`
 
 返回：
@@ -277,6 +406,8 @@ Master 第一版不做：
 - `Authorization: Bearer <token>`
 - worker 侧 source allowlist
 - 仅允许固定 Master 来源访问
+- 默认显式标注为 plaintext HTTP，无 TLS
+- `bind_host` 需要显式配置；若用于远程控制，不允许默认绑定 `127.0.0.1`
 
 这比用户系统、角色系统、双向 TLS 或 OAuth 简单得多，适合固定局域网环境。
 
@@ -284,6 +415,9 @@ Master 第一版不做：
 
 - 这是“受控局域网最低可用安全边界”，不是面向公网的安全模型
 - 第一版不解决 token 轮换、细粒度权限和多租户问题
+- 如果网络环境不是隔离管理网，明文 Bearer token 存在被嗅探风险；这属于第一版显式 trade-off
+
+allowlist 第一版建议按源 IP 实现，不依赖 `X-Forwarded-For` 这类可伪造头部。
 
 ## Control and Artifact Semantics
 
@@ -298,25 +432,82 @@ Master 应把 bridge 返回的内容视为控制结果，不直接假定 worker 
 因此，第一版“查看 artifacts”本质上是：
 
 - 先拿到路径和元数据
-- 再由后续能力决定是否做代理下载或集中同步
+- 再通过 `events/logs tail` 进行远程快速诊断
+- 完整文件代理下载或集中同步留到后续能力
 
 ## Failure Model
 
 需要优先稳定以下失败类型：
 
-- `already_running`
-- `not_running`
-- `invalid_request`
-- `unauthorized`
-- `forbidden_source`
-- `worker_unhealthy`
-- `start_failed`
-- `stop_failed`
+- `ALREADY_RUNNING`
+- `NOT_RUNNING`
+- `INVALID_REQUEST`
+- `UNAUTHORIZED`
+- `FORBIDDEN_SOURCE`
+- `WORKER_UNHEALTHY`
+- `START_FAILED`
+- `STOP_FAILED`
+
+并发控制语义也要明确：
+
+- `start` / `stop` 属于 control ops，第一版必须串行化处理
+- 同一 worker 上的 control ops 不允许并发修改 `active.json` / `pid` / `lock`
+- `status` / `list` / `artifacts` / `events` / `logs` 可以是只读并发，但读取时必须基于已提交的状态快照
+- 若 bridge 使用 async HTTP server，也必须在 control ops 上加单 worker 互斥锁
 
 其中：
 
 - `status` 不应因为“当前没有 active task”就报 transport failure
 - `list` 也不应因为“没有历史任务”就失败
+
+第一版建议加简单 control-op debounce / rate-limit：
+
+- 对相同来源在短窗口内重复 `start/stop` 请求做基本防抖
+- 目标不是 DoS 防御，而是避免 Master 或脚本重试把 worker 控制层打乱
+
+## Configuration
+
+第一版需要把配置格式显式写死，避免实现期各自发明。
+
+建议：
+
+- Master worker registry：JSON
+- Worker bridge config：JSON
+
+原因：
+
+- 当前仓库的运行时配置已经大量使用 JSON
+- 第一版追求最小实现面，不额外引入配置解析分支
+
+建议字段：
+
+### Worker bridge config
+
+- `worker_id`
+- `bind_host`
+- `port`
+- `token`
+- `master_allowlist`
+- `run_root_dir`
+- `log_dir`
+
+### Master worker registry
+
+- `worker_id`
+- `label`
+- `host`
+- `port`
+- `token_env`
+- `role_tags`
+- `enabled`
+
+token 第一版建议优先从环境变量注入；若支持文件，也应通过显式 `token_file` 路径引用，而不是把 secret 混在普通 registry 里。
+
+配置更新策略：
+
+- 第一版不做热加载
+- bridge 重启时重新读取配置
+- Master 侧 worker registry 也按显式重载或进程重启生效
 
 ## Risks / Trade-offs
 
