@@ -78,7 +78,7 @@
 
 - 支持矩阵
 - 参数规则
-- fixture 选择优先级
+- fixture 选择算法
 - no-live-fallback
 - transport-level output policy
 - replay failure normalization
@@ -145,6 +145,7 @@
 - 只有已经具备稳定 replay fixture 和正式 provider contract 的 capability 才进入支持矩阵。
 - 对于不在支持矩阵内的 flat 或 nested `api` 正式命令，开启 replay 必须稳定失败。
 - nested `api` 入口虽然普遍注册了 replay 参数，但只有上述子命令进入正式 replay transport 支持矩阵；其他 `api` 子命令必须以稳定 failure 结束，而不是 silent fallback 到 live。
+- `api send-user-block` 命令本身当前已经存在；本次 change 只硬化它的 replay transport contract，不新增这条 nested 命令。
 
 ### `task subscription-watch --provider-mode replay`
 
@@ -298,7 +299,7 @@ failure JSON 应继续沿用现有 provider-facing envelope，并在失败路径
 
 - 定义 replay 支持矩阵
 - 执行 replay 参数互斥校验
-- 统一 fixture 选择优先级
+- 统一 fixture 选择算法
 - 统一 stdout / stderr / exit code 语义
 - 统一 replay failure normalization
 
@@ -343,9 +344,10 @@ failure JSON 应继续沿用现有 provider-facing envelope，并在失败路径
 
 ### 2. Argument policy tests
 
-- `--fixture` / `--fixture-path` 互斥
-- 未显式指定 fixture 时默认 fixture 自动命中
-- `--fixture-path` 优先于 `--fixture`
+- 同时给出 `--fixture` 与 `--fixture-path` 时，由 argparse 级互斥规则稳定拒绝
+- 单独给出 `--fixture` 时，稳定命中指定 built-in fixture
+- 单独给出 `--fixture-path` 时，稳定命中指定外部路径
+- 未显式指定 fixture 时，默认 fixture 自动命中
 
 ### 3. Transport output contract tests
 
@@ -353,6 +355,8 @@ failure JSON 应继续沿用现有 provider-facing envelope，并在失败路径
 - 失败时 `stdout` 仍为单一 JSON failure
 - `stderr` 不承载正式结果
 - exit code 语义稳定
+- replay mode 下同时使用 `--output` 时，stdout 仍输出单一 JSON envelope
+- replay mode 下 `--output` 写入的文件内容与 stdout JSON 一致
 
 ### 4. Subscription watch replay artifact tests
 
