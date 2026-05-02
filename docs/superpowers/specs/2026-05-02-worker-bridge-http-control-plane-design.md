@@ -174,6 +174,14 @@ Worker bridge 收到 HTTP 请求后，直接后台启动/停止 `tdxquant task s
 - `starting` 与 `stopping` 都必须有超时阈值
 - stale detection 必须校验 `active.json` 与 `pid` 是否一致，并在 bridge 启动或 `status` 查询时做状态修正
 
+第一版建议把超时阈值配置成显式 worker-local background control 参数，而不是隐含常量：
+
+- `start_timeout_seconds`
+- `stop_grace_period_seconds`
+- `stop_force_kill_timeout_seconds`
+
+默认值可以在实现时提供，但 contract 层必须先固定这些字段的存在性和含义，避免后续变成行为漂移的隐藏常量。
+
 建议的 stale detection 规则：
 
 - 若 `active.json` 记录 `starting` / `running` / `stopping`，但 pid 不存在或目标进程已死亡，则状态修正为：
@@ -259,6 +267,18 @@ Master 第一版不做：
   }
 }
 ```
+
+字段要求：
+
+- `ok`：required，布尔值
+- `result`：required；成功时为对象，失败时为 `null`
+- `error`：required；成功时为 `null`，失败时为对象
+- `meta`：required，对象
+- `meta.bridge_version`：required
+- `meta.worker_id`：required
+- `meta.request_id`：required
+
+第一版不要求所有 endpoint 的 `result` payload 形状完全一致，但必须保证 envelope 四个顶层字段始终存在。
 
 版本策略固定为 URL prefix：
 
@@ -490,6 +510,9 @@ Master 应把 bridge 返回的内容视为控制结果，不直接假定 worker 
 - `master_allowlist`
 - `run_root_dir`
 - `log_dir`
+- `start_timeout_seconds`
+- `stop_grace_period_seconds`
+- `stop_force_kill_timeout_seconds`
 
 ### Master worker registry
 
@@ -502,6 +525,16 @@ Master 应把 bridge 返回的内容视为控制结果，不直接假定 worker 
 - `enabled`
 
 token 第一版建议优先从环境变量注入；若支持文件，也应通过显式 `token_file` 路径引用，而不是把 secret 混在普通 registry 里。
+
+路径约定建议显式化，而不是依赖隐藏默认值：
+
+- worker bridge：`tdxquant bridge serve --config /abs/path/worker-bridge.json`
+- Master registry consumer：`--registry /abs/path/master-workers.json`
+
+若需要仓库内推荐位置，第一版可约定：
+
+- worker bridge config：`runtime/bridge/worker-bridge.json`
+- Master worker registry：`runtime/bridge/master-workers.json`
 
 配置更新策略：
 
