@@ -1,0 +1,11 @@
+[
+  {
+    "worker_id": "worker-sh-01",
+    "label": "Shanghai Worker",
+    "host": "192.168.1.21",
+    "port": 8787,
+    "token_env": "TDX_BRIDGE_TOKEN_WORKER_SH_01",
+    "role_tags": ["subscription-watch"],
+    "enabled": true
+  }
+]

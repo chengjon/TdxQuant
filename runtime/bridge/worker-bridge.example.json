@@ -1,0 +1,12 @@
+{
+  "worker_id": "worker-sh-01",
+  "bind_host": "0.0.0.0",
+  "port": 8787,
+  "token": "replace-with-real-token",
+  "master_allowlist": ["192.168.1.10"],
+  "run_root_dir": "runtime/subscription-watch",
+  "log_dir": "runtime/bridge/logs",
+  "start_timeout_seconds": 10,
+  "stop_grace_period_seconds": 5,
+  "stop_force_kill_timeout_seconds": 2
+}
