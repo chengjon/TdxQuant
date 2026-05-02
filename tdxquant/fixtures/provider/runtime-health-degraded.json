@@ -2,11 +2,11 @@
   "success": true,
   "ok": true,
   "code": "ok",
-  "message": "collected provider doctor diagnostics",
-  "capability": "runtime.doctor",
+  "message": "collected provider health diagnostics",
+  "capability": "runtime.health",
   "capability_version": "v1",
   "schema_version": "2026-04-28",
-  "request_id": "fixture-runtime-doctor-degraded",
+  "request_id": "fixture-runtime-health-degraded",
   "started_at": "2026-04-28T12:00:00Z",
   "finished_at": "2026-04-28T12:00:00Z",
   "elapsed_ms": 0.0,
@@ -97,32 +97,6 @@
     "warnings": [
       "query_runtime: query runtime initialization failed",
       "desktop_window: desktop window probe failed"
-    ],
-    "findings": [
-      {
-        "id": "query_runtime",
-        "severity": "error",
-        "status": "failed",
-        "summary": "query runtime initialization failed",
-        "critical": true,
-        "related_checks": [
-          "query_runtime"
-        ],
-        "recommended_action_id": "query_runtime",
-        "recommended_action": "Confirm TongDaXin is running and the Windows TdxQuant runtime initializes successfully."
-      },
-      {
-        "id": "desktop_window",
-        "severity": "warning",
-        "status": "warning",
-        "summary": "desktop window probe failed",
-        "critical": false,
-        "related_checks": [
-          "desktop_window"
-        ],
-        "recommended_action_id": "desktop_window",
-        "recommended_action": "Verify the TongDaXin desktop window title and that the client is visible."
-      }
     ],
     "next_action": "Confirm TongDaXin is running and the Windows TdxQuant runtime initializes successfully."
   },

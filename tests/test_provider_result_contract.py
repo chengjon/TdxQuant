@@ -25,6 +25,11 @@ class ProviderResultContractTests(unittest.TestCase):
             runtime=build_runtime_metadata(mode="bridge"),
         )
         self.assertEqual(payload, expected)
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertIsInstance(payload["warnings"], list)
+        self.assertIsInstance(payload["artifacts"], list)
+        self.assertIsInstance(payload["data"], dict)
 
     def test_failure_fixture_matches_provider_contract(self) -> None:
         expected = self._load_fixture("provider_result_failure.json")
@@ -47,3 +52,8 @@ class ProviderResultContractTests(unittest.TestCase):
             runtime=build_runtime_metadata(mode="bridge"),
         )
         self.assertEqual(payload, expected)
+        self.assertFalse(payload["success"])
+        self.assertFalse(payload["ok"])
+        self.assertIsInstance(payload["warnings"], list)
+        self.assertIsInstance(payload["artifacts"], list)
+        self.assertIsInstance(payload["data"], dict)

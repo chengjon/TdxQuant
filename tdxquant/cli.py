@@ -147,6 +147,7 @@ PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
 def _add_api_common_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--profile", default="default")
     subparser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(subparser)
     subparser.add_argument("--output", help="Optional path to write the JSON result")
 
 
@@ -161,6 +162,13 @@ def _add_task_common_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--trade-profile")
     subparser.add_argument("--strategy-path")
     subparser.add_argument("--output", help="Optional path to write the JSON result")
+
+
+def _add_replay_provider_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--provider-mode", choices=("live", "replay"), default="live")
+    replay_group = subparser.add_mutually_exclusive_group()
+    replay_group.add_argument("--fixture")
+    replay_group.add_argument("--fixture-path")
 
 
 def _add_report_common_arguments(subparser: argparse.ArgumentParser, *, default_profile: str | None = None) -> None:
@@ -945,6 +953,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_subscription_watch_parser.add_argument("--jsonl-output-path")
     task_subscription_watch_parser.add_argument("--csv-output-path")
     task_subscription_watch_parser.add_argument("--status-output-path")
+    _add_replay_provider_arguments(task_subscription_watch_parser)
     _add_task_common_arguments(task_subscription_watch_parser)
 
     task_ledger_summary_parser = task_subparsers.add_parser("ledger-summary")
@@ -1319,14 +1328,17 @@ def build_parser() -> argparse.ArgumentParser:
     pingan_buy_parser.add_argument("--result-close-pre-delay", type=float)
     _add_trade_safety_arguments(pingan_buy_parser)
     tdx_capabilities_parser = subparsers.add_parser("tdx-capabilities")
+    _add_replay_provider_arguments(tdx_capabilities_parser)
     tdx_health_parser = subparsers.add_parser("tdx-health")
     tdx_health_parser.add_argument("--window-key", default="通达信金融终端")
     tdx_health_parser.add_argument("--hid-port")
     tdx_health_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_health_parser)
     tdx_doctor_parser = subparsers.add_parser("tdx-doctor")
     tdx_doctor_parser.add_argument("--window-key", default="通达信金融终端")
     tdx_doctor_parser.add_argument("--hid-port")
     tdx_doctor_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_doctor_parser)
     tdx_probe_parser = subparsers.add_parser("tdx-probe")
     tdx_probe_parser.add_argument("--window-key", default="通达信", help="Top-level window keyword for TongDaXin")
     tdx_probe_parser.add_argument("--max-depth", type=int, default=12)
@@ -1551,6 +1563,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_send_user_block_parser.add_argument("--show", action=argparse.BooleanOptionalAction, default=False)
     _add_block_mutation_arguments(tdx_send_user_block_parser)
     tdx_send_user_block_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_send_user_block_parser)
     tdx_formula_format_data_parser = subparsers.add_parser("tdx-formula-format-data")
     tdx_formula_format_data_parser.add_argument("--input-json-file", required=True)
     tdx_formula_format_data_parser.add_argument("--strategy-path")
@@ -1590,6 +1603,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_formula_screen_parser.add_argument("--start-time", default="")
     tdx_formula_screen_parser.add_argument("--end-time", default="")
     tdx_formula_screen_parser.add_argument("--count", default=0, type=int)
+    _add_replay_provider_arguments(tdx_formula_screen_parser)
     tdx_formula_screen_parser.add_argument("--dividend-type", default=0, type=int, choices=[0, 1, 2])
     tdx_formula_screen_parser.add_argument("--strategy-path")
     tdx_formula_exp_parser = subparsers.add_parser("tdx-formula-exp")
@@ -2539,6 +2553,97 @@ def _build_provider_result_payload(
     )
 
 
+_SUPPORTED_API_REPLAY_COMMANDS = {
+    "capabilities",
+    "health",
+    "doctor",
+    "formula-screen",
+    "send-user-block",
+}
+
+_API_REPLAY_CAPABILITIES = {
+    "snapshot": "market.snapshot",
+    "send-user-block": "block.send_user_block",
+    "formula-screen": "formula.screen",
+}
+
+
+def _build_cli_replay_failure_result(*, capability: str, message: str) -> Result:
+    return Result(
+        ok=False,
+        code=ErrorCode.INVALID_REQUEST,
+        message=message,
+        data={
+            "replay_source": {
+                "mode": "replay",
+                "capability": capability,
+            }
+        },
+    )
+
+
+def _infer_api_replay_capability(args: argparse.Namespace) -> str:
+    return _API_REPLAY_CAPABILITIES.get(args.api_command, f"api.{args.api_command}")
+
+
+def _reject_unsupported_api_replay(args: argparse.Namespace) -> Result | None:
+    if getattr(args, "provider_mode", "live") != "replay":
+        return None
+    if args.api_command in _SUPPORTED_API_REPLAY_COMMANDS:
+        return None
+    return _build_cli_replay_failure_result(
+        capability=_infer_api_replay_capability(args),
+        message=f"unsupported replay api command: {args.api_command}",
+    )
+
+
+def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None:
+    if getattr(args, "provider_mode", "live") != "replay":
+        return None
+    try:
+        manager = TdxApiManager(
+            profile="default",
+            strategy_path=getattr(args, "strategy_path", None),
+            provider_mode="replay",
+            replay_fixture=getattr(args, "fixture", None),
+            replay_fixture_path=getattr(args, "fixture_path", None),
+        )
+    except ValueError as exc:
+        return _build_cli_replay_failure_result(capability=str(args.command), message=str(exc))
+
+    if args.command == "tdx-capabilities":
+        return manager.runtime.capabilities()
+    if args.command == "tdx-health":
+        return manager.runtime.health(window_key=args.window_key, hid_port=args.hid_port)
+    if args.command == "tdx-doctor":
+        return manager.runtime.doctor(window_key=args.window_key, hid_port=args.hid_port)
+    if args.command == "tdx-send-user-block":
+        return manager.block.send_user_block(
+            block_code=args.block_code,
+            stocks=args.stock,
+            show=args.show,
+            mutation_key=args.mutation_key,
+            audit_dir=args.audit_dir,
+        )
+    if args.command == "tdx-formula-screen":
+        return manager.formula.screen(
+            formula_name=args.formula_name,
+            stock_list=args.code,
+            formula_arg=args.formula_arg,
+            return_count=args.return_count,
+            return_date=args.return_date,
+            stock_period=args.stock_period,
+            start_time=args.start_time,
+            end_time=args.end_time,
+            count=args.count,
+            dividend_type=args.dividend_type,
+        )
+    return _build_cli_replay_failure_result(
+        capability=str(args.command),
+        message=f"unsupported replay flat command: {args.command}",
+    )
+
+
 def _build_catalog_resolved_execution_namespace(
     args: argparse.Namespace,
     *,
@@ -2849,8 +2954,27 @@ def _run_catalog_bundle(args: argparse.Namespace) -> Result:
 
 
 def _handle_api_subcommand(args: argparse.Namespace) -> Result:
+    replay_rejection = _reject_unsupported_api_replay(args)
+    if replay_rejection is not None:
+        return replay_rejection
     try:
-        manager = TdxApiManager(profile=args.profile, strategy_path=args.strategy_path)
+        manager_kwargs: dict[str, object] = {
+            "profile": args.profile,
+            "strategy_path": args.strategy_path,
+        }
+        if (
+            getattr(args, "provider_mode", "live") != "live"
+            or getattr(args, "fixture", None) is not None
+            or getattr(args, "fixture_path", None) is not None
+        ):
+            manager_kwargs.update(
+                {
+                    "provider_mode": getattr(args, "provider_mode", "live"),
+                    "replay_fixture": getattr(args, "fixture", None),
+                    "replay_fixture_path": getattr(args, "fixture_path", None),
+                }
+            )
+        manager = TdxApiManager(**manager_kwargs)
     except ValueError as exc:
         return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
 
@@ -3108,14 +3232,27 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
 
 
 def _build_task_manager(args: argparse.Namespace) -> TdxTaskManager:
-    return TdxTaskManager(
-        profile=args.profile,
-        api_profile=getattr(args, "api_profile", None),
-        trade_profile=getattr(args, "trade_profile", None),
-        strategy_path=getattr(args, "strategy_path", None),
-        title_keyword=args.title_key,
-        exe_path=args.exe_path,
-    )
+    manager_kwargs: dict[str, object] = {
+        "profile": args.profile,
+        "api_profile": getattr(args, "api_profile", None),
+        "trade_profile": getattr(args, "trade_profile", None),
+        "strategy_path": getattr(args, "strategy_path", None),
+        "title_keyword": args.title_key,
+        "exe_path": args.exe_path,
+    }
+    if (
+        getattr(args, "provider_mode", "live") != "live"
+        or getattr(args, "fixture", None) is not None
+        or getattr(args, "fixture_path", None) is not None
+    ):
+        manager_kwargs.update(
+            {
+                "provider_mode": getattr(args, "provider_mode", "live"),
+                "replay_fixture": getattr(args, "fixture", None),
+                "replay_fixture_path": getattr(args, "fixture_path", None),
+            }
+        )
+    return TdxTaskManager(**manager_kwargs)
 
 
 def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace, command_name: str) -> Result | None:
@@ -3677,6 +3814,8 @@ def main() -> int:
         result = _handle_trade_subcommand(args)
     elif args.command == "catalog":
         result = _handle_catalog_subcommand(args)
+    elif (replay_result := _run_flat_replay_provider_command(args)) is not None:
+        result = replay_result
     elif args.command == "health-check":
         result = adapter.health_check()
     elif args.command == "inspect":

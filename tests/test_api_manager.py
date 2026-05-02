@@ -23,6 +23,7 @@ from tdxquant.api.market import MarketApi
 from tdxquant.api.meta import MetaApi
 from tdxquant.api.runtime import RuntimeApi
 from tdxquant.models import ErrorCode, Result
+from tdxquant.replay_fixtures import load_provider_replay_fixture
 from tdxquant.reporting import get_report_preset_path, load_report_presets, resolve_report_preset
 from tdxquant.tasking import get_task_preset_path, load_task_presets, resolve_task_preset
 
@@ -1210,6 +1211,62 @@ class TdxApiManagerTests(unittest.TestCase):
         manager = TdxApiManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
 
+    def test_manager_formula_screen_replay_mode_uses_default_fixture_without_live_call(self) -> None:
+        live_result = Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message="live formula screen should not run in replay mode",
+        )
+        manager = TdxApiManager(profile="default", provider_mode="replay")
+        with patch.object(type(manager._formula_api), "screen", return_value=live_result) as mocked_screen:
+            result = manager.formula.screen(
+                formula_name="UPN",
+                stock_list=["000001.SZ"],
+                formula_arg="3",
+            )
+        self.assertTrue(result.ok)
+        self.assertEqual(result.message, "screened formula matches")
+        self.assertEqual(result.data["matched_symbols"], ["000001.SZ"])
+        self.assertEqual(result.data["manager"]["method"], "screen")
+        mocked_screen.assert_not_called()
+
+    def test_manager_replay_mode_rejects_unsupported_capability_without_live_fallback(self) -> None:
+        live_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="live snapshot should not run in replay mode",
+            data={"rows": [{"symbol": "688260.SH"}]},
+        )
+        manager = TdxApiManager(profile="default", provider_mode="replay")
+        with patch.object(type(manager._market_api), "snapshot", return_value=live_result) as mocked_snapshot:
+            result = manager.market.snapshot("688260.SH")
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("unsupported", result.message)
+        mocked_snapshot.assert_not_called()
+
+    def test_manager_formula_screen_replay_mode_accepts_explicit_fixture_path(self) -> None:
+        fixture_payload = load_provider_replay_fixture("formula-screen-failure")
+        with TemporaryDirectory() as temp_dir:
+            fixture_path = Path(temp_dir) / "formula-screen-failure.json"
+            fixture_path.write_text(json.dumps(fixture_payload, ensure_ascii=False), encoding="utf-8")
+            live_result = Result(ok=True, code=ErrorCode.OK, message="live formula screen should not run")
+            manager = TdxApiManager(
+                profile="default",
+                provider_mode="replay",
+                replay_fixture_path=str(fixture_path),
+            )
+            with patch.object(type(manager._formula_api), "screen", return_value=live_result) as mocked_screen:
+                result = manager.formula.screen(
+                    formula_name="UPN",
+                    stock_list=["000001.SZ"],
+                )
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "formula argument is invalid")
+        self.assertEqual(result.data["manager"]["method"], "screen")
+        mocked_screen.assert_not_called()
+
     def test_manager_snapshot_uses_provider_result_envelope(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"symbol": "688260.SH"}]})
         with patch("tdxquant.api.market.run_tdx_data_snapshot", return_value=expected):
@@ -1217,7 +1274,9 @@ class TdxApiManagerTests(unittest.TestCase):
             result = manager.market.snapshot("688260.SH")
         payload = result.to_dict()
         self.assertIn("success", payload)
+        self.assertIn("ok", payload)
         self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
         self.assertEqual(payload["capability"], "market.snapshot")
         self.assertIn("capability_version", payload)
         self.assertIn("schema_version", payload)
@@ -1230,6 +1289,8 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(payload["data"]["rows"], [{"symbol": "688260.SH"}])
         self.assertEqual(payload["data"]["api_profile"]["name"], "brief")
         self.assertEqual(payload["data"]["manager"]["method"], "snapshot")
+        self.assertIsInstance(payload["warnings"], list)
+        self.assertIsInstance(payload["data"], dict)
         self.assertEqual(payload["artifacts"], [])
 
     def test_manager_snapshot_failure_uses_provider_result_envelope(self) -> None:
@@ -1246,12 +1307,26 @@ class TdxApiManagerTests(unittest.TestCase):
             result = manager.market.snapshot("688260.SH")
         payload = result.to_dict()
         self.assertFalse(payload["success"])
+        self.assertFalse(payload["ok"])
         self.assertEqual(payload["code"], ErrorCode.EXECUTION_FAILED.value)
         self.assertEqual(payload["message"], "snapshot failed")
         self.assertEqual(payload["warnings"], ["probe-warning"])
         self.assertEqual(payload["data"]["next_action"], "retry")
         self.assertEqual(payload["capability"], "market.snapshot")
         self.assertEqual(payload["runtime"]["mode"], "manager")
+
+    def test_manager_runtime_health_envelope_preserves_diagnostic_success_semantics(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"overall_status": "unavailable", "checks": {}})
+        with patch("tdxquant.api.runtime.run_tdx_provider_health", return_value=expected):
+            manager = TdxApiManager(profile="default", strategy_path="strategy.py")
+            result = manager.runtime.health(window_key="平安证券")
+        payload = result.to_dict()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["capability"], "runtime.health")
+        self.assertEqual(payload["data"]["overall_status"], "unavailable")
+        self.assertIsInstance(payload["warnings"], list)
+        self.assertIsInstance(payload["artifacts"], list)
 
     def test_manager_snapshot_attaches_metadata(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
@@ -1595,7 +1670,16 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(result.data["api_profile"]["options"]["down_type"], 2)
 
     def test_manager_runtime_capabilities_attaches_metadata(self) -> None:
-        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"capabilities": []})
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "capabilities": [],
+                "summary": {"total": 0, "by_domain": {}, "by_stability": {}, "by_side_effect_level": {}},
+                "grading": {"stability_levels": [], "side_effect_levels": []},
+            },
+        )
         with patch("tdxquant.api.runtime.run_tdx_provider_capabilities", return_value=expected) as mocked:
             manager = TdxApiManager(profile="default", strategy_path="strategy.py")
             result = manager.runtime.capabilities()
@@ -1604,9 +1688,32 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(result.data["manager"]["method"], "capabilities")
         self.assertEqual(result.data["api_profile"]["name"], "default")
         self.assertIn("manager_call", result.data["timing"])
+        payload = result.to_dict()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["capability"], "runtime.capabilities")
+        self.assertIn("summary", payload["data"])
+        self.assertIn("grading", payload["data"])
 
     def test_manager_runtime_health_attaches_metadata_and_forwards_probe_args(self) -> None:
-        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"overall_status": "degraded", "checks": {}})
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "overall_status": "degraded",
+                "checks": {},
+                "recommended_actions": ["retry query runtime"],
+                "recommended_action_items": [
+                    {
+                        "id": "query_runtime",
+                        "summary": "retry query runtime",
+                        "severity": "error",
+                        "related_checks": ["query_runtime"],
+                    }
+                ],
+            },
+        )
         with patch("tdxquant.api.runtime.run_tdx_provider_health", return_value=expected) as mocked:
             manager = TdxApiManager(profile="default", strategy_path="strategy.py")
             result = manager.runtime.health(window_key="平安证券", hid_port="COM3")
@@ -1620,9 +1727,36 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(result.data["api_profile"]["options"]["window_key"], "平安证券")
         self.assertEqual(result.data["api_profile"]["options"]["hid_port"], "COM3")
         self.assertEqual(result.data["overall_status"], "degraded")
+        self.assertIn("recommended_action_items", result.data)
 
     def test_manager_runtime_doctor_attaches_metadata_and_forwards_probe_args(self) -> None:
-        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"overall_status": "unavailable", "findings": []})
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "overall_status": "unavailable",
+                "findings": [
+                    {
+                        "id": "query_runtime",
+                        "severity": "error",
+                        "status": "failed",
+                        "summary": "runtime failed",
+                        "critical": True,
+                        "related_checks": ["query_runtime"],
+                        "recommended_action_id": "query_runtime",
+                    }
+                ],
+                "recommended_action_items": [
+                    {
+                        "id": "query_runtime",
+                        "summary": "restart runtime",
+                        "severity": "error",
+                        "related_checks": ["query_runtime"],
+                    }
+                ],
+            },
+        )
         with patch("tdxquant.api.runtime.run_tdx_provider_doctor", return_value=expected) as mocked:
             manager = TdxApiManager(profile="default", strategy_path="strategy.py")
             result = manager.runtime.doctor(window_key="通达信金融终端", hid_port="COM9")
@@ -1636,6 +1770,12 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(result.data["api_profile"]["options"]["window_key"], "通达信金融终端")
         self.assertEqual(result.data["api_profile"]["options"]["hid_port"], "COM9")
         self.assertEqual(result.data["overall_status"], "unavailable")
+        payload = result.to_dict()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["capability"], "runtime.doctor")
+        self.assertIn("recommended_action_items", payload["data"])
+        self.assertIn("recommended_action_id", payload["data"]["findings"][0])
 
     def test_manager_runtime_send_warn_attaches_metadata_and_preserves_count(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
@@ -1900,6 +2040,52 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(result.data["block_mutation"]["operation"], "send_user_block")
         self.assertEqual(result.data["block_mutation"]["requested_stock_count"], 1)
 
+    def test_manager_block_send_user_block_preserves_governance_contract(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="skipped",
+            data={
+                "block_mutation": {
+                    "schema_version": "2026-05-02",
+                    "mutation_id": "mut-003",
+                    "mutation_key": "mk-noop-1",
+                    "operation": "send_user_block",
+                    "status": "noop",
+                    "governance_decision": "skip",
+                    "governance_reason": "already_applied",
+                    "block_code": "ZXG",
+                    "requested_stock_count": 2,
+                    "show": False,
+                },
+                "artifacts": {
+                    "audit_log_path": "runtime/block-mutations/mut-003.json",
+                },
+            },
+        )
+        with patch("tdxquant.api.block.run_tdx_send_user_block", return_value=expected) as mocked:
+            manager = TdxApiManager(profile="default", strategy_path="strategy.py")
+            result = manager.block.send_user_block(
+                "ZXG",
+                ["000001.SZ", "600519.SH"],
+                show=False,
+                mutation_key="mk-noop-1",
+                audit_dir="runtime/block-mutations",
+            )
+        mocked.assert_called_once_with(
+            block_code="ZXG",
+            stocks=["000001.SZ", "600519.SH"],
+            show=False,
+            mutation_key="mk-noop-1",
+            audit_dir="runtime/block-mutations",
+            strategy_path="strategy.py",
+        )
+        payload = result.to_dict()
+        self.assertEqual(payload["data"]["block_mutation"]["status"], "noop")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_decision"], "skip")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_reason"], "already_applied")
+        self.assertEqual(payload["data"]["artifacts"]["audit_log_path"], "runtime/block-mutations/mut-003.json")
+
 
 class TdxTaskManagerTests(unittest.TestCase):
     def test_public_import_is_available(self) -> None:
@@ -1985,7 +2171,7 @@ class TdxTaskManagerTests(unittest.TestCase):
             manager = TdxTaskManager(
                 profile="subscription_watch",
                 strategy_path="strategy.py",
-                profile_overrides={"run_root_dir": temp_dir, "poll_interval": 0.1},
+                profile_overrides={"run_root_dir": temp_dir, "poll_interval": 0.0},
             )
             with patch.object(type(manager.api_manager.runtime), "open_subscription_session", return_value=fake_session):
                 result = manager.subscription_watch(stock_list=["600519.SH"], max_events=1, poll_interval=0.0)
@@ -2030,7 +2216,7 @@ class TdxTaskManagerTests(unittest.TestCase):
             manager = TdxTaskManager(
                 profile="subscription_watch",
                 strategy_path="strategy.py",
-                profile_overrides={"run_root_dir": temp_dir, "poll_interval": 0.0},
+                profile_overrides={"run_root_dir": temp_dir, "poll_interval": 0.1},
             )
             with (
                 patch.object(type(manager.api_manager.runtime), "open_subscription_session", return_value=fake_session),
@@ -2047,6 +2233,107 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(summary_payload["stop_reason"], "keyboard_interrupt")
         self.assertEqual(fake_session.unsubscribe_calls, [["600519.SH"]])
         self.assertEqual(fake_session.close_calls, 1)
+
+    def test_task_subscription_watch_replay_mode_materializes_completed_run_without_live_session(self) -> None:
+        fake_session = _FakeTaskRuntimeSubscriptionSession(
+            events=[
+                {
+                    "600519.SH": {
+                        "Now": 999.0,
+                        "UpdateTime": "2026-05-02T09:30:01+08:00",
+                    }
+                }
+            ]
+        )
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTaskManager(
+                profile="subscription_watch",
+                strategy_path="strategy.py",
+                profile_overrides={"run_root_dir": temp_dir},
+                provider_mode="replay",
+            )
+            with patch.object(type(manager.api_manager.runtime), "open_subscription_session", return_value=fake_session) as mocked_open:
+                result = manager.subscription_watch(stock_list=["600519.SH"])
+
+            manifest_path = Path(result.data["artifacts"]["manifest_path"])
+            summary_path = Path(result.data["artifacts"]["summary_path"])
+            events_path = Path(result.data["artifacts"]["events_jsonl_path"])
+            manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+            event_rows = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["task"]["name"], "subscription_watch")
+        self.assertEqual(result.data["summary"]["event_count"], 2)
+        self.assertEqual(result.data["summary"]["stop_reason"], "max_events")
+        self.assertIn("events_csv_path", result.data["artifacts"])
+        self.assertIn("jsonl_output_path", result.data["artifacts"])
+        self.assertIn("csv_output_path", result.data["artifacts"])
+        self.assertIn("status_output_path", result.data["artifacts"])
+        self.assertEqual(result.data["artifacts"]["jsonl_output_path"], result.data["artifacts"]["events_jsonl_path"])
+        self.assertEqual(result.data["artifacts"]["csv_output_path"], result.data["artifacts"]["events_csv_path"])
+        self.assertEqual(result.data["artifacts"]["status_output_path"], result.data["artifacts"]["status_path"])
+        self.assertEqual(manifest_payload["provider_mode"], "replay")
+        self.assertEqual(summary_payload["final_state"], "completed")
+        self.assertEqual(event_rows[0]["run_id"], result.data["subscription"]["run_id"])
+        mocked_open.assert_not_called()
+
+    def test_task_subscription_watch_replay_mode_accepts_explicit_source_directory(self) -> None:
+        source_manifest = load_provider_replay_fixture("subscription-watch-manifest")
+        source_status = load_provider_replay_fixture("subscription-watch-status-completed")
+        source_summary = load_provider_replay_fixture("subscription-watch-summary-completed")
+        source_events = load_provider_replay_fixture("subscription-watch-events")
+        source_run_id = source_manifest["run_id"]
+        with TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "source-run"
+            source_dir.mkdir()
+            (source_dir / "manifest.json").write_text(json.dumps(source_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            (source_dir / "status.json").write_text(json.dumps(source_status, ensure_ascii=False, indent=2), encoding="utf-8")
+            (source_dir / "summary.json").write_text(json.dumps(source_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+            (source_dir / "events.jsonl").write_text(
+                "\n".join(json.dumps(row, ensure_ascii=False) for row in source_events) + "\n",
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="subscription_watch",
+                strategy_path="strategy.py",
+                profile_overrides={"run_root_dir": str(Path(temp_dir) / "output")},
+                provider_mode="replay",
+                replay_fixture_path=str(source_dir),
+            )
+            with patch.object(type(manager.api_manager.runtime), "open_subscription_session") as mocked_open:
+                result = manager.subscription_watch(stock_list=["600519.SH"])
+
+        self.assertTrue(result.ok)
+        self.assertNotEqual(result.data["subscription"]["run_id"], source_run_id)
+        self.assertEqual(result.data["manifest"]["provider_mode"], "replay")
+        self.assertTrue(result.data["artifacts"]["run_dir"].endswith(result.data["subscription"]["run_id"]))
+        mocked_open.assert_not_called()
+
+    def test_task_subscription_watch_replay_mode_rejects_incomplete_source_directory_without_live_session(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "broken-run"
+            source_dir.mkdir()
+            (source_dir / "manifest.json").write_text("{}", encoding="utf-8")
+            (source_dir / "status.json").write_text("{}", encoding="utf-8")
+            (source_dir / "summary.json").write_text("{}", encoding="utf-8")
+            manager = TdxTaskManager(
+                profile="subscription_watch",
+                strategy_path="strategy.py",
+                profile_overrides={"run_root_dir": str(Path(temp_dir) / "output")},
+                provider_mode="replay",
+                replay_fixture_path=str(source_dir),
+            )
+
+            with patch.object(type(manager.api_manager.runtime), "open_subscription_session") as mocked_open:
+                result = manager.subscription_watch(stock_list=["600519.SH"])
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.data["replay_source"]["mode"], "replay")
+        self.assertEqual(result.data["replay_source"]["capability"], "subscription.watch")
+        self.assertIn("subscription.watch replay artifact does not exist", result.message)
+        mocked_open.assert_not_called()
 
     def test_task_ledger_summary_reads_default_jsonl_and_filters(self) -> None:
         with TemporaryDirectory() as temp_dir:

@@ -2,24 +2,31 @@
   "success": false,
   "ok": false,
   "code": "invalid_request",
-  "message": "invalid formula input",
+  "message": "formula argument is invalid",
   "capability": "formula.screen",
   "capability_version": "v1",
   "schema_version": "2026-04-28",
-  "request_id": "req-failure",
+  "request_id": "fixture-formula-screen-failure",
   "started_at": "2026-04-28T12:00:00Z",
   "finished_at": "2026-04-28T12:00:01Z",
   "elapsed_ms": 1000.0,
   "runtime": {
     "provider": "tdxquant",
     "provider_version": "dev",
-    "mode": "bridge"
+    "mode": "replay"
   },
   "warnings": [
-    "formula warning"
+    "formula.screen input validation failed"
   ],
   "data": {
-    "next_action": "fix-input"
+    "input": {
+      "formula_name": "UPN",
+      "formula_arg": "",
+      "stock_list": [
+        "000001.SZ"
+      ]
+    },
+    "next_action": "provide a non-empty formula argument"
   },
   "artifacts": []
 }

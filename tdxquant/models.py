@@ -120,6 +120,7 @@ class Result:
             warnings = list(self.warnings)
         return {
             "success": self.ok,
+            "ok": self.ok,
             "code": self.code.value,
             "message": self.message,
             "capability": capability or contract.get("capability") or "unknown",

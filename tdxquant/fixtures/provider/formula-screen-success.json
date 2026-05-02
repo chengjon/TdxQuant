@@ -1,5 +1,6 @@
 {
   "success": true,
+  "ok": true,
   "code": "ok",
   "message": "screened formula matches",
   "capability": "formula.screen",

@@ -106,15 +106,17 @@ def attach_manager_metadata(
     result.data["api_profile"] = metadata["api_profile"]
     result.data.setdefault("timing", {}).update(metadata["timing"])
     manager_timing = timing.get("manager_call", {})
+    existing_contract = dict(result._provider_contract or {})
     result._provider_contract = {
-        "capability": f"{domain}.{method}",
-        "capability_version": DEFAULT_CAPABILITY_VERSION,
-        "schema_version": DEFAULT_SCHEMA_VERSION,
+        "capability": existing_contract.get("capability") or f"{domain}.{method}",
+        "capability_version": existing_contract.get("capability_version") or DEFAULT_CAPABILITY_VERSION,
+        "schema_version": existing_contract.get("schema_version") or DEFAULT_SCHEMA_VERSION,
+        "request_id": existing_contract.get("request_id"),
         "started_at": manager_timing.get("started_at"),
         "finished_at": manager_timing.get("finished_at"),
         "elapsed_ms": manager_timing.get("total_ms"),
-        "runtime": build_runtime_metadata(mode="manager"),
-        "warnings": list(result.warnings),
-        "artifacts": list(result._provider_artifacts or []),
+        "runtime": existing_contract.get("runtime") or build_runtime_metadata(mode="manager"),
+        "warnings": list(existing_contract.get("warnings") or result.warnings),
+        "artifacts": list(existing_contract.get("artifacts") or result._provider_artifacts or []),
     }
     return result

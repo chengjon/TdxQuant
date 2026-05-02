@@ -33,11 +33,25 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "formula-screen-success.json",
     },
     {
+        "name": "formula-screen-failure",
+        "capability": "formula.screen",
+        "format": "json",
+        "description": "Representative failed formula.screen provider response sample.",
+        "relative_path": "formula-screen-failure.json",
+    },
+    {
         "name": "runtime-capabilities-success",
         "capability": "runtime.capabilities",
         "format": "json",
         "description": "Representative runtime.capabilities provider response sample.",
         "relative_path": "runtime-capabilities-success.json",
+    },
+    {
+        "name": "runtime-health-degraded",
+        "capability": "runtime.health",
+        "format": "json",
+        "description": "Representative degraded runtime.health provider response sample.",
+        "relative_path": "runtime-health-degraded.json",
     },
     {
         "name": "runtime-doctor-degraded",
@@ -52,6 +66,20 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "format": "json",
         "description": "Representative successful block mutation provider response sample.",
         "relative_path": "block-send-user-block-applied.json",
+    },
+    {
+        "name": "block-send-user-block-noop",
+        "capability": "block.send_user_block",
+        "format": "json",
+        "description": "Representative skipped block mutation provider response sample.",
+        "relative_path": "block-send-user-block-noop.json",
+    },
+    {
+        "name": "block-send-user-block-rejected",
+        "capability": "block.send_user_block",
+        "format": "json",
+        "description": "Representative rejected block mutation provider response sample.",
+        "relative_path": "block-send-user-block-rejected.json",
     },
     {
         "name": "subscription-event-batch",

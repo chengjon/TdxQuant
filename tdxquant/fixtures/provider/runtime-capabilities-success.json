@@ -1,5 +1,6 @@
 {
   "success": true,
+  "ok": true,
   "code": "ok",
   "message": "listed provider capabilities",
   "capability": "runtime.capabilities",
@@ -18,6 +19,11 @@
   "data": {
     "summary": {
       "total": 4,
+      "by_domain": {
+        "block": 1,
+        "formula": 1,
+        "runtime": 2
+      },
       "by_stability": {
         "stable": 2,
         "beta": 2
@@ -26,6 +32,18 @@
         "read_only": 2,
         "local_state_mutating": 2
       }
+    },
+    "grading": {
+      "stability_levels": [
+        "stable",
+        "beta",
+        "experimental"
+      ],
+      "side_effect_levels": [
+        "read_only",
+        "local_state_mutating",
+        "live_side_effecting"
+      ]
     },
     "capabilities": [
       {

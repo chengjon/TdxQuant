@@ -27,6 +27,10 @@ CLI:
 - 人工前台运行，持续接收订阅事件并落文件
 - 上层项目先通过文件协议消费 `JSONL / CSV / status.json`
 
+截至 `2026-05-02`，它还支持第三类场景：
+
+- replay mode 下离线物化一份 completed run artifact bundle，而不打开 live runtime session
+
 ## 3. 输入参数
 
 当前稳定输入至少包括：
@@ -38,6 +42,9 @@ CLI:
 - `jsonl_output_path`
 - `csv_output_path`
 - `status_output_path`
+- `provider_mode`
+- `fixture`
+- `fixture_path`
 
 语义说明：
 
@@ -45,7 +52,13 @@ CLI:
 - `max_events`：达到事件数后自动结束
 - `max_seconds`：达到运行时长后自动结束
 - `poll_interval`：前台保活轮询间隔
+- `provider_mode=live`：默认模式，打开真实 TongDaXin runtime subscription session
+- `provider_mode=replay`：离线模式，直接从 replay source 物化 completed run
+- `fixture`：显式选择 built-in replay source
+- `fixture_path`：显式选择 replay manifest 或 replay run 目录
 - 若不提供任何自动结束条件，则任务会一直运行到 `Ctrl+C`
+
+`fixture` 与 `fixture_path` 互斥。
 
 ## 4. 事件 JSONL Contract
 
@@ -58,6 +71,8 @@ CLI:
 每行当前固定字段：
 
 - `schema_version`
+- `capability`
+- `run_id`
 - `session_id`
 - `provider_instance_id`
 - `subscription_id`
@@ -79,7 +94,7 @@ CLI:
 - `symbol`：归一化后的股票代码；无法识别时可为 `null`
 - `source_ts`：从 TongDaXin callback payload 中尽力提取的源时间
 - `event_ts`：本地落盘时间
-- `reconnect_metadata`：当前第一版固定为 `null`
+- `reconnect_metadata`：当前第一版固定为空对象
 - `payload`：保留序列化后的原始事件载荷
 
 ## 5. CSV Contract
@@ -107,6 +122,8 @@ CLI:
 当前固定字段至少包括：
 
 - `schema_version`
+- `capability`
+- `run_id`
 - `state`
 - `session_id`
 - `provider_instance_id`
@@ -137,6 +154,8 @@ CLI:
 - `subscribe_failed`
 - `completed`
 
+在 replay mode 下，当前默认 built-in source 的 completed run 会保留 fixture 自带的 `stop_reason`，例如 `max_events`。
+
 ## 7. Completion Summary
 
 任务结束后返回的 task result 当前至少包含：
@@ -151,9 +170,30 @@ CLI:
 
 其中 `artifacts` 会暴露：
 
+- `run_dir`
+- `manifest_path`
+- `status_path`
+- `summary_path`
 - `jsonl_output_path`
 - `csv_output_path`
 - `status_output_path`
+
+同时 canonical run bundle 还会稳定生成：
+
+- `events_jsonl_path`
+- `events_csv_path`
+- `summary_path`
+
+在 replay mode 下，这些 artifact key 当前有稳定 alias 语义：
+
+- `jsonl_output_path == events_jsonl_path`，除非调用方显式传入 legacy `jsonl_output_path`
+- `csv_output_path == events_csv_path`，除非调用方显式传入 legacy `csv_output_path`
+- `status_output_path == status_path`，除非调用方显式传入 legacy `status_output_path`
+
+也就是说：
+
+- canonical run bundle 始终写到本次新建的 `run_dir`
+- legacy `*_output_path` 只是额外镜像出口，不替代 canonical artifact path
 
 ## 8. 当前边界
 
@@ -163,6 +203,9 @@ CLI:
 - 文件协议产物
 - bounded run
 - `Ctrl+C` 优雅退出
+- replay mode completed-run materialization
+- built-in replay source 自动选择
+- 显式 replay manifest / run-dir 输入
 
 这一版明确**不做**：
 
@@ -171,3 +214,17 @@ CLI:
 - reconnect/backoff
 - HTTP / SSE 输出通道
 - `catalog` / preset 暴露
+- live subscription session / delayed playback 模拟
+
+## 9. Replay Failure Behavior
+
+`provider_mode=replay` 下，`subscription-watch` 的失败语义当前是稳定的：
+
+- replay source 缺文件时直接失败，例如缺少 `manifest.json`、`status.json`、`summary.json` 或 `events.jsonl`
+- malformed bundle 直接失败，例如内置 bundle 结构不符合 `manifest/status/summary/events` 预期
+- 返回值固定为 task `Result` failure，`code=INVALID_REQUEST`
+- `data.replay_source.mode` 固定为 `replay`
+- `data.replay_source.capability` 固定为 `subscription.watch`
+- 不会降级回 live runtime，也不会尝试打开 subscription session
+
+因此上层调用方可以把 replay bundle 问题视为输入合同错误，而不是运行时随机故障。
