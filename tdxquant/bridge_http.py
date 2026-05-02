@@ -89,9 +89,15 @@ def load_bridge_config(config_path: str | Path) -> BridgeConfig:
         master_allowlist=[str(item) for item in payload.get("master_allowlist") or []],
         run_root_dir=str(payload.get("run_root_dir") or "runtime/subscription-watch"),
         log_dir=str(payload["log_dir"]) if payload.get("log_dir") is not None else None,
-        start_timeout_seconds=int(payload.get("start_timeout_seconds") or 10),
-        stop_grace_period_seconds=int(payload.get("stop_grace_period_seconds") or 5),
-        stop_force_kill_timeout_seconds=int(payload.get("stop_force_kill_timeout_seconds") or 2),
+        start_timeout_seconds=int(10 if payload.get("start_timeout_seconds") is None else payload.get("start_timeout_seconds")),
+        stop_grace_period_seconds=int(
+            5 if payload.get("stop_grace_period_seconds") is None else payload.get("stop_grace_period_seconds")
+        ),
+        stop_force_kill_timeout_seconds=int(
+            2
+            if payload.get("stop_force_kill_timeout_seconds") is None
+            else payload.get("stop_force_kill_timeout_seconds")
+        ),
     )
 
 
@@ -112,6 +118,9 @@ class BridgeHTTPServer(ThreadingHTTPServer):
         self.bridge_controller = controller or SubscriptionWatchBackgroundController(
             root_dir=self.run_root_dir,
             python_executable=sys.executable,
+            start_timeout_seconds=config.start_timeout_seconds,
+            default_stop_grace_period_seconds=config.stop_grace_period_seconds,
+            stop_force_kill_timeout_seconds=config.stop_force_kill_timeout_seconds,
         )
 
 
@@ -244,15 +253,19 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_watch_stop(self, request_id: str) -> None:
         body = self._read_json_body()
+        grace_period = self.server.bridge_config.stop_grace_period_seconds
+        if "grace_period_seconds" in body:
+            grace_period = self._optional_int(body.get("grace_period_seconds"))
         result = self.server.bridge_controller.stop(
             reason=self._optional_str(body.get("reason")),
-            grace_period_seconds=self._optional_int(body.get("grace_period_seconds")),
+            grace_period_seconds=grace_period,
         )
         self._write_control_result(result, request_id=request_id)
 
     def _handle_watch_status(self, request_id: str) -> None:
         control = self._background_state()
-        run_id = self._resolve_run_id(default_run_id=control.get("run_id"))
+        default_run_id = control.get("run_id") if bool(control.get("active")) else None
+        run_id = self._resolve_run_id(default_run_id=default_run_id)
         watch_status = None
         if run_id is not None:
             run_paths = build_subscription_watch_run_paths(self.server.run_root_dir, run_id=run_id)
@@ -388,7 +401,12 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return
         error = dict(result.get("error") or {})
         code = str(error.get("code") or "CONTROL_ERROR")
-        status = 409 if code in {"ALREADY_RUNNING", "CONTROL_LOCKED"} else 500
+        if code == "INVALID_REQUEST":
+            status = 400
+        elif code in {"ALREADY_RUNNING", "CONTROL_LOCKED"}:
+            status = 409
+        else:
+            status = 500
         self._write_json(
             status,
             build_bridge_failure(

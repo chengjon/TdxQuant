@@ -107,6 +107,8 @@ def run_bridge_watch_start(
     stock_list: list[str],
     max_events: int | None = None,
     max_seconds: float | None = None,
+    poll_interval: float | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
     body: dict[str, Any] = {"stock_list": list(stock_list)}
@@ -114,6 +116,10 @@ def run_bridge_watch_start(
         body["max_events"] = max_events
     if max_seconds is not None:
         body["max_seconds"] = max_seconds
+    if poll_interval is not None:
+        body["poll_interval"] = poll_interval
+    if idempotency_key is not None:
+        body["idempotency_key"] = idempotency_key
     return call_worker(
         worker,
         method="POST",

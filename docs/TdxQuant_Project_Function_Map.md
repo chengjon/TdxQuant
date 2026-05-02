@@ -213,8 +213,10 @@ TdxQuant
 - Master 侧静态 worker registry：`runtime/bridge/master-workers.json`
 - Master 侧远程 CLI：
   - `tdxquant bridge watch-start ...`
+  - 支持 `--max-events` / `--max-seconds` / `--poll-interval` / `--idempotency-key`
   - `tdxquant bridge watch-stop ...`
   - `tdxquant bridge watch-status ...`
+  - 默认只看当前 active snapshot；查历史 `status.json` 需要显式 `run_id`
 
 当前 bridge 对上层暴露的稳定 endpoint 为：
 

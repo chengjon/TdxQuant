@@ -100,12 +100,18 @@ class ApiCliParserTests(unittest.TestCase):
                 "5",
                 "--max-seconds",
                 "30",
+                "--poll-interval",
+                "0.5",
+                "--idempotency-key",
+                "idem-001",
             ]
         )
         self.assertEqual(args.bridge_command, "watch-start")
         self.assertEqual(args.code, ["000001.SZ", "600519.SH"])
         self.assertEqual(args.max_events, 5)
         self.assertEqual(args.max_seconds, 30.0)
+        self.assertEqual(args.poll_interval, 0.5)
+        self.assertEqual(args.idempotency_key, "idem-001")
 
     def test_bridge_watch_start_command_requires_registry_worker_and_code(self) -> None:
         parser = build_parser()
@@ -4569,6 +4575,10 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "5",
                 "--max-seconds",
                 "30",
+                "--poll-interval",
+                "0.5",
+                "--idempotency-key",
+                "idem-001",
             ]
         )
         with (
@@ -4584,6 +4594,8 @@ class ReportCliDispatchTests(unittest.TestCase):
             stock_list=["000001.SZ"],
             max_events=5,
             max_seconds=30.0,
+            poll_interval=0.5,
+            idempotency_key="idem-001",
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "started"}})
 

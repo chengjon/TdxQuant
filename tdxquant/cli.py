@@ -604,6 +604,8 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_start_parser.add_argument("--code", action="append", required=True)
     bridge_watch_start_parser.add_argument("--max-events", type=int)
     bridge_watch_start_parser.add_argument("--max-seconds", type=float)
+    bridge_watch_start_parser.add_argument("--poll-interval", type=float)
+    bridge_watch_start_parser.add_argument("--idempotency-key")
 
     bridge_watch_stop_parser = bridge_subparsers.add_parser("watch-stop")
     bridge_watch_stop_parser.add_argument("--registry", required=True)
@@ -3840,6 +3842,8 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                     stock_list=args.code,
                     max_events=args.max_events,
                     max_seconds=args.max_seconds,
+                    poll_interval=args.poll_interval,
+                    idempotency_key=args.idempotency_key,
                 )
             )
         if args.bridge_command == "watch-stop":

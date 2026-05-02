@@ -83,6 +83,32 @@ class BridgeEnvelopeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_bridge_config(config_path)
 
+    def test_load_bridge_config_preserves_explicit_zero_timeout_values(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "bridge.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "worker_id": "worker-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 8787,
+                        "token": "secret-token",
+                        "master_allowlist": ["127.0.0.1"],
+                        "run_root_dir": "runtime/subscription-watch",
+                        "start_timeout_seconds": 0,
+                        "stop_grace_period_seconds": 0,
+                        "stop_force_kill_timeout_seconds": 0,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = load_bridge_config(config_path)
+
+        self.assertEqual(config.start_timeout_seconds, 0)
+        self.assertEqual(config.stop_grace_period_seconds, 0)
+        self.assertEqual(config.stop_force_kill_timeout_seconds, 0)
+
 
 class BridgeRequestHandlerTests(unittest.TestCase):
     def _start_server(
@@ -197,13 +223,19 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                     f"{base_url}/bridge/v1/watch/start",
                     method="POST",
                     token="secret-token",
-                    payload={"stock_list": ["000001", "600519"], "max_events": 2, "poll_interval": 0.1},
+                    payload={
+                        "stock_list": ["000001", "600519"],
+                        "max_events": 2,
+                        "poll_interval": 0.1,
+                        "idempotency_key": "idem-001",
+                    },
                 )
                 self.assertTrue(payload["ok"])
                 self.assertEqual(payload["result"]["run_id"], "run-001")
                 self.assertEqual(controller.start_calls[0]["stock_list"], ["000001", "600519"])
                 self.assertEqual(controller.start_calls[0]["max_events"], 2)
                 self.assertEqual(controller.start_calls[0]["poll_interval"], 0.1)
+                self.assertEqual(controller.start_calls[0]["idempotency_key"], "idem-001")
             finally:
                 server.shutdown()
                 server.server_close()
@@ -214,11 +246,12 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             root_dir = Path(temp_dir)
             run_dir = root_dir / "run-001"
             run_dir.mkdir(parents=True)
+            pid = os.getpid()
             (root_dir / "active.json").write_text(
-                json.dumps({"state": "running", "active": True, "run_id": "run-001", "pid": 1234, "reason": None}),
+                json.dumps({"state": "running", "active": True, "run_id": "run-001", "pid": pid, "reason": None}),
                 encoding="utf-8",
             )
-            (root_dir / "pid").write_text("999999\n", encoding="utf-8")
+            (root_dir / "pid").write_text(f"{pid}\n", encoding="utf-8")
             (run_dir / "status.json").write_text(
                 json.dumps({"run_id": "run-001", "state": "running", "event_count": 3}),
                 encoding="utf-8",
@@ -291,6 +324,70 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 self.assertEqual(payload["result"]["control"]["state"], "failed")
                 self.assertFalse(payload["result"]["control"]["active"])
                 self.assertIsNone(payload["result"]["watch_status"])
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_status_does_not_fall_back_to_historical_status_without_explicit_run_id(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            run_dir = root_dir / "run-001"
+            run_dir.mkdir(parents=True)
+            (root_dir / "active.json").write_text(
+                json.dumps({"state": "completed", "active": False, "run_id": "run-001", "pid": None, "reason": "completed"}),
+                encoding="utf-8",
+            )
+            (run_dir / "status.json").write_text(
+                json.dumps({"run_id": "run-001", "state": "completed", "event_count": 3}),
+                encoding="utf-8",
+            )
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["control"]["run_id"], "run-001")
+                self.assertFalse(payload["result"]["control"]["active"])
+                self.assertIsNone(payload["result"]["watch_status"])
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_status_reads_historical_status_when_run_id_is_explicit(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            run_dir = root_dir / "run-001"
+            run_dir.mkdir(parents=True)
+            (root_dir / "active.json").write_text(
+                json.dumps({"state": "completed", "active": False, "run_id": "run-001", "pid": None, "reason": "completed"}),
+                encoding="utf-8",
+            )
+            (run_dir / "status.json").write_text(
+                json.dumps({"run_id": "run-001", "state": "completed", "event_count": 3}),
+                encoding="utf-8",
+            )
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?run_id=run-001", token="secret-token")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["watch_status"]["event_count"], 3)
             finally:
                 server.shutdown()
                 server.server_close()
@@ -597,6 +694,43 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 self.assertEqual(payload["error"]["code"], "ALREADY_RUNNING")
                 self.assertEqual(payload["error"]["message"], "subscription-watch background run is already active")
                 self.assertEqual(payload["error"]["details"], {"run_id": "run-001"})
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_start_maps_invalid_request_to_http_400(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.start_result = {
+                "ok": False,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "subscription watch task requires max_events > 0",
+                    "details": {},
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                with self.assertRaises(HTTPError) as ctx:
+                    self._request(
+                        f"{base_url}/bridge/v1/watch/start",
+                        method="POST",
+                        token="secret-token",
+                        payload={"stock_list": ["000001.SZ"], "max_events": 0},
+                    )
+                payload = json.loads(ctx.exception.read().decode("utf-8"))
+                self.assertEqual(ctx.exception.code, 400)
+                self.assertEqual(payload["error"]["code"], "INVALID_REQUEST")
+                self.assertEqual(payload["error"]["message"], "subscription watch task requires max_events > 0")
             finally:
                 server.shutdown()
                 server.server_close()

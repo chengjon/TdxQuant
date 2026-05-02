@@ -349,6 +349,84 @@ def test_start_rejects_when_active_state_is_running(tmp_path: Path) -> None:
     assert result["error"]["details"]["run_id"] == "run-001"
 
 
+def test_start_replays_current_active_run_for_same_idempotency_key(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+            "runner_log_path": str(tmp_path / "run-001" / "runner.log"),
+            "idempotency_key": "idem-001",
+        }
+    )
+    controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
+    controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+
+    result = controller.start(stock_list=["600519.SH"], idempotency_key="idem-001")
+
+    assert result["ok"] is True
+    assert result["result"]["run_id"] == "run-001"
+    assert result["result"]["state"] == "running"
+    assert result["result"]["pid"] == pid
+    assert result["result"]["replayed"] is True
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"stock_list": []}, "subscription watch task requires at least one stock code"),
+        ({"stock_list": ["600519.SH"], "max_events": 0}, "subscription watch task requires max_events > 0"),
+        ({"stock_list": ["600519.SH"], "max_seconds": 0.0}, "subscription watch task requires max_seconds > 0"),
+        ({"stock_list": ["600519.SH"], "poll_interval": -0.1}, "subscription watch task requires poll_interval >= 0"),
+    ],
+)
+def test_start_rejects_invalid_watch_request_before_spawn(
+    tmp_path: Path, kwargs: dict[str, object], message: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    spawn_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(controller, "_spawn_runner_process", lambda **spawn_kwargs: spawn_calls.append(spawn_kwargs))
+
+    result = controller.start(**kwargs)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "INVALID_REQUEST"
+    assert result["error"]["message"] == message
+    assert spawn_calls == []
+
+
+def test_start_returns_failure_when_runner_exits_during_startup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    controller = SubscriptionWatchBackgroundController(
+        root_dir=tmp_path,
+        python_executable="python",
+        start_timeout_seconds=0.2,
+    )
+
+    class FakeProcess:
+        pid = 4321
+
+        def poll(self) -> int:
+            return 1
+
+    monkeypatch.setattr(controller, "_spawn_runner_process", lambda **kwargs: FakeProcess())
+    monkeypatch.setattr("tdxquant.subscription_watch_background.time.sleep", lambda _: None)
+    controller._pid_is_alive = Mock(return_value=False)
+
+    result = controller.start(stock_list=["600519.SH"])
+    persisted = json.loads(controller.paths.active_path.read_text(encoding="utf-8"))
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "START_FAILED"
+    assert result["error"]["details"]["run_id"] == persisted["run_id"]
+    assert persisted["state"] == "failed"
+    assert persisted["reason"] == "start_failed"
+    assert persisted["active"] is False
+
+
 def test_stop_returns_run_id_and_coherent_terminal_state_when_process_exits(tmp_path: Path) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     pid = os.getpid()
@@ -552,7 +630,11 @@ def test_stop_does_not_overwrite_fast_runner_terminal_payload(tmp_path: Path) ->
 
 
 def test_stop_force_stops_when_grace_period_expires(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller = SubscriptionWatchBackgroundController(
+        root_dir=tmp_path,
+        python_executable="python",
+        stop_force_kill_timeout_seconds=0.2,
+    )
     pid = 4321
     controller._write_active_state(
         {
@@ -734,7 +816,11 @@ def test_start_preserves_blocking_state_when_spawned_process_cleanup_is_not_conf
 def test_stop_uses_graceful_timeout_when_grace_period_omitted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller = SubscriptionWatchBackgroundController(
+        root_dir=tmp_path,
+        python_executable="python",
+        default_stop_grace_period_seconds=7,
+    )
     pid = 4321
     controller._write_active_state(
         {
@@ -749,14 +835,16 @@ def test_stop_uses_graceful_timeout_when_grace_period_omitted(
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
     signal_calls: list[int] = []
     controller._signal_process = Mock(side_effect=lambda seen_pid, sig: signal_calls.append(sig) or True)
-    monkeypatch.setattr("tdxquant.subscription_watch_background.time.sleep", lambda _: None)
-    controller._pid_is_alive = Mock(side_effect=[True, False, False])
+    wait_calls: list[int] = []
+    monkeypatch.setattr(controller, "_wait_for_process_exit", lambda seen_pid, grace: wait_calls.append(grace) or True)
+    controller._pid_is_alive = Mock(side_effect=[True, False])
 
     result = controller.stop(reason="operator_stop")
     persisted = json.loads(controller.paths.active_path.read_text(encoding="utf-8"))
 
     assert result["ok"] is True
     assert signal_calls == [signal.SIGTERM]
+    assert wait_calls == [7]
     assert persisted["state"] == "stopped"
     assert persisted["reason"] == "operator_stop"
     assert persisted["active"] is False

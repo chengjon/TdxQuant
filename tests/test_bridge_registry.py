@@ -13,6 +13,7 @@ from tdxquant.bridge_registry import (
     call_worker,
     load_worker_registry,
     resolve_worker_token,
+    run_bridge_watch_start,
     select_worker,
 )
 
@@ -158,6 +159,44 @@ class BridgeRegistryTests(unittest.TestCase):
         self.assertEqual(request.get_method(), "POST")
         self.assertEqual(request.get_header("Authorization"), "Bearer secret-token")
         self.assertEqual(json.loads(request.data.decode("utf-8")), {"stock_list": ["000001.SZ"]})
+
+    def test_run_bridge_watch_start_includes_poll_interval_and_idempotency_key(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch("tdxquant.bridge_registry.call_worker", return_value={"ok": True, "result": {"run_id": "run-001"}}) as mocked_call,
+        ):
+            payload = run_bridge_watch_start(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                stock_list=["000001.SZ"],
+                max_events=5,
+                max_seconds=30.0,
+                poll_interval=0.5,
+                idempotency_key="idem-001",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"run_id": "run-001"}})
+        self.assertEqual(
+            mocked_call.call_args.kwargs["body"],
+            {
+                "stock_list": ["000001.SZ"],
+                "max_events": 5,
+                "max_seconds": 30.0,
+                "poll_interval": 0.5,
+                "idempotency_key": "idem-001",
+            },
+        )
 
     def test_call_worker_preserves_json_error_body_on_non_2xx_response(self) -> None:
         worker = BridgeWorker(

@@ -15,6 +15,8 @@ from typing import Any
 from .subscription_watch_run import build_subscription_watch_run_paths
 
 DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
+DEFAULT_START_TIMEOUT_SECONDS = 10
+DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
 
 
 @dataclass(frozen=True)
@@ -184,6 +186,7 @@ def _build_active_payload(
     state: str,
     reason: str | None,
     log_path: Path | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     return {
         "state": state,
@@ -192,6 +195,7 @@ def _build_active_payload(
         "pid": pid,
         "reason": reason,
         "runner_log_path": str(log_path) if log_path is not None else None,
+        "idempotency_key": idempotency_key,
     }
 
 
@@ -232,14 +236,24 @@ def write_background_state(
     state: str,
     reason: str | None,
     runner_log_path: Path | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     paths.root_dir.mkdir(parents=True, exist_ok=True)
+    existing_payload = read_active_payload(paths) or {}
+    resolved_idempotency_key = idempotency_key
+    if resolved_idempotency_key is None and existing_payload.get("run_id") == run_id:
+        resolved_idempotency_key = (
+            str(existing_payload.get("idempotency_key")).strip() or None
+            if existing_payload.get("idempotency_key") is not None
+            else None
+        )
     payload = _build_active_payload(
         run_id=run_id,
         pid=pid,
         state=state,
         reason=reason,
         log_path=runner_log_path,
+        idempotency_key=resolved_idempotency_key,
     )
     _write_active_payload(paths, payload)
     return payload
@@ -252,6 +266,7 @@ def write_terminal_background_state(
     state: str,
     reason: str | None,
     runner_log_path: Path | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     payload = write_background_state(
         paths,
@@ -260,6 +275,7 @@ def write_terminal_background_state(
         state=state,
         reason=reason,
         runner_log_path=runner_log_path,
+        idempotency_key=idempotency_key,
     )
     _cleanup_owned_state(paths)
     return payload
@@ -272,10 +288,16 @@ class SubscriptionWatchBackgroundController:
         root_dir: Path,
         python_executable: str,
         cli_module: str = "tdxquant.subscription_watch_background_runner",
+        start_timeout_seconds: float = DEFAULT_START_TIMEOUT_SECONDS,
+        default_stop_grace_period_seconds: int = DEFAULT_STOP_GRACE_PERIOD_SECONDS,
+        stop_force_kill_timeout_seconds: float = DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS,
     ) -> None:
         self.paths = build_background_paths(root_dir)
         self.python_executable = python_executable
         self.cli_module = cli_module
+        self.start_timeout_seconds = max(float(start_timeout_seconds), 0.0)
+        self.default_stop_grace_period_seconds = max(int(default_stop_grace_period_seconds), 0)
+        self.stop_force_kill_timeout_seconds = max(float(stop_force_kill_timeout_seconds), 0.0)
         self._control_lock = threading.Lock()
 
     def _write_active_state(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -342,12 +364,85 @@ class SubscriptionWatchBackgroundController:
         return True
 
     def _wait_for_forced_exit(self, pid: int) -> bool:
-        deadline = time.monotonic() + 1.0
+        deadline = time.monotonic() + self.stop_force_kill_timeout_seconds
         while self._pid_is_alive(pid):
             if time.monotonic() >= deadline:
                 return False
             time.sleep(0.05)
         return True
+
+    def _build_invalid_start_result(self, message: str) -> dict[str, Any]:
+        return {
+            "ok": False,
+            "error": {
+                "code": "INVALID_REQUEST",
+                "message": message,
+                "details": {},
+            },
+        }
+
+    def _validate_start_request(
+        self,
+        *,
+        stock_list: list[str],
+        max_events: int | None,
+        max_seconds: float | None,
+        poll_interval: float | None,
+    ) -> dict[str, Any] | None:
+        if not stock_list:
+            return self._build_invalid_start_result("subscription watch task requires at least one stock code")
+        if max_events is not None and max_events <= 0:
+            return self._build_invalid_start_result("subscription watch task requires max_events > 0")
+        if max_seconds is not None and max_seconds <= 0:
+            return self._build_invalid_start_result("subscription watch task requires max_seconds > 0")
+        resolved_poll_interval = 0.25 if poll_interval is None else float(poll_interval)
+        if resolved_poll_interval < 0:
+            return self._build_invalid_start_result("subscription watch task requires poll_interval >= 0")
+        return None
+
+    def _current_start_result(self, payload: dict[str, Any], *, replayed: bool = False) -> dict[str, Any]:
+        result = {
+            "run_id": payload.get("run_id"),
+            "pid": payload.get("pid"),
+            "state": payload.get("state"),
+            "runner_log_path": payload.get("runner_log_path"),
+        }
+        if replayed:
+            result["replayed"] = True
+        return {"ok": True, "result": result}
+
+    def _wait_for_startup_state(self, *, run_id: str, pid: int, runner_log_path: Path) -> dict[str, Any] | None:
+        deadline = time.monotonic() + self.start_timeout_seconds
+        while True:
+            current = read_active_payload(self.paths) or {}
+            if str(current.get("run_id") or "") == run_id:
+                state = str(current.get("state") or "")
+                if state == "running":
+                    return current
+                if state == "failed":
+                    return current
+                if state in {"completed", "stopped"}:
+                    return current
+
+            if not self._pid_is_alive(pid):
+                current = read_active_payload(self.paths) or {}
+                if str(current.get("run_id") or "") == run_id and str(current.get("state") or "") in {
+                    "failed",
+                    "completed",
+                    "stopped",
+                }:
+                    return current
+                return write_terminal_background_state(
+                    self.paths,
+                    run_id=run_id,
+                    state="failed",
+                    reason="start_failed",
+                    runner_log_path=runner_log_path,
+                )
+
+            if time.monotonic() >= deadline:
+                return None
+            time.sleep(0.05)
 
     def _terminate_spawned_process(self, process: subprocess.Popen[str]) -> bool:
         try:
@@ -381,7 +476,14 @@ class SubscriptionWatchBackgroundController:
         poll_interval: float | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        del idempotency_key
+        validation_error = self._validate_start_request(
+            stock_list=stock_list,
+            max_events=max_events,
+            max_seconds=max_seconds,
+            poll_interval=poll_interval,
+        )
+        if validation_error is not None:
+            return validation_error
         with self._control_lock:
             control_lock = _acquire_control_lock(self.paths)
             if control_lock is None:
@@ -394,10 +496,13 @@ class SubscriptionWatchBackgroundController:
             try:
                 current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
                 if current.get("state") in {"starting", "running", "stopping"}:
+                    if idempotency_key and idempotency_key == current.get("idempotency_key"):
+                        return self._current_start_result(current, replayed=True)
                     return {
                         "ok": False,
                         "error": {
                             "code": "ALREADY_RUNNING",
+                            "message": "subscription-watch background run is already active",
                             "details": current,
                         },
                     }
@@ -426,6 +531,7 @@ class SubscriptionWatchBackgroundController:
                             state="starting",
                             reason=None,
                             log_path=run_paths.runner_log_path,
+                            idempotency_key=idempotency_key,
                         )
                     )
                 except Exception:
@@ -442,15 +548,23 @@ class SubscriptionWatchBackgroundController:
                             runner_log_path=run_paths.runner_log_path,
                         )
                     raise
-                return {
-                    "ok": True,
-                    "result": {
-                        "run_id": run_paths.run_id,
-                        "pid": process.pid,
-                        "state": payload["state"],
-                        "runner_log_path": payload["runner_log_path"],
-                    },
-                }
+                startup_state = self._wait_for_startup_state(
+                    run_id=run_paths.run_id,
+                    pid=process.pid,
+                    runner_log_path=run_paths.runner_log_path,
+                )
+                if startup_state is None:
+                    return self._current_start_result(payload)
+                if startup_state.get("state") == "failed":
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "START_FAILED",
+                            "message": "subscription-watch background runner failed during startup",
+                            "details": startup_state,
+                        },
+                    }
+                return self._current_start_result(startup_state)
             finally:
                 _release_control_lock(control_lock)
 
@@ -518,7 +632,7 @@ class SubscriptionWatchBackgroundController:
                         },
                     }
 
-                resolved_grace = DEFAULT_STOP_GRACE_PERIOD_SECONDS if grace_period_seconds is None else max(
+                resolved_grace = self.default_stop_grace_period_seconds if grace_period_seconds is None else max(
                     int(grace_period_seconds), 0
                 )
                 if self._wait_for_process_exit(pid, resolved_grace):

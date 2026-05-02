@@ -231,6 +231,12 @@ bridge 访问前提当前也是 contract 的一部分：
 - worker 侧会按 `master_allowlist` 做 source-IP allowlist 校验
 - 任一前置条件不满足时，bridge 会直接拒绝请求，不进入 watch control 逻辑
 
+当前 `watch-start` / `watch-status` 还有两条稳定控制面语义：
+
+- `watch-start` 会把 `stock_list`、`max_events`、`max_seconds`、`poll_interval` 以及可选 `idempotency_key` 透传到 worker-local background controller；若请求本身不可能形成有效 run，会在 spawn 前直接返回 `INVALID_REQUEST`
+- `watch-start` 在当前 active run 上支持 same-`idempotency_key` replay；同键重试返回同一个 active `run_id`，而不是新的 `ALREADY_RUNNING`
+- `watch-status` 在**未显式提供 `run_id`** 时只返回当前 active snapshot；若当前没有 active watch，则 `watch_status` 明确为 `null`，不会静默回退到历史 `status.json`
+
 这一版明确**不做**：
 
 - reconnect/backoff
