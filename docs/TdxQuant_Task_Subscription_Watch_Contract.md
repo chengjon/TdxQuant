@@ -207,14 +207,41 @@ CLI:
 - built-in replay source 自动选择
 - 显式 replay manifest / run-dir 输入
 
+截至 `2026-05-03`，围绕这个前台 task 已经额外形成一层独立 control plane，但它不是 `subscription-watch` 本身的新执行语义：
+
+- worker-local single-active background control
+- worker 侧 HTTP bridge：`tdxquant bridge serve --config runtime/bridge/worker-bridge.json`
+- Master 侧静态 worker registry + `bridge watch-start|watch-stop|watch-status`
+- bridge 只管理 watch lifecycle / artifact 查询，不改变前台 run artifact contract
+
+当前 bridge 暴露的稳定 endpoint 为：
+
+- `POST /bridge/v1/watch/start`
+- `POST /bridge/v1/watch/stop`
+- `GET /bridge/v1/watch/status`
+- `GET /bridge/v1/watch/list`
+- `GET /bridge/v1/watch/artifacts`
+- `GET /bridge/v1/watch/events`
+- `GET /bridge/v1/watch/logs`
+- `GET /bridge/v1/health`
+
+bridge 访问前提当前也是 contract 的一部分：
+
+- 请求必须带 `Authorization: Bearer <token>`
+- worker 侧会按 `master_allowlist` 做 source-IP allowlist 校验
+- 任一前置条件不满足时，bridge 会直接拒绝请求，不进入 watch control 逻辑
+
 这一版明确**不做**：
 
-- daemon
-- `start / stop / status / list` 控制面
 - reconnect/backoff
 - HTTP / SSE 输出通道
 - `catalog` / preset 暴露
 - live subscription session / delayed playback 模拟
+
+这里的“不做”应理解为：
+
+- `subscription-watch` task 自身仍不是 daemon API
+- 后台控制面已经独立存在，但目前只提供单 worker、single-active watch 管理，不扩展为通用多任务调度器
 
 ## 9. Replay Failure Behavior
 

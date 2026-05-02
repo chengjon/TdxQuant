@@ -157,7 +157,10 @@ def _try_read_json_error_body(error: HTTPError) -> dict[str, Any] | None:
     body = error.fp.read()
     if not body:
         return None
-    payload = json.loads(body.decode("utf-8"))
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
     if isinstance(payload, dict):
         return payload
     return None

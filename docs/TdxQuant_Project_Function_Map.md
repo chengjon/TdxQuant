@@ -203,6 +203,44 @@ TdxQuant
 
 这层的目标不是补充新的底层函数，而是把多步骤流程收口成稳定任务。
 
+### 2.2.1 `subscription-watch` worker bridge control plane
+
+截至 `2026-05-03`，`subscription_watch` 已经不只停留在前台 task，还补齐了一层 worker bridge control plane，但边界仍然很克制：
+
+- worker-local single-active background control
+- 单个 worker 上同一时刻只允许一个活跃 `subscription-watch` 后台 run
+- worker 侧常驻入口：`tdxquant bridge serve --config runtime/bridge/worker-bridge.json`
+- Master 侧静态 worker registry：`runtime/bridge/master-workers.json`
+- Master 侧远程 CLI：
+  - `tdxquant bridge watch-start ...`
+  - `tdxquant bridge watch-stop ...`
+  - `tdxquant bridge watch-status ...`
+
+当前 bridge 对上层暴露的稳定 endpoint 为：
+
+- `POST /bridge/v1/watch/start`
+- `POST /bridge/v1/watch/stop`
+- `GET /bridge/v1/watch/status`
+- `GET /bridge/v1/watch/list`
+- `GET /bridge/v1/watch/artifacts`
+- `GET /bridge/v1/watch/events`
+- `GET /bridge/v1/watch/logs`
+- `GET /bridge/v1/health`
+
+当前 bridge 的访问前提也已经固定：
+
+- 请求头必须包含 `Authorization: Bearer <token>`
+- worker 只接受 `master_allowlist` 中 source IP 发来的请求
+- 这两层检查发生在 endpoint 分发之前，因此它们属于 transport/auth contract，而不是业务层可选行为
+
+这层能力的定位不是重写 `subscription-watch` 的业务 contract，而是把：
+
+- 本地后台生命周期控制
+- 最新 active/completed/failed run 摘要
+- canonical artifact / event / log tail 查询
+
+包装成 Master 可消费的控制平面。
+
 ### 2.3 报表与日常入口层
 
 当前项目已具备以下高层入口：

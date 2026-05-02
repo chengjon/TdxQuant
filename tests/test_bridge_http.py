@@ -563,3 +563,41 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 thread.join(timeout=5)
+
+    def test_watch_start_maps_already_running_to_conflict_failure(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.start_result = {
+                "ok": False,
+                "error": {
+                    "code": "ALREADY_RUNNING",
+                    "message": "subscription-watch background run is already active",
+                    "details": {"run_id": "run-001"},
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                with self.assertRaises(HTTPError) as ctx:
+                    self._request(
+                        f"{base_url}/bridge/v1/watch/start",
+                        method="POST",
+                        token="secret-token",
+                        payload={"stock_list": ["000001.SZ"]},
+                    )
+                payload = json.loads(ctx.exception.read().decode("utf-8"))
+                self.assertEqual(ctx.exception.code, 409)
+                self.assertEqual(payload["error"]["code"], "ALREADY_RUNNING")
+                self.assertEqual(payload["error"]["message"], "subscription-watch background run is already active")
+                self.assertEqual(payload["error"]["details"], {"run_id": "run-001"})
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)

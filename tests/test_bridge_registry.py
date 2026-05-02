@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 from tdxquant.bridge_registry import (
     BridgeWorker,
@@ -195,3 +195,50 @@ class BridgeRegistryTests(unittest.TestCase):
             )
 
         self.assertEqual(payload, error_payload)
+
+    def test_call_worker_normalizes_non_json_http_error_body(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+        http_error = HTTPError(
+            url="http://127.0.0.1:8787/bridge/v1/watch/status",
+            code=502,
+            msg="Bad Gateway",
+            hdrs=None,
+            fp=io.BytesIO(b"upstream gateway failure"),
+        )
+
+        with patch("tdxquant.bridge_registry.urlopen", side_effect=http_error):
+            with self.assertRaisesRegex(RuntimeError, "bridge worker request failed with HTTP 502: Bad Gateway"):
+                call_worker(
+                    worker,
+                    method="GET",
+                    route="/bridge/v1/watch/status",
+                    token="secret-token",
+                )
+
+    def test_call_worker_normalizes_url_error(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with patch("tdxquant.bridge_registry.urlopen", side_effect=URLError("connection refused")):
+            with self.assertRaisesRegex(RuntimeError, "bridge worker request failed: connection refused"):
+                call_worker(
+                    worker,
+                    method="GET",
+                    route="/bridge/v1/watch/status",
+                    token="secret-token",
+                )

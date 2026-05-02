@@ -62,6 +62,11 @@ def _snapshot(
 
 
 class ApiCliParserTests(unittest.TestCase):
+    def test_bridge_serve_command_requires_config(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["bridge", "serve"])
+
     def test_bridge_serve_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["bridge", "serve", "--config", "runtime/bridge/worker-bridge.json"])
@@ -101,6 +106,11 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.code, ["000001.SZ", "600519.SH"])
         self.assertEqual(args.max_events, 5)
         self.assertEqual(args.max_seconds, 30.0)
+
+    def test_bridge_watch_start_command_requires_registry_worker_and_code(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["bridge", "watch-start"])
 
     def test_bridge_watch_stop_command_parses(self) -> None:
         parser = build_parser()
@@ -4661,6 +4671,30 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "error": {
                     "code": "INVALID_REQUEST",
                     "message": "missing bridge token in environment: BRIDGE_TOKEN_A",
+                    "details": {},
+                },
+            },
+        )
+
+    def test_handle_bridge_watch_status_returns_json_failure_for_bridge_request_failure(self) -> None:
+        args = build_parser().parse_args(
+            ["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", side_effect=RuntimeError("bridge worker request failed: timed out")),
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            json.loads(stdout.getvalue()),
+            {
+                "ok": False,
+                "result": None,
+                "error": {
+                    "code": "BRIDGE_REQUEST_FAILED",
+                    "message": "bridge worker request failed: timed out",
                     "details": {},
                 },
             },
