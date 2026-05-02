@@ -61,6 +61,13 @@ def _snapshot(
 
 
 class ApiCliParserTests(unittest.TestCase):
+    def test_bridge_serve_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["bridge", "serve", "--config", "runtime/bridge/worker-bridge.json"])
+        self.assertEqual(args.command, "bridge")
+        self.assertEqual(args.bridge_command, "serve")
+        self.assertEqual(args.config, "runtime/bridge/worker-bridge.json")
+
     def test_api_capabilities_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "capabilities"])
@@ -4471,6 +4478,16 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mocked_service_builder.assert_called_once()
         service.place_order.assert_called_once()
+
+    def test_main_bridge_serve_dispatches_to_bridge_http_server(self) -> None:
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.serve_bridge_from_config", return_value=0) as mocked,
+            patch("sys.argv", ["tdxquant", "bridge", "serve", "--config", "runtime/bridge/worker-bridge.json"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with("runtime/bridge/worker-bridge.json")
 
     def test_main_pingan_buy_submit_once_uses_trade_manager(self) -> None:
         service = MagicMock()
