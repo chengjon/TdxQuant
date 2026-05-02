@@ -13,6 +13,17 @@
 - `tdxquant api ... --provider-mode replay`
 - `tdxquant task subscription-watch --provider-mode replay`
 
+当前还已经存在两层可复用的 CLI replay 接缝：
+
+- `_add_replay_provider_arguments(...)`
+  - 统一注册 `--provider-mode`
+  - 统一注册互斥的 `--fixture` / `--fixture-path`
+- `_run_flat_replay_provider_command(...)`
+  - 统一处理 flat replay 正式命令
+  - 对不在 flat replay 范围内的命令返回稳定 `unsupported replay flat command`
+
+同时，nested `api` 入口已经通过 `_add_api_common_arguments(...)` 为所有 `api` 子命令暴露 replay 参数，但这些子命令并不都拥有 replay fixture backing。
+
 但这些能力还主要停留在“本地可跑”的层面，尚未被明确固化成 **CLI 子进程级 transport contract**。这意味着上层项目虽然可以通过调用 `tdxquant` 子进程完成离线联调，但仍缺少这些稳定约束：
 
 - 哪些正式命令保证支持 replay
@@ -41,6 +52,7 @@
 - 不把所有 CLI 命令都提升为 replay-supported。
 - 不扩大 live Windows runtime capability 覆盖范围。
 - 不重做 `TdxApiManager` 的 replay 核心分发逻辑。
+- 不改变 `TdxApiManager(..., replay_fixture_map=...)` 这类程序内 API 的语义；它属于 manager 级 programmatic selector，不是本次 CLI transport contract 的新增面。
 - 不在本次设计中新增大规模 fixture 资产，只围绕现有 capability 与必要错误样例硬化。
 
 ## Approaches Considered
@@ -113,7 +125,6 @@
 
 包括：
 
-- `tdxquant api ... --provider-mode replay`
 - 对应 flat bridge-oriented 正式命令，例如：
   - `tdx-capabilities`
   - `tdx-health`
@@ -121,10 +132,19 @@
   - `tdx-formula-screen`
   - `tdx-send-user-block`
 
+以及 nested `api` 正式子命令中的以下子集：
+
+- `tdxquant api capabilities --provider-mode replay`
+- `tdxquant api health --provider-mode replay`
+- `tdxquant api doctor --provider-mode replay`
+- `tdxquant api formula-screen --provider-mode replay`
+- `tdxquant api send-user-block --provider-mode replay`
+
 原则：
 
 - 只有已经具备稳定 replay fixture 和正式 provider contract 的 capability 才进入支持矩阵。
-- 对于不在支持矩阵内的正式命令，开启 replay 必须稳定失败。
+- 对于不在支持矩阵内的 flat 或 nested `api` 正式命令，开启 replay 必须稳定失败。
+- nested `api` 入口虽然普遍注册了 replay 参数，但只有上述子命令进入正式 replay transport 支持矩阵；其他 `api` 子命令必须以稳定 failure 结束，而不是 silent fallback 到 live。
 
 ### `task subscription-watch --provider-mode replay`
 
@@ -151,18 +171,20 @@ CLI replay 参数语义必须统一，不允许每个命令各自解释。
 - `--provider-mode`
 - `--fixture`
 - `--fixture-path`
+- `--output`
 
 ### Rules
 
 1. `live` 仍是默认 provider mode。
 2. `--provider-mode replay` 才会进入 replay transport policy。
 3. `--fixture` 与 `--fixture-path` 必须互斥。
-4. replay fixture 选择优先级固定为：
-   1. `--fixture-path`
-   2. `--fixture`
-   3. capability 默认 built-in fixture
+4. replay fixture 选择算法固定为：
+   1. 若显式给出 `--fixture-path`，使用该外部路径
+   2. 否则若显式给出 `--fixture`，使用该 built-in fixture name
+   3. 否则使用 capability 默认 built-in fixture
 5. 未命中 default fixture、显式 fixture 名称或显式 fixture 路径时，必须稳定失败。
 6. replay mode 下严禁 silent fallback 到 live Windows runtime。
+7. `--output` 在 replay mode 下仍然受支持；它写出的 JSON 必须与 stdout 主结果保持一致，而不是改变 transport contract。
 
 ## Subprocess Transport Contract
 
@@ -173,6 +195,7 @@ CLI replay 参数语义必须统一，不允许每个命令各自解释。
 #### Synchronous provider JSON commands
 
 - `stdout` 必须只输出一个 provider-facing JSON envelope
+- 即使同时使用 `--output`，stdout 仍必须保留这个单一 JSON envelope；`--output` 只是额外文件镜像，不是 stdout 重定向
 
 #### `task subscription-watch --provider-mode replay`
 
@@ -218,6 +241,13 @@ exit code 表达 transport 调用是否成功，而详细失败原因由 `stdout
 - `status_path`
 - `summary_path`
 - `events_jsonl_path`
+- `events_csv_path`
+
+并保留现有兼容别名：
+
+- `jsonl_output_path`
+- `csv_output_path`
+- `status_output_path`
 
 规则：
 
@@ -251,6 +281,13 @@ exit code 表达 transport 调用是否成功，而详细失败原因由 `stdout
 - 不发生 traceback 级 contract 漂移
 - 不访问 live runtime
 
+failure JSON 应继续沿用现有 provider-facing envelope，并在失败路径中保留最小 replay metadata：
+
+- `data.replay_source.mode = "replay"`
+- `data.replay_source.capability = <requested capability>`
+
+这样同步 JSON failure 结果与现有 `execute_sync_replay(...)` 约定保持一致。
+
 ## Implementation Surface
 
 ### `tdxquant/cli.py`
@@ -268,6 +305,7 @@ exit code 表达 transport 调用是否成功，而详细失败原因由 `stdout
 原则：
 
 - transport policy 放在 CLI 顶层
+- 不重复发明第二套 flat replay dispatch，而是在现有 `_run_flat_replay_provider_command(...)` 和 nested `api` 分发基础上做 contract hardening
 - 不把 transport contract 逻辑散落到每个 capability 分支
 
 ### `tdxquant/replay_provider.py`
@@ -328,13 +366,18 @@ exit code 表达 transport 调用是否成功，而详细失败原因由 `stdout
 - fixture 缺失
 - fixture 内容非法
 
-以上全部必须稳定失败，并证明不会访问 live runtime。
+以上全部必须稳定失败，并通过下列至少一种方式证明不会访问 live runtime：
+
+- 对 live bridge / runtime session 打桩并断言其未被调用
+- 在无 Windows runtime 的环境里执行 replay 测试并确认成功或稳定失败
+- 通过结构化测试证明 replay 代码路径只经过 fixture resolver / materializer，而不进入 live bridge 分发
 
 ## Risks
 
 - 当前 CLI 文件仍较大，若不小心会把 transport policy 逻辑继续堆成新的分支泥团，因此需要保持 replay policy 边界明确。
 - 不同正式命令当前的 JSON-oriented 输出路径可能存在历史差异，本次需要先统一而不是只补 happy path。
 - `subscription-watch` replay 如果 artifact 重写不彻底，容易把 source fixture 路径泄漏给调用方，破坏“每次 materialize 新 run”的约束。
+- nested `api` 子命令目前普遍接受 `--provider-mode replay` 参数，但多数子命令并没有 replay fixture backing；如果支持矩阵和失败契约不显式锁定，调用方会在运行时才发现边界。
 
 ## Acceptance Criteria
 
