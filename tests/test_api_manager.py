@@ -2234,6 +2234,48 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(fake_session.unsubscribe_calls, [["600519.SH"]])
         self.assertEqual(fake_session.close_calls, 1)
 
+    def test_task_subscription_watch_honors_explicit_run_id(self) -> None:
+        fake_session = _FakeTaskRuntimeSubscriptionSession(
+            events=[
+                {
+                    "600519.SH": {
+                        "Now": 123.45,
+                        "UpdateTime": "2026-04-28T09:30:01+08:00",
+                    }
+                }
+            ]
+        )
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTaskManager(
+                profile="subscription_watch",
+                strategy_path="strategy.py",
+                profile_overrides={"run_root_dir": temp_dir, "poll_interval": 0.0},
+            )
+            with patch.object(type(manager.api_manager.runtime), "open_subscription_session", return_value=fake_session):
+                result = manager.subscription_watch(
+                    stock_list=["600519.SH"],
+                    max_events=1,
+                    poll_interval=0.0,
+                    run_id="custom-run-001",
+                )
+
+            run_dir = Path(result.data["artifacts"]["run_dir"])
+            manifest_path = Path(result.data["artifacts"]["manifest_path"])
+            status_path = Path(result.data["artifacts"]["status_path"])
+            summary_path = Path(result.data["artifacts"]["summary_path"])
+            events_path = Path(result.data["artifacts"]["events_jsonl_path"])
+            manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["subscription"]["run_id"], "custom-run-001")
+        self.assertEqual(run_dir.name, "custom-run-001")
+        self.assertEqual(manifest_payload["run_id"], "custom-run-001")
+        self.assertEqual(status_payload["run_id"], "custom-run-001")
+        self.assertEqual(summary_payload["run_id"], "custom-run-001")
+        self.assertEqual(events_path.parent, run_dir)
+
     def test_task_subscription_watch_replay_mode_materializes_completed_run_without_live_session(self) -> None:
         fake_session = _FakeTaskRuntimeSubscriptionSession(
             events=[

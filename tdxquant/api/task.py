@@ -1224,6 +1224,7 @@ class TdxTaskManager:
         jsonl_output_path: str | None = None,
         csv_output_path: str | None = None,
         status_output_path: str | None = None,
+        run_id: str | None = None,
     ) -> Result:
         def run() -> Result:
             if not stock_list:
@@ -1264,7 +1265,7 @@ class TdxTaskManager:
                 )
 
             run_root_dir = _resolve_subscription_watch_root_dir(self.profile_options)
-            run_paths = build_subscription_watch_run_paths(run_root_dir)
+            run_paths = build_subscription_watch_run_paths(run_root_dir, run_id=run_id)
             run_paths.run_dir.mkdir(parents=True, exist_ok=False)
 
             legacy_jsonl_path = Path(jsonl_output_path) if jsonl_output_path else None
