@@ -96,38 +96,6 @@ class TraderCliParserTests(unittest.TestCase):
 
 
 class TraderCliDispatchTests(unittest.TestCase):
-    def test_handle_trade_order_place_dispatches_sell_side_to_trade_service(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(
-            [
-                "trade",
-                "order-place",
-                "--broker",
-                "pingan_desktop",
-                "--port",
-                "COM3",
-                "--market",
-                "SZ",
-                "--side",
-                "sell",
-                "--code",
-                "000001",
-                "--price",
-                "10.50",
-                "--quantity",
-                "100",
-                "--client-order-id",
-                "client-sell-001",
-            ]
-        )
-        service = _FakeTradeService()
-        service.snapshot = replace(service.snapshot, side=OrderSide.SELL, gateway_order_id="gw-sell-001", client_order_id="client-sell-001")
-        with patch("tdxquant.cli._build_trader_service", return_value=service):
-            result = _handle_trade_subcommand(args)
-        self.assertTrue(result.ok)
-        self.assertEqual(service.last_request.side, OrderSide.SELL)
-        self.assertEqual(result.data["order"]["gateway_order_id"], "gw-sell-001")
-
     def test_handle_trade_order_place_dispatches_to_trade_service(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

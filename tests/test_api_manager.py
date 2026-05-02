@@ -23,6 +23,7 @@ from tdxquant.api.market import MarketApi
 from tdxquant.api.meta import MetaApi
 from tdxquant.api.runtime import RuntimeApi
 from tdxquant.models import ErrorCode, Result
+from tdxquant.replay_fixtures import load_provider_replay_fixture
 from tdxquant.reporting import get_report_preset_path, load_report_presets, resolve_report_preset
 from tdxquant.tasking import get_task_preset_path, load_task_presets, resolve_task_preset
 
@@ -1210,6 +1211,62 @@ class TdxApiManagerTests(unittest.TestCase):
         manager = TdxApiManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
 
+    def test_manager_formula_screen_replay_mode_uses_default_fixture_without_live_call(self) -> None:
+        live_result = Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message="live formula screen should not run in replay mode",
+        )
+        manager = TdxApiManager(profile="default", provider_mode="replay")
+        with patch.object(type(manager._formula_api), "screen", return_value=live_result) as mocked_screen:
+            result = manager.formula.screen(
+                formula_name="UPN",
+                stock_list=["000001.SZ"],
+                formula_arg="3",
+            )
+        self.assertTrue(result.ok)
+        self.assertEqual(result.message, "screened formula matches")
+        self.assertEqual(result.data["matched_symbols"], ["000001.SZ"])
+        self.assertEqual(result.data["manager"]["method"], "screen")
+        mocked_screen.assert_not_called()
+
+    def test_manager_replay_mode_rejects_unsupported_capability_without_live_fallback(self) -> None:
+        live_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="live snapshot should not run in replay mode",
+            data={"rows": [{"symbol": "688260.SH"}]},
+        )
+        manager = TdxApiManager(profile="default", provider_mode="replay")
+        with patch.object(type(manager._market_api), "snapshot", return_value=live_result) as mocked_snapshot:
+            result = manager.market.snapshot("688260.SH")
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("unsupported", result.message)
+        mocked_snapshot.assert_not_called()
+
+    def test_manager_formula_screen_replay_mode_accepts_explicit_fixture_path(self) -> None:
+        fixture_payload = load_provider_replay_fixture("formula-screen-failure")
+        with TemporaryDirectory() as temp_dir:
+            fixture_path = Path(temp_dir) / "formula-screen-failure.json"
+            fixture_path.write_text(json.dumps(fixture_payload, ensure_ascii=False), encoding="utf-8")
+            live_result = Result(ok=True, code=ErrorCode.OK, message="live formula screen should not run")
+            manager = TdxApiManager(
+                profile="default",
+                provider_mode="replay",
+                replay_fixture_path=str(fixture_path),
+            )
+            with patch.object(type(manager._formula_api), "screen", return_value=live_result) as mocked_screen:
+                result = manager.formula.screen(
+                    formula_name="UPN",
+                    stock_list=["000001.SZ"],
+                )
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "formula argument is invalid")
+        self.assertEqual(result.data["manager"]["method"], "screen")
+        mocked_screen.assert_not_called()
+
     def test_manager_snapshot_uses_provider_result_envelope(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"symbol": "688260.SH"}]})
         with patch("tdxquant.api.market.run_tdx_data_snapshot", return_value=expected):
@@ -1983,6 +2040,52 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(result.data["block_mutation"]["operation"], "send_user_block")
         self.assertEqual(result.data["block_mutation"]["requested_stock_count"], 1)
 
+    def test_manager_block_send_user_block_preserves_governance_contract(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="skipped",
+            data={
+                "block_mutation": {
+                    "schema_version": "2026-05-02",
+                    "mutation_id": "mut-003",
+                    "mutation_key": "mk-noop-1",
+                    "operation": "send_user_block",
+                    "status": "noop",
+                    "governance_decision": "skip",
+                    "governance_reason": "already_applied",
+                    "block_code": "ZXG",
+                    "requested_stock_count": 2,
+                    "show": False,
+                },
+                "artifacts": {
+                    "audit_log_path": "runtime/block-mutations/mut-003.json",
+                },
+            },
+        )
+        with patch("tdxquant.api.block.run_tdx_send_user_block", return_value=expected) as mocked:
+            manager = TdxApiManager(profile="default", strategy_path="strategy.py")
+            result = manager.block.send_user_block(
+                "ZXG",
+                ["000001.SZ", "600519.SH"],
+                show=False,
+                mutation_key="mk-noop-1",
+                audit_dir="runtime/block-mutations",
+            )
+        mocked.assert_called_once_with(
+            block_code="ZXG",
+            stocks=["000001.SZ", "600519.SH"],
+            show=False,
+            mutation_key="mk-noop-1",
+            audit_dir="runtime/block-mutations",
+            strategy_path="strategy.py",
+        )
+        payload = result.to_dict()
+        self.assertEqual(payload["data"]["block_mutation"]["status"], "noop")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_decision"], "skip")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_reason"], "already_applied")
+        self.assertEqual(payload["data"]["artifacts"]["audit_log_path"], "runtime/block-mutations/mut-003.json")
+
 
 class TdxTaskManagerTests(unittest.TestCase):
     def test_public_import_is_available(self) -> None:
@@ -2130,6 +2233,107 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(summary_payload["stop_reason"], "keyboard_interrupt")
         self.assertEqual(fake_session.unsubscribe_calls, [["600519.SH"]])
         self.assertEqual(fake_session.close_calls, 1)
+
+    def test_task_subscription_watch_replay_mode_materializes_completed_run_without_live_session(self) -> None:
+        fake_session = _FakeTaskRuntimeSubscriptionSession(
+            events=[
+                {
+                    "600519.SH": {
+                        "Now": 999.0,
+                        "UpdateTime": "2026-05-02T09:30:01+08:00",
+                    }
+                }
+            ]
+        )
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTaskManager(
+                profile="subscription_watch",
+                strategy_path="strategy.py",
+                profile_overrides={"run_root_dir": temp_dir},
+                provider_mode="replay",
+            )
+            with patch.object(type(manager.api_manager.runtime), "open_subscription_session", return_value=fake_session) as mocked_open:
+                result = manager.subscription_watch(stock_list=["600519.SH"])
+
+            manifest_path = Path(result.data["artifacts"]["manifest_path"])
+            summary_path = Path(result.data["artifacts"]["summary_path"])
+            events_path = Path(result.data["artifacts"]["events_jsonl_path"])
+            manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+            event_rows = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["task"]["name"], "subscription_watch")
+        self.assertEqual(result.data["summary"]["event_count"], 2)
+        self.assertEqual(result.data["summary"]["stop_reason"], "max_events")
+        self.assertIn("events_csv_path", result.data["artifacts"])
+        self.assertIn("jsonl_output_path", result.data["artifacts"])
+        self.assertIn("csv_output_path", result.data["artifacts"])
+        self.assertIn("status_output_path", result.data["artifacts"])
+        self.assertEqual(result.data["artifacts"]["jsonl_output_path"], result.data["artifacts"]["events_jsonl_path"])
+        self.assertEqual(result.data["artifacts"]["csv_output_path"], result.data["artifacts"]["events_csv_path"])
+        self.assertEqual(result.data["artifacts"]["status_output_path"], result.data["artifacts"]["status_path"])
+        self.assertEqual(manifest_payload["provider_mode"], "replay")
+        self.assertEqual(summary_payload["final_state"], "completed")
+        self.assertEqual(event_rows[0]["run_id"], result.data["subscription"]["run_id"])
+        mocked_open.assert_not_called()
+
+    def test_task_subscription_watch_replay_mode_accepts_explicit_source_directory(self) -> None:
+        source_manifest = load_provider_replay_fixture("subscription-watch-manifest")
+        source_status = load_provider_replay_fixture("subscription-watch-status-completed")
+        source_summary = load_provider_replay_fixture("subscription-watch-summary-completed")
+        source_events = load_provider_replay_fixture("subscription-watch-events")
+        source_run_id = source_manifest["run_id"]
+        with TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "source-run"
+            source_dir.mkdir()
+            (source_dir / "manifest.json").write_text(json.dumps(source_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            (source_dir / "status.json").write_text(json.dumps(source_status, ensure_ascii=False, indent=2), encoding="utf-8")
+            (source_dir / "summary.json").write_text(json.dumps(source_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+            (source_dir / "events.jsonl").write_text(
+                "\n".join(json.dumps(row, ensure_ascii=False) for row in source_events) + "\n",
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="subscription_watch",
+                strategy_path="strategy.py",
+                profile_overrides={"run_root_dir": str(Path(temp_dir) / "output")},
+                provider_mode="replay",
+                replay_fixture_path=str(source_dir),
+            )
+            with patch.object(type(manager.api_manager.runtime), "open_subscription_session") as mocked_open:
+                result = manager.subscription_watch(stock_list=["600519.SH"])
+
+        self.assertTrue(result.ok)
+        self.assertNotEqual(result.data["subscription"]["run_id"], source_run_id)
+        self.assertEqual(result.data["manifest"]["provider_mode"], "replay")
+        self.assertTrue(result.data["artifacts"]["run_dir"].endswith(result.data["subscription"]["run_id"]))
+        mocked_open.assert_not_called()
+
+    def test_task_subscription_watch_replay_mode_rejects_incomplete_source_directory_without_live_session(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "broken-run"
+            source_dir.mkdir()
+            (source_dir / "manifest.json").write_text("{}", encoding="utf-8")
+            (source_dir / "status.json").write_text("{}", encoding="utf-8")
+            (source_dir / "summary.json").write_text("{}", encoding="utf-8")
+            manager = TdxTaskManager(
+                profile="subscription_watch",
+                strategy_path="strategy.py",
+                profile_overrides={"run_root_dir": str(Path(temp_dir) / "output")},
+                provider_mode="replay",
+                replay_fixture_path=str(source_dir),
+            )
+
+            with patch.object(type(manager.api_manager.runtime), "open_subscription_session") as mocked_open:
+                result = manager.subscription_watch(stock_list=["600519.SH"])
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.data["replay_source"]["mode"], "replay")
+        self.assertEqual(result.data["replay_source"]["capability"], "subscription.watch")
+        self.assertIn("subscription.watch replay artifact does not exist", result.message)
+        mocked_open.assert_not_called()
 
     def test_task_ledger_summary_reads_default_jsonl_and_filters(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -3095,81 +3299,6 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["task"]["name"], "trade_submit_once")
         self.assertIn("task_call", result.data["timing"])
         self.assertEqual(result.data["input"]["submission_key"], "task-submit-001")
-        self.assertEqual(result.data["input"]["max_price"], 10.50)
-
-    def test_task_trade_sell_uses_trade_manager_profile(self) -> None:
-        trade_result = Result(
-            ok=True,
-            code=ErrorCode.OK,
-            message="ok",
-            data={
-                "artifacts": {"last_order_state_path": "runtime/pingan-last-order.json"},
-                "result_dialog": {"contract_no": "S202604300003"},
-            },
-        )
-        manager = TdxTaskManager(profile="trade_sell", strategy_path="strategy.py")
-        with patch.object(type(manager.trade_manager.pingan), "sell", return_value=trade_result) as mocked_trade:
-            result = manager.trade_sell(
-                port="COM3",
-                code="000001",
-                price="10.00",
-                quantity=100,
-                submission_key="task-sell-001",
-                max_price=10.50,
-            )
-        mocked_trade.assert_called_once_with(
-            port="COM3",
-            baudrate=115200,
-            timeout=2.0,
-            code="000001",
-            price="10.00",
-            quantity=100,
-            max_depth=12,
-            close_result_dialog=True,
-            submission_key="task-sell-001",
-            max_price=10.50,
-        )
-        self.assertTrue(result.ok)
-        self.assertEqual(result.data["task"]["name"], "trade_sell")
-        self.assertEqual(result.data["input"]["submission_key"], "task-sell-001")
-        self.assertEqual(result.data["input"]["max_price"], 10.50)
-
-    def test_task_trade_sell_submit_once_uses_trade_manager_profile(self) -> None:
-        trade_result = Result(
-            ok=True,
-            code=ErrorCode.OK,
-            message="ok",
-            data={
-                "artifacts": {"last_order_state_path": "runtime/pingan-last-order.json"},
-                "result_dialog": {"contract_no": "S202604300004"},
-            },
-        )
-        manager = TdxTaskManager(profile="trade_sell_submit_once", strategy_path="strategy.py")
-        with patch.object(type(manager.trade_manager.pingan), "sell_submit_once", return_value=trade_result) as mocked_trade:
-            result = manager.trade_sell_submit_once(
-                port="COM3",
-                code="000001",
-                price="10.00",
-                quantity=100,
-                submission_key="task-sell-submit-001",
-                max_price=10.50,
-            )
-        mocked_trade.assert_called_once_with(
-            port="COM3",
-            baudrate=115200,
-            timeout=2.0,
-            code="000001",
-            price="10.00",
-            quantity=100,
-            max_depth=12,
-            close_result_dialog=True,
-            submission_key="task-sell-submit-001",
-            max_price=10.50,
-        )
-        self.assertTrue(result.ok)
-        self.assertEqual(result.data["task"]["name"], "trade_sell_submit_once")
-        self.assertIn("task_call", result.data["timing"])
-        self.assertEqual(result.data["input"]["submission_key"], "task-sell-submit-001")
         self.assertEqual(result.data["input"]["max_price"], 10.50)
 
     def test_task_trade_submit_ready_can_refresh_before_submit_boundary(self) -> None:

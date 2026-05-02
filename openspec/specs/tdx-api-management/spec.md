@@ -28,7 +28,7 @@ The system SHALL load query API profiles from `runtime/api-profiles.json` using 
 - **THEN** the explicit parameter values MUST take precedence over the profile defaults
 
 ### Requirement: Query API management SHALL attach standardized management metadata
-The system SHALL return manager-driven synchronous query and formula style results inside the provider-facing result envelope and SHALL attach standardized management metadata, including effective profile identity, timing fields, capability identity, schema/version metadata, and compatibility fields required by the current provider contract.
+The system SHALL return manager-driven synchronous query and formula style results inside the provider-facing result envelope and SHALL attach standardized management metadata, including effective profile identity, timing fields, capability identity, and schema/version metadata.
 
 #### Scenario: Manager-driven query returns profile metadata in the provider result envelope
 - **WHEN** a manager-driven query or formula style call completes
@@ -41,12 +41,6 @@ The system SHALL return manager-driven synchronous query and formula style resul
 #### Scenario: Manager-driven query returns capability identity and version metadata
 - **WHEN** a manager-driven query or formula style call completes
 - **THEN** the result MUST include `capability`, `capability_version`, and `schema_version` fields in addition to the manager metadata already attached by the manager layer
-
-#### Scenario: Manager-driven query uses the hardened provider envelope
-- **WHEN** a manager-driven query or formula style call completes
-- **THEN** the result MUST include both `success` and `ok`
-- **AND** the result MUST include a normalized `runtime` object
-- **AND** the result MUST normalize `warnings` and `artifacts` as arrays and `data` as an object
 
 ### Requirement: Query API management SHALL expose refresh cache as a direct manager action
 The system SHALL expose `refresh_cache` as a direct manager action instead of placing it in the read-only `meta` domain or conflating it with `refresh_kline`.
@@ -276,7 +270,6 @@ The system SHALL attach the same manager-driven metadata model to provider disco
 #### Scenario: Manager capability discovery returns provider metadata
 - **WHEN** a caller invokes `manager.runtime.capabilities(...)`, `manager.runtime.health(...)`, or `manager.runtime.doctor(...)`
 - **THEN** the manager MUST attach effective profile metadata, capability identity, capability version, schema version, and timing metadata to the returned provider result envelope
-- **AND** the returned envelope MUST include the same `success` / `ok` compatibility fields and normalized top-level container types that manager-driven query and formula calls use
 
 ### Requirement: Query API management SHALL expose a stable formula screen action
 The system SHALL expose a stable `formula.screen(...)` action through `TdxApiManager.formula` in addition to the existing raw batch formula methods.
@@ -303,3 +296,4 @@ The system SHALL allow callers to pass mutation safety options explicitly throug
 #### Scenario: Caller passes mutation safety options through manager block write
 - **WHEN** a caller invokes a manager block write action with `mutation_key` and/or `audit_dir`
 - **THEN** the manager MUST forward those options unchanged to the block-domain implementation and preserve them in the returned mutation contract
+

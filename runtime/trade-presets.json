@@ -37,31 +37,5 @@
       "max_depth": 12,
       "close_result_dialog": true
     }
-  },
-  "balanced-sell": {
-    "command": "sell",
-    "description": "平安证券常规卖出模板，固定环境参数，保留 code/price/quantity 动态输入。",
-    "profile": "balanced",
-    "title_key": "平安证券",
-    "options": {
-      "port": "COM3",
-      "baudrate": 115200,
-      "timeout": 2.0,
-      "max_depth": 12,
-      "close_result_dialog": true
-    }
-  },
-  "sell-submit-once-default": {
-    "command": "sell-submit-once",
-    "description": "平安证券卖出完整提交模板，固定环境参数，保留 code/price/quantity 动态输入。",
-    "profile": "submit_once",
-    "title_key": "平安证券",
-    "options": {
-      "port": "COM3",
-      "baudrate": 115200,
-      "timeout": 2.0,
-      "max_depth": 12,
-      "close_result_dialog": true
-    }
   }
 }

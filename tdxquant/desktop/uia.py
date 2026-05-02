@@ -712,55 +712,6 @@ def run_pingan_buy_submit_once(
     )
 
 
-def run_pingan_sell_submit_once(
-    title_keyword: str,
-    port: str,
-    baudrate: int,
-    timeout: float,
-    code: str,
-    price: str,
-    quantity: int,
-    post_delay: float = 1.0,
-    max_depth: int = 12,
-    dialog_timeout: float = 2.5,
-    hid_pre_delay: float = 0.0,
-    confirm_timeout: float = 3.0,
-    confirm_post_delay: float = 1.0,
-    result_timeout: float = 3.0,
-    close_result_dialog: bool = True,
-    result_close_pre_delay: float = 0.0,
-    capture_final_uia: bool = True,
-) -> Result:
-    result = run_pingan_sell_fast(
-        title_keyword=title_keyword,
-        port=port,
-        baudrate=baudrate,
-        timeout=timeout,
-        code=code,
-        price=price,
-        quantity=quantity,
-        post_delay=post_delay,
-        max_depth=max_depth,
-        dialog_timeout=dialog_timeout,
-        hid_pre_delay=hid_pre_delay,
-        confirm_timeout=confirm_timeout,
-        confirm_post_delay=confirm_post_delay,
-        result_timeout=result_timeout,
-        close_result_dialog=close_result_dialog,
-        result_close_pre_delay=result_close_pre_delay,
-        capture_final_uia=capture_final_uia,
-    )
-    message = "completed pingan sell submit once" if result.ok else "pingan sell submit once encountered an error"
-    return Result(
-        ok=result.ok,
-        code=result.code,
-        message=message,
-        data=result.data,
-        warnings=list(result.warnings),
-        next_action=result.next_action,
-    )
-
-
 def run_pingan_buy_fast(
     title_keyword: str,
     port: str,

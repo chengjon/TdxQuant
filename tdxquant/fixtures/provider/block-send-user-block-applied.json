@@ -18,18 +18,37 @@
   "warnings": [],
   "data": {
     "block_mutation": {
-      "schema_version": "2026-04-28",
+      "schema_version": "2026-05-02",
       "mutation_id": "fixture-block-mutation-001",
       "mutation_key": "watchlist-sync-20260428-01",
       "operation": "send_user_block",
       "status": "applied",
+      "governance_decision": "execute",
+      "governance_reason": "state_diff_detected",
       "block_code": "ZXG",
       "requested_stocks": [
         "000001.SZ",
         "600519.SH"
       ],
       "requested_stock_count": 2,
-      "show": true
+      "show": true,
+      "desired_state": {
+        "block_code": "ZXG",
+        "exists": true,
+        "stocks": [
+          "000001.SZ",
+          "600519.SH"
+        ]
+      },
+      "observed_state": {
+        "block_code": "ZXG",
+        "exists": true,
+        "block_name": "自选股",
+        "stocks": [
+          "000001.SZ"
+        ],
+        "stock_count": 1
+      }
     },
     "artifacts": {
       "audit_log_path": "runtime/block-mutations/fixture-block-mutation-001.json"

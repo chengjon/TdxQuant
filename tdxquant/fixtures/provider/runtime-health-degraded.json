@@ -1,0 +1,104 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "collected provider health diagnostics",
+  "capability": "runtime.health",
+  "capability_version": "v1",
+  "schema_version": "2026-04-28",
+  "request_id": "fixture-runtime-health-degraded",
+  "started_at": "2026-04-28T12:00:00Z",
+  "finished_at": "2026-04-28T12:00:00Z",
+  "elapsed_ms": 0.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [
+    "query_runtime: query runtime initialization failed",
+    "desktop_window: desktop window probe failed"
+  ],
+  "data": {
+    "overall_status": "degraded",
+    "context": {
+      "window_key": "通达信金融终端",
+      "strategy_path": "C:/fixture/strategy.py",
+      "requested_hid_port": "COM3"
+    },
+    "checks": {
+      "platform": {
+        "status": "ok",
+        "summary": "native Windows Python is available",
+        "critical": true,
+        "detail": {
+          "platform": "Windows"
+        }
+      },
+      "query_runtime": {
+        "status": "failed",
+        "summary": "query runtime initialization failed",
+        "critical": true,
+        "detail": {
+          "available": false
+        },
+        "recommended_action": "Confirm TongDaXin is running and the Windows TdxQuant runtime initializes successfully."
+      },
+      "desktop_window": {
+        "status": "warning",
+        "summary": "desktop window probe failed",
+        "critical": false,
+        "detail": {
+          "window_key": "通达信金融终端"
+        },
+        "recommended_action": "Verify the TongDaXin desktop window title and that the client is visible."
+      },
+      "hid": {
+        "status": "ok",
+        "summary": "requested HID port COM3 is available",
+        "critical": false,
+        "detail": {
+          "requested_port": "COM3",
+          "requested_port_found": true,
+          "ports": [
+            {
+              "device": "COM3",
+              "name": "COM3",
+              "description": "USB Serial Device",
+              "hwid": "USB VID:PID=0000:0000"
+            }
+          ]
+        }
+      }
+    },
+    "recommended_actions": [
+      "Confirm TongDaXin is running and the Windows TdxQuant runtime initializes successfully.",
+      "Verify the TongDaXin desktop window title and that the client is visible."
+    ],
+    "recommended_action_items": [
+      {
+        "id": "query_runtime",
+        "summary": "Confirm TongDaXin is running and the Windows TdxQuant runtime initializes successfully.",
+        "severity": "error",
+        "related_checks": [
+          "query_runtime"
+        ]
+      },
+      {
+        "id": "desktop_window",
+        "summary": "Verify the TongDaXin desktop window title and that the client is visible.",
+        "severity": "warning",
+        "related_checks": [
+          "desktop_window"
+        ]
+      }
+    ],
+    "warning_count": 2,
+    "warnings": [
+      "query_runtime: query runtime initialization failed",
+      "desktop_window: desktop window probe failed"
+    ],
+    "next_action": "Confirm TongDaXin is running and the Windows TdxQuant runtime initializes successfully."
+  },
+  "artifacts": []
+}

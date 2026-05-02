@@ -68,6 +68,20 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "block-send-user-block-applied.json",
     },
     {
+        "name": "block-send-user-block-noop",
+        "capability": "block.send_user_block",
+        "format": "json",
+        "description": "Representative skipped block mutation provider response sample.",
+        "relative_path": "block-send-user-block-noop.json",
+    },
+    {
+        "name": "block-send-user-block-rejected",
+        "capability": "block.send_user_block",
+        "format": "json",
+        "description": "Representative rejected block mutation provider response sample.",
+        "relative_path": "block-send-user-block-rejected.json",
+    },
+    {
         "name": "subscription-event-batch",
         "capability": "subscription.quote_update",
         "format": "jsonl",

@@ -29,12 +29,6 @@ CLI:
 
 - [TdxQuant_Provider_Result_Contract.md](/opt/iflow/TdxQuant/docs/TdxQuant_Provider_Result_Contract.md)
 
-当前 discovery JSON 也必须满足这些公共约束：
-
-- 顶层同时包含 `success` 和兼容别名 `ok`
-- `warnings` 与 `artifacts` 始终是数组
-- `data` 始终是对象
-
 ## 2. Capability Registry
 
 `capabilities` 的 `data` 目前包含：
@@ -42,18 +36,6 @@ CLI:
 - `capabilities`
 - `summary`
 - `grading`
-
-其中 `summary` 当前固定包含：
-
-- `total`
-- `by_domain`
-- `by_stability`
-- `by_side_effect_level`
-
-其中 `grading` 当前固定包含：
-
-- `stability_levels`
-- `side_effect_levels`
 
 单条 capability 当前固定字段：
 
@@ -91,7 +73,6 @@ CLI:
 - `context`
 - `checks`
 - `recommended_actions`
-- `recommended_action_items`
 - `warning_count`
 - `warnings`
 
@@ -118,25 +99,6 @@ CLI:
 - `detail`（如有）
 - `recommended_action`（如有）
 
-`recommended_action_items` 是当前新增的 machine-readable action row，单条当前固定字段：
-
-- `id`
-- `summary`
-- `severity`
-- `related_checks`
-
-其中：
-
-- `id` 当前优先复用相关 check 名
-- `summary` 是给人类显示的动作摘要
-- `severity` 当前固定字面值以实现为准，至少包括 `info / warning / error`
-- `related_checks` 是产生这条 action 的 check 名列表
-
-兼容层说明：
-
-- `recommended_actions` 仍然保留为字符串数组
-- 它当前可视为 `recommended_action_items[*].summary` 的兼容投影
-
 `status` 当前固定字面值：
 
 - `ok`
@@ -157,15 +119,7 @@ CLI:
 - `status`
 - `summary`
 - `critical`
-- `related_checks`
-- `recommended_action_id`
 - `recommended_action`（如有）
-
-其中：
-
-- `id` 当前要求 machine-readable 且稳定，优先复用 check 名
-- `related_checks` 标识这条 finding 对应的 check 列表
-- `recommended_action_id` 如存在，应指向 `recommended_action_items[*].id`
 
 当前 `severity` 固定字面值以实现为准，第一版至少使用：
 
@@ -179,8 +133,6 @@ CLI:
 
 - 诊断命令本身是否成功产出结构化结果
 
-当前顶层 `ok` 与 `success` 必须完全一致。
-
 它**不直接等价于**：
 
 - 当前 provider 环境是否健康
@@ -188,16 +140,9 @@ CLI:
 也就是说，下面这种情况是允许的：
 
 - top-level `success = true`
-- top-level `ok = true`
 - `data.overall_status = "unavailable"`
 
 这是刻意设计的，目的是让上层系统在环境不健康时，仍然能拿到完整的结构化诊断负载，而不是只拿到一个进程失败码。
-
-对应 CLI 语义是：
-
-- JSON 仍然输出完整 provider envelope
-- 如果诊断命令本身成功产出结构化结果，CLI 返回 `0`
-- 环境是否健康由 `data.overall_status`、`checks`、`findings`、`warnings` 判定，而不是由 CLI 文本错误替代
 
 ## 6. 当前边界
 
@@ -207,8 +152,6 @@ CLI:
 - provider health
 - provider doctor
 - capability grading
-- structured recommended action rows
-- finding to action linkage
 
 当前还没有覆盖：
 

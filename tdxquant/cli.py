@@ -147,6 +147,7 @@ PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
 def _add_api_common_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--profile", default="default")
     subparser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(subparser)
     subparser.add_argument("--output", help="Optional path to write the JSON result")
 
 
@@ -161,6 +162,13 @@ def _add_task_common_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--trade-profile")
     subparser.add_argument("--strategy-path")
     subparser.add_argument("--output", help="Optional path to write the JSON result")
+
+
+def _add_replay_provider_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--provider-mode", choices=("live", "replay"), default="live")
+    replay_group = subparser.add_mutually_exclusive_group()
+    replay_group.add_argument("--fixture")
+    replay_group.add_argument("--fixture-path")
 
 
 def _add_report_common_arguments(subparser: argparse.ArgumentParser, *, default_profile: str | None = None) -> None:
@@ -945,6 +953,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_subscription_watch_parser.add_argument("--jsonl-output-path")
     task_subscription_watch_parser.add_argument("--csv-output-path")
     task_subscription_watch_parser.add_argument("--status-output-path")
+    _add_replay_provider_arguments(task_subscription_watch_parser)
     _add_task_common_arguments(task_subscription_watch_parser)
 
     task_ledger_summary_parser = task_subparsers.add_parser("ledger-summary")
@@ -1011,26 +1020,12 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_trade_buy_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
     _add_task_common_arguments(task_trade_buy_parser)
 
-    task_trade_sell_parser = task_subparsers.add_parser("trade-sell")
-    _add_trade_common_arguments(task_trade_sell_parser)
-    task_trade_sell_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
-    task_trade_sell_parser.add_argument("--refresh-market")
-    task_trade_sell_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
-    _add_task_common_arguments(task_trade_sell_parser)
-
     task_trade_submit_once_parser = task_subparsers.add_parser("trade-submit-once")
     _add_trade_common_arguments(task_trade_submit_once_parser)
     task_trade_submit_once_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_submit_once_parser.add_argument("--refresh-market")
     task_trade_submit_once_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
     _add_task_common_arguments(task_trade_submit_once_parser)
-
-    task_trade_sell_submit_once_parser = task_subparsers.add_parser("trade-sell-submit-once")
-    _add_trade_common_arguments(task_trade_sell_submit_once_parser)
-    task_trade_sell_submit_once_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
-    task_trade_sell_submit_once_parser.add_argument("--refresh-market")
-    task_trade_sell_submit_once_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
-    _add_task_common_arguments(task_trade_sell_submit_once_parser)
 
     task_trade_submit_ready_parser = task_subparsers.add_parser("trade-submit-ready")
     _add_task_trade_submit_ready_arguments(task_trade_submit_ready_parser)
@@ -1158,20 +1153,10 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     _add_trade_buy_profile_arguments(trade_buy_parser)
     trade_buy_parser.add_argument("--output", help="Optional path to write the JSON result")
 
-    trade_sell_parser = trade_subparsers.add_parser("sell")
-    _add_trade_common_arguments(trade_sell_parser)
-    _add_trade_buy_profile_arguments(trade_sell_parser)
-    trade_sell_parser.add_argument("--output", help="Optional path to write the JSON result")
-
     trade_submit_once_parser = trade_subparsers.add_parser("submit-once")
     _add_trade_common_arguments(trade_submit_once_parser)
     _add_trade_submit_once_profile_arguments(trade_submit_once_parser)
     trade_submit_once_parser.add_argument("--output", help="Optional path to write the JSON result")
-
-    trade_sell_submit_once_parser = trade_subparsers.add_parser("sell-submit-once")
-    _add_trade_common_arguments(trade_sell_submit_once_parser)
-    _add_trade_submit_once_profile_arguments(trade_sell_submit_once_parser)
-    trade_sell_submit_once_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_presets_parser = trade_subparsers.add_parser("presets")
     trade_presets_parser.add_argument("--preset")
@@ -1343,14 +1328,17 @@ def build_parser() -> argparse.ArgumentParser:
     pingan_buy_parser.add_argument("--result-close-pre-delay", type=float)
     _add_trade_safety_arguments(pingan_buy_parser)
     tdx_capabilities_parser = subparsers.add_parser("tdx-capabilities")
+    _add_replay_provider_arguments(tdx_capabilities_parser)
     tdx_health_parser = subparsers.add_parser("tdx-health")
     tdx_health_parser.add_argument("--window-key", default="通达信金融终端")
     tdx_health_parser.add_argument("--hid-port")
     tdx_health_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_health_parser)
     tdx_doctor_parser = subparsers.add_parser("tdx-doctor")
     tdx_doctor_parser.add_argument("--window-key", default="通达信金融终端")
     tdx_doctor_parser.add_argument("--hid-port")
     tdx_doctor_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_doctor_parser)
     tdx_probe_parser = subparsers.add_parser("tdx-probe")
     tdx_probe_parser.add_argument("--window-key", default="通达信", help="Top-level window keyword for TongDaXin")
     tdx_probe_parser.add_argument("--max-depth", type=int, default=12)
@@ -1575,6 +1563,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_send_user_block_parser.add_argument("--show", action=argparse.BooleanOptionalAction, default=False)
     _add_block_mutation_arguments(tdx_send_user_block_parser)
     tdx_send_user_block_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_send_user_block_parser)
     tdx_formula_format_data_parser = subparsers.add_parser("tdx-formula-format-data")
     tdx_formula_format_data_parser.add_argument("--input-json-file", required=True)
     tdx_formula_format_data_parser.add_argument("--strategy-path")
@@ -1614,6 +1603,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_formula_screen_parser.add_argument("--start-time", default="")
     tdx_formula_screen_parser.add_argument("--end-time", default="")
     tdx_formula_screen_parser.add_argument("--count", default=0, type=int)
+    _add_replay_provider_arguments(tdx_formula_screen_parser)
     tdx_formula_screen_parser.add_argument("--dividend-type", default=0, type=int, choices=[0, 1, 2])
     tdx_formula_screen_parser.add_argument("--strategy-path")
     tdx_formula_exp_parser = subparsers.add_parser("tdx-formula-exp")
@@ -1946,29 +1936,6 @@ def _run_trade_buy(args: argparse.Namespace) -> Result:
         return Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message=str(exc))
 
 
-def _run_trade_sell(args: argparse.Namespace) -> Result:
-    try:
-        service = _build_trader_service(args, execution_mode="buy")
-        request = SecurityOrderRequest(
-            broker="pingan_desktop",
-            client_order_id=str(getattr(args, "client_order_id", None) or f"trade-sell-{uuid4().hex[:12]}"),
-            submission_key=args.submission_key,
-            symbol=str(args.code),
-            market="SZ",
-            side=OrderSide.SELL,
-            quantity=int(args.quantity),
-            limit_price=Decimal(str(args.price)),
-        )
-        snapshot = service.place_order(request)
-        return _build_trade_command_compat_result(snapshot, profile_name=str(args.profile), message="completed trade sell command")
-    except ValueError as exc:
-        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
-    except NotImplementedError as exc:
-        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
-    except RuntimeError as exc:
-        return Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message=str(exc))
-
-
 def _run_trade_submit_once(args: argparse.Namespace) -> Result:
     profile_name = getattr(args, "profile", None) or "submit_once"
     try:
@@ -1985,30 +1952,6 @@ def _run_trade_submit_once(args: argparse.Namespace) -> Result:
         )
         snapshot = service.place_order(request)
         return _build_trade_command_compat_result(snapshot, profile_name=str(profile_name), message="completed trade submit-once command")
-    except ValueError as exc:
-        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
-    except NotImplementedError as exc:
-        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
-    except RuntimeError as exc:
-        return Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message=str(exc))
-
-
-def _run_trade_sell_submit_once(args: argparse.Namespace) -> Result:
-    profile_name = getattr(args, "profile", None) or "submit_once"
-    try:
-        service = _build_trader_service(args, execution_mode="submit_once")
-        request = SecurityOrderRequest(
-            broker="pingan_desktop",
-            client_order_id=str(getattr(args, "client_order_id", None) or f"trade-sell-submit-once-{uuid4().hex[:12]}"),
-            submission_key=args.submission_key,
-            symbol=str(args.code),
-            market="SZ",
-            side=OrderSide.SELL,
-            quantity=int(args.quantity),
-            limit_price=Decimal(str(args.price)),
-        )
-        snapshot = service.place_order(request)
-        return _build_trade_command_compat_result(snapshot, profile_name=str(profile_name), message="completed trade sell-submit-once command")
     except ValueError as exc:
         return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
     except NotImplementedError as exc:
@@ -2610,6 +2553,97 @@ def _build_provider_result_payload(
     )
 
 
+_SUPPORTED_API_REPLAY_COMMANDS = {
+    "capabilities",
+    "health",
+    "doctor",
+    "formula-screen",
+    "send-user-block",
+}
+
+_API_REPLAY_CAPABILITIES = {
+    "snapshot": "market.snapshot",
+    "send-user-block": "block.send_user_block",
+    "formula-screen": "formula.screen",
+}
+
+
+def _build_cli_replay_failure_result(*, capability: str, message: str) -> Result:
+    return Result(
+        ok=False,
+        code=ErrorCode.INVALID_REQUEST,
+        message=message,
+        data={
+            "replay_source": {
+                "mode": "replay",
+                "capability": capability,
+            }
+        },
+    )
+
+
+def _infer_api_replay_capability(args: argparse.Namespace) -> str:
+    return _API_REPLAY_CAPABILITIES.get(args.api_command, f"api.{args.api_command}")
+
+
+def _reject_unsupported_api_replay(args: argparse.Namespace) -> Result | None:
+    if getattr(args, "provider_mode", "live") != "replay":
+        return None
+    if args.api_command in _SUPPORTED_API_REPLAY_COMMANDS:
+        return None
+    return _build_cli_replay_failure_result(
+        capability=_infer_api_replay_capability(args),
+        message=f"unsupported replay api command: {args.api_command}",
+    )
+
+
+def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None:
+    if getattr(args, "provider_mode", "live") != "replay":
+        return None
+    try:
+        manager = TdxApiManager(
+            profile="default",
+            strategy_path=getattr(args, "strategy_path", None),
+            provider_mode="replay",
+            replay_fixture=getattr(args, "fixture", None),
+            replay_fixture_path=getattr(args, "fixture_path", None),
+        )
+    except ValueError as exc:
+        return _build_cli_replay_failure_result(capability=str(args.command), message=str(exc))
+
+    if args.command == "tdx-capabilities":
+        return manager.runtime.capabilities()
+    if args.command == "tdx-health":
+        return manager.runtime.health(window_key=args.window_key, hid_port=args.hid_port)
+    if args.command == "tdx-doctor":
+        return manager.runtime.doctor(window_key=args.window_key, hid_port=args.hid_port)
+    if args.command == "tdx-send-user-block":
+        return manager.block.send_user_block(
+            block_code=args.block_code,
+            stocks=args.stock,
+            show=args.show,
+            mutation_key=args.mutation_key,
+            audit_dir=args.audit_dir,
+        )
+    if args.command == "tdx-formula-screen":
+        return manager.formula.screen(
+            formula_name=args.formula_name,
+            stock_list=args.code,
+            formula_arg=args.formula_arg,
+            return_count=args.return_count,
+            return_date=args.return_date,
+            stock_period=args.stock_period,
+            start_time=args.start_time,
+            end_time=args.end_time,
+            count=args.count,
+            dividend_type=args.dividend_type,
+        )
+    return _build_cli_replay_failure_result(
+        capability=str(args.command),
+        message=f"unsupported replay flat command: {args.command}",
+    )
+
+
 def _build_catalog_resolved_execution_namespace(
     args: argparse.Namespace,
     *,
@@ -2920,8 +2954,27 @@ def _run_catalog_bundle(args: argparse.Namespace) -> Result:
 
 
 def _handle_api_subcommand(args: argparse.Namespace) -> Result:
+    replay_rejection = _reject_unsupported_api_replay(args)
+    if replay_rejection is not None:
+        return replay_rejection
     try:
-        manager = TdxApiManager(profile=args.profile, strategy_path=args.strategy_path)
+        manager_kwargs: dict[str, object] = {
+            "profile": args.profile,
+            "strategy_path": args.strategy_path,
+        }
+        if (
+            getattr(args, "provider_mode", "live") != "live"
+            or getattr(args, "fixture", None) is not None
+            or getattr(args, "fixture_path", None) is not None
+        ):
+            manager_kwargs.update(
+                {
+                    "provider_mode": getattr(args, "provider_mode", "live"),
+                    "replay_fixture": getattr(args, "fixture", None),
+                    "replay_fixture_path": getattr(args, "fixture_path", None),
+                }
+            )
+        manager = TdxApiManager(**manager_kwargs)
     except ValueError as exc:
         return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
 
@@ -3179,14 +3232,27 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
 
 
 def _build_task_manager(args: argparse.Namespace) -> TdxTaskManager:
-    return TdxTaskManager(
-        profile=args.profile,
-        api_profile=getattr(args, "api_profile", None),
-        trade_profile=getattr(args, "trade_profile", None),
-        strategy_path=getattr(args, "strategy_path", None),
-        title_keyword=args.title_key,
-        exe_path=args.exe_path,
-    )
+    manager_kwargs: dict[str, object] = {
+        "profile": args.profile,
+        "api_profile": getattr(args, "api_profile", None),
+        "trade_profile": getattr(args, "trade_profile", None),
+        "strategy_path": getattr(args, "strategy_path", None),
+        "title_keyword": args.title_key,
+        "exe_path": args.exe_path,
+    }
+    if (
+        getattr(args, "provider_mode", "live") != "live"
+        or getattr(args, "fixture", None) is not None
+        or getattr(args, "fixture_path", None) is not None
+    ):
+        manager_kwargs.update(
+            {
+                "provider_mode": getattr(args, "provider_mode", "live"),
+                "replay_fixture": getattr(args, "fixture", None),
+                "replay_fixture_path": getattr(args, "fixture_path", None),
+            }
+        )
+    return TdxTaskManager(**manager_kwargs)
 
 
 def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace, command_name: str) -> Result | None:
@@ -3411,12 +3477,12 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
     if merged.get("title_key") == "平安证券" and resolved_preset.get("title_key"):
         merged["title_key"] = resolved_preset.get("title_key")
 
-    if command_name in {"trade-buy", "trade-sell", "trade-submit-once", "trade-sell-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
+    if command_name in {"trade-buy", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
         merged["baudrate"] = 115200 if merged.get("baudrate") is None else merged["baudrate"]
         merged["timeout"] = 2.0 if merged.get("timeout") is None else merged["timeout"]
         merged["max_depth"] = 12 if merged.get("max_depth") is None else merged["max_depth"]
 
-    if command_name in {"trade-buy", "trade-sell", "trade-submit-once", "trade-sell-submit-once", "guarded-trade-buy", "trade-confirm-current"}:
+    if command_name in {"trade-buy", "trade-submit-once", "guarded-trade-buy", "trade-confirm-current"}:
         merged["close_result_dialog"] = True if merged.get("close_result_dialog") is None else merged["close_result_dialog"]
 
     if command_name == "guarded-trade-buy":
@@ -3434,7 +3500,7 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
         merged["task_command"] = command_name
         return argparse.Namespace(**merged)
 
-    if command_name in {"trade-buy", "trade-sell", "trade-submit-once", "trade-sell-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
+    if command_name in {"trade-buy", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
         missing_required = [name for name in ("port", "code", "price", "quantity") if merged.get(name) is None]
         if missing_required:
             raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
@@ -3576,40 +3642,8 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
         )
-    if args.task_command == "trade-sell":
-        return manager.trade_sell(
-            port=args.port,
-            baudrate=args.baudrate,
-            timeout=args.timeout,
-            code=args.code,
-            price=args.price,
-            quantity=args.quantity,
-            max_depth=args.max_depth,
-            close_result_dialog=args.close_result_dialog,
-            submission_key=args.submission_key,
-            max_price=args.max_price,
-            refresh_before_trade=args.refresh_before_trade,
-            refresh_market=args.refresh_market,
-            refresh_force=args.refresh_force,
-        )
     if args.task_command == "trade-submit-once":
         return manager.trade_submit_once(
-            port=args.port,
-            baudrate=args.baudrate,
-            timeout=args.timeout,
-            code=args.code,
-            price=args.price,
-            quantity=args.quantity,
-            max_depth=args.max_depth,
-            close_result_dialog=args.close_result_dialog,
-            submission_key=args.submission_key,
-            max_price=args.max_price,
-            refresh_before_trade=args.refresh_before_trade,
-            refresh_market=args.refresh_market,
-            refresh_force=args.refresh_force,
-        )
-    if args.task_command == "trade-sell-submit-once":
-        return manager.trade_sell_submit_once(
             port=args.port,
             baudrate=args.baudrate,
             timeout=args.timeout,
@@ -3718,12 +3752,8 @@ def _handle_trade_subcommand(args: argparse.Namespace) -> Result:
         return _run_trade_trade_query(args)
     if args.trade_command == "buy":
         return _run_trade_buy(args)
-    if args.trade_command == "sell":
-        return _run_trade_sell(args)
     if args.trade_command == "submit-once":
         return _run_trade_submit_once(args)
-    if args.trade_command == "sell-submit-once":
-        return _run_trade_sell_submit_once(args)
     if args.trade_command == "health":
         return _run_trade_health(args)
     if args.trade_command == "preflight":
@@ -3784,6 +3814,8 @@ def main() -> int:
         result = _handle_trade_subcommand(args)
     elif args.command == "catalog":
         result = _handle_catalog_subcommand(args)
+    elif (replay_result := _run_flat_replay_provider_command(args)) is not None:
+        result = replay_result
     elif args.command == "health-check":
         result = adapter.health_check()
     elif args.command == "inspect":

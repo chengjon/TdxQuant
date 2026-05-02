@@ -18,7 +18,7 @@
 - `runtime.capabilities`
 - `runtime.health`
 - `runtime.doctor`
-- `block.send_user_block` 的 mutation safety 结果
+- `block.send_user_block` 的 mutation safety 结果（applied / noop / rejected）
 - provider-level subscription event rows
 - `subscription-watch` run artifact bundle
 
@@ -40,18 +40,23 @@
 当前稳定 helper 位于：
 
 - `tdxquant.replay_fixtures`
+- `tdxquant.replay_provider`
 
 可用函数：
 
 - `list_provider_replay_fixtures()`
 - `get_provider_replay_fixture_path(name)`
 - `load_provider_replay_fixture(name)`
+- `execute_sync_replay(capability, ...)`
+- `materialize_subscription_watch_replay(paths=..., ...)`
 
 其中：
 
 - `list_provider_replay_fixtures()` 返回 fixture manifest
 - `get_provider_replay_fixture_path(name)` 返回绝对路径
 - `load_provider_replay_fixture(name)` 自动按 `json` 或 `jsonl` 解析
+- `execute_sync_replay(...)` 把内置 fixture 或显式 JSON 文件物化成同步 provider `Result`
+- `materialize_subscription_watch_replay(...)` 把 built-in bundle 或显式 run artifact 目录物化成新的 completed run
 
 ## 4. Current Fixture Names
 
@@ -65,6 +70,8 @@
 - `runtime-health-degraded`
 - `runtime-doctor-degraded`
 - `block-send-user-block-applied`
+- `block-send-user-block-noop`
+- `block-send-user-block-rejected`
 - `subscription-event-batch`
 - `subscription-watch-events`
 - `subscription-watch-status-completed`
@@ -73,7 +80,67 @@
 
 这些名字应被视为对上层稳定的 sample 标识。
 
-## 5. Python Example
+## 5. Replay Mode Entry Points
+
+截至 `2026-05-02`，fixture bundle 已经不再只是静态样例，而是可以通过正式入口跑成 in-process replay mode。
+
+当前支持的同步 replay capability：
+
+- `formula.screen`
+- `runtime.capabilities`
+- `runtime.health`
+- `runtime.doctor`
+- `block.send_user_block`
+
+当前支持的运行入口：
+
+- Python manager
+  - `TdxApiManager(..., provider_mode="replay")`
+  - `TdxApiManager(..., provider_mode="replay", replay_fixture="formula-screen-failure")`
+  - `TdxApiManager(..., provider_mode="replay", replay_fixture_path="/tmp/custom.json")`
+- nested CLI
+  - supported:
+    - `tdxquant api capabilities --provider-mode replay`
+    - `tdxquant api health --provider-mode replay`
+    - `tdxquant api doctor --provider-mode replay`
+    - `tdxquant api formula-screen --provider-mode replay`
+    - `tdxquant api send-user-block --provider-mode replay`
+  - explicit reject example:
+    - `tdxquant api snapshot --provider-mode replay`
+- flat CLI
+  - supported:
+    - `tdxquant tdx-capabilities --provider-mode replay`
+    - `tdxquant tdx-health --provider-mode replay`
+    - `tdxquant tdx-doctor --provider-mode replay`
+    - `tdxquant tdx-formula-screen --provider-mode replay`
+    - `tdxquant tdx-send-user-block --provider-mode replay`
+  - explicit reject example:
+    - `tdxquant tdx-data-kline --provider-mode replay`
+- task
+  - `tdxquant task subscription-watch --provider-mode replay`
+
+fixture 选择规则：
+
+- selector precedence:
+  - `--fixture-path <json/jsonl-or-run-dir>`: 使用显式路径输入
+  - `--fixture <builtin-name>`: 使用显式 built-in fixture 名称
+  - 默认：按 capability 自动选 built-in fixture
+- Python 侧还支持 capability-keyed `replay_fixture_map`
+
+replay mode 的安全语义：
+
+- 不支持的 capability 直接稳定拒绝
+- fixture 缺失或格式错误直接稳定拒绝
+- replay mode 不允许 silent fallback 到 live Windows runtime
+
+CLI subprocess replay contract：
+
+- nested `api` replay command 在 CLI 层先过支持矩阵；不支持时直接返回 `INVALID_REQUEST`，并在 `data.replay_source` 里带上 `mode=replay` 与被拒绝的 capability 推断值
+- flat `tdx-*` replay command 只对当前支持矩阵做 replay dispatch；未纳入矩阵的命令会返回 `unsupported replay flat command: ...`
+- `task subscription-watch --provider-mode replay` 只走 replay bundle materialization；replay source 有问题时返回稳定失败结果，不会打开 live session
+- `--output <path>` 会把和 stdout 完全相同的 JSON payload 镜像写入文件，包括 replay 失败 payload；stdout 与文件内容应视为同一 contract 的两个出口
+
+## 6. Python Example
 
 ```python
 from tdxquant import list_provider_replay_fixtures, load_provider_replay_fixture
@@ -138,7 +205,48 @@ watch_summary = load_provider_replay_fixture("subscription-watch-summary-complet
   - `requested_symbols`
   - `output_dir`
 
-## 6. Current Boundary
+其中 `block mutation` fixtures 额外锁定这些结构：
+
+- `block-send-user-block-applied`
+  - `governance_decision`
+  - `governance_reason`
+  - `desired_state`
+  - `observed_state`
+- `block-send-user-block-noop`
+  - `status=noop`
+  - `governance_decision=skip`
+  - `governance_reason=already_applied`
+- `block-send-user-block-rejected`
+  - `status=rejected`
+  - `governance_decision=reject`
+  - `governance_reason=missing_block`
+
+## 7. Subscription Watch Replay
+
+`subscription-watch` 在 replay mode 下不是模拟长连接，而是立即物化一份 completed run artifact bundle：
+
+- `manifest.json`
+- `status.json`
+- `summary.json`
+- `events.jsonl`
+- `events.csv`
+
+当前支持两种来源：
+
+- built-in completed-run fixture bundle
+- 显式 replay manifest 路径或 replay run 目录
+
+物化时会统一重写：
+
+- `run_id`
+- `output_dir`
+- `output_paths`
+- `artifacts.*_path`
+- `events.jsonl` 中每一行的 `run_id`
+
+这意味着 replay source 只是输入资产，不会把旧 run 的路径原样泄露到新 run 结果里。
+
+## 8. Current Boundary
 
 这包当前已经解决：
 
@@ -146,12 +254,15 @@ watch_summary = load_provider_replay_fixture("subscription-watch-summary-complet
 - 稳定 fixture 名称
 - 统一 loader
 - JSON / JSONL contract test 基座
+- in-process fake provider mode
+- `subscription-watch` completed-run replay materialization
 
 这包当前还没有解决：
 
-- live runtime 自动 replay mode
 - HTTP replay 服务
 - daemon fake provider
+- live subscription session / delayed playback 模拟
+- 更大范围 capability 覆盖
 - start / stop / status 形态的测试控制面
 
 这些属于后续更高一层的 fake provider / integration hardening 工作。

@@ -19,6 +19,8 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("runtime-health-degraded", names)
         self.assertIn("runtime-doctor-degraded", names)
         self.assertIn("block-send-user-block-applied", names)
+        self.assertIn("block-send-user-block-noop", names)
+        self.assertIn("block-send-user-block-rejected", names)
         self.assertIn("subscription-event-batch", names)
         self.assertIn("subscription-watch-events", names)
         self.assertIn("subscription-watch-status-completed", names)
@@ -105,7 +107,28 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["capability"], "block.send_user_block")
         self.assertEqual(payload["data"]["block_mutation"]["mutation_key"], "watchlist-sync-20260428-01")
+        self.assertEqual(payload["data"]["block_mutation"]["status"], "applied")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_decision"], "execute")
         self.assertEqual(payload["artifacts"][0]["kind"], "block_mutation_audit")
+
+    def test_load_block_mutation_noop_fixture_returns_governance_summary(self) -> None:
+        payload = load_provider_replay_fixture("block-send-user-block-noop")
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["data"]["block_mutation"]["status"], "noop")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_decision"], "skip")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_reason"], "already_applied")
+        self.assertIn("observed_state", payload["data"]["block_mutation"])
+
+    def test_load_block_mutation_rejected_fixture_returns_governance_summary(self) -> None:
+        payload = load_provider_replay_fixture("block-send-user-block-rejected")
+        self.assertFalse(payload["success"])
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["code"], "invalid_request")
+        self.assertEqual(payload["data"]["block_mutation"]["status"], "rejected")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_decision"], "reject")
+        self.assertEqual(payload["data"]["block_mutation"]["governance_reason"], "missing_block")
+        self.assertIn("observed_state", payload["data"]["block_mutation"])
 
     def test_unknown_fixture_name_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

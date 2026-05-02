@@ -22,7 +22,7 @@ M1 的证券 trader 主线只覆盖普通 A 股现货限价 `buy/sell` 与本地
   - 负责 canonical 下单、订单查询、成交查询、同日成交恢复
 - `PingAnDesktopTraderGateway`
   - 第一号证券 gateway 实现
-  - 当前已接入 `side=buy|sell` 与 `submit_once` 兼容执行模式
+  - 当前已接入 `side=buy` 与 `submit_once` 兼容执行模式
 - `TraderStore`
   - canonical runtime 存储
   - 负责 `order-events` / `order-snapshots` / `trade-fills`
@@ -32,12 +32,6 @@ M1 的证券 trader 主线只覆盖普通 A 股现货限价 `buy/sell` 与本地
 - `manager.pingan.buy_submit_once(...)`
   - 对应完整提交确认路径
   - 底层调用 `run_pingan_buy_submit_once(...)`
-- `manager.pingan.sell(...)`
-  - 对应稳定快速卖出路径
-  - 底层调用 `run_pingan_sell_fast(...)`
-- `manager.pingan.sell_submit_once(...)`
-  - 对应卖出完整提交确认路径
-  - 底层调用 `run_pingan_sell_submit_once(...)`
 
 ## 默认产物
 
@@ -46,7 +40,7 @@ M1 的证券 trader 主线只覆盖普通 A 股现货限价 `buy/sell` 与本地
 - 追加事件日志：
   - `runtime/pingan-order-events.jsonl`
 
-每次 `PingAn + HID` live-trading 主线上的 `buy` / `sell` / `submit_once` / `sell_submit_once` 成功或失败后，manager 都会回填这两个文件。
+每次 `pingan-buy` 或 `pingan-buy-submit-once` 成功或失败后，manager 都会回填这两个文件。
 
 新增 canonical trader 产物：
 
@@ -98,9 +92,7 @@ result = manager.pingan.buy(
 现有 nested 兼容命令继续保留：
 
 - `trade buy`
-- `trade sell`
 - `trade submit-once`
-- `trade sell-submit-once`
 - `trade submit-ready`
 - `trade confirm-current`
 
@@ -115,9 +107,7 @@ result = manager.pingan.buy(
 当前迁移关系是：
 
 - `trade buy`：兼容入口，内部转发到 canonical `TradeService.place_order(... side=buy ...)`
-- `trade sell`：兼容入口，内部转发到 canonical `TradeService.place_order(... side=sell ...)`
 - `trade submit-once`：兼容入口，内部转发到 canonical `TradeService.place_order(...)` 的 PingAn `submit_once` 执行模式
-- `trade sell-submit-once`：兼容入口，内部转发到 canonical `TradeService.place_order(... side=sell ...)` 的 PingAn `submit_once` 执行模式
 - `trade submit-ready` / `trade confirm-current`：继续保留为 PingAn 桌面边界命令
 - profile 不再硬编码在 `cli.py`
 - canonical 订单/成交快照落到 `runtime/trader/*`
@@ -152,10 +142,8 @@ python -m tdxquant.cli trade trade-query
 ```bash
 python -m tdxquant.cli trade presets
 python -m tdxquant.cli trade run --preset balanced-buy --code 516820 --price 0.35 --quantity 100
-python -m tdxquant.cli trade run --preset balanced-sell --code 516820 --price 0.35 --quantity 100
 python -m tdxquant.cli trade run --preset turbo-buy --code 516820 --price 0.35 --quantity 100
 python -m tdxquant.cli trade run --preset submit-once-default --code 516820 --price 0.35 --quantity 100
-python -m tdxquant.cli trade run --preset sell-submit-once-default --code 516820 --price 0.35 --quantity 100
 ```
 
 边界约定：
@@ -167,6 +155,6 @@ python -m tdxquant.cli trade run --preset sell-submit-once-default --code 516820
 
 ## 后续建议
 
-- 下一步优先补 `cancel_order` 与 `sync_open_orders`
+- 下一步优先补 `side=sell` 的 PingAn 桌面执行链路
 - 再补 canonical `sync_today_trades` 的更完整恢复来源
-- 后续阶段再扩展账户、持仓与更强的同步能力
+- 后续阶段再扩展撤单、账户、持仓与更强的同步能力

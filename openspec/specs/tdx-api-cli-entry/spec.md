@@ -41,12 +41,7 @@ The system SHALL allow the nested `api` command group to accept a profile select
 
 #### Scenario: Caller requests structured output from api command
 - **WHEN** a caller invokes a nested `api` query command with an output destination
-- **THEN** the command MUST write the structured result using the hardened provider-facing synchronous result envelope
-
-#### Scenario: CLI provider failure preserves JSON structure and shell failure semantics
-- **WHEN** a nested `api` command returns a failed synchronous provider result
-- **THEN** the command MUST still emit the hardened provider-facing synchronous result envelope
-- **AND** the command MUST exit with a non-zero process status for the failed provider call
+- **THEN** the command MUST write the structured result using the provider-facing synchronous result envelope
 
 ### Requirement: Query API CLI SHALL expose flat bridge commands for runtime public query actions
 The system SHALL expose flat bridge commands for runtime public query actions so that bridge-oriented callers can use the same capabilities without going through the manager layer.
@@ -339,3 +334,4 @@ The system SHALL emit the standardized block mutation summary and audit artifact
 #### Scenario: Flat bridge block write returns standardized mutation contract
 - **WHEN** a flat bridge block write command completes
 - **THEN** the JSON result MUST include the standardized `data.block_mutation` payload and audit artifact metadata
+

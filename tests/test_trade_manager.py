@@ -199,38 +199,6 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(result.data["trade_safety"]["submission_key"], "sell-20260430-001")
         self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
 
-    def test_pingan_sell_submit_once_uses_submit_once_profile(self) -> None:
-        expected = Result(
-            ok=True,
-            code=ErrorCode.OK,
-            message="ok",
-            data={
-                "input": {"code": "000001", "price": "10.00", "quantity": 100},
-                "result_dialog": {"contract_no": "S202604300002"},
-            },
-        )
-        with TemporaryDirectory() as temp_dir:
-            with patch("tdxquant.trade.manager.run_pingan_sell_submit_once", return_value=expected) as mocked:
-                manager = TdxTradeManager(
-                    profile="submit_once",
-                    state_path=str(Path(temp_dir) / "state.json"),
-                    event_log_path=str(Path(temp_dir) / "events.jsonl"),
-                    submission_ledger_path=str(Path(temp_dir) / "submission-ledger.jsonl"),
-                )
-                result = manager.pingan.sell_submit_once(
-                    port="COM3",
-                    code="000001",
-                    price="10.00",
-                    quantity=100,
-                    submission_key="sell-submit-once-20260430-001",
-                    max_price=10.50,
-                )
-        mocked.assert_called_once()
-        self.assertEqual(result.data["manager"]["method"], "sell_submit_once")
-        self.assertEqual(result.data["trade_profile"]["name"], "submit_once")
-        self.assertEqual(result.data["trade_safety"]["submission_key"], "sell-submit-once-20260430-001")
-        self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
-
     def test_pingan_buy_rejects_invalid_order_before_desktop_execution(self) -> None:
         with TemporaryDirectory() as temp_dir:
             with patch("tdxquant.trade.manager.run_pingan_buy_fast") as mocked:

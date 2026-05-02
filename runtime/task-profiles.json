@@ -69,23 +69,7 @@
     "refresh_market": "AG",
     "refresh_force": false
   },
-  "trade_sell": {
-    "api_profile": "safe_read",
-    "trade_profile": "balanced",
-    "output_format": "json",
-    "refresh_before_trade": false,
-    "refresh_market": "AG",
-    "refresh_force": false
-  },
   "trade_submit_once": {
-    "api_profile": "safe_read",
-    "trade_profile": "submit_once",
-    "output_format": "json",
-    "refresh_before_trade": false,
-    "refresh_market": "AG",
-    "refresh_force": false
-  },
-  "trade_sell_submit_once": {
     "api_profile": "safe_read",
     "trade_profile": "submit_once",
     "output_format": "json",

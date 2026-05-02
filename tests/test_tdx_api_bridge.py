@@ -51,11 +51,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
         self.assertEqual(result.code.value, "ok")
         self.assertIn("capabilities", result.data)
         self.assertIn("summary", result.data)
-        self.assertIn("grading", result.data)
         self.assertGreater(result.data["summary"]["total"], 0)
-        self.assertIn("by_domain", result.data["summary"])
-        self.assertIn("stability_levels", result.data["grading"])
-        self.assertIn("side_effect_levels", result.data["grading"])
         capability_names = {item["name"] for item in result.data["capabilities"]}
         self.assertIn("formula.screen", capability_names)
         first = result.data["capabilities"][0]
@@ -76,14 +72,6 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
         self.assertIn("subscription_runtime", result.data["checks"])
         self.assertIn("desktop_window", result.data["checks"])
         self.assertIn("hid", result.data["checks"])
-        self.assertIn("recommended_action_items", result.data)
-        self.assertIsInstance(result.data["recommended_action_items"], list)
-        if result.data["recommended_action_items"]:
-            first = result.data["recommended_action_items"][0]
-            self.assertIn("id", first)
-            self.assertIn("summary", first)
-            self.assertIn("severity", first)
-            self.assertIn("related_checks", first)
 
     def test_provider_doctor_returns_findings_and_actions(self) -> None:
         result = run_tdx_provider_doctor(window_key="通达信金融终端")
@@ -92,18 +80,8 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
         self.assertIn(result.data["overall_status"], {"ok", "degraded", "unavailable"})
         self.assertIn("findings", result.data)
         self.assertIn("recommended_actions", result.data)
-        self.assertIn("recommended_action_items", result.data)
         self.assertIsInstance(result.data["findings"], list)
         self.assertIsInstance(result.data["recommended_actions"], list)
-        self.assertIsInstance(result.data["recommended_action_items"], list)
-        first_finding = result.data["findings"][0]
-        self.assertIn("id", first_finding)
-        self.assertIn("severity", first_finding)
-        self.assertIn("status", first_finding)
-        self.assertIn("summary", first_finding)
-        self.assertIn("critical", first_finding)
-        self.assertIn("related_checks", first_finding)
-        self.assertIn("recommended_action_id", first_finding)
 
     def test_formula_screen_normalizes_batch_formula_result(self) -> None:
         raw_result = Result(
