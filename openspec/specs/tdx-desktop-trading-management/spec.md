@@ -90,3 +90,64 @@ The system SHALL preserve normalized trade-audit correlation data across the exi
 - **THEN** the written last-order state payload MUST include the normalized `trade_audit` summary
 - **AND** the appended order-event row MUST include the normalized `trade_audit` summary
 
+### Requirement: Desktop trading management SHALL expose a parallel securities trade service
+The system SHALL expose a broker-neutral securities trade service and gateway registry in parallel with the existing desktop trade manager path.
+
+#### Scenario: Caller resolves a canonical securities trade path
+- **WHEN** a caller executes first-phase canonical securities trading behavior
+- **THEN** the system MUST route the request through a dedicated securities trade service and gateway resolution path
+- **AND** that path MUST remain parallel to the legacy `TdxTradeManager.pingan.*` workflow surface
+
+#### Scenario: Management resolves the first-phase PingAn desktop gateway
+- **WHEN** a caller selects the first-phase PingAn desktop broker for canonical order placement
+- **THEN** the management layer MUST resolve a dedicated PingAn desktop trader gateway implementation
+- **AND** the canonical service MUST govern lifecycle, storage, and capability reporting around that implementation
+
+### Requirement: Desktop trading management SHALL persist canonical trader artifacts alongside legacy PingAn artifacts during migration
+The system SHALL persist canonical securities trader artifacts during first-phase gateway execution without requiring immediate removal of the existing PingAn runtime artifacts.
+
+#### Scenario: Canonical gateway execution writes canonical trader storage
+- **WHEN** a first-phase order executes through the canonical securities trade service
+- **THEN** the management layer MUST write canonical trader artifacts for order events, order snapshots, or trade fills under the dedicated trader storage area
+
+#### Scenario: Migration keeps legacy PingAn artifacts available
+- **WHEN** the system introduces canonical trader storage
+- **THEN** existing PingAn runtime artifacts such as submission ledger, last-order state, and trade-audit outputs MUST remain available during the migration period
+- **AND** the introduction of canonical storage MUST NOT require immediate deprecation of the legacy artifact paths
+
+### Requirement: Desktop trading management SHALL preserve TdxTradeManager as a compatibility surface during migration
+The system SHALL preserve the existing top-level desktop trade manager surface while the canonical securities trade service is being introduced.
+
+#### Scenario: Existing PingAn workflow surface remains callable
+- **WHEN** existing callers execute the legacy PingAn desktop trade manager workflows during the migration period
+- **THEN** those workflows MUST remain callable through their current surface
+- **AND** the implementation MAY satisfy them through delegation into the canonical trade service where the caller contract remains equivalent
+
+#### Scenario: Canonical service does not force immediate removal of boundary workflows
+- **WHEN** the project introduces the canonical securities trade service
+- **THEN** desktop boundary workflows such as submit-ready and confirm-current MUST remain governed by the desktop trading management capability
+- **AND** they MUST NOT be required to masquerade as broker-neutral canonical order states
+
+### Requirement: Desktop trading management SHALL define PingAn plus HID as the active live-trading execution mainline
+The system SHALL treat `PingAn` desktop execution with HID-backed final submit actions as the only active live-trading mainline for desktop trading workflows.
+
+#### Scenario: Live-trading scope excludes TongDaXin execution
+- **WHEN** the project defines the current live desktop trading path
+- **THEN** the active execution baseline MUST be `PingAn` desktop plus HID
+- **AND** `TongDaXin` trading MUST NOT be required for live execution closure
+
+#### Scenario: PingAn live workflow persists through the standard finalized path
+- **WHEN** a stable `PingAn` live trade completes through the management layer
+- **THEN** the workflow MUST continue to use the standard finalized persistence path for audit, state, and event artifacts
+
+### Requirement: Desktop trading management SHALL expose stable PingAn sell workflows alongside existing buy workflows
+The system SHALL expose stable `PingAn` sell workflows that mirror the current buy workflows across both the fast path and the full submit-once path.
+
+#### Scenario: Caller executes fast sell through the management layer
+- **WHEN** a caller requests a stable `PingAn` sell workflow through the desktop trading management path
+- **THEN** the system MUST support a finalized sell execution path analogous to the existing stable buy path
+
+#### Scenario: Caller executes sell submit-once through the management layer
+- **WHEN** a caller requests a stable `PingAn` sell workflow that advances through HID submit, confirmation, and result dialog handling
+- **THEN** the system MUST support a finalized `sell_submit_once` execution path
+- **AND** that workflow MUST preserve the same safety controls and finalized artifact governance already used by the existing buy submit-once path

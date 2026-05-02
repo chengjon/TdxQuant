@@ -12,7 +12,6 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..models import ErrorCode, Result
-from ..replay_provider import materialize_subscription_watch_replay
 from ..subscription_event import (
     SUBSCRIPTION_EVENT_CAPABILITY,
     SUBSCRIPTION_EVENT_SCHEMA_VERSION,
@@ -917,10 +916,6 @@ class TdxTaskManager:
         trade_profile_overrides: dict[str, Any] | None = None,
         title_keyword: str = "平安证券",
         exe_path: str | None = None,
-        provider_mode: str = "live",
-        replay_fixture: str | None = None,
-        replay_fixture_path: str | None = None,
-        replay_fixture_map: dict[str, Any] | None = None,
     ) -> None:
         self.profile_name = profile
         self.profile_options = resolve_task_profile(profile, overrides=profile_overrides)
@@ -931,10 +926,6 @@ class TdxTaskManager:
             profile=resolved_api_profile,
             strategy_path=strategy_path,
             profile_overrides=api_profile_overrides,
-            provider_mode=provider_mode,
-            replay_fixture=replay_fixture,
-            replay_fixture_path=replay_fixture_path,
-            replay_fixture_map=replay_fixture_map,
         )
         self.trade_manager = TdxTradeManager(
             profile=resolved_trade_profile,
@@ -1270,129 +1261,6 @@ class TdxTaskManager:
             legacy_jsonl_path = Path(jsonl_output_path) if jsonl_output_path else None
             legacy_csv_path = Path(csv_output_path) if csv_output_path else None
             legacy_status_path = Path(status_output_path) if status_output_path else None
-
-            if getattr(self.api_manager, "provider_mode", "live") == "replay":
-                try:
-                    materialized = materialize_subscription_watch_replay(
-                        paths=run_paths,
-                        replay_fixture=getattr(self.api_manager, "replay_fixture", None),
-                        replay_fixture_path=getattr(self.api_manager, "replay_fixture_path", None),
-                    )
-                except ValueError as exc:
-                    return Result(
-                        ok=False,
-                        code=ErrorCode.INVALID_REQUEST,
-                        message=str(exc),
-                        data={
-                            "replay_source": {
-                                "mode": "replay",
-                                "capability": "subscription.watch",
-                            }
-                        },
-                    )
-                if legacy_jsonl_path is not None and legacy_jsonl_path != run_paths.events_jsonl_path:
-                    legacy_jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-                    legacy_jsonl_path.write_text(
-                        run_paths.events_jsonl_path.read_text(encoding="utf-8"),
-                        encoding="utf-8",
-                    )
-                if legacy_csv_path is not None and legacy_csv_path != run_paths.events_csv_path:
-                    legacy_csv_path.parent.mkdir(parents=True, exist_ok=True)
-                    legacy_csv_path.write_text(
-                        run_paths.events_csv_path.read_text(encoding="utf-8"),
-                        encoding="utf-8",
-                    )
-                if legacy_status_path is not None and legacy_status_path != run_paths.status_path:
-                    legacy_status_path.parent.mkdir(parents=True, exist_ok=True)
-                    legacy_status_path.write_text(
-                        run_paths.status_path.read_text(encoding="utf-8"),
-                        encoding="utf-8",
-                    )
-
-                artifact_paths = {
-                    "run_dir": str(run_paths.run_dir),
-                    "manifest_path": str(run_paths.manifest_path),
-                    "status_path": str(run_paths.status_path),
-                    "summary_path": str(run_paths.summary_path),
-                    "events_jsonl_path": str(run_paths.events_jsonl_path),
-                    "events_csv_path": str(run_paths.events_csv_path),
-                    "jsonl_output_path": str(legacy_jsonl_path or run_paths.events_jsonl_path),
-                    "csv_output_path": str(legacy_csv_path or run_paths.events_csv_path),
-                    "status_output_path": str(legacy_status_path or run_paths.status_path),
-                }
-                status_payload = copy.deepcopy(materialized.status)
-                status_payload["artifacts"] = dict(artifact_paths)
-                status_payload["output_paths"] = {
-                    "run_dir": str(run_paths.run_dir),
-                    "manifest_path": str(run_paths.manifest_path),
-                    "status_path": str(run_paths.status_path),
-                    "summary_path": str(run_paths.summary_path),
-                    "events_jsonl_path": str(run_paths.events_jsonl_path),
-                    "events_csv_path": str(run_paths.events_csv_path),
-                }
-                _write_json_file(run_paths.status_path, status_payload)
-                if legacy_status_path is not None and legacy_status_path != run_paths.status_path:
-                    _write_json_file(legacy_status_path, status_payload)
-
-                summary_payload = copy.deepcopy(materialized.summary)
-                event_rows = [dict(row) for row in materialized.events]
-                session_id = str(status_payload.get("session_id") or "replay-session")
-                provider_instance_id = str(status_payload.get("provider_instance_id") or "replay-provider")
-                subscription_id = str(status_payload.get("subscription_id") or "replay-subscription")
-                stop_reason = str(summary_payload.get("stop_reason") or status_payload.get("stop_reason") or "completed")
-                interrupted = str(summary_payload.get("final_state") or "completed") == "interrupted"
-                started_at = str(summary_payload.get("started_at") or status_payload.get("started_at") or _now_utc_iso())
-                finished_at = str(summary_payload.get("finished_at") or status_payload.get("finished_at") or _now_utc_iso())
-                elapsed_ms = float(summary_payload.get("elapsed_ms") or 0.0)
-                unique_symbols = list(status_payload.get("unique_symbols") or sorted({str(row.get("symbol")) for row in event_rows if row.get("symbol")}))
-                subscribe_result = Result(
-                    ok=True,
-                    code=ErrorCode.OK,
-                    message="materialized subscription watch replay run",
-                    data={"mode": "replay"},
-                )
-                unsubscribe_result = Result(
-                    ok=True,
-                    code=ErrorCode.OK,
-                    message="completed subscription watch replay cleanup",
-                    data={"mode": "replay"},
-                )
-                return Result(
-                    ok=True,
-                    code=ErrorCode.OK,
-                    message="completed subscription watch task",
-                    data={
-                        "input": {
-                            "stock_list": list(stock_list),
-                            "max_events": max_events,
-                            "max_seconds": max_seconds,
-                            "poll_interval": poll_interval,
-                        },
-                        "subscription": {
-                            "session_id": session_id,
-                            "provider_instance_id": provider_instance_id,
-                            "subscription_id": subscription_id,
-                            "run_id": run_paths.run_id,
-                        },
-                        "summary": {
-                            "event_count": int(summary_payload.get("event_count", len(event_rows))),
-                            "unique_symbol_count": int(status_payload.get("unique_symbol_count", len(unique_symbols))),
-                            "unique_symbols": unique_symbols,
-                            "stop_reason": stop_reason,
-                            "interrupted": interrupted,
-                            "started_at": started_at,
-                            "finished_at": finished_at,
-                            "elapsed_ms": elapsed_ms,
-                            "last_event_at": status_payload.get("last_event_at"),
-                        },
-                        "status": status_payload,
-                        "manifest": copy.deepcopy(materialized.manifest),
-                        "artifacts": dict(artifact_paths),
-                        "subscribe_result": subscribe_result.to_dict(),
-                        "unsubscribe_result": unsubscribe_result.to_dict(),
-                    },
-                    warnings=[],
-                )
 
             session_id = uuid4().hex
             started_at = _now_utc_iso()
@@ -2858,6 +2726,105 @@ class TdxTaskManager:
         result, timing = _capture_task_timing("task.trade_buy", run)
         return self._attach_task_metadata(result, task_name="trade_buy", timing=timing)
 
+    def trade_sell(
+        self,
+        *,
+        port: str,
+        code: str,
+        price: str,
+        quantity: int,
+        baudrate: int = 115200,
+        timeout: float = 2.0,
+        max_depth: int = 12,
+        close_result_dialog: bool = True,
+        submission_key: str | None = None,
+        max_price: float | None = None,
+        refresh_before_trade: bool | None = None,
+        refresh_market: str | None = None,
+        refresh_force: bool | None = None,
+    ) -> Result:
+        def run() -> Result:
+            resolved_refresh_first = bool(
+                self.profile_options.get("refresh_before_trade", False)
+                if refresh_before_trade is None
+                else refresh_before_trade
+            )
+            resolved_refresh_market = refresh_market if refresh_market is not None else self.profile_options.get("refresh_market")
+            resolved_refresh_force = refresh_force if refresh_force is not None else self.profile_options.get("refresh_force")
+            refresh_result: Result | None = None
+            if resolved_refresh_first:
+                refresh_result = self.api_manager.refresh_cache(
+                    market=None if resolved_refresh_market is None else str(resolved_refresh_market),
+                    force=None if resolved_refresh_force is None else bool(resolved_refresh_force),
+                )
+                if not refresh_result.ok:
+                    return Result(
+                        ok=False,
+                        code=refresh_result.code,
+                        message="trade sell task aborted during environment refresh",
+                        data={
+                            "input": {
+                                "port": port,
+                                "code": code,
+                                "price": price,
+                                "quantity": quantity,
+                                "submission_key": submission_key,
+                                "max_price": max_price,
+                                "refresh_before_trade": resolved_refresh_first,
+                                "refresh_market": resolved_refresh_market,
+                                "refresh_force": resolved_refresh_force,
+                            },
+                            "refresh_result": refresh_result.to_dict(),
+                        },
+                        warnings=refresh_result.warnings,
+                        next_action=refresh_result.next_action,
+                    )
+            trade_result = self.trade_manager.pingan.sell(
+                port=port,
+                baudrate=baudrate,
+                timeout=timeout,
+                code=code,
+                price=price,
+                quantity=quantity,
+                max_depth=max_depth,
+                close_result_dialog=close_result_dialog,
+                submission_key=submission_key,
+                max_price=max_price,
+            )
+            if not trade_result.ok:
+                return trade_result
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="completed trade sell task",
+                data={
+                    "input": {
+                        "port": port,
+                        "code": code,
+                        "price": price,
+                        "quantity": quantity,
+                        "baudrate": baudrate,
+                        "timeout": timeout,
+                        "max_depth": max_depth,
+                        "close_result_dialog": close_result_dialog,
+                        "submission_key": submission_key,
+                        "max_price": max_price,
+                        "refresh_before_trade": resolved_refresh_first,
+                        "refresh_market": resolved_refresh_market,
+                        "refresh_force": resolved_refresh_force,
+                    },
+                    "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
+                    "trade_result": trade_result.to_dict(),
+                    "artifacts": copy.deepcopy(trade_result.data.get("artifacts", {})),
+                    "result_dialog": copy.deepcopy(trade_result.data.get("result_dialog", {})),
+                },
+                warnings=list(trade_result.warnings),
+                next_action=trade_result.next_action,
+            )
+
+        result, timing = _capture_task_timing("task.trade_sell", run)
+        return self._attach_task_metadata(result, task_name="trade_sell", timing=timing)
+
     def trade_submit_once(
         self,
         *,
@@ -2956,6 +2923,105 @@ class TdxTaskManager:
 
         result, timing = _capture_task_timing("task.trade_submit_once", run)
         return self._attach_task_metadata(result, task_name="trade_submit_once", timing=timing)
+
+    def trade_sell_submit_once(
+        self,
+        *,
+        port: str,
+        code: str,
+        price: str,
+        quantity: int,
+        baudrate: int = 115200,
+        timeout: float = 2.0,
+        max_depth: int = 12,
+        close_result_dialog: bool = True,
+        submission_key: str | None = None,
+        max_price: float | None = None,
+        refresh_before_trade: bool | None = None,
+        refresh_market: str | None = None,
+        refresh_force: bool | None = None,
+    ) -> Result:
+        def run() -> Result:
+            resolved_refresh_first = bool(
+                self.profile_options.get("refresh_before_trade", False)
+                if refresh_before_trade is None
+                else refresh_before_trade
+            )
+            resolved_refresh_market = refresh_market if refresh_market is not None else self.profile_options.get("refresh_market")
+            resolved_refresh_force = refresh_force if refresh_force is not None else self.profile_options.get("refresh_force")
+            refresh_result: Result | None = None
+            if resolved_refresh_first:
+                refresh_result = self.api_manager.refresh_cache(
+                    market=None if resolved_refresh_market is None else str(resolved_refresh_market),
+                    force=None if resolved_refresh_force is None else bool(resolved_refresh_force),
+                )
+                if not refresh_result.ok:
+                    return Result(
+                        ok=False,
+                        code=refresh_result.code,
+                        message="trade sell-submit-once task aborted during environment refresh",
+                        data={
+                            "input": {
+                                "port": port,
+                                "code": code,
+                                "price": price,
+                                "quantity": quantity,
+                                "submission_key": submission_key,
+                                "max_price": max_price,
+                                "refresh_before_trade": resolved_refresh_first,
+                                "refresh_market": resolved_refresh_market,
+                                "refresh_force": resolved_refresh_force,
+                            },
+                            "refresh_result": refresh_result.to_dict(),
+                        },
+                        warnings=refresh_result.warnings,
+                        next_action=refresh_result.next_action,
+                    )
+            trade_result = self.trade_manager.pingan.sell_submit_once(
+                port=port,
+                baudrate=baudrate,
+                timeout=timeout,
+                code=code,
+                price=price,
+                quantity=quantity,
+                max_depth=max_depth,
+                close_result_dialog=close_result_dialog,
+                submission_key=submission_key,
+                max_price=max_price,
+            )
+            if not trade_result.ok:
+                return trade_result
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="completed trade sell-submit-once task",
+                data={
+                    "input": {
+                        "port": port,
+                        "code": code,
+                        "price": price,
+                        "quantity": quantity,
+                        "baudrate": baudrate,
+                        "timeout": timeout,
+                        "max_depth": max_depth,
+                        "close_result_dialog": close_result_dialog,
+                        "submission_key": submission_key,
+                        "max_price": max_price,
+                        "refresh_before_trade": resolved_refresh_first,
+                        "refresh_market": resolved_refresh_market,
+                        "refresh_force": resolved_refresh_force,
+                    },
+                    "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
+                    "trade_result": trade_result.to_dict(),
+                    "artifacts": copy.deepcopy(trade_result.data.get("artifacts", {})),
+                    "result_dialog": copy.deepcopy(trade_result.data.get("result_dialog", {})),
+                },
+                warnings=list(trade_result.warnings),
+                next_action=trade_result.next_action,
+            )
+
+        result, timing = _capture_task_timing("task.trade_sell_submit_once", run)
+        return self._attach_task_metadata(result, task_name="trade_sell_submit_once", timing=timing)
 
     def trade_submit_ready(
         self,

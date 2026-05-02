@@ -14,6 +14,7 @@ class _FakePingAnProxy:
         self.buy_calls: list[dict[str, object]] = []
         self.sell_calls: list[dict[str, object]] = []
         self.buy_submit_once_calls: list[dict[str, object]] = []
+        self.sell_submit_once_calls: list[dict[str, object]] = []
         self.health_result = Result(ok=True, code=ErrorCode.OK, message="health ok", data={})
         self.buy_result = Result(
             ok=True,
@@ -42,6 +43,15 @@ class _FakePingAnProxy:
                 "trade_audit": {"status": "confirmed"},
             },
         )
+        self.sell_submit_once_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="sell submit once ok",
+            data={
+                "result_dialog": {"contract_no": "S202604300002"},
+                "trade_audit": {"status": "confirmed"},
+            },
+        )
 
     def health(self, **kwargs: object) -> Result:
         self.health_calls.append(dict(kwargs))
@@ -58,6 +68,10 @@ class _FakePingAnProxy:
     def buy_submit_once(self, **kwargs: object) -> Result:
         self.buy_submit_once_calls.append(dict(kwargs))
         return self.buy_submit_once_result
+
+    def sell_submit_once(self, **kwargs: object) -> Result:
+        self.sell_submit_once_calls.append(dict(kwargs))
+        return self.sell_submit_once_result
 
 
 class _FakeTradeManager:
@@ -147,3 +161,23 @@ class PingAnDesktopTraderGatewayTests(unittest.TestCase):
         self.assertEqual(placement.snapshot.gateway_order_id, "B202604300002")
         self.assertEqual(manager.pingan.buy_submit_once_calls[0]["submission_key"], "submit-001")
         self.assertEqual(placement.adapter_events[0]["step"], "pingan_buy_submit_once")
+
+    def test_place_order_supports_sell_submit_once_execution_mode(self) -> None:
+        manager = _FakeTradeManager()
+        gateway = PingAnDesktopTraderGateway(manager=manager, port="COM3", execution_mode="submit_once")
+        request = SecurityOrderRequest(
+            broker="pingan_desktop",
+            client_order_id="client-004",
+            symbol="000001",
+            market="SZ",
+            side=OrderSide.SELL,
+            quantity=100,
+            limit_price=Decimal("10.50"),
+            submission_key="sell-submit-001",
+        )
+
+        placement = gateway.place_order(request)
+
+        self.assertEqual(placement.snapshot.gateway_order_id, "S202604300002")
+        self.assertEqual(manager.pingan.sell_submit_once_calls[0]["submission_key"], "sell-submit-001")
+        self.assertEqual(placement.adapter_events[0]["step"], "pingan_sell_submit_once")

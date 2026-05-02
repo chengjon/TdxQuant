@@ -140,7 +140,7 @@ TdxQuant
 - 内置 provider replay fixture bundle
 - 稳定 fixture manifest / loader
 - `json` / `jsonl` sample 资产
-- `formula.screen` / `doctor` / `block mutation` / `subscription event` representative fixtures
+- `formula.screen` / `doctor` / `block mutation` / `subscription event` / `subscription watch run artifact` representative fixtures
 
 #### `financial`
 
@@ -256,7 +256,9 @@ TdxQuant
 当前已落地的交易方向能力包括：
 
 - 平安证券买入流程
+- 平安证券卖出流程
 - 平安证券 submit-once 流程
+- 平安证券 sell submit-once 流程
 - 买入确认推进
 - 结果窗关闭
 - 交易状态回填
@@ -284,9 +286,11 @@ TdxQuant
   - `TdxTradeManager.pingan.preflight(...)`
   - `TdxTradeManager.pingan.submit_ready(...)`
   - `TdxTradeManager.pingan.confirm_current(...)`
-  - `TdxTradeManager.pingan.dialog_readiness(...)`
+ - `TdxTradeManager.pingan.dialog_readiness(...)`
   - `TdxTradeManager.pingan.buy(...)`
+  - `TdxTradeManager.pingan.sell(...)`
   - `TdxTradeManager.pingan.buy_submit_once(...)`
+  - `TdxTradeManager.pingan.sell_submit_once(...)`
 - CLI：
   - `tdxquant trade health ...`
   - `tdxquant trade preflight ...`
@@ -294,23 +298,29 @@ TdxQuant
   - `tdxquant trade confirm-current ...`
   - `tdxquant trade dialog-readiness ...`
   - `tdxquant trade buy ...`
+  - `tdxquant trade sell ...`
   - `tdxquant trade submit-once ...`
+  - `tdxquant trade sell-submit-once ...`
   - `tdxquant trade run --preset ...`
   - 兼容旧入口 `pingan-buy` / `pingan-buy-submit-once`
 
-这条线的目标是“辅助实盘执行”，不是把 TdxQuant 当成标准交易 API。
+当前真实交易执行主线已经明确收口到 `PingAN + HID`。这条线的目标是“辅助实盘执行”，不是把 TdxQuant 当成标准交易 API。
 
 与 task 层的当前衔接状态是：
 
 - Python：
   - `TdxTaskManager.trade_buy(...)`
+  - `TdxTaskManager.trade_sell(...)`
   - `TdxTaskManager.trade_submit_once(...)`
+  - `TdxTaskManager.trade_sell_submit_once(...)`
   - `TdxTaskManager.trade_submit_ready(...)`
   - `TdxTaskManager.trade_confirm_current(...)`
   - `TdxTaskManager.guarded_trade_buy(...)`
 - CLI：
   - `tdxquant task trade-buy ...`
+  - `tdxquant task trade-sell ...`
   - `tdxquant task trade-submit-once ...`
+  - `tdxquant task trade-sell-submit-once ...`
   - `tdxquant task trade-submit-ready ...`
   - `tdxquant task trade-confirm-current ...`
  - `tdxquant task guarded-trade-buy ...`
@@ -342,13 +352,15 @@ TdxQuant
   - `tdxquant trade order-query ...`
   - `tdxquant trade trade-query ...`
   - `tdxquant trade buy ...`
+  - `tdxquant trade sell ...`
   - `tdxquant trade submit-once ...`
+  - `tdxquant trade sell-submit-once ...`
 
 这条新主线当前的边界是：
 
 - 只覆盖普通 A 股现货限价 `buy/sell`
 - 只保证 canonical tracked-order / trade query，不承诺完整券商委托页/成交页抓取
-- `trade buy` / `trade submit-once` 已转发到 canonical `TradeService`
+- `trade buy` / `trade sell` / `trade submit-once` / `trade sell-submit-once` 已转发到 canonical `TradeService`
 - `trade submit-ready` / `trade confirm-current` 继续保留为 PingAn 桌面边界命令
 
 新主线的 canonical runtime 产物位于：
@@ -375,8 +387,10 @@ TdxQuant
 - `task subscription-watch`
 - 持有持久订阅 session
 - 连续接收回调
-- 将事件落到 `JSONL` / `CSV`
-- 维护 `status.json`
+- 每次运行创建独立 `run_id` 目录
+- canonical `events.jsonl`
+- 维护 `status.json` / `summary.json` / `manifest.json`
+- 兼容 `CSV` 导出
 - 支持 `Ctrl+C` 优雅退出
 - 输出摘要结果与运行统计
 

@@ -1,5 +1,3 @@
-import argparse
-import io
 import json
 import unittest
 from datetime import UTC, datetime
@@ -12,15 +10,16 @@ from tdxquant.cli import (
     _handle_api_subcommand,
     _handle_catalog_subcommand,
     _handle_report_subcommand,
-    _run_flat_replay_provider_command,
     _handle_task_subcommand,
     _handle_trade_subcommand,
     _run_trade_buy,
+    _run_trade_sell,
     _run_trade_confirm_current,
     _run_trade_submit_ready,
     _run_trade_dialog_readiness,
     _run_trade_health,
     _run_trade_preflight,
+    _run_trade_sell_submit_once,
     _run_trade_submit_once,
     build_parser,
     main,
@@ -126,46 +125,6 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.code, ["000001.SZ"])
         self.assertEqual(args.return_count, 3)
         self.assertTrue(args.return_date)
-
-    def test_api_formula_screen_replay_command_parses(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(
-            [
-                "api",
-                "formula-screen",
-                "--formula-name",
-                "UPN",
-                "--code",
-                "000001.SZ",
-                "--provider-mode",
-                "replay",
-                "--fixture",
-                "formula-screen-failure",
-            ]
-        )
-        self.assertEqual(args.provider_mode, "replay")
-        self.assertEqual(args.fixture, "formula-screen-failure")
-        self.assertIsNone(args.fixture_path)
-
-    def test_api_replay_fixture_and_fixture_path_are_mutually_exclusive(self) -> None:
-        parser = build_parser()
-        with self.assertRaises(SystemExit):
-            parser.parse_args(
-                [
-                    "api",
-                    "formula-screen",
-                    "--formula-name",
-                    "UPN",
-                    "--code",
-                    "000001.SZ",
-                    "--provider-mode",
-                    "replay",
-                    "--fixture",
-                    "formula-screen-success",
-                    "--fixture-path",
-                    "runtime/custom.json",
-                ]
-            )
 
     def test_api_kline_command_parses(self) -> None:
         parser = build_parser()
@@ -295,15 +254,6 @@ class ApiCliParserTests(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["tdx-capabilities"])
         self.assertEqual(args.command, "tdx-capabilities")
-
-    def test_tdx_capabilities_replay_command_parses(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(
-            ["tdx-capabilities", "--provider-mode", "replay", "--fixture", "runtime-capabilities-success"]
-        )
-        self.assertEqual(args.command, "tdx-capabilities")
-        self.assertEqual(args.provider_mode, "replay")
-        self.assertEqual(args.fixture, "runtime-capabilities-success")
 
     def test_tdx_health_command_parses(self) -> None:
         parser = build_parser()
@@ -846,24 +796,6 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.max_seconds, 10.0)
         self.assertEqual(args.poll_interval, 0.5)
 
-    def test_task_subscription_watch_replay_command_parses(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(
-            [
-                "task",
-                "subscription-watch",
-                "--code",
-                "600519.SH",
-                "--provider-mode",
-                "replay",
-                "--fixture-path",
-                "runtime/subscription-replay/manifest.json",
-            ]
-        )
-        self.assertEqual(args.provider_mode, "replay")
-        self.assertIsNone(args.fixture)
-        self.assertEqual(args.fixture_path, "runtime/subscription-replay/manifest.json")
-
     def test_task_ledger_summary_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "ledger-summary", "--code", "000001", "--trade-ok"])
@@ -987,6 +919,58 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.task_command, "trade-submit-once")
         self.assertIsNone(args.refresh_before_trade)
         self.assertEqual(args.submission_key, "task-submit-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_task_trade_sell_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "task-sell-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-sell")
+        self.assertIsNone(args.refresh_before_trade)
+        self.assertEqual(args.submission_key, "task-sell-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_task_trade_sell_submit_once_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-sell-submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "task-sell-submit-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-sell-submit-once")
+        self.assertIsNone(args.refresh_before_trade)
+        self.assertEqual(args.submission_key, "task-sell-submit-001")
         self.assertEqual(args.max_price, 10.50)
 
     def test_task_trade_submit_ready_command_parses(self) -> None:
@@ -1204,6 +1188,58 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.trade_command, "submit-once")
         self.assertTrue(args.close_result_dialog)
         self.assertEqual(args.submission_key, "trade-submit-20260428-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_trade_sell_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "trade-sell-20260430-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "sell")
+        self.assertEqual(args.profile, "balanced")
+        self.assertEqual(args.submission_key, "trade-sell-20260430-001")
+        self.assertEqual(args.max_price, 10.50)
+
+    def test_trade_sell_submit_once_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "sell-submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "trade-sell-submit-20260430-001",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "sell-submit-once")
+        self.assertTrue(args.close_result_dialog)
+        self.assertEqual(args.submission_key, "trade-sell-submit-20260430-001")
         self.assertEqual(args.max_price, 10.50)
 
     def test_trade_health_command_parses(self) -> None:
@@ -1529,60 +1565,6 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         mocked_manager.assert_called_once_with(profile="default", strategy_path=None)
         manager.market.snapshot.assert_called_once_with("688260.SH", fields=None)
-
-    def test_handle_api_formula_screen_replay_uses_manager_replay_configuration(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(
-            [
-                "api",
-                "formula-screen",
-                "--formula-name",
-                "UPN",
-                "--code",
-                "000001.SZ",
-                "--provider-mode",
-                "replay",
-                "--fixture",
-                "formula-screen-failure",
-            ]
-        )
-        expected = Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="fixture failure")
-        manager = MagicMock()
-        manager.formula.screen.return_value = expected
-        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
-            result = _handle_api_subcommand(args)
-        self.assertIs(result, expected)
-        mocked_manager.assert_called_once_with(
-            profile="default",
-            strategy_path=None,
-            provider_mode="replay",
-            replay_fixture="formula-screen-failure",
-            replay_fixture_path=None,
-        )
-        manager.formula.screen.assert_called_once_with(
-            formula_name="UPN",
-            stock_list=["000001.SZ"],
-            formula_arg="",
-            return_count=1,
-            return_date=False,
-            stock_period="1d",
-            start_time="",
-            end_time="",
-            count=0,
-            dividend_type=0,
-        )
-
-    def test_handle_api_snapshot_replay_rejects_unsupported_command_before_manager_construction(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(["api", "snapshot", "--code", "000001.SZ", "--provider-mode", "replay"])
-        with patch("tdxquant.cli.TdxApiManager") as mocked_manager:
-            result = _handle_api_subcommand(args)
-        self.assertFalse(result.ok)
-        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
-        self.assertEqual(result.message, "unsupported replay api command: snapshot")
-        self.assertEqual(result.data["replay_source"]["mode"], "replay")
-        self.assertEqual(result.data["replay_source"]["capability"], "market.snapshot")
-        mocked_manager.assert_not_called()
 
     def test_handle_api_kline_uses_manager(self) -> None:
         parser = build_parser()
@@ -2109,51 +2091,6 @@ class ApiCliDispatchTests(unittest.TestCase):
             mutation_key="mk-send-1",
             audit_dir="runtime/block-mutations",
         )
-
-    def test_handle_api_send_user_block_replay_uses_replay_manager_configuration(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(
-            [
-                "api",
-                "send-user-block",
-                "--block-code",
-                "ZXG",
-                "--stock",
-                "000001",
-                "--provider-mode",
-                "replay",
-                "--fixture",
-                "block-send-user-block-noop",
-            ]
-        )
-        expected = Result(ok=True, code=ErrorCode.OK, message="noop", data={"block_mutation": {"status": "noop"}})
-        manager = MagicMock()
-        manager.block.send_user_block.return_value = expected
-        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
-            result = _handle_api_subcommand(args)
-        self.assertIs(result, expected)
-        mocked_manager.assert_called_once_with(
-            profile="default",
-            strategy_path=None,
-            provider_mode="replay",
-            replay_fixture="block-send-user-block-noop",
-            replay_fixture_path=None,
-        )
-        manager.block.send_user_block.assert_called_once_with(block_code="ZXG", stocks=["000001"], show=False)
-
-    def test_run_flat_replay_provider_command_returns_replay_source_for_unsupported_command(self) -> None:
-        args = argparse.Namespace(
-            command="tdx-data-kline",
-            provider_mode="replay",
-            strategy_path=None,
-            fixture=None,
-            fixture_path=None,
-        )
-        result = _run_flat_replay_provider_command(args)
-        self.assertFalse(result.ok)
-        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
-        self.assertEqual(result.data["replay_source"]["mode"], "replay")
-        self.assertEqual(result.data["replay_source"]["capability"], "tdx-data-kline")
 
     def test_handle_api_user_sectors_uses_manager(self) -> None:
         parser = build_parser()
@@ -2972,47 +2909,6 @@ class TaskCliDispatchTests(unittest.TestCase):
             status_output_path="runtime/watch-status.json",
         )
 
-    def test_handle_task_subscription_watch_replay_builds_task_manager_with_replay_configuration(self) -> None:
-        parser = build_parser()
-        args = parser.parse_args(
-            [
-                "task",
-                "subscription-watch",
-                "--code",
-                "600519.SH",
-                "--provider-mode",
-                "replay",
-                "--fixture",
-                "subscription-watch-manifest",
-            ]
-        )
-        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
-        manager = MagicMock()
-        manager.subscription_watch.return_value = expected
-        with patch("tdxquant.cli.TdxTaskManager", return_value=manager) as mocked_manager:
-            result = _handle_task_subcommand(args)
-        self.assertIs(result, expected)
-        mocked_manager.assert_called_once_with(
-            profile="default",
-            api_profile=None,
-            trade_profile=None,
-            strategy_path=None,
-            title_keyword="平安证券",
-            exe_path=None,
-            provider_mode="replay",
-            replay_fixture="subscription-watch-manifest",
-            replay_fixture_path=None,
-        )
-        manager.subscription_watch.assert_called_once_with(
-            stock_list=["600519.SH"],
-            max_events=None,
-            max_seconds=None,
-            poll_interval=None,
-            jsonl_output_path=None,
-            csv_output_path=None,
-            status_output_path=None,
-        )
-
     def test_handle_task_ledger_summary_uses_task_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "ledger-summary", "--code", "000001", "--trade-ok"])
@@ -3300,6 +3196,31 @@ class TaskCliDispatchTests(unittest.TestCase):
             refresh_force=None,
         )
 
+    def test_handle_task_trade_sell_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-sell", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_sell.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_sell.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            close_result_dialog=True,
+            submission_key=None,
+            max_price=None,
+            refresh_before_trade=None,
+            refresh_market=None,
+            refresh_force=None,
+        )
+
     def test_handle_task_trade_submit_once_uses_task_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "trade-submit-once", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
@@ -3310,6 +3231,31 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertIs(result, expected)
         manager.trade_submit_once.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            close_result_dialog=True,
+            submission_key=None,
+            max_price=None,
+            refresh_before_trade=None,
+            refresh_market=None,
+            refresh_force=None,
+        )
+
+    def test_handle_task_trade_sell_submit_once_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-sell-submit-once", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_sell_submit_once.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.trade_sell_submit_once.assert_called_once_with(
             port="COM3",
             baudrate=115200,
             timeout=2.0,
@@ -3578,6 +3524,32 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertEqual(called_args.port, "COM3")
         self.assertEqual(called_args.confirm_timeout, 3.0)
 
+    def test_handle_trade_run_uses_sell_submit_once_preset(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["trade", "run", "--preset", "sell-submit-once-default", "--code", "000001", "--price", "10.00", "--quantity", "100"]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with (
+            patch(
+                "tdxquant.cli.resolve_trade_preset",
+                return_value={
+                    "command": "sell-submit-once",
+                    "profile": "submit_once",
+                    "title_key": "平安证券",
+                    "exe_path": None,
+                    "options": {"port": "COM3", "confirm_timeout": 3.0},
+                },
+            ),
+            patch("tdxquant.cli._run_trade_sell_submit_once", return_value=expected) as mocked,
+        ):
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        called_args = mocked.call_args.args[0]
+        self.assertEqual(called_args.profile, "submit_once")
+        self.assertEqual(called_args.port, "COM3")
+        self.assertEqual(called_args.confirm_timeout, 3.0)
+
     def test_handle_trade_run_rejects_unsupported_preset_command(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["trade", "run", "--preset", "bad", "--code", "000001", "--price", "10.00", "--quantity", "100"])
@@ -3598,11 +3570,29 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)
 
+    def test_handle_trade_sell_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "sell", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"trade_profile": {"name": "balanced", "options": {}}, "result_dialog": {}})
+        with patch("tdxquant.cli._run_trade_sell", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
     def test_handle_trade_submit_once_uses_trade_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["trade", "submit-once", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
         with patch("tdxquant.cli._run_trade_submit_once", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_sell_submit_once_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "sell-submit-once", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result_dialog": {}})
+        with patch("tdxquant.cli._run_trade_sell_submit_once", return_value=expected) as mocked:
             result = _handle_trade_subcommand(args)
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)
@@ -3720,6 +3710,75 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertEqual(request.submission_key, "submit-20260428-002")
         self.assertTrue(result.ok)
         self.assertEqual(result.data["order"]["gateway_order_id"], "gw-002")
+        self.assertEqual(result.data["execution_profile"]["name"], "submit_once")
+
+    def test_run_trade_sell_forwards_safety_controls(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "sell-20260430-002",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        snapshot = _snapshot(gateway_order_id="gw-sell-002")
+        snapshot.side = OrderSide.SELL
+        service = MagicMock()
+        service.place_order.return_value = snapshot
+        with patch("tdxquant.cli._build_trader_service", return_value=service) as mocked_builder:
+            result = _run_trade_sell(args)
+        mocked_builder.assert_called_once()
+        request = service.place_order.call_args.args[0]
+        self.assertEqual(request.side, OrderSide.SELL)
+        self.assertEqual(request.symbol, "000001")
+        self.assertEqual(request.submission_key, "sell-20260430-002")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["order"]["gateway_order_id"], "gw-sell-002")
+        self.assertEqual(result.data["execution_profile"]["name"], "balanced")
+
+    def test_run_trade_sell_submit_once_forwards_safety_controls(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "sell-submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--submission-key",
+                "sell-submit-20260430-002",
+                "--max-price",
+                "10.50",
+            ]
+        )
+        snapshot = _snapshot(gateway_order_id="gw-sell-submit-002")
+        snapshot.side = OrderSide.SELL
+        service = MagicMock()
+        service.place_order.return_value = snapshot
+        with patch("tdxquant.cli._build_trader_service", return_value=service) as mocked_builder:
+            result = _run_trade_sell_submit_once(args)
+        self.assertEqual(mocked_builder.call_args.kwargs["execution_mode"], "submit_once")
+        request = service.place_order.call_args.args[0]
+        self.assertEqual(request.side, OrderSide.SELL)
+        self.assertEqual(request.submission_key, "sell-submit-20260430-002")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["order"]["gateway_order_id"], "gw-sell-submit-002")
         self.assertEqual(result.data["execution_profile"]["name"], "submit_once")
 
     def test_run_trade_buy_returns_failed_result_when_snapshot_failed(self) -> None:
@@ -4934,27 +4993,6 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mocked.assert_called_once_with(strategy_path=None)
 
-    def test_main_tdx_capabilities_replay_uses_manager_instead_of_live_bridge(self) -> None:
-        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"summary": {"total": 4}})
-        manager = MagicMock()
-        manager.runtime.capabilities.return_value = expected
-        with (
-            patch("tdxquant.cli.PingAnBrokerAdapter"),
-            patch("tdxquant.cli.run_tdx_provider_capabilities", side_effect=AssertionError("live bridge must not run")),
-            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
-            patch("sys.argv", ["tdxquant", "tdx-capabilities", "--provider-mode", "replay"]),
-        ):
-            exit_code = main()
-        self.assertEqual(exit_code, 0)
-        mocked_manager.assert_called_once_with(
-            profile="default",
-            strategy_path=None,
-            provider_mode="replay",
-            replay_fixture=None,
-            replay_fixture_path=None,
-        )
-        manager.runtime.capabilities.assert_called_once_with()
-
     def test_main_tdx_create_sector_uses_bridge(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
         with (
@@ -5063,67 +5101,6 @@ class ReportCliDispatchTests(unittest.TestCase):
             strategy_path=None,
         )
 
-    def test_main_tdx_send_user_block_rejected_prints_provider_result_envelope_and_nonzero_exit(self) -> None:
-        expected = Result(
-            ok=False,
-            code=ErrorCode.INVALID_REQUEST,
-            message="rejected send_user_block because the current block state conflicts with the requested target state",
-            data={
-                "block_mutation": {
-                    "schema_version": "2026-05-02",
-                    "mutation_id": "mut-004",
-                    "mutation_key": "mk-reject-1",
-                    "operation": "send_user_block",
-                    "status": "rejected",
-                    "governance_decision": "reject",
-                    "governance_reason": "missing_block",
-                    "block_code": "MISSING",
-                    "requested_stock_count": 1,
-                    "show": True,
-                },
-                "artifacts": {
-                    "audit_log_path": "runtime/block-mutations/mut-004.json",
-                },
-            },
-        )
-        expected._provider_artifacts = [
-            {
-                "kind": "block_mutation_audit",
-                "path": "runtime/block-mutations/mut-004.json",
-            }
-        ]
-        with (
-            patch("tdxquant.cli.PingAnBrokerAdapter"),
-            patch("tdxquant.cli.run_tdx_send_user_block", return_value=expected),
-            patch("builtins.print") as mocked_stdout_print,
-            patch(
-                "sys.argv",
-                [
-                    "tdxquant",
-                    "tdx-send-user-block",
-                    "--block-code",
-                    "MISSING",
-                    "--stock",
-                    "000001.SZ",
-                    "--show",
-                    "--mutation-key",
-                    "mk-reject-1",
-                    "--audit-dir",
-                    "runtime/block-mutations",
-                ],
-            ),
-        ):
-            exit_code = main()
-        self.assertEqual(exit_code, 1)
-        parsed = json.loads(mocked_stdout_print.call_args.args[0])
-        self.assertFalse(parsed["success"])
-        self.assertFalse(parsed["ok"])
-        self.assertEqual(parsed["code"], ErrorCode.INVALID_REQUEST.value)
-        self.assertEqual(parsed["data"]["block_mutation"]["status"], "rejected")
-        self.assertEqual(parsed["data"]["block_mutation"]["governance_reason"], "missing_block")
-        self.assertEqual(parsed["artifacts"][0]["kind"], "block_mutation_audit")
-        self.assertEqual(parsed["artifacts"][0]["path"], "runtime/block-mutations/mut-004.json")
-
     def test_main_catalog_summary_view_prints_summary_payload(self) -> None:
         expected = Result(
             ok=True,
@@ -5200,35 +5177,6 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertEqual(parsed["warnings"], ["warn"])
         self.assertEqual(parsed["data"]["next_action"], "fix-input")
         self.assertEqual(parsed["capability"], "api.snapshot")
-
-    def test_main_api_snapshot_replay_output_file_matches_stdout_json(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "snapshot.json"
-            stdout_buffer = io.StringIO()
-            with (
-                patch("tdxquant.cli.PingAnBrokerAdapter"),
-                patch(
-                    "sys.argv",
-                    [
-                        "tdxquant",
-                        "api",
-                        "snapshot",
-                        "--code",
-                        "000001.SZ",
-                        "--provider-mode",
-                        "replay",
-                        "--output",
-                        str(output_path),
-                    ],
-                ),
-                patch("sys.stdout", stdout_buffer),
-            ):
-                exit_code = main()
-            stdout_payload = json.loads(stdout_buffer.getvalue())
-            file_payload = json.loads(output_path.read_text(encoding="utf-8"))
-        self.assertEqual(exit_code, 1)
-        self.assertEqual(stdout_payload, file_payload)
-        self.assertEqual(stdout_payload["data"]["replay_source"]["mode"], "replay")
 
     def test_main_tdx_data_stock_info_prints_provider_result_envelope(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"symbol": "688260.SH"}]})

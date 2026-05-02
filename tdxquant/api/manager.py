@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from ..models import Result
-from ..replay_provider import execute_sync_replay, is_replay_mode, normalize_provider_mode
 from .block import BlockApi
 from .bridge import run_tdx_refresh_cache
 from .context import attach_manager_metadata, capture_api_timing, resolve_api_profile
@@ -26,10 +25,7 @@ class _MarketManagerProxy:
         effective_profile = self._manager._build_effective_profile({"field_list": field_list})
         result, timing = capture_api_timing(
             "market.snapshot",
-            lambda: self._manager._dispatch_sync_capability(
-                "market.snapshot",
-                lambda: self._manager._market_api.snapshot(stock_code=stock_code, field_list=field_list),
-            ),
+            lambda: self._manager._market_api.snapshot(stock_code=stock_code, field_list=field_list),
         )
         return attach_manager_metadata(
             result,
@@ -445,20 +441,17 @@ class _FormulaManagerProxy:
         )
         result, timing = capture_api_timing(
             "formula.screen",
-            lambda: self._manager._dispatch_sync_capability(
-                "formula.screen",
-                lambda: self._manager._formula_api.screen(
-                    formula_name=formula_name,
-                    stock_list=stock_list,
-                    formula_arg=formula_arg,
-                    return_count=return_count,
-                    return_date=return_date,
-                    stock_period=stock_period,
-                    start_time=start_time,
-                    end_time=end_time,
-                    count=count,
-                    dividend_type=dividend_type,
-                ),
+            lambda: self._manager._formula_api.screen(
+                formula_name=formula_name,
+                stock_list=stock_list,
+                formula_arg=formula_arg,
+                return_count=return_count,
+                return_date=return_date,
+                stock_period=stock_period,
+                start_time=start_time,
+                end_time=end_time,
+                count=count,
+                dividend_type=dividend_type,
             ),
         )
         return attach_manager_metadata(
@@ -853,10 +846,7 @@ class _RuntimeManagerProxy:
         effective_profile = self._manager._build_effective_profile({})
         result, timing = capture_api_timing(
             "runtime.capabilities",
-            lambda: self._manager._dispatch_sync_capability(
-                "runtime.capabilities",
-                lambda: self._manager._runtime_api.capabilities(),
-            ),
+            lambda: self._manager._runtime_api.capabilities(),
         )
         return attach_manager_metadata(
             result,
@@ -1004,10 +994,7 @@ class _RuntimeManagerProxy:
         effective_profile = self._manager._build_effective_profile({"window_key": window_key, "hid_port": hid_port})
         result, timing = capture_api_timing(
             "runtime.health",
-            lambda: self._manager._dispatch_sync_capability(
-                "runtime.health",
-                lambda: self._manager._runtime_api.health(window_key=window_key, hid_port=hid_port),
-            ),
+            lambda: self._manager._runtime_api.health(window_key=window_key, hid_port=hid_port),
         )
         return attach_manager_metadata(
             result,
@@ -1022,10 +1009,7 @@ class _RuntimeManagerProxy:
         effective_profile = self._manager._build_effective_profile({"window_key": window_key, "hid_port": hid_port})
         result, timing = capture_api_timing(
             "runtime.doctor",
-            lambda: self._manager._dispatch_sync_capability(
-                "runtime.doctor",
-                lambda: self._manager._runtime_api.doctor(window_key=window_key, hid_port=hid_port),
-            ),
+            lambda: self._manager._runtime_api.doctor(window_key=window_key, hid_port=hid_port),
         )
         return attach_manager_metadata(
             result,
@@ -1313,14 +1297,11 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.send_user_block",
-            lambda: self._manager._dispatch_sync_capability(
-                "block.send_user_block",
-                lambda: self._manager._block_api.send_user_block(
-                    block_code=block_code,
-                    stocks=stocks,
-                    show=show,
-                    **options,
-                ),
+            lambda: self._manager._block_api.send_user_block(
+                block_code=block_code,
+                stocks=stocks,
+                show=show,
+                **options,
             ),
         )
         return attach_manager_metadata(
@@ -1338,10 +1319,6 @@ class TdxApiManager:
         "profile_name",
         "profile_options",
         "strategy_path",
-        "provider_mode",
-        "replay_fixture",
-        "replay_fixture_path",
-        "replay_fixture_map",
         "_market_api",
         "_meta_api",
         "_financial_api",
@@ -1364,18 +1341,10 @@ class TdxApiManager:
         profile: str = "default",
         strategy_path: str | None = None,
         profile_overrides: dict[str, Any] | None = None,
-        provider_mode: str = "live",
-        replay_fixture: str | None = None,
-        replay_fixture_path: str | None = None,
-        replay_fixture_map: dict[str, Any] | None = None,
     ) -> None:
         self.profile_name = profile
         self.profile_options = resolve_api_profile(profile, overrides=profile_overrides)
         self.strategy_path = strategy_path
-        self.provider_mode = normalize_provider_mode(provider_mode)
-        self.replay_fixture = replay_fixture
-        self.replay_fixture_path = replay_fixture_path
-        self.replay_fixture_map = dict(replay_fixture_map or {})
         self._market_api = MarketApi(strategy_path=strategy_path)
         self._meta_api = MetaApi(strategy_path=strategy_path)
         self._financial_api = FinancialApi(strategy_path=strategy_path)
@@ -1411,22 +1380,6 @@ class TdxApiManager:
         for key, value in overrides.items():
             effective[key] = value
         return effective
-
-    def _is_replay_mode(self) -> bool:
-        return is_replay_mode(self.provider_mode)
-
-    def _execute_sync_replay(self, capability: str) -> Result:
-        return execute_sync_replay(
-            capability,
-            replay_fixture=self.replay_fixture,
-            replay_fixture_path=self.replay_fixture_path,
-            replay_fixture_map=self.replay_fixture_map,
-        )
-
-    def _dispatch_sync_capability(self, capability: str, live_call: Any) -> Result:
-        if self._is_replay_mode():
-            return self._execute_sync_replay(capability)
-        return live_call()
 
     def refresh_cache(self, market: str | None = None, force: bool | None = None) -> Result:
         resolved_market = market if market is not None else str(self.profile_options.get("refresh_market", "AG"))

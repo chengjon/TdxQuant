@@ -240,9 +240,22 @@ def _derive_provider_overall_status(checks: dict[str, dict[str, Any]]) -> str:
     return "ok"
 
 
-def _collect_provider_warnings_and_actions(checks: dict[str, dict[str, Any]]) -> tuple[list[str], list[str]]:
+def _provider_diagnostic_severity(status: str) -> str:
+    severity_map = {
+        "ok": "info",
+        "warning": "warning",
+        "failed": "error",
+        "unsupported": "error",
+    }
+    return severity_map.get(status, "error")
+
+
+def _collect_provider_warnings_and_actions(
+    checks: dict[str, dict[str, Any]]
+) -> tuple[list[str], list[str], list[dict[str, Any]]]:
     warnings: list[str] = []
     actions: list[str] = []
+    action_items: list[dict[str, Any]] = []
     for check_name, payload in checks.items():
         status = str(payload.get("status", ""))
         if status == "ok":
@@ -251,7 +264,15 @@ def _collect_provider_warnings_and_actions(checks: dict[str, dict[str, Any]]) ->
         action = payload.get("recommended_action")
         if isinstance(action, str) and action:
             actions.append(action)
-    return warnings, _dedupe_strings(actions)
+            action_items.append(
+                {
+                    "id": check_name,
+                    "summary": action,
+                    "severity": _provider_diagnostic_severity(status),
+                    "related_checks": [check_name],
+                }
+            )
+    return warnings, _dedupe_strings(actions), action_items
 
 
 def _collect_provider_probe_snapshot(window_key: str, strategy_path: str | None = None, hid_port: str | None = None) -> dict[str, Any]:
@@ -264,7 +285,7 @@ def _collect_provider_probe_snapshot(window_key: str, strategy_path: str | None 
         "desktop_window": _probe_desktop_window(window_key),
         "hid": _probe_hid(hid_port),
     }
-    warnings, recommended_actions = _collect_provider_warnings_and_actions(checks)
+    warnings, recommended_actions, recommended_action_items = _collect_provider_warnings_and_actions(checks)
     return {
         "overall_status": _derive_provider_overall_status(checks),
         "context": {
@@ -274,20 +295,23 @@ def _collect_provider_probe_snapshot(window_key: str, strategy_path: str | None 
         },
         "checks": checks,
         "recommended_actions": recommended_actions,
+        "recommended_action_items": recommended_action_items,
         "warning_count": len(warnings),
         "warnings": warnings,
     }
 
 
 def _build_provider_doctor_findings(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    severity_map = {
-        "ok": "info",
-        "warning": "warning",
-        "failed": "error",
-        "unsupported": "error",
-    }
     findings: list[dict[str, Any]] = []
     checks = snapshot.get("checks", {})
+    action_items = snapshot.get("recommended_action_items", [])
+    action_ids: set[str] = set()
+    if isinstance(action_items, list):
+        for item in action_items:
+            if isinstance(item, dict):
+                action_id = item.get("id")
+                if isinstance(action_id, str):
+                    action_ids.add(action_id)
     if isinstance(checks, dict):
         for check_name, payload in checks.items():
             if not isinstance(payload, dict):
@@ -295,13 +319,16 @@ def _build_provider_doctor_findings(snapshot: dict[str, Any]) -> list[dict[str, 
             status = str(payload.get("status", ""))
             if status == "ok":
                 continue
+            recommended_action_id = check_name if check_name in action_ids else None
             findings.append(
                 {
                     "id": check_name,
-                    "severity": severity_map.get(status, "error"),
+                    "severity": _provider_diagnostic_severity(status),
                     "status": status,
                     "summary": payload.get("summary"),
                     "critical": bool(payload.get("critical", False)),
+                    "related_checks": [check_name],
+                    "recommended_action_id": recommended_action_id,
                     "recommended_action": payload.get("recommended_action"),
                 }
             )
@@ -314,6 +341,8 @@ def _build_provider_doctor_findings(snapshot: dict[str, Any]) -> list[dict[str, 
             "status": "ok",
             "summary": "All provider health checks passed.",
             "critical": False,
+            "related_checks": [],
+            "recommended_action_id": None,
         }
     ]
 
