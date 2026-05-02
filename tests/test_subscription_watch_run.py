@@ -18,6 +18,7 @@ def test_build_subscription_watch_run_paths_uses_run_id_directory(tmp_path: Path
     assert paths.run_id == "run-001"
     assert paths.run_dir == tmp_path / "run-001"
     assert paths.events_jsonl_path == tmp_path / "run-001" / "events.jsonl"
+    assert paths.runner_log_path == tmp_path / "run-001" / "runner.log"
     assert paths.status_path == tmp_path / "run-001" / "status.json"
     assert paths.summary_path == tmp_path / "run-001" / "summary.json"
     assert paths.manifest_path == tmp_path / "run-001" / "manifest.json"
