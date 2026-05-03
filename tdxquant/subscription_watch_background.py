@@ -1,0 +1,680 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import errno
+import fcntl
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import threading
+import time
+from typing import Any
+
+from .subscription_watch_run import build_subscription_watch_run_paths
+
+DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
+DEFAULT_START_TIMEOUT_SECONDS = 10
+DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
+
+
+@dataclass(frozen=True)
+class SubscriptionWatchBackgroundPaths:
+    root_dir: Path
+    active_path: Path
+    pid_path: Path
+    lock_path: Path
+
+
+def build_background_paths(root_dir: Path) -> SubscriptionWatchBackgroundPaths:
+    return SubscriptionWatchBackgroundPaths(
+        root_dir=root_dir,
+        active_path=root_dir / "active.json",
+        pid_path=root_dir / "pid",
+        lock_path=root_dir / "lock",
+    )
+
+
+def _pid_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _parse_pid(raw_pid: Any) -> int:
+    try:
+        return int(raw_pid or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _cleanup_owned_state(paths: SubscriptionWatchBackgroundPaths) -> None:
+    if paths.pid_path.exists():
+        paths.pid_path.unlink()
+
+
+def _cleanup_start_failure_state(
+    paths: SubscriptionWatchBackgroundPaths,
+    *,
+    previous_active_payload: dict[str, Any] | None,
+) -> None:
+    _cleanup_owned_state(paths)
+    if previous_active_payload is None:
+        if paths.active_path.exists():
+            paths.active_path.unlink()
+        return
+    _write_active_payload(paths, previous_active_payload)
+
+
+def _write_startup_failure_blocking_state(
+    paths: SubscriptionWatchBackgroundPaths,
+    *,
+    run_id: str,
+    pid: int,
+    runner_log_path: Path | None,
+) -> dict[str, Any]:
+    payload = _build_active_payload(
+        run_id=run_id,
+        pid=pid,
+        state="starting",
+        reason="startup_persistence_failed",
+        log_path=runner_log_path,
+    )
+    _write_active_payload(paths, payload)
+    return payload
+
+
+def _read_owned_pid(paths: SubscriptionWatchBackgroundPaths) -> int:
+    if not paths.pid_path.exists():
+        return 0
+    return _parse_pid(paths.pid_path.read_text(encoding="utf-8").strip())
+
+
+def _write_active_payload(paths: SubscriptionWatchBackgroundPaths, payload: dict[str, Any]) -> None:
+    paths.active_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _normalize_terminal_payload(
+    paths: SubscriptionWatchBackgroundPaths,
+    payload: dict[str, Any],
+    *,
+    state: str,
+    reason: str | None,
+    run_id: Any = None,
+) -> dict[str, Any]:
+    normalized = dict(payload)
+    normalized["state"] = state
+    normalized["active"] = False
+    normalized["pid"] = None
+    normalized["reason"] = reason
+    normalized["run_id"] = normalized.get("run_id", run_id)
+    _write_active_payload(paths, normalized)
+    _cleanup_owned_state(paths)
+    return normalized
+
+
+def reconcile_background_state(
+    paths: SubscriptionWatchBackgroundPaths,
+    *,
+    pid_is_alive: Any = _pid_is_alive,
+) -> dict[str, Any]:
+    if not paths.active_path.exists():
+        _cleanup_owned_state(paths)
+        return {
+            "state": "stopped",
+            "active": False,
+            "run_id": None,
+            "pid": None,
+            "reason": None,
+        }
+
+    try:
+        raw_payload = json.loads(paths.active_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return _normalize_terminal_payload(
+            paths,
+            {},
+            state="failed",
+            reason="stale_process_state",
+        )
+
+    if not isinstance(raw_payload, dict):
+        return _normalize_terminal_payload(
+            paths,
+            {},
+            state="failed",
+            reason="stale_process_state",
+        )
+
+    payload = raw_payload
+    state = str(payload.get("state") or "failed")
+    payload_pid = _parse_pid(payload.get("pid"))
+    owned_pid = _read_owned_pid(paths)
+    pid_matches_owned_state = payload_pid > 0 and owned_pid == payload_pid
+    startup_persistence_failed = str(payload.get("reason") or "") == "startup_persistence_failed"
+
+    if state == "starting" and startup_persistence_failed and payload_pid > 0 and pid_is_alive(payload_pid):
+        return payload
+
+    if state in {"starting", "running", "stopping"} and (
+        not pid_matches_owned_state or not pid_is_alive(payload_pid)
+    ):
+        return _normalize_terminal_payload(
+            paths,
+            payload,
+            state="stopped" if state == "stopping" else "failed",
+            reason=(str(payload.get("reason") or "operator_stop") if state == "stopping" else "stale_process_state"),
+        )
+    elif state in {"failed", "stopped", "completed"}:
+        return _normalize_terminal_payload(
+            paths,
+            payload,
+            state=state,
+            reason=payload.get("reason"),
+        )
+
+    return payload
+
+
+def _build_active_payload(
+    *,
+    run_id: str,
+    pid: int | None,
+    state: str,
+    reason: str | None,
+    log_path: Path | None = None,
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "state": state,
+        "active": state in {"starting", "running", "stopping"},
+        "run_id": run_id,
+        "pid": pid,
+        "reason": reason,
+        "runner_log_path": str(log_path) if log_path is not None else None,
+        "idempotency_key": idempotency_key,
+    }
+
+
+def _acquire_control_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None:
+    paths.root_dir.mkdir(parents=True, exist_ok=True)
+    handle = paths.lock_path.open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        handle.close()
+        if exc.errno in {errno.EACCES, errno.EAGAIN}:
+            return None
+        raise
+    return handle
+
+
+def _release_control_lock(handle: Any) -> None:
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    finally:
+        handle.close()
+
+
+def read_active_payload(paths: SubscriptionWatchBackgroundPaths) -> dict[str, Any] | None:
+    if not paths.active_path.exists():
+        return None
+    payload = json.loads(paths.active_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def write_background_state(
+    paths: SubscriptionWatchBackgroundPaths,
+    *,
+    run_id: str,
+    pid: int | None,
+    state: str,
+    reason: str | None,
+    runner_log_path: Path | None = None,
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    paths.root_dir.mkdir(parents=True, exist_ok=True)
+    existing_payload = read_active_payload(paths) or {}
+    resolved_idempotency_key = idempotency_key
+    if resolved_idempotency_key is None and existing_payload.get("run_id") == run_id:
+        resolved_idempotency_key = (
+            str(existing_payload.get("idempotency_key")).strip() or None
+            if existing_payload.get("idempotency_key") is not None
+            else None
+        )
+    payload = _build_active_payload(
+        run_id=run_id,
+        pid=pid,
+        state=state,
+        reason=reason,
+        log_path=runner_log_path,
+        idempotency_key=resolved_idempotency_key,
+    )
+    _write_active_payload(paths, payload)
+    return payload
+
+
+def write_terminal_background_state(
+    paths: SubscriptionWatchBackgroundPaths,
+    *,
+    run_id: str,
+    state: str,
+    reason: str | None,
+    runner_log_path: Path | None = None,
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    payload = write_background_state(
+        paths,
+        run_id=run_id,
+        pid=None,
+        state=state,
+        reason=reason,
+        runner_log_path=runner_log_path,
+        idempotency_key=idempotency_key,
+    )
+    _cleanup_owned_state(paths)
+    return payload
+
+
+class SubscriptionWatchBackgroundController:
+    def __init__(
+        self,
+        *,
+        root_dir: Path,
+        python_executable: str,
+        cli_module: str = "tdxquant.subscription_watch_background_runner",
+        start_timeout_seconds: float = DEFAULT_START_TIMEOUT_SECONDS,
+        default_stop_grace_period_seconds: int = DEFAULT_STOP_GRACE_PERIOD_SECONDS,
+        stop_force_kill_timeout_seconds: float = DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS,
+    ) -> None:
+        self.paths = build_background_paths(root_dir)
+        self.python_executable = python_executable
+        self.cli_module = cli_module
+        self.start_timeout_seconds = max(float(start_timeout_seconds), 0.0)
+        self.default_stop_grace_period_seconds = max(int(default_stop_grace_period_seconds), 0)
+        self.stop_force_kill_timeout_seconds = max(float(stop_force_kill_timeout_seconds), 0.0)
+        self._control_lock = threading.Lock()
+
+    def _write_active_state(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.paths.root_dir.mkdir(parents=True, exist_ok=True)
+        _write_active_payload(self.paths, payload)
+        return payload
+
+    def _spawn_runner_process(
+        self,
+        *,
+        run_id: str,
+        stock_list: list[str],
+        max_events: int | None,
+        max_seconds: float | None,
+        poll_interval: float | None,
+        runner_log_path: Path,
+    ) -> subprocess.Popen[str]:
+        args = [
+            self.python_executable,
+            "-m",
+            self.cli_module,
+            "--root-dir",
+            str(self.paths.root_dir),
+            "--run-id",
+            run_id,
+        ]
+        for stock_code in stock_list:
+            args.extend(["--code", stock_code])
+        if max_events is not None:
+            args.extend(["--max-events", str(max_events)])
+        if max_seconds is not None:
+            args.extend(["--max-seconds", str(max_seconds)])
+        if poll_interval is not None:
+            args.extend(["--poll-interval", str(poll_interval)])
+        runner_log_path.parent.mkdir(parents=True, exist_ok=True)
+        runner_log_handle = runner_log_path.open("a", encoding="utf-8")
+        try:
+            return subprocess.Popen(
+                args,
+                stdout=runner_log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+                start_new_session=True,
+            )
+        finally:
+            runner_log_handle.close()
+
+    def _signal_process(self, pid: int, sig: int) -> bool:
+        try:
+            os.kill(pid, sig)
+        except OSError:
+            return False
+        return True
+
+    def _pid_is_alive(self, pid: int) -> bool:
+        return _pid_is_alive(pid)
+
+    def _wait_for_process_exit(self, pid: int, grace_period_seconds: int) -> bool:
+        deadline = time.monotonic() + max(grace_period_seconds, 0)
+        while self._pid_is_alive(pid):
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
+        return True
+
+    def _wait_for_forced_exit(self, pid: int) -> bool:
+        deadline = time.monotonic() + self.stop_force_kill_timeout_seconds
+        while self._pid_is_alive(pid):
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
+        return True
+
+    def _build_invalid_start_result(self, message: str) -> dict[str, Any]:
+        return {
+            "ok": False,
+            "error": {
+                "code": "INVALID_REQUEST",
+                "message": message,
+                "details": {},
+            },
+        }
+
+    def _validate_start_request(
+        self,
+        *,
+        stock_list: list[str],
+        max_events: int | None,
+        max_seconds: float | None,
+        poll_interval: float | None,
+    ) -> dict[str, Any] | None:
+        if not stock_list:
+            return self._build_invalid_start_result("subscription watch task requires at least one stock code")
+        if max_events is not None and max_events <= 0:
+            return self._build_invalid_start_result("subscription watch task requires max_events > 0")
+        if max_seconds is not None and max_seconds <= 0:
+            return self._build_invalid_start_result("subscription watch task requires max_seconds > 0")
+        resolved_poll_interval = 0.25 if poll_interval is None else float(poll_interval)
+        if resolved_poll_interval < 0:
+            return self._build_invalid_start_result("subscription watch task requires poll_interval >= 0")
+        return None
+
+    def _current_start_result(self, payload: dict[str, Any], *, replayed: bool = False) -> dict[str, Any]:
+        result = {
+            "run_id": payload.get("run_id"),
+            "pid": payload.get("pid"),
+            "state": payload.get("state"),
+            "runner_log_path": payload.get("runner_log_path"),
+        }
+        if replayed:
+            result["replayed"] = True
+        return {"ok": True, "result": result}
+
+    def _wait_for_startup_state(self, *, run_id: str, pid: int, runner_log_path: Path) -> dict[str, Any] | None:
+        deadline = time.monotonic() + self.start_timeout_seconds
+        while True:
+            current = read_active_payload(self.paths) or {}
+            if str(current.get("run_id") or "") == run_id:
+                state = str(current.get("state") or "")
+                if state == "running":
+                    return current
+                if state == "failed":
+                    return current
+                if state in {"completed", "stopped"}:
+                    return current
+
+            if not self._pid_is_alive(pid):
+                current = read_active_payload(self.paths) or {}
+                if str(current.get("run_id") or "") == run_id and str(current.get("state") or "") in {
+                    "failed",
+                    "completed",
+                    "stopped",
+                }:
+                    return current
+                return write_terminal_background_state(
+                    self.paths,
+                    run_id=run_id,
+                    state="failed",
+                    reason="start_failed",
+                    runner_log_path=runner_log_path,
+                )
+
+            if time.monotonic() >= deadline:
+                return None
+            time.sleep(0.05)
+
+    def _terminate_spawned_process(self, process: subprocess.Popen[str]) -> bool:
+        try:
+            process.terminate()
+        except Exception:
+            return False
+
+        try:
+            process.wait(timeout=1.0)
+            return True
+        except Exception:
+            pass
+
+        try:
+            process.kill()
+        except Exception:
+            return False
+
+        try:
+            process.wait(timeout=1.0)
+            return True
+        except Exception:
+            return False
+
+    def start(
+        self,
+        *,
+        stock_list: list[str],
+        max_events: int | None = None,
+        max_seconds: float | None = None,
+        poll_interval: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        validation_error = self._validate_start_request(
+            stock_list=stock_list,
+            max_events=max_events,
+            max_seconds=max_seconds,
+            poll_interval=poll_interval,
+        )
+        if validation_error is not None:
+            return validation_error
+        with self._control_lock:
+            control_lock = _acquire_control_lock(self.paths)
+            if control_lock is None:
+                return {
+                    "ok": False,
+                    "error": {
+                        "code": "CONTROL_LOCKED",
+                    },
+                }
+            try:
+                current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+                if current.get("state") in {"starting", "running", "stopping"}:
+                    if idempotency_key and idempotency_key == current.get("idempotency_key"):
+                        return self._current_start_result(current, replayed=True)
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "ALREADY_RUNNING",
+                            "message": "subscription-watch background run is already active",
+                            "details": current,
+                        },
+                    }
+
+                previous_active_payload = read_active_payload(self.paths)
+                run_paths = build_subscription_watch_run_paths(self.paths.root_dir)
+                try:
+                    process = self._spawn_runner_process(
+                        run_id=run_paths.run_id,
+                        stock_list=list(stock_list),
+                        max_events=max_events,
+                        max_seconds=max_seconds,
+                        poll_interval=poll_interval,
+                        runner_log_path=run_paths.runner_log_path,
+                    )
+                except Exception:
+                    _cleanup_owned_state(self.paths)
+                    raise
+
+                try:
+                    self.paths.pid_path.write_text(f"{process.pid}\n", encoding="utf-8")
+                    payload = self._write_active_state(
+                        _build_active_payload(
+                            run_id=run_paths.run_id,
+                            pid=process.pid,
+                            state="starting",
+                            reason=None,
+                            log_path=run_paths.runner_log_path,
+                            idempotency_key=idempotency_key,
+                        )
+                    )
+                except Exception:
+                    if self._terminate_spawned_process(process):
+                        _cleanup_start_failure_state(
+                            self.paths,
+                            previous_active_payload=previous_active_payload,
+                        )
+                    else:
+                        _write_startup_failure_blocking_state(
+                            self.paths,
+                            run_id=run_paths.run_id,
+                            pid=process.pid,
+                            runner_log_path=run_paths.runner_log_path,
+                        )
+                    raise
+                startup_state = self._wait_for_startup_state(
+                    run_id=run_paths.run_id,
+                    pid=process.pid,
+                    runner_log_path=run_paths.runner_log_path,
+                )
+                if startup_state is None:
+                    return self._current_start_result(payload)
+                if startup_state.get("state") == "failed":
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "START_FAILED",
+                            "message": "subscription-watch background runner failed during startup",
+                            "details": startup_state,
+                        },
+                    }
+                return self._current_start_result(startup_state)
+            finally:
+                _release_control_lock(control_lock)
+
+    def stop(self, *, reason: str | None = None, grace_period_seconds: int | None = None) -> dict[str, Any]:
+        with self._control_lock:
+            control_lock = _acquire_control_lock(self.paths)
+            if control_lock is None:
+                return {
+                    "ok": False,
+                    "error": {
+                        "code": "CONTROL_LOCKED",
+                    },
+                }
+            try:
+                current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+                if current.get("state") not in {"starting", "running", "stopping"}:
+                    return {
+                        "ok": True,
+                        "result": {
+                            "status": "noop",
+                            "reason": "NOT_RUNNING",
+                            "run_id": current.get("run_id"),
+                        },
+                    }
+
+                pid = _parse_pid(current.get("pid"))
+                if pid <= 0:
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "SIGNAL_FAILED",
+                            "details": {"run_id": current.get("run_id"), "pid": current.get("pid")},
+                        },
+                    }
+                stopping_payload = dict(current)
+                stopping_payload["state"] = "stopping"
+                stopping_payload["reason"] = reason
+                stopping_payload["active"] = True
+                self._write_active_state(stopping_payload)
+
+                if not self._signal_process(pid, signal.SIGTERM):
+                    if self._pid_is_alive(pid):
+                        self._write_active_state(current)
+                        return {
+                            "ok": False,
+                            "error": {
+                                "code": "SIGNAL_FAILED",
+                                "details": {"run_id": current.get("run_id"), "pid": pid},
+                            },
+                        }
+                    refreshed = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+                    if refreshed.get("state") in {"stopped", "failed", "completed"}:
+                        return {
+                            "ok": True,
+                            "result": {
+                                "run_id": refreshed.get("run_id"),
+                                "state": refreshed.get("state"),
+                            },
+                        }
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "SIGNAL_FAILED",
+                            "details": {"run_id": current.get("run_id"), "pid": pid},
+                        },
+                    }
+
+                resolved_grace = self.default_stop_grace_period_seconds if grace_period_seconds is None else max(
+                    int(grace_period_seconds), 0
+                )
+                if self._wait_for_process_exit(pid, resolved_grace):
+                    refreshed = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+                    return {
+                        "ok": True,
+                        "result": {
+                            "run_id": refreshed.get("run_id"),
+                            "state": refreshed.get("state"),
+                        },
+                    }
+
+                if not self._signal_process(pid, signal.SIGKILL) and self._pid_is_alive(pid):
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "FORCE_SIGNAL_FAILED",
+                            "details": {"run_id": current.get("run_id"), "pid": pid},
+                        },
+                    }
+                if not self._wait_for_forced_exit(pid):
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "FORCE_SIGNAL_FAILED",
+                            "details": {"run_id": current.get("run_id"), "pid": pid},
+                        },
+                    }
+
+                forced = write_terminal_background_state(
+                    self.paths,
+                    run_id=str(current.get("run_id") or ""),
+                    state="stopped",
+                    reason="forced_stop",
+                    runner_log_path=Path(str(current.get("runner_log_path"))) if current.get("runner_log_path") else None,
+                )
+                return {
+                    "ok": True,
+                    "result": {
+                        "run_id": forced.get("run_id"),
+                        "state": forced.get("state"),
+                    },
+                }
+            finally:
+                _release_control_lock(control_lock)

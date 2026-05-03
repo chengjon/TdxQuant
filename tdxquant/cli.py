@@ -38,6 +38,8 @@ from .reporting import REPORT_COMMAND_DEFAULT_PROFILES, load_report_presets, res
 from .tasking import TASK_COMMAND_DEFAULT_PROFILES, load_task_presets, resolve_task_preset
 from .desktop.hid import build_type_command, normalize_hid_key, run_hid_ping, run_hid_send, validate_hid_wire_command
 from .desktop.inspect import enumerate_controls, find_main_window
+from .bridge_registry import run_bridge_watch_start, run_bridge_watch_status, run_bridge_watch_stop
+from .bridge_http import serve_bridge_from_config
 from .models import ErrorCode, OrderRequest, Result
 from .result_contract import DEFAULT_CAPABILITY_VERSION, DEFAULT_SCHEMA_VERSION, build_runtime_metadata, format_rfc3339, utc_now
 from .api.bridge import (
@@ -583,6 +585,33 @@ def _build_catalog_parser(subparsers: argparse._SubParsersAction[argparse.Argume
     _add_catalog_run_arguments(catalog_plan_parser)
 
     return catalog_parser
+
+
+def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
+    bridge_parser = subparsers.add_parser("bridge")
+    bridge_subparsers = bridge_parser.add_subparsers(dest="bridge_command", required=True)
+
+    bridge_serve_parser = bridge_subparsers.add_parser("serve")
+    bridge_serve_parser.add_argument("--config", required=True)
+
+    bridge_watch_status_parser = bridge_subparsers.add_parser("watch-status")
+    bridge_watch_status_parser.add_argument("--registry", required=True)
+    bridge_watch_status_parser.add_argument("--worker", required=True)
+
+    bridge_watch_start_parser = bridge_subparsers.add_parser("watch-start")
+    bridge_watch_start_parser.add_argument("--registry", required=True)
+    bridge_watch_start_parser.add_argument("--worker", required=True)
+    bridge_watch_start_parser.add_argument("--code", action="append", required=True)
+    bridge_watch_start_parser.add_argument("--max-events", type=int)
+    bridge_watch_start_parser.add_argument("--max-seconds", type=float)
+    bridge_watch_start_parser.add_argument("--poll-interval", type=float)
+    bridge_watch_start_parser.add_argument("--idempotency-key")
+
+    bridge_watch_stop_parser = bridge_subparsers.add_parser("watch-stop")
+    bridge_watch_stop_parser.add_argument("--registry", required=True)
+    bridge_watch_stop_parser.add_argument("--worker", required=True)
+
+    return bridge_parser
 
 
 def _add_report_run_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -1181,6 +1210,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_report_parser(subparsers)
     _build_trade_parser(subparsers)
     _build_catalog_parser(subparsers)
+    _build_bridge_parser(subparsers)
     health_parser = subparsers.add_parser("health-check")
     inspect_parser = subparsers.add_parser("inspect")
     uia_windows_parser = subparsers.add_parser("uia-windows")
@@ -3798,9 +3828,61 @@ def _handle_catalog_subcommand(args: argparse.Namespace) -> Result:
         return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
 
 
+def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
+    try:
+        if args.bridge_command == "serve":
+            return serve_bridge_from_config(args.config)
+        if args.bridge_command == "watch-status":
+            return _emit_bridge_payload(run_bridge_watch_status(registry_path=args.registry, worker_id=args.worker))
+        if args.bridge_command == "watch-start":
+            return _emit_bridge_payload(
+                run_bridge_watch_start(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    stock_list=args.code,
+                    max_events=args.max_events,
+                    max_seconds=args.max_seconds,
+                    poll_interval=args.poll_interval,
+                    idempotency_key=args.idempotency_key,
+                )
+            )
+        if args.bridge_command == "watch-stop":
+            return _emit_bridge_payload(run_bridge_watch_stop(registry_path=args.registry, worker_id=args.worker))
+        return 2
+    except Exception as exc:
+        return _emit_bridge_payload(_build_bridge_local_failure(exc))
+
+
+def _emit_bridge_payload(payload: dict[str, object]) -> int:
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False))
+    sys.stdout.write("\n")
+    return 0 if payload.get("ok") else 1
+
+
+def _build_bridge_local_failure(exc: Exception) -> dict[str, object]:
+    code = "INTERNAL_ERROR"
+    if isinstance(exc, FileNotFoundError):
+        code = "REGISTRY_NOT_FOUND"
+    elif isinstance(exc, ValueError):
+        code = "INVALID_REQUEST"
+    elif isinstance(exc, RuntimeError):
+        code = "BRIDGE_REQUEST_FAILED"
+    return {
+        "ok": False,
+        "result": None,
+        "error": {
+            "code": code,
+            "message": str(exc),
+            "details": {},
+        },
+    }
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.command == "bridge":
+        return _handle_bridge_subcommand(args)
     adapter = PingAnBrokerAdapter(title_keyword=args.title_key, exe_path=args.exe_path)
     command_started_wall = utc_now()
     command_started_at = time.perf_counter()

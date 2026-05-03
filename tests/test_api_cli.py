@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 from tdxquant.cli import (
     _handle_api_subcommand,
+    _handle_bridge_subcommand,
     _handle_catalog_subcommand,
     _handle_report_subcommand,
     _run_flat_replay_provider_command,
@@ -61,6 +62,69 @@ def _snapshot(
 
 
 class ApiCliParserTests(unittest.TestCase):
+    def test_bridge_serve_command_requires_config(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["bridge", "serve"])
+
+    def test_bridge_serve_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["bridge", "serve", "--config", "runtime/bridge/worker-bridge.json"])
+        self.assertEqual(args.command, "bridge")
+        self.assertEqual(args.bridge_command, "serve")
+        self.assertEqual(args.config, "runtime/bridge/worker-bridge.json")
+
+    def test_bridge_watch_status_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"])
+        self.assertEqual(args.command, "bridge")
+        self.assertEqual(args.bridge_command, "watch-status")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+
+    def test_bridge_watch_start_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-start",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--code",
+                "000001.SZ",
+                "--code",
+                "600519.SH",
+                "--max-events",
+                "5",
+                "--max-seconds",
+                "30",
+                "--poll-interval",
+                "0.5",
+                "--idempotency-key",
+                "idem-001",
+            ]
+        )
+        self.assertEqual(args.bridge_command, "watch-start")
+        self.assertEqual(args.code, ["000001.SZ", "600519.SH"])
+        self.assertEqual(args.max_events, 5)
+        self.assertEqual(args.max_seconds, 30.0)
+        self.assertEqual(args.poll_interval, 0.5)
+        self.assertEqual(args.idempotency_key, "idem-001")
+
+    def test_bridge_watch_start_command_requires_registry_worker_and_code(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["bridge", "watch-start"])
+
+    def test_bridge_watch_stop_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["bridge", "watch-stop", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"])
+        self.assertEqual(args.bridge_command, "watch-stop")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+
     def test_api_capabilities_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "capabilities"])
@@ -4471,6 +4535,182 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mocked_service_builder.assert_called_once()
         service.place_order.assert_called_once()
+
+    def test_main_bridge_serve_dispatches_to_bridge_http_server(self) -> None:
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.serve_bridge_from_config", return_value=0) as mocked,
+            patch("sys.argv", ["tdxquant", "bridge", "serve", "--config", "runtime/bridge/worker-bridge.json"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked.assert_called_once_with("runtime/bridge/worker-bridge.json")
+
+    def test_handle_bridge_watch_status_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            ["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", return_value={"ok": True, "result": {"status": "idle"}}) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(registry_path="runtime/bridge/master-workers.json", worker_id="worker-a")
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "idle"}})
+
+    def test_handle_bridge_watch_start_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-start",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--code",
+                "000001.SZ",
+                "--max-events",
+                "5",
+                "--max-seconds",
+                "30",
+                "--poll-interval",
+                "0.5",
+                "--idempotency-key",
+                "idem-001",
+            ]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_start", return_value={"ok": True, "result": {"status": "started"}}) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            stock_list=["000001.SZ"],
+            max_events=5,
+            max_seconds=30.0,
+            poll_interval=0.5,
+            idempotency_key="idem-001",
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "started"}})
+
+    def test_handle_bridge_watch_stop_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            ["bridge", "watch-stop", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_stop", return_value={"ok": True, "result": {"status": "stopping"}}) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(registry_path="runtime/bridge/master-workers.json", worker_id="worker-a")
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "stopping"}})
+
+    def test_handle_bridge_watch_status_returns_json_failure_for_unknown_worker(self) -> None:
+        args = build_parser().parse_args(
+            ["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", side_effect=ValueError("unknown worker: worker-a")),
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            json.loads(stdout.getvalue()),
+            {
+                "ok": False,
+                "result": None,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "unknown worker: worker-a",
+                    "details": {},
+                },
+            },
+        )
+
+    def test_handle_bridge_watch_status_returns_json_failure_for_missing_registry_path(self) -> None:
+        args = build_parser().parse_args(
+            ["bridge", "watch-status", "--registry", "runtime/bridge/missing.json", "--worker", "worker-a"]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", side_effect=FileNotFoundError("runtime/bridge/missing.json")),
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            json.loads(stdout.getvalue()),
+            {
+                "ok": False,
+                "result": None,
+                "error": {
+                    "code": "REGISTRY_NOT_FOUND",
+                    "message": "runtime/bridge/missing.json",
+                    "details": {},
+                },
+            },
+        )
+
+    def test_handle_bridge_watch_status_returns_json_failure_for_missing_token_env(self) -> None:
+        args = build_parser().parse_args(
+            ["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"]
+        )
+        with (
+            patch(
+                "tdxquant.cli.run_bridge_watch_status",
+                side_effect=ValueError("missing bridge token in environment: BRIDGE_TOKEN_A"),
+            ),
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            json.loads(stdout.getvalue()),
+            {
+                "ok": False,
+                "result": None,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "missing bridge token in environment: BRIDGE_TOKEN_A",
+                    "details": {},
+                },
+            },
+        )
+
+    def test_handle_bridge_watch_status_returns_json_failure_for_bridge_request_failure(self) -> None:
+        args = build_parser().parse_args(
+            ["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", side_effect=RuntimeError("bridge worker request failed: timed out")),
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            json.loads(stdout.getvalue()),
+            {
+                "ok": False,
+                "result": None,
+                "error": {
+                    "code": "BRIDGE_REQUEST_FAILED",
+                    "message": "bridge worker request failed: timed out",
+                    "details": {},
+                },
+            },
+        )
 
     def test_main_pingan_buy_submit_once_uses_trade_manager(self) -> None:
         service = MagicMock()

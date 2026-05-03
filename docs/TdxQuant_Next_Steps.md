@@ -148,7 +148,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 
 ### 方向 D：把订阅底层能力产品化成长期契约
 
-当前订阅 session 底层已经完成，但还没有真正变成 provider-ready 的长期契约。
+当前订阅 session 底层已经完成，并且已经形成了前台 task + worker bridge 两层可消费 contract。
 
 截至 `2026-05-01`，前台 `subscription-watch` 已经进一步收口为 run artifact contract：
 
@@ -157,21 +157,33 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `status.json` / `summary.json` / `manifest.json`
 - `CSV` 仅保留兼容导出角色
 
+截至 `2026-05-03`，这条线又补齐了一层 worker bridge control plane：
+
+- worker-local single-active background control
+- worker 侧 `tdxquant bridge serve --config runtime/bridge/worker-bridge.json`
+- Master 侧静态 worker registry
+- 远程 `watch-start / watch-stop / watch-status`
+- `list / artifacts / events / logs / health` HTTP endpoint
+- bridge auth preconditions：`Authorization: Bearer <token>` + `master_allowlist` source-IP enforcement
+
 下一步不应只停留在：
 
 - `open_subscription_session()`
 - `subscribe_hq()`
 
-而应尽快产品化为更稳定的任务或 worker 形态，例如：
+这意味着“产品化为更稳定的任务或 worker 形态”这一层已经有了第一版落地：
 
-- `subscription-watch`
-- `start / stop / status / list`
-- `Ctrl+C` 优雅退出
-- `JSONL` 事件输出
-- 状态文件
-- session 结束原因
-- reconnect metadata
-- 心跳或 watermark
+- 前台：`subscription-watch`
+- 后台控制：worker-local single-active watch
+- 远程 transport：HTTP bridge v1
+- Master 发现方式：静态 worker registry
+
+当前剩余重点不再是从 0 到 1 地补 `start / stop / status / list`，而是继续强化：
+
+- reconnect/backoff
+- 更强的长期运行治理
+- 更细的 health / watermark / heartbeat 摘要
+- 更广的 integration / contract regression coverage
 
 建议事件 JSONL 从第一版起就固定至少这些字段：
 
@@ -225,16 +237,20 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - fake provider 模式
 - contract test 夹具
 
-截至 `2026-04-28`，这条线已经补齐第一版 provider replay fixture bundle：
+截至 `2026-05-02`，这条线已经补齐两层基础设施：
 
 - 包内稳定 fixture 资产
 - 统一 manifest / loader helper
-- `formula.screen` / `runtime.capabilities` / `runtime.doctor` / `block mutation` / `subscription event` representative samples
+- `formula.screen` / `runtime.capabilities` / `runtime.health` / `runtime.doctor` / `block mutation` / `subscription event` / `subscription-watch run artifact` representative samples
+- in-process fake provider mode
+- `subscription-watch` completed-run replay materialization
+- CLI subprocess replay hardening groundwork：supported replay matrix、selector precedence、stable replay failure envelope、stdout / `--output` mirroring contract
 
 当前剩余重点收缩为：
 
-- 更高一层的 fake provider mode
 - transport-level replay / integration hardening
+- 更大范围 capability 覆盖
+- 可能的后台 `subscription-watch start/stop/status/list`
 
 这些夹具应优先服务：
 
@@ -387,7 +403,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - 提供 replay / fake / contract fixture
 - 视需要补 block 同步衔接示例
 
-### Phase 4：订阅能力 contract-ready（已完成 foreground slice）
+### Phase 4：订阅能力 contract-ready（已完成 foreground + bridge slice）
 
 当前状态：
 
@@ -397,6 +413,10 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - 已固定 `status.json` 状态文件
 - 已支持 `max_events` / `max_seconds` bounded run
 - 已支持前台 `Ctrl+C` 优雅退出
+- 已提供 worker-local single-active background control
+- 已提供 `tdxquant bridge serve --config ...`
+- 已提供 Master 侧静态 worker registry 与 `bridge watch-start|watch-stop|watch-status`
+- 已提供 `watch/list/artifacts/events/logs/health` HTTP bridge endpoint
 
 对应文档见：
 
@@ -404,9 +424,9 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 
 后续围绕订阅能力的剩余工作主要是：
 
-- daemon / `start / stop / status / list`
 - reconnect/backoff 与更强运行态治理
-- future transport wrapper，例如 HTTP / SSE
+- 更强的 bridge / worker integration regression
+- future transport wrapper，例如 SSE 或更高层协调协议
 
 ### Phase 5：Block 写入治理
 

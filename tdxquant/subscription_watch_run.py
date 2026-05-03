@@ -27,6 +27,7 @@ class SubscriptionWatchRunPaths:
     summary_path: Path
     events_jsonl_path: Path
     events_csv_path: Path
+    runner_log_path: Path
 
 
 def build_subscription_watch_run_paths(root_dir: Path, *, run_id: str | None = None) -> SubscriptionWatchRunPaths:
@@ -40,6 +41,7 @@ def build_subscription_watch_run_paths(root_dir: Path, *, run_id: str | None = N
         summary_path=run_dir / "summary.json",
         events_jsonl_path=run_dir / "events.jsonl",
         events_csv_path=run_dir / "events.csv",
+        runner_log_path=run_dir / "runner.log",
     )
 
 
