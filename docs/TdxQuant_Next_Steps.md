@@ -60,6 +60,7 @@
 - 要求尽快稳定 machine-readable contract。
 - 要求提供 capability discovery / health probe。
 - 要求查询路径与交易路径明确隔离。
+- 对已稳定的 provider contract，更偏好补薄 task/report/catalog 入口，而不是再复制一层新语义。
 
 这意味着，TdxQuant 的下一步重点已经不是“再补更多原子函数”，而是把现有能力整理成 **稳定可集成的 provider contract**。
 
@@ -146,6 +147,12 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 
 - `公式选股 -> 标准股票列表 -> TongDaXin block`
 
+对 `block` 这条线，当前更合适的推进方式也已经更明确：
+
+- provider 级 `block.sync_watchlist` 继续作为 canonical contract
+- `task block-sync` 这类入口只做 task metadata、profile 默认值与日常命令收口
+- 避免在 task 层复制第二套 block sync result schema
+
 ### 方向 D：把订阅底层能力产品化成长期契约
 
 当前订阅 session 底层已经完成，并且已经形成了前台 task + worker bridge 两层可消费 contract。
@@ -185,6 +192,26 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - 更细的 health / watermark / heartbeat 摘要
 - 更广的 integration / contract regression coverage
 
+截至 `2026-05-03`，这条 resilience 主线已经收口出明确 contract：
+
+- live watch 在断线恢复前后保持同一个 `run_id`
+- `watch_status.state=reconnecting / degraded` 已成为正式运行态摘要，而不是临时内部细节
+- `status.json` / `summary.json` 已承担 heartbeat、reconnect 计数、degraded 摘要等状态输出
+- `GET /bridge/v1/watch/status` 只做 controller projection，`/bridge/v1/health` 与 active `run_id` fallback 走 control-only read path
+- Master registry/client 的 auth、allowlist、invalid JSON、connection refused、HTTP non-JSON failure 已固定为 transport-scoped machine error
+- CLI `bridge health/watch-status/watch-list/watch-artifacts/watch-events/watch-logs` 已固定为透传 registry/client payload 的远程读命令
+
+这里同样需要区分：
+
+- `control.state` 是 background/bridge control-plane 状态
+- `watch_status.state` 是 `subscription-watch` runtime-state summary
+
+因此这条线接下来的重点更偏向：
+
+- 调整 replay / fixture / contract regression coverage 与新状态对齐
+- 继续验证 background / bridge / replay 对同一套 resilience 字段的兼容性
+- 只在必要时扩展读模型，不引入第二套并行 lifecycle contract
+
 建议事件 JSONL 从第一版起就固定至少这些字段：
 
 - `schema_version`
@@ -210,10 +237,19 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - failure feedback
 - 可选 `mutation_key`
 
+截至 `2026-05-03`，这条线已经补齐第一版 provider-level `block sync`：
+
+- `watchlist -> TongDaXin block`
+- `replace` / `merge`
+- `create_if_missing`
+- `dry_run`
+- sync-level `mutation_key` replay / conflict
+
 当前剩余重点收缩为：
 
-- 覆盖写 / 增量写区分
-- 更强的幂等或重复写保护
+- `TongDaXin block -> 上层 watchlist`
+- 文件导入式 watchlist 适配
+- 更高阶的覆盖写 / 增量写任务化入口
 
 这样 `block` 才适合作为：
 
@@ -251,6 +287,8 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - transport-level replay / integration hardening
 - 更大范围 capability 覆盖
 - 可能的后台 `subscription-watch start/stop/status/list`
+
+也就是说，CLI subprocess replay 这一层现在已经从“待建设”转成“已完成基础 contract 固化”；后续 replay 工作主要是更高一层 transport / integration follow-up，而不是继续扩写当前这层 CLI 失败语义。
 
 这些夹具应优先服务：
 
@@ -450,11 +488,17 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 
 ### Phase 6：更广泛的 provider-ready 整理
 
-目标：
+截至 `2026-05-03`，这条线已经完成第一版 query contract hardening：
 
-- 统一 `market / meta / financial / transaction` 输出
-- 对齐 metadata
-- 强化批量调用场景
+- `market / meta / financial / transaction` 统一 `data.query_meta`
+- CLI / manager / replay fixture / discovery metadata 对齐
+- representative success / empty / failure query fixtures
+
+当前剩余重点收缩为：
+
+- 更大范围 query replay coverage
+- 批量调用场景下的更强 contract 和 scenario task 收口
+- 上层项目面向 query adapter 的集成回归
 
 ### Phase 7：交易线独立加固
 
@@ -497,7 +541,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 建议候选方向：
 
 1. `block-mutation-safety`
-   - 已完成：block 写入审计、mutation result schema、失败反馈、可选 `mutation_key`
+   - 已完成：block 写入审计、`applied / noop / rejected / failed` governance schema、失败反馈、可选 `mutation_key`、本地 replay / conflict 治理
 2. `provider-replay-fixtures`
    - 已完成：包内 fixture bundle、manifest / loader、JSON / JSONL contract samples
 3. `trade-safety-hardening`

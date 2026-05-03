@@ -66,6 +66,8 @@ TdxQuant
 - 个股静态资料
 - 扩展静态资料
 - 可转债资料
+- 稳定 `data.query_meta` provider contract
+- representative replay fixtures
 
 典型入口：
 
@@ -83,6 +85,8 @@ TdxQuant
 - 单股专项数据
 - 分红送转因子
 - IPO / 新股新债资料
+- 稳定 `data.query_meta` provider contract
+- representative replay fixtures
 
 #### `formula`
 
@@ -121,7 +125,9 @@ TdxQuant
 - 清空板块
 - 写入板块成分
 - `block.read_watchlist_snapshot` provider contract
+- 受治理的 `watchlist -> block` 同步
 - `block_mutation` 标准摘要
+- `block sync` 标准摘要
 - 本地 audit log artifact
 - 可选 `mutation_key` 关联键
 
@@ -143,6 +149,7 @@ TdxQuant
 - 稳定 fixture manifest / loader
 - `json` / `jsonl` sample 资产
 - `formula.screen` / `doctor` / `block mutation` / `block read snapshot` / `subscription event` representative fixtures
+- `formula.screen` / `doctor` / `query contract` / `block mutation` / `block sync` / `block read snapshot` / `subscription event` representative fixtures
 
 #### `financial`
 
@@ -150,6 +157,8 @@ TdxQuant
 
 - 专业财务数据查询
 - 按日期查询专业财务数据
+- 稳定 `data.query_meta` provider contract
+- representative replay fixtures
 
 #### `transaction`
 
@@ -161,6 +170,8 @@ TdxQuant
 - 按日期查询板块交易统计数据
 - 市场交易统计数据
 - 按日期查询市场交易统计数据
+- 稳定 `data.query_meta` provider contract
+- representative replay fixtures
 
 #### `runtime subscription session`
 
@@ -187,6 +198,7 @@ TdxQuant
 
 已实现或已形成稳定入口的任务包括：
 
+- `block_sync`
 - `sector_research`
 - `formula_scan`
 - `watchlist_overview`
@@ -205,6 +217,12 @@ TdxQuant
 
 这层的目标不是补充新的底层函数，而是把多步骤流程收口成稳定任务。
 
+其中 `block_sync` 明确保持为薄 task wrapper：
+
+- 底层能力仍然是 provider 级 `block.sync_watchlist`
+- task 层只补 task timing / profile metadata / 日常入口收口
+- 不在 task 层重定义 block sync contract
+
 ### 2.2.1 `subscription-watch` worker bridge control plane
 
 截至 `2026-05-03`，`subscription_watch` 已经不只停留在前台 task，还补齐了一层 worker bridge control plane，但边界仍然很克制：
@@ -216,9 +234,14 @@ TdxQuant
 - Master 侧远程 CLI：
   - `tdxquant bridge watch-start ...`
   - 支持 `--max-events` / `--max-seconds` / `--poll-interval` / `--idempotency-key`
+  - `tdxquant bridge health ...`
   - `tdxquant bridge watch-stop ...`
   - `tdxquant bridge watch-status ...`
-  - 默认只看当前 active snapshot；查历史 `status.json` 需要显式 `run_id`
+  - `tdxquant bridge watch-list ...`
+  - `tdxquant bridge watch-artifacts ...`
+  - `tdxquant bridge watch-events ...`
+  - `tdxquant bridge watch-logs ...`
+  - `watch-status` 当前只返回 controller projection / active snapshot；显式 `run_id` 当前不会触发历史查找
 
 当前 bridge 对上层暴露的稳定 endpoint 为：
 
@@ -231,11 +254,31 @@ TdxQuant
 - `GET /bridge/v1/watch/logs`
 - `GET /bridge/v1/health`
 
+同一天，这条线的 live runtime resilience contract 也已经补齐到前台 task / background / bridge 共用的同一套状态语义：
+
+- `watch_status.state` 的 active runtime state 包括 `starting` / `running` / `reconnecting` / `degraded` / `stopping`
+- reconnect / degraded 期间保持同一个 `run_id`
+- reconnect / degraded 期间继续写同一个 canonical `events.jsonl`
+- 运行态恢复信息通过 `status.json` / `summary.json` 暴露，而不是通过 synthetic lifecycle events 暴露
+
+这里需要和 control plane 分层理解：
+
+- `control.state` 反映 worker-local background process / controller 状态
+- `watch_status.state` 反映前台 `subscription-watch` run 的 runtime-state summary
+
 当前 bridge 的访问前提也已经固定：
 
 - 请求头必须包含 `Authorization: Bearer <token>`
 - worker 只接受 `master_allowlist` 中 source IP 发来的请求
 - 这两层检查发生在 endpoint 分发之前，因此它们属于 transport/auth contract，而不是业务层可选行为
+
+这一层的 bridge integration regression surface 当前也已经固定：
+
+- worker-local background control 是 watch runtime state 的 source of truth
+- `GET /bridge/v1/watch/status` 是 controller 读模型的 verbatim projection，而不是 bridge 自行发明的新状态
+- `/bridge/v1/health` 与 active `run_id` fallback 走 control-only read path
+- Master 侧 registry/client transport failure 与 auth/allowlist failure 都保持 transport-scoped，不投射成 task runtime failure
+- Master CLI `bridge health/watch-status/watch-list/watch-artifacts/watch-events/watch-logs` 直接打印 client 收到的 JSON payload，不做额外改写
 
 这层能力的定位不是重写 `subscription-watch` 的业务 contract，而是把：
 

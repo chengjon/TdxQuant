@@ -4,6 +4,8 @@ import copy
 from collections import Counter
 from typing import Any
 
+from .query_contract import get_query_discovery_metadata
+
 STABILITY_LEVELS = ("stable", "beta", "experimental")
 SIDE_EFFECT_LEVELS = ("read_only", "local_state_mutating", "live_side_effecting")
 
@@ -19,7 +21,6 @@ def _capability(
     api_command: str | None = None,
     flat_command: str | None = None,
     requires: list[str] | None = None,
-    query_metadata: dict[str, Any] | None = None,
     capability_version: str = "v1",
 ) -> dict[str, Any]:
     entrypoints: dict[str, str] = {}
@@ -39,8 +40,9 @@ def _capability(
         "entrypoints": entrypoints,
         "requires": list(requires or []),
     }
+    query_metadata = get_query_discovery_metadata(name)
     if query_metadata is not None:
-        payload["query_metadata"] = copy.deepcopy(query_metadata)
+        payload["query_metadata"] = query_metadata
     return payload
 
 
@@ -486,19 +488,17 @@ _CAPABILITY_REGISTRY: list[dict[str, Any]] = [
         api_command="block-read-watchlist",
         flat_command="tdx-block-read-watchlist",
         requires=["native_windows_python", "tqcenter"],
-        query_metadata={
-            "query_shapes": [
-                {
-                    "query_kind": "block.read_watchlist_snapshot",
-                    "selectors": ["block_code"],
-                    "query_params": [],
-                }
-            ],
-            "supports_empty_results": True,
-            "returns_ordered_symbols": True,
-            "deduplicates_members": True,
-            "normalizes_symbols": True,
-        },
+    ),
+    _capability(
+        "block.sync_watchlist",
+        domain="block",
+        description="Synchronize a normalized watchlist into a TongDaXin custom sector with governed replace or merge semantics.",
+        stability="beta",
+        side_effect_level="local_state_mutating",
+        manager_method="block.sync_watchlist",
+        api_command="block-sync",
+        flat_command="tdx-block-sync",
+        requires=["native_windows_python", "tqcenter"],
     ),
     _capability(
         "formula.format_data",

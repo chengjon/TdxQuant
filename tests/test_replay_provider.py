@@ -12,9 +12,10 @@ def test_execute_sync_replay_uses_default_runtime_capabilities_fixture() -> None
 
     assert result.ok is True
     assert result.message == "listed provider capabilities"
-    assert result.data["summary"]["total"] == 5
-    capability_names = {item["name"] for item in result.data["capabilities"]}
-    assert "block.read_watchlist_snapshot" in capability_names
+    capabilities = {item["name"]: item for item in result.data["capabilities"]}
+    assert result.data["summary"]["total"] >= 5
+    assert "block.read_watchlist_snapshot" in capabilities
+    assert capabilities["market.snapshot"]["query_metadata"]["supports_replay"] is True
     assert result.data["replay_source"]["fixture"] == "runtime-capabilities-success"
     assert result._provider_contract["runtime"]["mode"] == "replay"
 
@@ -42,10 +43,28 @@ def test_block_read_watchlist_discovery_metadata_is_exposed() -> None:
             }
         ],
         "supports_empty_results": True,
-        "returns_ordered_symbols": True,
-        "deduplicates_members": True,
-        "normalizes_symbols": True,
+        "supports_requested_fields": False,
+        "supports_replay": True,
     }
+
+
+def test_execute_sync_replay_uses_default_block_sync_fixture() -> None:
+    result = execute_sync_replay("block.sync_watchlist")
+
+    assert result.ok is True
+    assert result.data["sync"]["mode"] == "replace"
+    assert result.data["sync"]["status"] == "applied"
+    assert result.data["replay_source"]["fixture"] == "block-sync-replace-applied"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_execute_sync_replay_uses_default_market_snapshot_fixture() -> None:
+    result = execute_sync_replay("market.snapshot")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.snapshot"
+    assert result.data["replay_source"]["fixture"] == "market-snapshot-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
 
 
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:

@@ -18,6 +18,18 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("runtime-capabilities-success", names)
         self.assertIn("runtime-health-degraded", names)
         self.assertIn("runtime-doctor-degraded", names)
+        self.assertIn("market-snapshot-success", names)
+        self.assertIn("market-kline-success", names)
+        self.assertIn("meta-stock-list-success", names)
+        self.assertIn("meta-sector-stocks-success", names)
+        self.assertIn("financial-financial-data-success", names)
+        self.assertIn("financial-financial-data-by-date-success", names)
+        self.assertIn("transaction-stock-transaction-data-success", names)
+        self.assertIn("transaction-market-transaction-data-success", names)
+        self.assertIn("market-kline-empty", names)
+        self.assertIn("meta-sector-stocks-empty", names)
+        self.assertIn("financial-financial-data-failure", names)
+        self.assertIn("transaction-stock-transaction-data-failure", names)
         self.assertIn("block-send-user-block-applied", names)
         self.assertIn("block-send-user-block-noop", names)
         self.assertIn("block-send-user-block-rejected", names)
@@ -25,6 +37,10 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("block-read-watchlist-empty", names)
         self.assertIn("block-read-watchlist-missing-block", names)
         self.assertIn("block-read-watchlist-invalid-member", names)
+        self.assertIn("block-sync-replace-applied", names)
+        self.assertIn("block-sync-merge-noop", names)
+        self.assertIn("block-sync-replace-rejected", names)
+        self.assertIn("block-sync-replace-plan", names)
         self.assertIn("subscription-event-batch", names)
         self.assertIn("subscription-watch-events", names)
         self.assertIn("subscription-watch-status-completed", names)
@@ -53,6 +69,13 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["capability"], "formula.screen")
         self.assertEqual(payload["data"]["matched_symbols"], ["000001.SZ"])
         self.assertEqual(payload["data"]["summary"]["matched_symbol_count"], 1)
+
+    def test_load_market_snapshot_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("market-snapshot-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "market.snapshot")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "market.snapshot")
+        self.assertEqual(payload["data"]["query_meta"]["symbol"], "000001.SZ")
 
     def test_load_formula_failure_fixture_returns_hardened_provider_envelope(self) -> None:
         payload = load_provider_replay_fixture("formula-screen-failure")
@@ -90,6 +113,25 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         capability_names = {item["name"] for item in payload["data"]["capabilities"]}
         self.assertIn("block.read_watchlist_snapshot", capability_names)
 
+    def test_load_runtime_capabilities_fixture_includes_query_metadata_for_supported_queries(self) -> None:
+        payload = load_provider_replay_fixture("runtime-capabilities-success")
+        capabilities = {item["name"]: item for item in payload["data"]["capabilities"]}
+        self.assertEqual(
+            capabilities["market.snapshot"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "market.snapshot",
+                        "selectors": ["symbol"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+
     def test_load_jsonl_fixture_returns_rows(self) -> None:
         rows = load_provider_replay_fixture("subscription-event-batch")
         self.assertEqual(len(rows), 2)
@@ -106,6 +148,39 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["capability"], "subscription.watch")
         self.assertEqual(payload["final_state"], "completed")
         self.assertEqual(payload["stop_reason"], "max_events")
+
+    def test_fixture_manifest_exposes_subscription_watch_resilience_samples(self) -> None:
+        fixtures = list_provider_replay_fixtures()
+        names = {item["name"] for item in fixtures}
+        self.assertIn("subscription-watch-status-reconnecting", names)
+        self.assertIn("subscription-watch-status-degraded", names)
+        self.assertIn("subscription-watch-summary-with-reconnect", names)
+
+    def test_load_subscription_watch_reconnecting_status_fixture(self) -> None:
+        payload = load_provider_replay_fixture("subscription-watch-status-reconnecting")
+        self.assertEqual(payload["capability"], "subscription.watch")
+        self.assertEqual(payload["state"], "reconnecting")
+        self.assertEqual(payload["reconnect_count"], 1)
+        self.assertEqual(payload["consecutive_reconnect_failures"], 1)
+        self.assertIsNotNone(payload["next_reconnect_at"])
+        self.assertEqual(payload["last_error"]["code"], "SESSION_LOST")
+
+    def test_load_subscription_watch_degraded_status_fixture(self) -> None:
+        payload = load_provider_replay_fixture("subscription-watch-status-degraded")
+        self.assertEqual(payload["capability"], "subscription.watch")
+        self.assertEqual(payload["state"], "degraded")
+        self.assertEqual(payload["reconnect_count"], 3)
+        self.assertEqual(payload["consecutive_reconnect_failures"], 3)
+        self.assertIsNone(payload["next_reconnect_at"])
+        self.assertIsNotNone(payload["degraded_since"])
+
+    def test_load_subscription_watch_summary_with_reconnect_fixture(self) -> None:
+        payload = load_provider_replay_fixture("subscription-watch-summary-with-reconnect")
+        self.assertEqual(payload["capability"], "subscription.watch")
+        self.assertEqual(payload["final_state"], "completed")
+        self.assertEqual(payload["reconnect_count"], 1)
+        self.assertEqual(payload["degraded_duration_ms"], 0.0)
+        self.assertIsNone(payload["final_last_error"])
 
     def test_load_block_mutation_fixture_returns_provider_artifact_descriptor(self) -> None:
         payload = load_provider_replay_fixture("block-send-user-block-applied")
@@ -152,6 +227,23 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["capability"], "block.read_watchlist_snapshot")
         self.assertEqual(payload["code"], "invalid_request")
         self.assertEqual(payload["message"], "block_code not found: ZXG")
+
+    def test_load_block_sync_applied_fixture_returns_sync_summary(self) -> None:
+        payload = load_provider_replay_fixture("block-sync-replace-applied")
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["capability"], "block.sync_watchlist")
+        self.assertEqual(payload["data"]["sync"]["mode"], "replace")
+        self.assertEqual(payload["data"]["sync"]["status"], "applied")
+        self.assertEqual(payload["data"]["block_mutation"]["operation"], "send_user_block")
+        self.assertEqual(payload["artifacts"][0]["kind"], "block_sync_audit")
+
+    def test_load_block_sync_plan_fixture_returns_dry_run_summary(self) -> None:
+        payload = load_provider_replay_fixture("block-sync-replace-plan")
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["data"]["sync"]["dry_run"], True)
+        self.assertEqual(payload["data"]["sync"]["would_create_block"], True)
 
     def test_unknown_fixture_name_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

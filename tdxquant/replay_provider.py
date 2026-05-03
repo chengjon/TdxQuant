@@ -20,8 +20,17 @@ _SYNC_REPLAY_DEFAULT_FIXTURES: dict[str, str] = {
     "runtime.capabilities": "runtime-capabilities-success",
     "runtime.health": "runtime-health-degraded",
     "runtime.doctor": "runtime-doctor-degraded",
+    "market.snapshot": "market-snapshot-success",
+    "market.kline": "market-kline-success",
+    "meta.stock_list": "meta-stock-list-success",
+    "meta.sector_stocks": "meta-sector-stocks-success",
+    "financial.financial_data": "financial-financial-data-success",
+    "financial.financial_data_by_date": "financial-financial-data-by-date-success",
+    "transaction.stock_transaction_data": "transaction-stock-transaction-data-success",
+    "transaction.market_transaction_data": "transaction-market-transaction-data-success",
     "block.send_user_block": "block-send-user-block-applied",
     "block.read_watchlist_snapshot": "block-read-watchlist-success",
+    "block.sync_watchlist": "block-sync-replace-applied",
 }
 
 _SUBSCRIPTION_WATCH_BUNDLE_DEFAULTS: dict[str, str] = {

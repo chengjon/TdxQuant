@@ -18,18 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 5,
+      "total": 14,
       "by_domain": {
-        "block": 2,
+        "runtime": 2,
         "formula": 1,
-        "runtime": 2
+        "market": 2,
+        "meta": 2,
+        "financial": 2,
+        "transaction": 2,
+        "block": 3
       },
       "by_stability": {
-        "stable": 3,
-        "beta": 2
+        "beta": 5,
+        "stable": 9
       },
       "by_side_effect_level": {
-        "read_only": 3,
+        "read_only": 12,
         "local_state_mutating": 2
       }
     },
@@ -80,8 +84,8 @@
         "name": "formula.screen",
         "capability_version": "v1",
         "domain": "formula",
-        "description": "Run normalized formula-based stock screening.",
-        "stability": "stable",
+        "description": "Execute the stable provider-facing batch stock-screen contract.",
+        "stability": "beta",
         "side_effect_level": "read_only",
         "entrypoints": {
           "manager_method": "formula.screen",
@@ -94,11 +98,275 @@
         ]
       },
       {
+        "name": "market.snapshot",
+        "capability_version": "v1",
+        "domain": "market",
+        "description": "Fetch market snapshot fields for a stock.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "market.snapshot",
+          "api_command": "snapshot",
+          "flat_command": "tdx-data-snapshot"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "market.snapshot",
+              "selectors": [
+                "symbol"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "market.kline",
+        "capability_version": "v1",
+        "domain": "market",
+        "description": "Fetch kline series data.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "market.kline",
+          "api_command": "kline",
+          "flat_command": "tdx-data-kline"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "market.kline",
+              "selectors": [
+                "symbols",
+                "date_range"
+              ],
+              "query_params": [
+                "period",
+                "count",
+                "dividend_type",
+                "fill_data"
+              ]
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "meta.stock_list",
+        "capability_version": "v1",
+        "domain": "meta",
+        "description": "List securities in a market.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "meta.stock_list",
+          "api_command": "stock-list",
+          "flat_command": "tdx-data-stock-list"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "meta.stock_list",
+              "selectors": [
+                "market"
+              ],
+              "query_params": [
+                "list_type"
+              ]
+            }
+          ],
+          "supports_requested_fields": false,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "meta.sector_stocks",
+        "capability_version": "v1",
+        "domain": "meta",
+        "description": "List securities inside a TongDaXin sector.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "meta.sector_stocks",
+          "api_command": "sector-stocks",
+          "flat_command": "tdx-data-sector-stocks"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "meta.sector_stocks",
+              "selectors": [
+                "block_code"
+              ],
+              "query_params": [
+                "block_type",
+                "list_type"
+              ]
+            }
+          ],
+          "supports_requested_fields": false,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "financial.financial_data",
+        "capability_version": "v1",
+        "domain": "financial",
+        "description": "Fetch professional financial data by range.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "financial.financial_data",
+          "api_command": "financial-data",
+          "flat_command": "tdx-data-financial"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "financial.financial_data",
+              "selectors": [
+                "symbols",
+                "date_range"
+              ],
+              "query_params": [
+                "report_type"
+              ]
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "financial.financial_data_by_date",
+        "capability_version": "v1",
+        "domain": "financial",
+        "description": "Fetch professional financial data by report date.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "financial.financial_data_by_date",
+          "api_command": "financial-data-by-date",
+          "flat_command": "tdx-data-financial-by-date"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "financial.financial_data_by_date",
+              "selectors": [
+                "symbols",
+                "date"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "transaction.stock_transaction_data",
+        "capability_version": "v1",
+        "domain": "transaction",
+        "description": "Fetch stock transaction statistics by range.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "transaction.stock_transaction_data",
+          "api_command": "stock-transaction-data",
+          "flat_command": "tdx-data-stock-transaction"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "transaction.stock_transaction_data",
+              "selectors": [
+                "symbols",
+                "date_range"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "transaction.market_transaction_data",
+        "capability_version": "v1",
+        "domain": "transaction",
+        "description": "Fetch market transaction statistics by range.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "transaction.market_transaction_data",
+          "api_command": "market-transaction-data",
+          "flat_command": "tdx-data-market-transaction"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "transaction.market_transaction_data",
+              "selectors": [
+                "date_range"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
         "name": "block.send_user_block",
         "capability_version": "v1",
         "domain": "block",
-        "description": "Update TongDaXin custom-sector members.",
-        "stability": "stable",
+        "description": "Write symbols into a custom TongDaXin sector.",
+        "stability": "beta",
         "side_effect_level": "local_state_mutating",
         "entrypoints": {
           "manager_method": "block.send_user_block",
@@ -136,11 +404,27 @@
               "query_params": []
             }
           ],
+          "supports_requested_fields": false,
           "supports_empty_results": true,
-          "returns_ordered_symbols": true,
-          "deduplicates_members": true,
-          "normalizes_symbols": true
+          "supports_replay": true
         }
+      },
+      {
+        "name": "block.sync_watchlist",
+        "capability_version": "v1",
+        "domain": "block",
+        "description": "Synchronize a normalized watchlist into a TongDaXin custom sector with governed replace or merge semantics.",
+        "stability": "beta",
+        "side_effect_level": "local_state_mutating",
+        "entrypoints": {
+          "manager_method": "block.sync_watchlist",
+          "api_command": "block-sync",
+          "flat_command": "tdx-block-sync"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ]
       }
     ]
   },
