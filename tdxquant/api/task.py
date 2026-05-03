@@ -1065,6 +1065,33 @@ class TdxTaskManager:
         )
         return self._attach_task_metadata(result, task_name="watchlist_overview", timing=timing)
 
+    def block_sync(
+        self,
+        *,
+        block_code: str,
+        symbols: list[str],
+        mode: str = "replace",
+        create_if_missing: bool = False,
+        dry_run: bool = False,
+        show: bool = True,
+        mutation_key: str | None = None,
+        audit_dir: str | None = None,
+    ) -> Result:
+        result, timing = _capture_task_timing(
+            "task.block_sync",
+            lambda: self.api_manager.block.sync_watchlist(
+                block_code=block_code,
+                symbols=symbols,
+                mode=mode,
+                create_if_missing=create_if_missing,
+                dry_run=dry_run,
+                show=show,
+                mutation_key=mutation_key,
+                audit_dir=audit_dir,
+            ),
+        )
+        return self._attach_task_metadata(result, task_name="block_sync", timing=timing)
+
     def sector_formula_scan(
         self,
         *,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..models import Result
 from .bridge import (
+    run_tdx_block_sync,
     run_tdx_clear_sector,
     run_tdx_create_sector,
     run_tdx_delete_sector,
@@ -98,6 +99,33 @@ class BlockApi:
         return run_tdx_send_user_block(
             block_code=block_code,
             stocks=stocks,
+            show=show,
+            **options,
+            strategy_path=self.strategy_path,
+        )
+
+    def sync_watchlist(
+        self,
+        block_code: str,
+        symbols: list[str],
+        mode: str = "replace",
+        create_if_missing: bool = False,
+        dry_run: bool = False,
+        show: bool = True,
+        mutation_key: str | None = None,
+        audit_dir: str | None = None,
+    ) -> Result:
+        options: dict[str, str] = {}
+        if mutation_key is not None:
+            options["mutation_key"] = mutation_key
+        if audit_dir is not None:
+            options["audit_dir"] = audit_dir
+        return run_tdx_block_sync(
+            block_code=block_code,
+            symbols=symbols,
+            mode=mode,
+            create_if_missing=create_if_missing,
+            dry_run=dry_run,
             show=show,
             **options,
             strategy_path=self.strategy_path,

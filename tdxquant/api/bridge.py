@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..block_mutation import apply_block_mutation_safety
+from ..block_sync import sync_watchlist_to_block
 from ..desktop.inspect import find_main_window
 from ..formula_screen import build_formula_screen_payload
 from ..models import ErrorCode, Result
@@ -1004,6 +1005,73 @@ def run_tdx_get_user_sector(strategy_path: str | None = None) -> Result:
     return _run_tq_call("fetched TongDaXin custom sector list", callback, strategy_path=strategy_path)
 
 
+def _extract_runtime_result_payload(result: Result) -> Any:
+    return result.data.get("result")
+
+
+def _extract_custom_sector_entry(entries: Any, block_code: str) -> dict[str, Any] | None:
+    if not isinstance(entries, list):
+        return None
+    target = block_code.strip().upper()
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("Code") or item.get("code") or item.get("block_code") or "").strip().upper()
+        if code == target:
+            return item
+    return None
+
+
+def _extract_sector_stock_codes(payload: Any) -> list[str]:
+    if not isinstance(payload, list):
+        return []
+    stocks: list[str] = []
+    for item in payload:
+        if isinstance(item, str):
+            normalized = item.strip()
+            if normalized:
+                stocks.append(normalized)
+            continue
+        if isinstance(item, dict):
+            code = str(item.get("Code") or item.get("code") or item.get("stock_code") or "").strip()
+            if code:
+                stocks.append(code)
+    return stocks
+
+
+def _probe_custom_sector_state(
+    block_code: str,
+    *,
+    strategy_path: str | None = None,
+    include_stocks: bool = False,
+) -> dict[str, Any] | Result:
+    sectors_result = run_tdx_get_user_sector(strategy_path=strategy_path)
+    if not sectors_result.ok:
+        return sectors_result
+    sector_entry = _extract_custom_sector_entry(_extract_runtime_result_payload(sectors_result), block_code)
+    if sector_entry is None:
+        return {"block_code": block_code, "exists": False}
+
+    observed_state: dict[str, Any] = {
+        "block_code": block_code,
+        "exists": True,
+        "block_name": sector_entry.get("Name") or sector_entry.get("name") or "",
+    }
+    if not include_stocks:
+        return observed_state
+
+    stocks_result = run_tdx_data_sector_stocks(
+        block_code=block_code,
+        block_type=1,
+        list_type=0,
+        strategy_path=strategy_path,
+    )
+    if not stocks_result.ok:
+        return stocks_result
+    observed_state["stocks"] = _extract_sector_stock_codes(_extract_runtime_result_payload(stocks_result))
+    return observed_state
+
+
 def run_tdx_create_sector(
     block_code: str,
     block_name: str,
@@ -1108,6 +1176,43 @@ def run_tdx_send_user_block(
         stocks=stocks,
         show=show,
         mutation_key=mutation_key,
+        audit_dir=audit_dir,
+    )
+
+
+def run_tdx_block_sync(
+    block_code: str,
+    symbols: list[str],
+    mode: str = "replace",
+    create_if_missing: bool = False,
+    dry_run: bool = False,
+    show: bool = True,
+    mutation_key: str | None = None,
+    audit_dir: str | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    return sync_watchlist_to_block(
+        block_code=block_code,
+        symbols=symbols,
+        mode=mode,
+        create_if_missing=create_if_missing,
+        dry_run=dry_run,
+        show=show,
+        mutation_key=mutation_key,
+        observed_state=lambda: _probe_custom_sector_state(block_code, strategy_path=strategy_path, include_stocks=True),
+        create_block=lambda: run_tdx_create_sector(
+            block_code=block_code,
+            block_name=block_code,
+            audit_dir=audit_dir,
+            strategy_path=strategy_path,
+        ),
+        sync_members=lambda requested_symbols, requested_show: run_tdx_send_user_block(
+            block_code=block_code,
+            stocks=requested_symbols,
+            show=requested_show,
+            audit_dir=audit_dir,
+            strategy_path=strategy_path,
+        ),
         audit_dir=audit_dir,
     )
 

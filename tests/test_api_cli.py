@@ -864,6 +864,38 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.mutation_key, "mk-send-1")
         self.assertEqual(args.audit_dir, "runtime/block-mutations")
 
+    def test_api_block_sync_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "block-sync",
+                "--block-code",
+                "ZXG",
+                "--stock",
+                "000001.SZ",
+                "--mode",
+                "merge",
+                "--create-if-missing",
+                "--dry-run",
+                "--show",
+                "--mutation-key",
+                "sync-001",
+                "--audit-dir",
+                "runtime/block-sync",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "block-sync")
+        self.assertEqual(args.block_code, "ZXG")
+        self.assertEqual(args.stock, ["000001.SZ"])
+        self.assertEqual(args.mode, "merge")
+        self.assertTrue(args.create_if_missing)
+        self.assertTrue(args.dry_run)
+        self.assertTrue(args.show)
+        self.assertEqual(args.mutation_key, "sync-001")
+        self.assertEqual(args.audit_dir, "runtime/block-sync")
+
     def test_task_sector_research_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "sector-research", "--sector", "钛金属"])
@@ -877,6 +909,40 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.command, "task")
         self.assertEqual(args.task_command, "watchlist-overview")
         self.assertEqual(args.code, ["000001"])
+
+    def test_task_block_sync_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "block-sync",
+                "--block-code",
+                "ZXG",
+                "--stock",
+                "000001.SZ",
+                "--stock",
+                "600519.SH",
+                "--mode",
+                "merge",
+                "--create-if-missing",
+                "--dry-run",
+                "--show",
+                "--mutation-key",
+                "sync-001",
+                "--audit-dir",
+                "runtime/block-sync",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "block-sync")
+        self.assertEqual(args.block_code, "ZXG")
+        self.assertEqual(args.stock, ["000001.SZ", "600519.SH"])
+        self.assertEqual(args.mode, "merge")
+        self.assertTrue(args.create_if_missing)
+        self.assertTrue(args.dry_run)
+        self.assertTrue(args.show)
+        self.assertEqual(args.mutation_key, "sync-001")
+        self.assertEqual(args.audit_dir, "runtime/block-sync")
 
     def test_task_watchlist_export_command_parses(self) -> None:
         parser = build_parser()
@@ -2205,6 +2271,46 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         manager.block.send_user_block.assert_called_once_with(block_code="ZXG", stocks=["000001"], show=False)
 
+    def test_handle_api_block_sync_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "block-sync",
+                "--block-code",
+                "ZXG",
+                "--stock",
+                "000001.SZ",
+                "--stock",
+                "600519.SH",
+                "--mode",
+                "merge",
+                "--create-if-missing",
+                "--dry-run",
+                "--show",
+                "--mutation-key",
+                "sync-001",
+                "--audit-dir",
+                "runtime/block-sync",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="planned", data={"sync": {"mode": "merge"}})
+        manager = MagicMock()
+        manager.block.sync_watchlist.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.sync_watchlist.assert_called_once_with(
+            block_code="ZXG",
+            symbols=["000001.SZ", "600519.SH"],
+            mode="merge",
+            create_if_missing=True,
+            dry_run=True,
+            show=True,
+            mutation_key="sync-001",
+            audit_dir="runtime/block-sync",
+        )
+
     def test_run_flat_replay_provider_command_returns_replay_source_for_unsupported_command(self) -> None:
         args = argparse.Namespace(
             command="tdx-data-kline",
@@ -2957,6 +3063,46 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertIs(result, expected)
         manager.watchlist_overview.assert_called_once_with(stock_list=["000001", "000002"], fields=None)
+
+    def test_handle_task_block_sync_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "block-sync",
+                "--block-code",
+                "ZXG",
+                "--stock",
+                "000001.SZ",
+                "--stock",
+                "600519.SH",
+                "--mode",
+                "merge",
+                "--create-if-missing",
+                "--dry-run",
+                "--show",
+                "--mutation-key",
+                "sync-001",
+                "--audit-dir",
+                "runtime/block-sync",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_sync.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_sync.assert_called_once_with(
+            block_code="ZXG",
+            symbols=["000001.SZ", "600519.SH"],
+            mode="merge",
+            create_if_missing=True,
+            dry_run=True,
+            show=True,
+            mutation_key="sync-001",
+            audit_dir="runtime/block-sync",
+        )
 
     def test_handle_task_sector_formula_scan_uses_task_manager(self) -> None:
         parser = build_parser()

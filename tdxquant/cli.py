@@ -158,6 +158,16 @@ def _add_block_mutation_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--audit-dir")
 
 
+def _add_block_sync_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--block-code", required=True)
+    subparser.add_argument("--stock", action="append", default=[])
+    subparser.add_argument("--mode", choices=("replace", "merge"), default="replace")
+    subparser.add_argument("--create-if-missing", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--show", action=argparse.BooleanOptionalAction, default=True)
+    _add_block_mutation_arguments(subparser)
+
+
 def _add_task_common_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--profile", default="default")
     subparser.add_argument("--api-profile")
@@ -855,6 +865,10 @@ def _build_api_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     _add_block_mutation_arguments(api_send_user_block_parser)
     _add_api_common_arguments(api_send_user_block_parser)
 
+    api_block_sync_parser = api_subparsers.add_parser("block-sync")
+    _add_block_sync_arguments(api_block_sync_parser)
+    _add_api_common_arguments(api_block_sync_parser)
+
     api_formula_format_data_parser = api_subparsers.add_parser("formula-format-data")
     api_formula_format_data_parser.add_argument("--input-json-file", required=True)
     _add_api_common_arguments(api_formula_format_data_parser)
@@ -966,6 +980,10 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_watchlist_overview_parser.add_argument("--code", action="append", required=True)
     task_watchlist_overview_parser.add_argument("--field", action="append", default=None)
     _add_task_common_arguments(task_watchlist_overview_parser)
+
+    task_block_sync_parser = task_subparsers.add_parser("block-sync")
+    _add_block_sync_arguments(task_block_sync_parser)
+    _add_task_common_arguments(task_block_sync_parser)
 
     task_watchlist_export_parser = task_subparsers.add_parser("watchlist-export")
     task_watchlist_export_parser.add_argument("--code", action="append", required=True)
@@ -3191,6 +3209,21 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
             show=args.show,
             **options,
         )
+    if args.api_command == "block-sync":
+        options = {}
+        if args.mutation_key is not None:
+            options["mutation_key"] = args.mutation_key
+        if args.audit_dir is not None:
+            options["audit_dir"] = args.audit_dir
+        return manager.block.sync_watchlist(
+            block_code=args.block_code,
+            symbols=args.stock,
+            mode=args.mode,
+            create_if_missing=args.create_if_missing,
+            dry_run=args.dry_run,
+            show=args.show,
+            **options,
+        )
     if args.api_command == "formula-format-data":
         return manager.formula.format_data(json.loads(Path(args.input_json_file).read_text(encoding="utf-8")))
     if args.api_command == "formula-set-data":
@@ -3613,6 +3646,17 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
         )
     if args.task_command == "watchlist-overview":
         return manager.watchlist_overview(stock_list=args.code, fields=args.field)
+    if args.task_command == "block-sync":
+        return manager.block_sync(
+            block_code=args.block_code,
+            symbols=args.stock,
+            mode=args.mode,
+            create_if_missing=args.create_if_missing,
+            dry_run=args.dry_run,
+            show=args.show,
+            mutation_key=args.mutation_key,
+            audit_dir=args.audit_dir,
+        )
     if args.task_command == "watchlist-export":
         return manager.watchlist_export(
             stock_list=args.code,

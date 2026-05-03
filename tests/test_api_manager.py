@@ -2086,11 +2086,93 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(payload["data"]["block_mutation"]["governance_reason"], "already_applied")
         self.assertEqual(payload["data"]["artifacts"]["audit_log_path"], "runtime/block-mutations/mut-003.json")
 
+    def test_manager_block_sync_watchlist_attaches_metadata(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="planned block sync",
+            data={
+                "sync": {
+                    "block_code": "ZXG",
+                    "mode": "replace",
+                    "dry_run": True,
+                    "governance_decision": "execute",
+                }
+            },
+        )
+        with patch("tdxquant.api.block.run_tdx_block_sync", return_value=expected) as mocked:
+            manager = TdxApiManager(profile="default", strategy_path="strategy.py")
+            result = manager.block.sync_watchlist(
+                block_code="ZXG",
+                symbols=["000001.SZ", "600519.SH"],
+                mode="replace",
+                create_if_missing=True,
+                dry_run=True,
+                show=True,
+                mutation_key="sync-001",
+                audit_dir="runtime/block-sync",
+            )
+        mocked.assert_called_once_with(
+            block_code="ZXG",
+            symbols=["000001.SZ", "600519.SH"],
+            mode="replace",
+            create_if_missing=True,
+            dry_run=True,
+            show=True,
+            mutation_key="sync-001",
+            audit_dir="runtime/block-sync",
+            strategy_path="strategy.py",
+        )
+        self.assertEqual(result.data["manager"]["domain"], "block")
+        self.assertEqual(result.data["manager"]["method"], "sync_watchlist")
+        self.assertEqual(result.data["api_profile"]["options"]["block_code"], "ZXG")
+        self.assertEqual(result.data["sync"]["mode"], "replace")
+
 
 class TdxTaskManagerTests(unittest.TestCase):
     def test_public_import_is_available(self) -> None:
         manager = TdxTaskManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
+
+    def test_task_block_sync_attaches_task_metadata_and_forwards_symbols(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="planned block sync",
+            data={
+                "sync": {
+                    "block_code": "ZXG",
+                    "mode": "merge",
+                    "dry_run": True,
+                }
+            },
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with patch.object(type(manager.api_manager.block), "sync_watchlist", return_value=expected) as mocked:
+            result = manager.block_sync(
+                block_code="ZXG",
+                symbols=["000001.SZ", "600519.SH"],
+                mode="merge",
+                create_if_missing=True,
+                dry_run=True,
+                show=True,
+                mutation_key="sync-001",
+                audit_dir="runtime/block-sync",
+            )
+        mocked.assert_called_once_with(
+            block_code="ZXG",
+            symbols=["000001.SZ", "600519.SH"],
+            mode="merge",
+            create_if_missing=True,
+            dry_run=True,
+            show=True,
+            mutation_key="sync-001",
+            audit_dir="runtime/block-sync",
+        )
+        self.assertEqual(result.data["task"]["name"], "block_sync")
+        self.assertEqual(result.data["task_profile"]["name"], "default")
+        self.assertIn("task_call", result.data["timing"])
+        self.assertEqual(result.data["sync"]["block_code"], "ZXG")
 
     def test_task_formula_scan_attaches_task_metadata(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})

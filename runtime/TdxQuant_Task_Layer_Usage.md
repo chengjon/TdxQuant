@@ -104,6 +104,24 @@ result = manager.formula_scan(
 print(result.to_dict())
 ```
 
+板块同步示例：
+
+```python
+from tdxquant.api import TdxTaskManager
+
+manager = TdxTaskManager(profile="default")
+
+result = manager.block_sync(
+    block_code="ZXG",
+    symbols=["000001.SZ", "600519.SH"],
+    mode="replace",
+    create_if_missing=True,
+    dry_run=True,
+)
+
+print(result.to_dict())
+```
+
 ## 4. CLI 调用
 
 ### 4.1 板块研究
@@ -189,7 +207,37 @@ python -m tdxquant.cli task watchlist-overview \
 
 这个任务当前直接编排 `manager.meta.gp_one_data(...)`，适合对一组固定代码做稳定批量总览。
 
-### 4.5 板块公式扫描
+### 4.5 板块同步
+
+```bash
+python -m tdxquant.cli task block-sync \
+  --block-code ZXG \
+  --stock 000001.SZ \
+  --stock 600519.SH \
+  --mode replace \
+  --create-if-missing \
+  --profile default
+```
+
+可选参数：
+
+- `--mode`
+- `--create-if-missing`
+- `--dry-run`
+- `--show`
+- `--mutation-key`
+- `--audit-dir`
+- `--api-profile`
+- `--strategy-path`
+- `--output`
+
+这个任务当前是对 `manager.block.sync_watchlist(...)` 的薄封装：
+
+- Python task API 使用 `symbols`
+- CLI 继续使用可重复 `--stock`
+- 底层 `block sync` provider result 原样保留，只额外挂上 task metadata
+
+### 4.6 板块公式扫描
 
 ```bash
 python -m tdxquant.cli task sector-formula-scan \

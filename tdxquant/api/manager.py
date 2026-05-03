@@ -1332,6 +1332,58 @@ class _BlockManagerProxy:
             timing=timing,
         )
 
+    def sync_watchlist(
+        self,
+        block_code: str,
+        symbols: list[str],
+        mode: str = "replace",
+        create_if_missing: bool = False,
+        dry_run: bool = False,
+        show: bool = True,
+        mutation_key: str | None = None,
+        audit_dir: str | None = None,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {
+                "block_code": block_code,
+                "symbols": list(symbols),
+                "mode": mode,
+                "create_if_missing": create_if_missing,
+                "dry_run": dry_run,
+                "show": show,
+                "mutation_key": mutation_key,
+                "audit_dir": audit_dir,
+            }
+        )
+        options: dict[str, str] = {}
+        if mutation_key is not None:
+            options["mutation_key"] = mutation_key
+        if audit_dir is not None:
+            options["audit_dir"] = audit_dir
+        result, timing = capture_api_timing(
+            "block.sync_watchlist",
+            lambda: self._manager._dispatch_sync_capability(
+                "block.sync_watchlist",
+                lambda: self._manager._block_api.sync_watchlist(
+                    block_code=block_code,
+                    symbols=symbols,
+                    mode=mode,
+                    create_if_missing=create_if_missing,
+                    dry_run=dry_run,
+                    show=show,
+                    **options,
+                ),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="block",
+            method="sync_watchlist",
+            timing=timing,
+        )
+
 
 class TdxApiManager:
     __slots__ = (
