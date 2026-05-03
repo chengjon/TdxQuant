@@ -1,0 +1,21 @@
+{
+  "success": false,
+  "ok": false,
+  "code": "invalid_request",
+  "message": "block_code not found: ZXG",
+  "capability": "block.read_watchlist_snapshot",
+  "capability_version": "v1",
+  "schema_version": "2026-05-04",
+  "request_id": "fixture-block-read-watchlist-missing-block",
+  "started_at": "2026-05-04T12:00:00Z",
+  "finished_at": "2026-05-04T12:00:01Z",
+  "elapsed_ms": 1000.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {},
+  "artifacts": []
+}

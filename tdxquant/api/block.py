@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..models import Result
 from .bridge import (
     run_tdx_block_sync,
+    run_tdx_block_read_watchlist_snapshot,
     run_tdx_clear_sector,
     run_tdx_create_sector,
     run_tdx_delete_sector,
@@ -20,6 +21,9 @@ class BlockApi:
 
     def user_sectors(self) -> Result:
         return run_tdx_get_user_sector(strategy_path=self.strategy_path)
+
+    def read_watchlist_snapshot(self, block_code: str) -> Result:
+        return run_tdx_block_read_watchlist_snapshot(block_code=block_code, strategy_path=self.strategy_path)
 
     def create_sector(
         self,

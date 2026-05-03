@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "normalized block snapshot",
+  "capability": "block.read_watchlist_snapshot",
+  "capability_version": "v1",
+  "schema_version": "2026-05-04",
+  "request_id": "fixture-block-read-watchlist-success",
+  "started_at": "2026-05-04T12:00:00Z",
+  "finished_at": "2026-05-04T12:00:01Z",
+  "elapsed_ms": 1000.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [
+    "Deduplicated 1 repeated members in block ZXG"
+  ],
+  "data": {
+    "snapshot": {
+      "block_code": "ZXG",
+      "symbols": [
+        "600519.SH",
+        "000001.SZ"
+      ],
+      "symbol_count": 2,
+      "source": "tongdaxin.custom_sector",
+      "source_metadata": {
+        "sector_name": "自选股",
+        "raw_member_count": 3,
+        "duplicate_count": 1
+      }
+    }
+  },
+  "artifacts": []
+}

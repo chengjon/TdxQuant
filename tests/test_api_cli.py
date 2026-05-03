@@ -162,6 +162,13 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.sector, "钛金属")
         self.assertEqual(args.list_type, 1)
 
+    def test_api_block_read_watchlist_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "block-read-watchlist", "--block-code", "ZXG"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "block-read-watchlist")
+        self.assertEqual(args.block_code, "ZXG")
+
     def test_api_formula_xg_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "formula-xg", "--formula-name", "MY_FORMULA"])
@@ -388,6 +395,12 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.command, "tdx-formula-screen")
         self.assertEqual(args.formula_name, "UPN")
         self.assertEqual(args.code, ["000001.SZ"])
+
+    def test_tdx_block_read_watchlist_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["tdx-block-read-watchlist", "--block-code", "ZXG"])
+        self.assertEqual(args.command, "tdx-block-read-watchlist")
+        self.assertEqual(args.block_code, "ZXG")
 
     def test_api_divid_factors_command_parses(self) -> None:
         parser = build_parser()
@@ -2270,6 +2283,17 @@ class ApiCliDispatchTests(unittest.TestCase):
             replay_fixture_path=None,
         )
         manager.block.send_user_block.assert_called_once_with(block_code="ZXG", stocks=["000001"], show=False)
+
+    def test_handle_api_block_read_watchlist_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "block-read-watchlist", "--block-code", "ZXG"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"snapshot": {"block_code": "ZXG"}})
+        manager = MagicMock()
+        manager.block.read_watchlist_snapshot.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block.read_watchlist_snapshot.assert_called_once_with(block_code="ZXG")
 
     def test_handle_api_block_sync_uses_manager(self) -> None:
         parser = build_parser()
@@ -5509,6 +5533,56 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertEqual(parsed["data"]["block_mutation"]["governance_reason"], "missing_block")
         self.assertEqual(parsed["artifacts"][0]["kind"], "block_mutation_audit")
         self.assertEqual(parsed["artifacts"][0]["path"], "runtime/block-mutations/mut-004.json")
+
+    def test_main_tdx_block_read_watchlist_uses_manager(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["000001.SZ"]}},
+        )
+        manager = MagicMock()
+        manager.block.read_watchlist_snapshot.return_value = expected
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "tdx-block-read-watchlist", "--block-code", "ZXG"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="live",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.block.read_watchlist_snapshot.assert_called_once_with(block_code="ZXG")
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["ok"])
+        self.assertEqual(parsed["capability"], "block.read_watchlist_snapshot")
+        self.assertEqual(parsed["data"]["snapshot"]["block_code"], "ZXG")
+
+    def test_main_api_block_read_watchlist_prints_provider_result_envelope(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["000001.SZ"]}},
+        )
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_api_subcommand", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "api", "block-read-watchlist", "--block-code", "ZXG"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        parsed = json.loads(mocked_stdout_print.call_args.args[0])
+        self.assertTrue(parsed["success"])
+        self.assertEqual(parsed["capability"], "block.read_watchlist_snapshot")
+        self.assertEqual(parsed["data"]["snapshot"]["block_code"], "ZXG")
 
     def test_main_catalog_summary_view_prints_summary_payload(self) -> None:
         expected = Result(

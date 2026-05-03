@@ -18,18 +18,18 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 4,
+      "total": 5,
       "by_domain": {
-        "block": 1,
+        "block": 2,
         "formula": 1,
         "runtime": 2
       },
       "by_stability": {
-        "stable": 2,
+        "stable": 3,
         "beta": 2
       },
       "by_side_effect_level": {
-        "read_only": 2,
+        "read_only": 3,
         "local_state_mutating": 2
       }
     },
@@ -109,6 +109,38 @@
           "native_windows_python",
           "tqcenter"
         ]
+      },
+      {
+        "name": "block.read_watchlist_snapshot",
+        "capability_version": "v1",
+        "domain": "block",
+        "description": "Read one TongDaXin custom sector as a normalized watchlist snapshot.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "block.read_watchlist_snapshot",
+          "api_command": "block-read-watchlist",
+          "flat_command": "tdx-block-read-watchlist"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "block.read_watchlist_snapshot",
+              "selectors": [
+                "block_code"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_empty_results": true,
+          "returns_ordered_symbols": true,
+          "deduplicates_members": true,
+          "normalizes_symbols": true
+        }
       }
     ]
   },

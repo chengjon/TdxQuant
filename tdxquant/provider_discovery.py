@@ -19,6 +19,7 @@ def _capability(
     api_command: str | None = None,
     flat_command: str | None = None,
     requires: list[str] | None = None,
+    query_metadata: dict[str, Any] | None = None,
     capability_version: str = "v1",
 ) -> dict[str, Any]:
     entrypoints: dict[str, str] = {}
@@ -28,7 +29,7 @@ def _capability(
         entrypoints["api_command"] = api_command
     if flat_command:
         entrypoints["flat_command"] = flat_command
-    return {
+    payload = {
         "name": name,
         "capability_version": capability_version,
         "domain": domain,
@@ -38,6 +39,9 @@ def _capability(
         "entrypoints": entrypoints,
         "requires": list(requires or []),
     }
+    if query_metadata is not None:
+        payload["query_metadata"] = copy.deepcopy(query_metadata)
+    return payload
 
 
 _CAPABILITY_REGISTRY: list[dict[str, Any]] = [
@@ -471,6 +475,30 @@ _CAPABILITY_REGISTRY: list[dict[str, Any]] = [
         api_command="send-user-block",
         flat_command="tdx-send-user-block",
         requires=["native_windows_python", "tqcenter"],
+    ),
+    _capability(
+        "block.read_watchlist_snapshot",
+        domain="block",
+        description="Read one TongDaXin custom sector as a normalized watchlist snapshot.",
+        stability="stable",
+        side_effect_level="read_only",
+        manager_method="block.read_watchlist_snapshot",
+        api_command="block-read-watchlist",
+        flat_command="tdx-block-read-watchlist",
+        requires=["native_windows_python", "tqcenter"],
+        query_metadata={
+            "query_shapes": [
+                {
+                    "query_kind": "block.read_watchlist_snapshot",
+                    "selectors": ["block_code"],
+                    "query_params": [],
+                }
+            ],
+            "supports_empty_results": True,
+            "returns_ordered_symbols": True,
+            "deduplicates_members": True,
+            "normalizes_symbols": True,
+        },
     ),
     _capability(
         "formula.format_data",

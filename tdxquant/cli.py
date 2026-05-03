@@ -865,6 +865,10 @@ def _build_api_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     _add_block_mutation_arguments(api_send_user_block_parser)
     _add_api_common_arguments(api_send_user_block_parser)
 
+    api_block_read_watchlist_parser = api_subparsers.add_parser("block-read-watchlist")
+    api_block_read_watchlist_parser.add_argument("--block-code", required=True)
+    _add_api_common_arguments(api_block_read_watchlist_parser)
+
     api_block_sync_parser = api_subparsers.add_parser("block-sync")
     _add_block_sync_arguments(api_block_sync_parser)
     _add_api_common_arguments(api_block_sync_parser)
@@ -1612,6 +1616,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_block_mutation_arguments(tdx_send_user_block_parser)
     tdx_send_user_block_parser.add_argument("--strategy-path")
     _add_replay_provider_arguments(tdx_send_user_block_parser)
+    tdx_block_read_watchlist_parser = subparsers.add_parser("tdx-block-read-watchlist")
+    tdx_block_read_watchlist_parser.add_argument("--block-code", required=True)
+    tdx_block_read_watchlist_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_block_read_watchlist_parser)
     tdx_formula_format_data_parser = subparsers.add_parser("tdx-formula-format-data")
     tdx_formula_format_data_parser.add_argument("--input-json-file", required=True)
     tdx_formula_format_data_parser.add_argument("--strategy-path")
@@ -2549,6 +2557,7 @@ _FLAT_PROVIDER_RESULT_COMMANDS = {
     "tdx-rename-sector",
     "tdx-clear-sector",
     "tdx-send-user-block",
+    "tdx-block-read-watchlist",
     "tdx-formula-format-data",
     "tdx-formula-set-data",
     "tdx-formula-set-data-info",
@@ -2571,8 +2580,12 @@ def _uses_provider_result_contract(args: argparse.Namespace) -> bool:
 def _resolve_provider_result_capability(args: argparse.Namespace) -> str:
     if args.command == "api" and args.api_command == "formula-screen":
         return "formula.screen"
+    if args.command == "api" and args.api_command == "block-read-watchlist":
+        return "block.read_watchlist_snapshot"
     if args.command == "tdx-formula-screen":
         return "formula.screen"
+    if args.command == "tdx-block-read-watchlist":
+        return "block.read_watchlist_snapshot"
     if args.command == "api":
         return f"api.{args.api_command}"
     if args.command.startswith("tdx-data-"):
@@ -2607,11 +2620,13 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "doctor",
     "formula-screen",
     "send-user-block",
+    "block-read-watchlist",
 }
 
 _API_REPLAY_CAPABILITIES = {
     "snapshot": "market.snapshot",
     "send-user-block": "block.send_user_block",
+    "block-read-watchlist": "block.read_watchlist_snapshot",
     "formula-screen": "formula.screen",
 }
 
@@ -2673,6 +2688,8 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
             mutation_key=args.mutation_key,
             audit_dir=args.audit_dir,
         )
+    if args.command == "tdx-block-read-watchlist":
+        return manager.block.read_watchlist_snapshot(block_code=args.block_code)
     if args.command == "tdx-formula-screen":
         return manager.formula.screen(
             formula_name=args.formula_name,
@@ -3209,6 +3226,8 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
             show=args.show,
             **options,
         )
+    if args.api_command == "block-read-watchlist":
+        return manager.block.read_watchlist_snapshot(block_code=args.block_code)
     if args.api_command == "block-sync":
         options = {}
         if args.mutation_key is not None:
@@ -4391,6 +4410,15 @@ def main() -> int:
             **options,
             strategy_path=args.strategy_path,
         )
+    elif args.command == "tdx-block-read-watchlist":
+        manager = TdxApiManager(
+            profile="default",
+            strategy_path=args.strategy_path,
+            provider_mode=getattr(args, "provider_mode", "live"),
+            replay_fixture=getattr(args, "fixture", None),
+            replay_fixture_path=getattr(args, "fixture_path", None),
+        )
+        result = manager.block.read_watchlist_snapshot(block_code=args.block_code)
     elif args.command == "tdx-formula-format-data":
         result = run_tdx_formula_format_data(
             kline_payload=json.loads(Path(args.input_json_file).read_text(encoding="utf-8")),

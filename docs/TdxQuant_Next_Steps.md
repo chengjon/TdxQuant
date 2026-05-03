@@ -349,6 +349,17 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `Phase 5：provider integration hardening`
 - `Phase 6：更广泛的 provider-ready 整理、block sync task 与 trade safety`
 
+其中 `block` 主线在 provider 层已经补齐了两条对称能力：
+
+- 正向：`block.sync_watchlist(...)`
+- 反向：`block.read_watchlist_snapshot(...)`
+
+当前仍明确延期的，是围绕这条反向读取能力的场景层包装：
+
+- `task block-read-watchlist`
+- 文件导出 / watchlist 导出
+- 直接写回上层系统
+
 ### Phase 1：Provider 基础 contract（已完成基础版）
 
 目标：
