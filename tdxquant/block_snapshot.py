@@ -63,15 +63,17 @@ def normalize_block_snapshot(request: BlockSnapshotRequest) -> Result:
         code=ErrorCode.OK,
         message="normalized block snapshot",
         data={
-            "block_code": block_code,
-            "symbols": symbols,
-            "symbol_count": len(symbols),
-            "source": BLOCK_SNAPSHOT_SOURCE,
-            "source_metadata": {
-                "sector_name": sector_name,
-                "raw_member_count": len(raw_members),
-                "duplicate_count": duplicate_count,
-            },
+            "snapshot": {
+                "block_code": block_code,
+                "symbols": symbols,
+                "symbol_count": len(symbols),
+                "source": BLOCK_SNAPSHOT_SOURCE,
+                "source_metadata": {
+                    "sector_name": sector_name,
+                    "raw_member_count": len(raw_members),
+                    "duplicate_count": duplicate_count,
+                },
+            }
         },
         warnings=warnings,
     )

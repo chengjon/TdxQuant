@@ -16,12 +16,22 @@ class BlockSnapshotTests(unittest.TestCase):
 
         self.assertTrue(result.ok)
         self.assertEqual(result.code, ErrorCode.OK)
-        self.assertEqual(result.data["block_code"], "ZXG")
-        self.assertEqual(result.data["symbols"], ["600519.SH", "000001.SZ", "300750.SZ"])
-        self.assertEqual(result.data["symbol_count"], 3)
-        self.assertEqual(result.data["source"], "tongdaxin.custom_sector")
         self.assertEqual(
-            result.data["source_metadata"],
+            result.data["snapshot"],
+            {
+                "block_code": "ZXG",
+                "symbols": ["600519.SH", "000001.SZ", "300750.SZ"],
+                "symbol_count": 3,
+                "source": "tongdaxin.custom_sector",
+                "source_metadata": {
+                    "sector_name": "自选股",
+                    "raw_member_count": 5,
+                    "duplicate_count": 2,
+                },
+            },
+        )
+        self.assertEqual(
+            result.data["snapshot"]["source_metadata"],
             {
                 "sector_name": "自选股",
                 "raw_member_count": 5,
@@ -41,10 +51,22 @@ class BlockSnapshotTests(unittest.TestCase):
 
         self.assertTrue(result.ok)
         self.assertEqual(result.code, ErrorCode.OK)
-        self.assertEqual(result.data["symbols"], [])
-        self.assertEqual(result.data["symbol_count"], 0)
         self.assertEqual(
-            result.data["source_metadata"],
+            result.data["snapshot"],
+            {
+                "block_code": "ZXG",
+                "symbols": [],
+                "symbol_count": 0,
+                "source": "tongdaxin.custom_sector",
+                "source_metadata": {
+                    "sector_name": "空板块",
+                    "raw_member_count": 0,
+                    "duplicate_count": 0,
+                },
+            },
+        )
+        self.assertEqual(
+            result.data["snapshot"]["source_metadata"],
             {
                 "sector_name": "空板块",
                 "raw_member_count": 0,
