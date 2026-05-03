@@ -977,6 +977,15 @@ class FormulaApiTests(unittest.TestCase):
 
 
 class BlockApiTests(unittest.TestCase):
+    def test_read_watchlist_snapshot_delegates_to_bridge(self) -> None:
+        with patch("tdxquant.api.block.run_tdx_block_read_watchlist_snapshot") as mocked:
+            expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+            mocked.return_value = expected
+            api = BlockApi(strategy_path="strategy.py")
+            result = api.read_watchlist_snapshot(block_code="ZXG")
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(block_code="ZXG", strategy_path="strategy.py")
+
     def test_user_sectors_delegates_to_bridge(self) -> None:
         with patch("tdxquant.api.block.run_tdx_get_user_sector") as mocked:
             expected = Result(ok=True, code=ErrorCode.OK, message="ok")
@@ -1207,6 +1216,102 @@ class _FakeTaskRuntimeSubscriptionSession:
 
 
 class TdxApiManagerTests(unittest.TestCase):
+    def test_run_tdx_block_read_watchlist_snapshot_normalizes_custom_sector_members(self) -> None:
+        bridge = import_module("tdxquant.api.bridge")
+        sectors_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": [{"Code": "ZXG", "Name": "自选股"}]},
+        )
+        stocks_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": ["600519.SH", "000001.SZ", "600519.SH"]},
+            warnings=["raw-warning"],
+        )
+        with (
+            patch.object(bridge, "run_tdx_get_user_sector", return_value=sectors_result) as mocked_sectors,
+            patch.object(bridge, "run_tdx_data_sector_stocks", return_value=stocks_result) as mocked_stocks,
+        ):
+            result = bridge.run_tdx_block_read_watchlist_snapshot(block_code="ZXG", strategy_path="strategy.py")
+        mocked_sectors.assert_called_once_with(strategy_path="strategy.py")
+        mocked_stocks.assert_called_once_with(
+            block_code="ZXG",
+            block_type=1,
+            list_type=0,
+            strategy_path="strategy.py",
+        )
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["snapshot"]["block_code"], "ZXG")
+        self.assertEqual(result.data["snapshot"]["symbols"], ["600519.SH", "000001.SZ"])
+        self.assertEqual(result.data["snapshot"]["source_metadata"]["sector_name"], "自选股")
+        self.assertEqual(result.data["snapshot"]["source_metadata"]["raw_member_count"], 3)
+        self.assertEqual(result.warnings, ["raw-warning", "Deduplicated 1 repeated members in block ZXG"])
+
+    def test_run_tdx_block_read_watchlist_snapshot_returns_invalid_request_for_missing_block(self) -> None:
+        bridge = import_module("tdxquant.api.bridge")
+        sectors_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": [{"Code": "ABCD", "Name": "其他板块"}]},
+        )
+        with (
+            patch.object(bridge, "run_tdx_get_user_sector", return_value=sectors_result) as mocked_sectors,
+            patch.object(bridge, "run_tdx_data_sector_stocks") as mocked_stocks,
+        ):
+            result = bridge.run_tdx_block_read_watchlist_snapshot(block_code="ZXG", strategy_path="strategy.py")
+        mocked_sectors.assert_called_once_with(strategy_path="strategy.py")
+        mocked_stocks.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "block_code not found: ZXG")
+
+    def test_run_tdx_block_read_watchlist_snapshot_returns_empty_snapshot_for_empty_block(self) -> None:
+        bridge = import_module("tdxquant.api.bridge")
+        sectors_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": [{"Code": "ZXG", "Name": "空板块"}]},
+        )
+        stocks_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result": []})
+        with (
+            patch.object(bridge, "run_tdx_get_user_sector", return_value=sectors_result),
+            patch.object(bridge, "run_tdx_data_sector_stocks", return_value=stocks_result),
+        ):
+            result = bridge.run_tdx_block_read_watchlist_snapshot(block_code="ZXG", strategy_path="strategy.py")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.code, ErrorCode.OK)
+        self.assertEqual(result.data["snapshot"]["symbols"], [])
+        self.assertEqual(result.data["snapshot"]["symbol_count"], 0)
+        self.assertEqual(result.data["snapshot"]["source_metadata"]["sector_name"], "空板块")
+
+    def test_run_tdx_block_read_watchlist_snapshot_preserves_explicit_bj_suffix(self) -> None:
+        bridge = import_module("tdxquant.api.bridge")
+        sectors_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": [{"Code": "ZXG", "Name": "北交所板块"}]},
+        )
+        stocks_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": ["430001.BJ", "920001.BJ", "430001.BJ"]},
+        )
+        with (
+            patch.object(bridge, "run_tdx_get_user_sector", return_value=sectors_result),
+            patch.object(bridge, "run_tdx_data_sector_stocks", return_value=stocks_result),
+        ):
+            result = bridge.run_tdx_block_read_watchlist_snapshot(block_code="ZXG", strategy_path="strategy.py")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["snapshot"]["symbols"], ["430001.BJ", "920001.BJ"])
+        self.assertEqual(result.data["snapshot"]["source_metadata"]["duplicate_count"], 1)
+
     def test_public_import_is_available(self) -> None:
         manager = TdxApiManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
@@ -2127,6 +2232,29 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertEqual(result.data["manager"]["method"], "sync_watchlist")
         self.assertEqual(result.data["api_profile"]["options"]["block_code"], "ZXG")
         self.assertEqual(result.data["sync"]["mode"], "replace")
+
+    def test_manager_block_read_watchlist_snapshot_attaches_metadata(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={
+                "snapshot": {
+                    "block_code": "ZXG",
+                    "symbols": ["000001.SZ"],
+                    "symbol_count": 1,
+                }
+            },
+        )
+        with patch("tdxquant.api.block.run_tdx_block_read_watchlist_snapshot", return_value=expected) as mocked:
+            manager = TdxApiManager(profile="default", strategy_path="strategy.py")
+            result = manager.block.read_watchlist_snapshot(block_code="ZXG")
+        mocked.assert_called_once_with(block_code="ZXG", strategy_path="strategy.py")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["snapshot"]["block_code"], "ZXG")
+        self.assertEqual(result.data["manager"]["domain"], "block")
+        self.assertEqual(result.data["manager"]["method"], "read_watchlist_snapshot")
+        self.assertEqual(result.data["api_profile"]["options"]["block_code"], "ZXG")
 
 
 class TdxTaskManagerTests(unittest.TestCase):

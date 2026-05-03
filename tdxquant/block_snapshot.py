@@ -15,9 +15,16 @@ class BlockSnapshotRequest:
 
 
 def _normalize_member_code(raw_member: str) -> str | None:
-    code = str(raw_member).strip()
+    code = str(raw_member).strip().upper()
+    if "." in code:
+        base, suffix = code.rsplit(".", 1)
+        if len(base) == 6 and base.isdigit() and suffix in {"SH", "SZ", "BJ"}:
+            return f"{base}.{suffix}"
+        return None
     if len(code) != 6 or not code.isdigit():
         return None
+    if code.startswith(("43", "83", "87", "88", "92")):
+        return f"{code}.BJ"
     if code[0] in {"0", "1", "2", "3"}:
         return f"{code}.SZ"
     if code[0] in {"5", "6", "9"}:

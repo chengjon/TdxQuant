@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..block_mutation import apply_block_mutation_safety
+from ..block_snapshot import BlockSnapshotRequest, normalize_block_snapshot
 from ..block_sync import sync_watchlist_to_block
 from ..desktop.inspect import find_main_window
 from ..formula_screen import build_formula_screen_payload
@@ -1005,6 +1006,42 @@ def run_tdx_get_user_sector(strategy_path: str | None = None) -> Result:
     return _run_tq_call("fetched TongDaXin custom sector list", callback, strategy_path=strategy_path)
 
 
+def run_tdx_block_read_watchlist_snapshot(block_code: str, strategy_path: str | None = None) -> Result:
+    sectors_result = run_tdx_get_user_sector(strategy_path=strategy_path)
+    if not sectors_result.ok:
+        return sectors_result
+
+    sector_entry = _extract_custom_sector_entry(_extract_runtime_result_payload(sectors_result), block_code)
+    if sector_entry is None:
+        return Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message=f"block_code not found: {block_code}",
+        )
+
+    stocks_result = run_tdx_data_sector_stocks(
+        block_code=block_code,
+        block_type=1,
+        list_type=0,
+        strategy_path=strategy_path,
+    )
+    if not stocks_result.ok:
+        return stocks_result
+
+    snapshot_result = normalize_block_snapshot(
+        BlockSnapshotRequest(
+            block_code=block_code,
+            sector_name=str(sector_entry.get("Name") or sector_entry.get("name") or block_code).strip(),
+            member_codes=_extract_snapshot_member_codes(_extract_runtime_result_payload(stocks_result)),
+        )
+    )
+    return replace(
+        snapshot_result,
+        warnings=list(sectors_result.warnings) + list(stocks_result.warnings) + list(snapshot_result.warnings),
+        next_action=stocks_result.next_action or sectors_result.next_action or snapshot_result.next_action,
+    )
+
+
 def _extract_runtime_result_payload(result: Result) -> Any:
     return result.data.get("result")
 
@@ -1037,6 +1074,15 @@ def _extract_sector_stock_codes(payload: Any) -> list[str]:
             if code:
                 stocks.append(code)
     return stocks
+
+
+def _extract_snapshot_member_codes(payload: Any) -> list[str]:
+    member_codes: list[str] = []
+    for stock_code in _extract_sector_stock_codes(payload):
+        code = str(stock_code).strip()
+        if code:
+            member_codes.append(code)
+    return member_codes
 
 
 def _probe_custom_sector_state(

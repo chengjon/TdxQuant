@@ -21,6 +21,10 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("block-send-user-block-applied", names)
         self.assertIn("block-send-user-block-noop", names)
         self.assertIn("block-send-user-block-rejected", names)
+        self.assertIn("block-read-watchlist-success", names)
+        self.assertIn("block-read-watchlist-empty", names)
+        self.assertIn("block-read-watchlist-missing-block", names)
+        self.assertIn("block-read-watchlist-invalid-member", names)
         self.assertIn("subscription-event-batch", names)
         self.assertIn("subscription-watch-events", names)
         self.assertIn("subscription-watch-status-completed", names)
@@ -83,6 +87,8 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("by_domain", payload["data"]["summary"])
         self.assertIn("grading", payload["data"])
         self.assertIn("stability_levels", payload["data"]["grading"])
+        capability_names = {item["name"] for item in payload["data"]["capabilities"]}
+        self.assertIn("block.read_watchlist_snapshot", capability_names)
 
     def test_load_jsonl_fixture_returns_rows(self) -> None:
         rows = load_provider_replay_fixture("subscription-event-batch")
@@ -129,6 +135,23 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["block_mutation"]["governance_decision"], "reject")
         self.assertEqual(payload["data"]["block_mutation"]["governance_reason"], "missing_block")
         self.assertIn("observed_state", payload["data"]["block_mutation"])
+
+    def test_load_block_read_watchlist_success_fixture_returns_snapshot_contract(self) -> None:
+        payload = load_provider_replay_fixture("block-read-watchlist-success")
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["capability"], "block.read_watchlist_snapshot")
+        self.assertEqual(payload["data"]["snapshot"]["block_code"], "ZXG")
+        self.assertEqual(payload["data"]["snapshot"]["symbols"], ["600519.SH", "000001.SZ"])
+        self.assertEqual(payload["data"]["snapshot"]["source_metadata"]["duplicate_count"], 1)
+
+    def test_load_block_read_watchlist_missing_block_fixture_returns_invalid_request(self) -> None:
+        payload = load_provider_replay_fixture("block-read-watchlist-missing-block")
+        self.assertFalse(payload["success"])
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["capability"], "block.read_watchlist_snapshot")
+        self.assertEqual(payload["code"], "invalid_request")
+        self.assertEqual(payload["message"], "block_code not found: ZXG")
 
     def test_unknown_fixture_name_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

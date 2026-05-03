@@ -1147,6 +1147,21 @@ class _BlockManagerProxy:
             timing=timing,
         )
 
+    def read_watchlist_snapshot(self, block_code: str) -> Result:
+        effective_profile = self._manager._build_effective_profile({"block_code": block_code})
+        result, timing = capture_api_timing(
+            "block.read_watchlist_snapshot",
+            lambda: self._manager._block_api.read_watchlist_snapshot(block_code=block_code),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="block",
+            method="read_watchlist_snapshot",
+            timing=timing,
+        )
+
     def create_sector(
         self,
         block_code: str,

@@ -114,11 +114,13 @@ TdxQuant
 已实现：
 
 - 读取自定义板块
+- 读取标准化 watchlist snapshot
 - 创建板块
 - 删除板块
 - 重命名板块
 - 清空板块
 - 写入板块成分
+- `block.read_watchlist_snapshot` provider contract
 - `block_mutation` 标准摘要
 - 本地 audit log artifact
 - 可选 `mutation_key` 关联键
@@ -140,7 +142,7 @@ TdxQuant
 - 内置 provider replay fixture bundle
 - 稳定 fixture manifest / loader
 - `json` / `jsonl` sample 资产
-- `formula.screen` / `doctor` / `block mutation` / `subscription event` representative fixtures
+- `formula.screen` / `doctor` / `block mutation` / `block read snapshot` / `subscription event` representative fixtures
 
 #### `financial`
 

@@ -88,6 +88,35 @@ class BlockSnapshotTests(unittest.TestCase):
         self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
         self.assertIn("ABC123", result.message)
 
+    def test_preserves_explicit_exchange_suffix_and_bj_symbols(self) -> None:
+        result = normalize_block_snapshot(
+            BlockSnapshotRequest(
+                block_code="ZXG",
+                sector_name="北交所板块",
+                member_codes=["430001.BJ", "920001.BJ", "430001.BJ"],
+            )
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            result.data["snapshot"]["symbols"],
+            ["430001.BJ", "920001.BJ"],
+        )
+        self.assertEqual(result.data["snapshot"]["source_metadata"]["duplicate_count"], 1)
+        self.assertEqual(result.warnings, ["Deduplicated 1 repeated members in block ZXG"])
+
+    def test_infers_bj_symbol_for_supported_numeric_prefixes(self) -> None:
+        result = normalize_block_snapshot(
+            BlockSnapshotRequest(
+                block_code="ZXG",
+                sector_name="北交所板块",
+                member_codes=["430001", "920001"],
+            )
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["snapshot"]["symbols"], ["430001.BJ", "920001.BJ"])
+
     def test_blank_block_code_failure(self) -> None:
         result = normalize_block_snapshot(
             BlockSnapshotRequest(

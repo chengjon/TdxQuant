@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from tdxquant.provider_discovery import list_provider_capabilities
 from tdxquant.replay_fixtures import load_provider_replay_fixture
 from tdxquant.replay_provider import execute_sync_replay, materialize_subscription_watch_replay
 from tdxquant.subscription_watch_run import build_subscription_watch_run_paths
@@ -11,9 +12,40 @@ def test_execute_sync_replay_uses_default_runtime_capabilities_fixture() -> None
 
     assert result.ok is True
     assert result.message == "listed provider capabilities"
-    assert result.data["summary"]["total"] == 4
+    assert result.data["summary"]["total"] == 5
+    capability_names = {item["name"] for item in result.data["capabilities"]}
+    assert "block.read_watchlist_snapshot" in capability_names
     assert result.data["replay_source"]["fixture"] == "runtime-capabilities-success"
     assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_execute_sync_replay_uses_default_block_read_watchlist_fixture() -> None:
+    result = execute_sync_replay("block.read_watchlist_snapshot")
+
+    assert result.ok is True
+    assert result.data["snapshot"]["block_code"] == "ZXG"
+    assert result.data["snapshot"]["symbols"] == ["600519.SH", "000001.SZ"]
+    assert result.data["replay_source"]["fixture"] == "block-read-watchlist-success"
+
+
+def test_block_read_watchlist_discovery_metadata_is_exposed() -> None:
+    capability = next(
+        item for item in list_provider_capabilities() if item["name"] == "block.read_watchlist_snapshot"
+    )
+
+    assert capability["query_metadata"] == {
+        "query_shapes": [
+            {
+                "query_kind": "block.read_watchlist_snapshot",
+                "selectors": ["block_code"],
+                "query_params": [],
+            }
+        ],
+        "supports_empty_results": True,
+        "returns_ordered_symbols": True,
+        "deduplicates_members": True,
+        "normalizes_symbols": True,
+    }
 
 
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:

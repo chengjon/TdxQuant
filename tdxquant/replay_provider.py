@@ -21,6 +21,7 @@ _SYNC_REPLAY_DEFAULT_FIXTURES: dict[str, str] = {
     "runtime.health": "runtime-health-degraded",
     "runtime.doctor": "runtime-doctor-degraded",
     "block.send_user_block": "block-send-user-block-applied",
+    "block.read_watchlist_snapshot": "block-read-watchlist-success",
 }
 
 _SUBSCRIPTION_WATCH_BUNDLE_DEFAULTS: dict[str, str] = {
