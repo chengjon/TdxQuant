@@ -1275,6 +1275,25 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.submission_key, "preset-run-001")
         self.assertEqual(args.max_price, 10.30)
 
+    def test_task_run_block_read_watchlist_export_preset_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "run",
+                "--preset",
+                "export-zxg-watchlist",
+                "--export-output",
+                "runtime/exports/zxg-override.json",
+                "--overwrite",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "run")
+        self.assertEqual(args.preset, "export-zxg-watchlist")
+        self.assertEqual(args.export_output, "runtime/exports/zxg-override.json")
+        self.assertTrue(args.overwrite)
+
     def test_pingan_buy_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -2832,6 +2851,31 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary"]["preset_count"], 2)
         self.assertEqual(result.data["presets"][0]["name"], "guarded-default")
 
+    def test_handle_task_presets_lists_export_watchlist_preset(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "presets"])
+        with patch(
+            "tdxquant.cli.load_task_presets",
+            return_value={
+                "export-zxg-watchlist": {
+                    "command": "block-read-watchlist-export",
+                    "description": "export zxg snapshot",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "options": {
+                        "block_code": "ZXG",
+                        "export_output": "runtime/exports/zxg.json",
+                        "overwrite": False,
+                    },
+                }
+            },
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["preset_count"], 1)
+        self.assertEqual(result.data["presets"][0]["name"], "export-zxg-watchlist")
+        self.assertEqual(result.data["presets"][0]["command"], "block-read-watchlist-export")
+
     def test_handle_task_run_uses_guarded_preset_defaults(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -3075,6 +3119,99 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertFalse(result.ok)
         self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+
+    def test_handle_task_run_uses_block_read_watchlist_export_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "export-zxg-watchlist"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_watchlist_export.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-watchlist-export",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "block_code": "ZXG",
+                        "export_output": "runtime/exports/zxg.json",
+                        "overwrite": False,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_watchlist_export.assert_called_once_with(
+            block_code="ZXG",
+            output="runtime/exports/zxg.json",
+            overwrite=False,
+        )
+
+    def test_handle_task_run_prefers_block_read_watchlist_export_cli_overrides(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "run",
+                "--preset",
+                "export-zxg-watchlist",
+                "--export-output",
+                "runtime/exports/zxg-override.json",
+                "--overwrite",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_watchlist_export.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-watchlist-export",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "block_code": "ZXG",
+                        "export_output": "runtime/exports/zxg.json",
+                        "overwrite": False,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_watchlist_export.assert_called_once_with(
+            block_code="ZXG",
+            output="runtime/exports/zxg-override.json",
+            overwrite=True,
+        )
+
+    def test_handle_task_run_rejects_block_read_watchlist_export_preset_missing_required_fields(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "export-zxg-watchlist"])
+        with patch(
+            "tdxquant.cli.resolve_task_preset",
+            return_value={
+                "command": "block-read-watchlist-export",
+                "profile": "default",
+                "api_profile": "safe_read",
+                "trade_profile": None,
+                "strategy_path": None,
+                "options": {"block_code": "ZXG"},
+            },
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("export_output", result.message)
 
     def test_handle_task_sector_research_uses_task_manager(self) -> None:
         parser = build_parser()

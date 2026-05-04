@@ -130,6 +130,7 @@ TdxQuant
 - `block sync` 标准摘要
 - `task block-read-watchlist`
 - `task block-read-watchlist-export`
+- `task run --preset export-zxg-watchlist`
 - 本地 audit log artifact
 - 可选 `mutation_key` 关联键
 

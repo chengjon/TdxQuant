@@ -73,5 +73,16 @@
     "options": {
       "close_result_dialog": true
     }
+  },
+  "export-zxg-watchlist": {
+    "command": "block-read-watchlist-export",
+    "description": "导出 ZXG 自选板块快照到固定 JSON 文件。",
+    "profile": "default",
+    "api_profile": "safe_read",
+    "options": {
+      "block_code": "ZXG",
+      "export_output": "runtime/exports/zxg.json",
+      "overwrite": false
+    }
   }
 }

@@ -281,6 +281,22 @@ python -m tdxquant.cli task block-read-watchlist-export \
 - 默认拒绝覆盖已有文件，只有显式 `--overwrite` 才允许替换目标文件
 - 同时补齐常规 `data.task` / `data.task_profile` / `data.timing` metadata
 
+这个任务现在也已经接入 task preset 体系，例如：
+
+```bash
+python -m tdxquant.cli task run --preset export-zxg-watchlist
+python -m tdxquant.cli task run \
+  --preset export-zxg-watchlist \
+  --export-output runtime/exports/zxg-override.json \
+  --overwrite
+```
+
+说明：
+
+- preset 内部使用 `export_output` 保存导出目标文件
+- `task run --output` 仍然只表示“把整条命令 JSON 结果写到文件”
+- 如需覆盖导出目标文件，应使用 `--export-output`
+
 ### 4.6 板块公式扫描
 
 ```bash

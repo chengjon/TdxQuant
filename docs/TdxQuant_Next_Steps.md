@@ -153,6 +153,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `task block-sync` / `task block-read-watchlist` / `task block-read-watchlist-export` 这类入口只做标准 task metadata、profile 默认值与日常命令收口
 - `task block-read-watchlist` 继续直接保留 `block.read_watchlist_snapshot` / `data.snapshot` 的 provider contract
 - `task block-read-watchlist-export` 继续只把 `data.snapshot` 安全写到单文件 JSON，不反向定义新的 provider schema
+- `task block-read-watchlist-export` 已接入现有 task preset 体系，当前只支持静态 `block_code / export_output / overwrite`
 - 避免在 task 层复制第二套 block sync result schema
 
 ### 方向 D：把订阅底层能力产品化成长期契约

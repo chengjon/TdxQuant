@@ -407,6 +407,8 @@ def _add_task_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--formula-dividend-type", type=int)
     subparser.add_argument("--json-output-path")
     subparser.add_argument("--csv-output-path")
+    subparser.add_argument("--export-output")
+    subparser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=None)
     subparser.add_argument("--output", help="Optional path to write the JSON result")
 
 
@@ -3594,6 +3596,11 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
     if command_name == "refresh-environment":
         merged["task_command"] = command_name
         return argparse.Namespace(**merged)
+
+    if command_name == "block-read-watchlist-export":
+        missing_required = [name for name in ("block_code", "export_output") if merged.get(name) in (None, "")]
+        if missing_required:
+            raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
 
     if command_name in {"trade-buy", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
         missing_required = [name for name in ("port", "code", "price", "quantity") if merged.get(name) is None]
