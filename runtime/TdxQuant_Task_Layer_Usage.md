@@ -237,6 +237,24 @@ python -m tdxquant.cli task block-sync \
 - CLI 继续使用可重复 `--stock`
 - 底层 `block sync` provider result 原样保留，只额外挂上 task metadata
 
+### 4.5.1 读取自选板块快照
+
+```bash
+python -m tdxquant.cli task block-read-watchlist --block-code ZXG --profile default
+```
+
+可选参数：
+
+- `--api-profile`
+- `--strategy-path`
+- `--output`
+
+这个任务当前是对 `manager.block.read_watchlist_snapshot(...)` 的薄封装：
+
+- 底层直接调用 `manager.block.read_watchlist_snapshot(...)`
+- 返回 provider `data.snapshot` 原样结果
+- 同时补齐常规 `data.task` / `data.task_profile` / `data.timing` metadata
+
 ### 4.6 板块公式扫描
 
 ```bash

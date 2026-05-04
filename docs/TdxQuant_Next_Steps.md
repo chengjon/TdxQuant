@@ -150,7 +150,8 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 对 `block` 这条线，当前更合适的推进方式也已经更明确：
 
 - provider 级 `block.sync_watchlist` 继续作为 canonical contract
-- `task block-sync` 这类入口只做 task metadata、profile 默认值与日常命令收口
+- `task block-sync` / `task block-read-watchlist` 这类入口只做标准 task metadata、profile 默认值与日常命令收口
+- `task block-read-watchlist` 继续直接保留 `block.read_watchlist_snapshot` / `data.snapshot` 的 provider contract
 - 避免在 task 层复制第二套 block sync result schema
 
 ### 方向 D：把订阅底层能力产品化成长期契约
@@ -247,7 +248,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 
 当前剩余重点收缩为：
 
-- `TongDaXin block -> 上层 watchlist`
+- 继续围绕 `TongDaXin block -> 上层 watchlist` 打磨集成面，而不是补新的薄 task 包装
 - 文件导入式 watchlist 适配
 - 更高阶的覆盖写 / 增量写任务化入口
 
@@ -392,11 +393,11 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - 正向：`block.sync_watchlist(...)`
 - 反向：`block.read_watchlist_snapshot(...)`
 
-当前仍明确延期的，是围绕这条反向读取能力的场景层包装：
+当前仍明确延期的，是围绕这条反向读取能力的更厚场景包装：
 
-- `task block-read-watchlist`
 - 文件导出 / watchlist 导出
 - 直接写回上层系统
+- `catalog` / preset / report 层收口
 
 ### Phase 1：Provider 基础 contract（已完成基础版）
 

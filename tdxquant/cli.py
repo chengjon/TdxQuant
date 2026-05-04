@@ -989,6 +989,10 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     _add_block_sync_arguments(task_block_sync_parser)
     _add_task_common_arguments(task_block_sync_parser)
 
+    task_block_read_watchlist_parser = task_subparsers.add_parser("block-read-watchlist")
+    task_block_read_watchlist_parser.add_argument("--block-code", required=True)
+    _add_task_common_arguments(task_block_read_watchlist_parser)
+
     task_watchlist_export_parser = task_subparsers.add_parser("watchlist-export")
     task_watchlist_export_parser.add_argument("--code", action="append", required=True)
     task_watchlist_export_parser.add_argument("--field", action="append", default=None)
@@ -3676,6 +3680,8 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             mutation_key=args.mutation_key,
             audit_dir=args.audit_dir,
         )
+    if args.task_command == "block-read-watchlist":
+        return manager.block_read_watchlist(block_code=args.block_code)
     if args.task_command == "watchlist-export":
         return manager.watchlist_export(
             stock_list=args.code,

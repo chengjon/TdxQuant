@@ -2334,6 +2334,45 @@ class TdxTaskManagerTests(unittest.TestCase):
         mocked_gp_one.assert_called_once_with(stock_list=["000001", "000002"], fields=["Now", "Volume"])
         self.assertEqual(result.data["task"]["name"], "watchlist_overview")
 
+    def test_task_block_read_watchlist_uses_provider_snapshot_and_attaches_task_metadata(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"]}},
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with patch.object(
+            type(manager.api_manager.block),
+            "read_watchlist_snapshot",
+            return_value=expected,
+        ) as mocked_snapshot:
+            result = manager.block_read_watchlist(block_code="ZXG")
+
+        mocked_snapshot.assert_called_once_with(block_code="ZXG")
+        self.assertIs(result, expected)
+        self.assertEqual(result.data["task"]["name"], "block_read_watchlist")
+        self.assertEqual(result.data["task_profile"]["name"], "default")
+        self.assertIn("task_call", result.data["timing"])
+
+    def test_task_block_read_watchlist_preserves_provider_failure_contract(self) -> None:
+        expected = Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message="block_code not found: ZXG",
+            data={},
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with patch.object(
+            type(manager.api_manager.block),
+            "read_watchlist_snapshot",
+            return_value=expected,
+        ):
+            result = manager.block_read_watchlist(block_code="ZXG")
+
+        self.assertIs(result, expected)
+        self.assertEqual(result.data["task"]["name"], "block_read_watchlist")
+
     def test_task_sector_formula_scan_composes_meta_and_formula_calls(self) -> None:
         sector_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"stocks": [{"code": "000001"}, {"code": "000002"}]})
         scan_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": []})

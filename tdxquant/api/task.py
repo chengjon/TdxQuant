@@ -1092,6 +1092,17 @@ class TdxTaskManager:
         )
         return self._attach_task_metadata(result, task_name="block_sync", timing=timing)
 
+    def block_read_watchlist(
+        self,
+        *,
+        block_code: str,
+    ) -> Result:
+        result, timing = _capture_task_timing(
+            "task.block_read_watchlist",
+            lambda: self.api_manager.block.read_watchlist_snapshot(block_code=block_code),
+        )
+        return self._attach_task_metadata(result, task_name="block_read_watchlist", timing=timing)
+
     def sector_formula_scan(
         self,
         *,

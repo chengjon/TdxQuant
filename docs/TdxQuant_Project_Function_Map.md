@@ -199,6 +199,7 @@ TdxQuant
 已实现或已形成稳定入口的任务包括：
 
 - `block_sync`
+- `block_read_watchlist`
 - `sector_research`
 - `formula_scan`
 - `watchlist_overview`
@@ -220,8 +221,14 @@ TdxQuant
 其中 `block_sync` 明确保持为薄 task wrapper：
 
 - 底层能力仍然是 provider 级 `block.sync_watchlist`
-- task 层只补 task timing / profile metadata / 日常入口收口
+- task 层只补 `data.task` / `data.task_profile` / `data.timing` 这类标准 task metadata 与日常入口收口
 - 不在 task 层重定义 block sync contract
+
+对应地，`block_read_watchlist` 是 `block_sync` 的读侧薄任务对等入口：
+
+- 底层能力仍然是 provider 级 `block.read_watchlist_snapshot`
+- task 层继续只补 `data.task` / `data.task_profile` / `data.timing` 这类标准 task metadata 与日常入口收口
+- 不在 task 层重定义 block read snapshot contract
 
 ### 2.2.1 `subscription-watch` worker bridge control plane
 
