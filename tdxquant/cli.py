@@ -993,6 +993,15 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_block_read_watchlist_parser.add_argument("--block-code", required=True)
     _add_task_common_arguments(task_block_read_watchlist_parser)
 
+    task_block_read_watchlist_export_parser = task_subparsers.add_parser("block-read-watchlist-export")
+    task_block_read_watchlist_export_parser.add_argument("--block-code", required=True)
+    task_block_read_watchlist_export_parser.add_argument("--output", dest="export_output", required=True)
+    task_block_read_watchlist_export_parser.add_argument("--overwrite", action="store_true", default=False)
+    task_block_read_watchlist_export_parser.add_argument("--profile", default="default")
+    task_block_read_watchlist_export_parser.add_argument("--api-profile")
+    task_block_read_watchlist_export_parser.add_argument("--trade-profile")
+    task_block_read_watchlist_export_parser.add_argument("--strategy-path")
+
     task_watchlist_export_parser = task_subparsers.add_parser("watchlist-export")
     task_watchlist_export_parser.add_argument("--code", action="append", required=True)
     task_watchlist_export_parser.add_argument("--field", action="append", default=None)
@@ -3682,6 +3691,12 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
         )
     if args.task_command == "block-read-watchlist":
         return manager.block_read_watchlist(block_code=args.block_code)
+    if args.task_command == "block-read-watchlist-export":
+        return manager.block_read_watchlist_export(
+            block_code=args.block_code,
+            output=args.export_output,
+            overwrite=args.overwrite,
+        )
     if args.task_command == "watchlist-export":
         return manager.watchlist_export(
             stock_list=args.code,

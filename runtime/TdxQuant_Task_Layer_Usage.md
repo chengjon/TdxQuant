@@ -253,6 +253,32 @@ python -m tdxquant.cli task block-read-watchlist --block-code ZXG --profile defa
 
 - 底层直接调用 `manager.block.read_watchlist_snapshot(...)`
 - 返回 provider `data.snapshot` 原样结果
+
+### 4.5.2 导出自选板块快照
+
+```bash
+python -m tdxquant.cli task block-read-watchlist-export \
+  --block-code ZXG \
+  --output runtime/exports/zxg.json \
+  --profile default
+```
+
+可选参数：
+
+- `--overwrite`
+- `--api-profile`
+- `--strategy-path`
+
+这个任务当前是对 `manager.block.read_watchlist_snapshot(...)` 的导出型薄封装：
+
+- 先读取 provider `data.snapshot`
+- 只把 `data.snapshot` 以单文件 JSON 写到 `--output`
+- 返回仍保留 `data.snapshot`，并追加 `data.export`
+- `data.export` 当前固定包含：
+  - `output_path`
+  - `overwritten`
+  - `file_size`
+- 默认拒绝覆盖已有文件，只有显式 `--overwrite` 才允许替换目标文件
 - 同时补齐常规 `data.task` / `data.task_profile` / `data.timing` metadata
 
 ### 4.6 板块公式扫描

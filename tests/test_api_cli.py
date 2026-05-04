@@ -964,6 +964,25 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.task_command, "block-read-watchlist")
         self.assertEqual(args.block_code, "ZXG")
 
+    def test_task_block_read_watchlist_export_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "block-read-watchlist-export",
+                "--block-code",
+                "ZXG",
+                "--output",
+                "runtime/exports/zxg.json",
+                "--overwrite",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "block-read-watchlist-export")
+        self.assertEqual(args.block_code, "ZXG")
+        self.assertEqual(args.export_output, "runtime/exports/zxg.json")
+        self.assertTrue(args.overwrite)
+
     def test_task_watchlist_export_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "watchlist-export", "--code", "000001"])
@@ -3145,6 +3164,31 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertIs(result, expected)
         manager.block_read_watchlist.assert_called_once_with(block_code="ZXG")
+
+    def test_handle_task_block_read_watchlist_export_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "block-read-watchlist-export",
+                "--block-code",
+                "ZXG",
+                "--output",
+                "runtime/exports/zxg.json",
+                "--overwrite",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_watchlist_export.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_watchlist_export.assert_called_once_with(
+            block_code="ZXG",
+            output="runtime/exports/zxg.json",
+            overwrite=True,
+        )
 
     def test_handle_task_sector_formula_scan_uses_task_manager(self) -> None:
         parser = build_parser()

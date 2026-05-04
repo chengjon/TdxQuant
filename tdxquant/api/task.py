@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import csv
 import json
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -121,6 +122,36 @@ def _write_json_file(path: Path, payload: Any) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def _write_json_file_atomic(path: Path, payload: Any, *, overwrite: bool = True) -> Path:
+    temp_path = path.parent / f".{path.name}.{uuid4().hex}.tmp"
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    try:
+        temp_path.write_text(serialized, encoding="utf-8")
+        if overwrite:
+            temp_path.replace(path)
+        else:
+            os.link(temp_path, path)
+            temp_path.unlink()
+    except Exception:
+        try:
+            temp_path.unlink()
+        except OSError:
+            pass
+        raise
+    return path
+
+
+def _probe_directory_writable(path: Path) -> None:
+    probe_path = path / f".tdxquant-write-probe.{uuid4().hex}.tmp"
+    try:
+        probe_path.write_text("", encoding="utf-8")
+    finally:
+        try:
+            probe_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _write_csv_file(path: Path, rows: list[dict[str, Any]]) -> Path:
@@ -1102,6 +1133,126 @@ class TdxTaskManager:
             lambda: self.api_manager.block.read_watchlist_snapshot(block_code=block_code),
         )
         return self._attach_task_metadata(result, task_name="block_read_watchlist", timing=timing)
+
+    def block_read_watchlist_export(
+        self,
+        *,
+        block_code: str,
+        output: str,
+        overwrite: bool = False,
+    ) -> Result:
+        def run() -> Result:
+            result = self.api_manager.block.read_watchlist_snapshot(block_code=block_code)
+            if not result.ok:
+                return result
+
+            snapshot = result.data.get("snapshot")
+            export_metadata = {"output_path": str(output)}
+
+            def fail_result(
+                *,
+                code: ErrorCode,
+                message: str,
+                error: str,
+                next_action: str,
+            ) -> Result:
+                result.ok = False
+                result.code = code
+                result.message = message
+                result.next_action = next_action
+                result.data["export"] = {**export_metadata, "error": error}
+                return result
+
+            if not isinstance(snapshot, dict):
+                return fail_result(
+                    code=ErrorCode.EXECUTION_FAILED,
+                    message="block watchlist export requires a snapshot object from the upstream provider",
+                    error="snapshot payload missing or not an object",
+                    next_action="Inspect the upstream block snapshot payload and retry once it returns data.snapshot as an object.",
+                )
+
+            try:
+                output_path = Path(output).expanduser().resolve()
+            except (OSError, RuntimeError, ValueError) as exc:
+                return fail_result(
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"block watchlist export output path is invalid: {output}",
+                    error=str(exc),
+                    next_action="Provide a valid --output file path and retry the export.",
+                )
+
+            export_metadata["output_path"] = str(output_path)
+
+            if output_path.exists() and output_path.is_dir():
+                return fail_result(
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"block watchlist export output path must be a file: {output_path}",
+                    error=f"output path is a directory: {output_path}",
+                    next_action="Provide a file path for --output.",
+                )
+
+            parent_dir = output_path.parent
+            if not parent_dir.exists():
+                return fail_result(
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"block watchlist export parent directory does not exist: {parent_dir}",
+                    error=f"parent directory does not exist: {parent_dir}",
+                    next_action="Create the output directory before exporting the snapshot.",
+                )
+
+            if not parent_dir.is_dir():
+                return fail_result(
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"block watchlist export parent path is not a directory: {parent_dir}",
+                    error=f"parent path is not a directory: {parent_dir}",
+                    next_action="Provide an output path whose parent is an existing directory.",
+                )
+
+            overwritten = output_path.exists()
+            if overwritten and not overwrite:
+                return fail_result(
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"block watchlist export output file already exists: {output_path}",
+                    error=f"output file already exists: {output_path}",
+                    next_action="Re-run with overwrite=True or choose a different output path.",
+                )
+
+            try:
+                _probe_directory_writable(parent_dir)
+            except OSError as exc:
+                return fail_result(
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"block watchlist export parent directory is not writable: {parent_dir}",
+                    error=str(exc),
+                    next_action="Grant write access to the output directory or choose another location.",
+                )
+
+            try:
+                _write_json_file_atomic(output_path, snapshot, overwrite=overwrite)
+            except FileExistsError:
+                return fail_result(
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"block watchlist export output file already exists: {output_path}",
+                    error=f"output file already exists: {output_path}",
+                    next_action="Re-run with overwrite=True or choose a different output path.",
+                )
+            except (OSError, TypeError, ValueError) as exc:
+                return fail_result(
+                    code=ErrorCode.EXECUTION_FAILED,
+                    message=f"block watchlist export failed: {exc}",
+                    error=str(exc),
+                    next_action="Inspect the output path permissions and retry the export.",
+                )
+
+            result.data["export"] = {
+                **export_metadata,
+                "overwritten": overwritten,
+                "file_size": output_path.stat().st_size,
+            }
+            return result
+
+        result, timing = _capture_task_timing("task.block_read_watchlist_export", run)
+        return self._attach_task_metadata(result, task_name="block_read_watchlist_export", timing=timing)
 
     def sector_formula_scan(
         self,

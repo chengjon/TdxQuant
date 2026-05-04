@@ -128,6 +128,8 @@ TdxQuant
 - 受治理的 `watchlist -> block` 同步
 - `block_mutation` 标准摘要
 - `block sync` 标准摘要
+- `task block-read-watchlist`
+- `task block-read-watchlist-export`
 - 本地 audit log artifact
 - 可选 `mutation_key` 关联键
 

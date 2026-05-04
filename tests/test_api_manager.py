@@ -2373,6 +2373,368 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertIs(result, expected)
         self.assertEqual(result.data["task"]["name"], "block_read_watchlist")
 
+    def test_task_block_read_watchlist_export_writes_snapshot_json(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with patch.object(
+                type(manager.api_manager.block),
+                "read_watchlist_snapshot",
+                return_value=expected,
+            ) as mocked_snapshot:
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+            mocked_snapshot.assert_called_once_with(block_code="ZXG")
+            self.assertTrue(output_path.exists())
+            self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), expected.data["snapshot"])
+            self.assertEqual(result.data["export"]["output_path"], str(output_path.resolve()))
+            self.assertFalse(result.data["export"]["overwritten"])
+            self.assertGreater(result.data["export"]["file_size"], 0)
+            self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_passthroughs_provider_failure_without_writing_file(self) -> None:
+        expected = Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message="block_code not found: ZXG",
+            data={},
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with patch.object(
+                type(manager.api_manager.block),
+                "read_watchlist_snapshot",
+                return_value=expected,
+            ) as mocked_snapshot:
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+            mocked_snapshot.assert_called_once_with(block_code="ZXG")
+            self.assertIs(result, expected)
+            self.assertFalse(output_path.exists())
+            self.assertNotIn("export", result.data)
+            self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_rejects_existing_file_without_overwrite(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={
+                "snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1},
+                "provider_context": {"source": "fixture"},
+            },
+            warnings=["provider-warning"],
+            next_action="provider-next-action",
+            _provider_artifacts=[{"kind": "provider-log", "path": "runtime/provider.log"}],
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            output_path.write_text('{"stale": true}\n', encoding="utf-8")
+            original_contents = output_path.read_text(encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with patch.object(
+                type(manager.api_manager.block),
+                "read_watchlist_snapshot",
+                return_value=expected,
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+            self.assertIs(result, expected)
+            self.assertEqual(result.data["snapshot"]["block_code"], "ZXG")
+            self.assertEqual(result.data["provider_context"], {"source": "fixture"})
+            self.assertEqual(result.warnings, ["provider-warning"])
+            self.assertEqual(result.to_provider_dict()["artifacts"], [{"kind": "provider-log", "path": "runtime/provider.log"}])
+            self.assertEqual(result.data["export"]["output_path"], str(output_path.resolve()))
+            self.assertIn("exists", result.data["export"]["error"])
+            self.assertEqual(output_path.read_text(encoding="utf-8"), original_contents)
+            self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_rejects_existing_file_before_writable_probe(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            output_path.write_text('{"stale": true}\n', encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with (
+                patch.object(
+                    type(manager.api_manager.block),
+                    "read_watchlist_snapshot",
+                    return_value=expected,
+                ),
+                patch("tdxquant.api.task._probe_directory_writable", side_effect=OSError("permission denied")) as mocked_probe,
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+            self.assertIn("exists", result.data["export"]["error"])
+            self.assertNotIn("permission denied", result.data["export"]["error"])
+            mocked_probe.assert_not_called()
+            self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_overwrites_when_enabled(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            output_path.write_text('{"stale": true}\n', encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with patch.object(
+                type(manager.api_manager.block),
+                "read_watchlist_snapshot",
+                return_value=expected,
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path), overwrite=True)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), expected.data["snapshot"])
+            self.assertTrue(result.data["export"]["overwritten"])
+            self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_preserves_snapshot_when_write_fails(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={
+                "snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1},
+                "provider_context": {"source": "fixture"},
+            },
+            warnings=["provider-warning"],
+            next_action="provider-next-action",
+            _provider_artifacts=[{"kind": "provider-log", "path": "runtime/provider.log"}],
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with (
+                patch.object(
+                    type(manager.api_manager.block),
+                    "read_watchlist_snapshot",
+                    return_value=expected,
+                ),
+                patch("tdxquant.api.task._write_json_file_atomic", side_effect=OSError("disk full")),
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.code, ErrorCode.EXECUTION_FAILED)
+            self.assertIs(result, expected)
+            self.assertEqual(result.data["snapshot"], expected.data["snapshot"])
+            self.assertEqual(result.data["provider_context"], {"source": "fixture"})
+            self.assertEqual(result.warnings, ["provider-warning"])
+            self.assertEqual(result.to_provider_dict()["artifacts"], [{"kind": "provider-log", "path": "runtime/provider.log"}])
+            self.assertEqual(result.data["export"]["output_path"], str(output_path.resolve()))
+            self.assertIn("disk full", result.data["export"]["error"])
+            self.assertFalse(output_path.exists())
+            self.assertEqual(list(Path(temp_dir).glob(".*.tmp")), [])
+            self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_rejects_missing_or_malformed_snapshot(self) -> None:
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        malformed_results = [
+            Result(ok=True, code=ErrorCode.OK, message="normalized block snapshot", data={}),
+            Result(ok=True, code=ErrorCode.OK, message="normalized block snapshot", data={"snapshot": ["600519.SH"]}),
+        ]
+
+        with TemporaryDirectory() as temp_dir:
+            for index, expected in enumerate(malformed_results):
+                output_path = Path(temp_dir) / f"bad-{index}.json"
+                with patch.object(
+                    type(manager.api_manager.block),
+                    "read_watchlist_snapshot",
+                    return_value=expected,
+                ):
+                    result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+                self.assertFalse(result.ok)
+                self.assertEqual(result.code, ErrorCode.EXECUTION_FAILED)
+                self.assertEqual(result.data["export"]["output_path"], str(output_path.resolve()))
+                self.assertIn("snapshot", result.data["export"]["error"])
+                self.assertFalse(output_path.exists())
+                self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_rejects_unresolvable_output_path(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with (
+            patch.object(
+                type(manager.api_manager.block),
+                "read_watchlist_snapshot",
+                return_value=expected,
+            ),
+            patch("tdxquant.api.task.Path.resolve", side_effect=RuntimeError("symlink loop detected")),
+        ):
+            result = manager.block_read_watchlist_export(block_code="ZXG", output="broken-link/zxg.json")
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.data["export"]["output_path"], "broken-link/zxg.json")
+        self.assertIn("symlink loop detected", result.data["export"]["error"])
+        self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_rejects_unwritable_parent_directory_as_invalid_request(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={
+                "snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1},
+                "provider_context": {"source": "fixture"},
+            },
+            warnings=["provider-warning"],
+            _provider_artifacts=[{"kind": "provider-log", "path": "runtime/provider.log"}],
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "nested" / "zxg.json"
+            output_path.parent.mkdir()
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with (
+                patch.object(
+                    type(manager.api_manager.block),
+                    "read_watchlist_snapshot",
+                    return_value=expected,
+                ),
+                patch("tdxquant.api.task._probe_directory_writable", side_effect=OSError("permission denied")),
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+            self.assertIs(result, expected)
+            self.assertEqual(result.data["snapshot"], expected.data["snapshot"])
+            self.assertEqual(result.data["provider_context"], {"source": "fixture"})
+            self.assertEqual(result.warnings, ["provider-warning"])
+            self.assertEqual(result.to_provider_dict()["artifacts"], [{"kind": "provider-log", "path": "runtime/provider.log"}])
+            self.assertEqual(result.data["export"]["output_path"], str(output_path.resolve()))
+            self.assertIn("permission denied", result.data["export"]["error"])
+            self.assertFalse(output_path.exists())
+            self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_rejects_invalid_output_path_without_crashing(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with (
+            patch.object(
+                type(manager.api_manager.block),
+                "read_watchlist_snapshot",
+                return_value=expected,
+            ),
+            patch("tdxquant.api.task.Path.resolve", side_effect=RuntimeError("symlink loop")),
+        ):
+            result = manager.block_read_watchlist_export(block_code="ZXG", output="runtime/exports/zxg.json")
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.data["snapshot"], expected.data["snapshot"])
+        self.assertEqual(result.data["export"]["output_path"], "runtime/exports/zxg.json")
+        self.assertIn("symlink loop", result.data["export"]["error"])
+        self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_rejects_directory_output_path(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with patch.object(
+                type(manager.api_manager.block),
+                "read_watchlist_snapshot",
+                return_value=expected,
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_dir))
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("must be a file", result.message)
+        self.assertEqual(result.data["snapshot"], expected.data["snapshot"])
+        self.assertEqual(result.data["export"]["output_path"], str(output_dir.resolve()))
+        self.assertIn("directory", result.data["export"]["error"])
+        self.assertEqual(result.data["task"]["name"], "block_read_watchlist_export")
+
+    def test_task_block_read_watchlist_export_existing_file_conflict_wins_before_probe_failure(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            output_path.write_text('{"stale": true}\n', encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with (
+                patch.object(
+                    type(manager.api_manager.block),
+                    "read_watchlist_snapshot",
+                    return_value=expected,
+                ),
+                patch("tdxquant.api.task._probe_directory_writable", side_effect=OSError("permission denied")),
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("already exists", result.message)
+        self.assertIn("already exists", result.data["export"]["error"])
+
+    def test_task_block_read_watchlist_export_treats_racy_create_as_existing_file_conflict(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={"snapshot": {"block_code": "ZXG", "symbols": ["600519.SH"], "symbol_count": 1}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "zxg.json"
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            with (
+                patch.object(
+                    type(manager.api_manager.block),
+                    "read_watchlist_snapshot",
+                    return_value=expected,
+                ),
+                patch("tdxquant.api.task._write_json_file_atomic", side_effect=FileExistsError("already exists")),
+            ):
+                result = manager.block_read_watchlist_export(block_code="ZXG", output=str(output_path))
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("already exists", result.message)
+        self.assertIn("already exists", result.data["export"]["error"])
+
     def test_task_sector_formula_scan_composes_meta_and_formula_calls(self) -> None:
         sector_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"stocks": [{"code": "000001"}, {"code": "000002"}]})
         scan_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": []})
