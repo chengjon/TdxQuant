@@ -1134,6 +1134,31 @@ class TdxTaskManager:
         )
         return self._attach_task_metadata(result, task_name="block_read_watchlist", timing=timing)
 
+    def block_read_full(
+        self,
+        *,
+        block_code: str,
+    ) -> Result:
+        def run() -> Result:
+            result = self.api_manager.block.read_watchlist_snapshot(block_code=block_code)
+            if not result.ok:
+                return result
+
+            snapshot = result.data.get("snapshot")
+            source_metadata = snapshot.get("source_metadata") if isinstance(snapshot, dict) else None
+            metadata = source_metadata if isinstance(source_metadata, dict) else {}
+            warnings = result.warnings if isinstance(result.warnings, list) else []
+            result.data["read_full"] = {
+                "sector_name": metadata.get("sector_name"),
+                "raw_member_count": metadata.get("raw_member_count"),
+                "duplicate_count": metadata.get("duplicate_count"),
+                "warnings_present": len(warnings) > 0,
+            }
+            return result
+
+        result, timing = _capture_task_timing("task.block_read_full", run)
+        return self._attach_task_metadata(result, task_name="block_read_full", timing=timing)
+
     def block_read_watchlist_export(
         self,
         *,

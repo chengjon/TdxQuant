@@ -2373,6 +2373,109 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertIs(result, expected)
         self.assertEqual(result.data["task"]["name"], "block_read_watchlist")
 
+    def test_task_block_read_full_adds_read_summary_and_task_metadata(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={
+                "snapshot": {
+                    "block_code": "ZXG",
+                    "symbols": ["600519.SH"],
+                    "symbol_count": 1,
+                    "source": "tongdaxin.custom_sector",
+                    "source_metadata": {
+                        "sector_name": "自选股",
+                        "raw_member_count": 2,
+                        "duplicate_count": 1,
+                    },
+                }
+            },
+            warnings=["duplicate members removed"],
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with patch.object(
+            type(manager.api_manager.block),
+            "read_watchlist_snapshot",
+            return_value=expected,
+        ) as mocked_snapshot:
+            result = manager.block_read_full(block_code="ZXG")
+
+        mocked_snapshot.assert_called_once_with(block_code="ZXG")
+        self.assertIs(result, expected)
+        self.assertEqual(
+            result.data["read_full"],
+            {
+                "sector_name": "自选股",
+                "raw_member_count": 2,
+                "duplicate_count": 1,
+                "warnings_present": True,
+            },
+        )
+        self.assertEqual(result.data["task"]["name"], "block_read_full")
+        self.assertEqual(result.data["task_profile"]["name"], "default")
+        self.assertIn("task_call", result.data["timing"])
+
+    def test_task_block_read_full_preserves_provider_failure_contract(self) -> None:
+        expected = Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message="block_code not found: ZXG",
+            data={"diagnostic": {"block_code": "ZXG"}},
+            warnings=["provider warning"],
+            next_action="Inspect the block code and retry.",
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with patch.object(
+            type(manager.api_manager.block),
+            "read_watchlist_snapshot",
+            return_value=expected,
+        ):
+            result = manager.block_read_full(block_code="ZXG")
+
+        self.assertIs(result, expected)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "block_code not found: ZXG")
+        self.assertEqual(result.data["diagnostic"], {"block_code": "ZXG"})
+        self.assertEqual(result.warnings, ["provider warning"])
+        self.assertEqual(result.next_action, "Inspect the block code and retry.")
+        self.assertNotIn("read_full", result.data)
+        self.assertEqual(result.data["task"]["name"], "block_read_full")
+
+    def test_task_block_read_full_tolerates_partial_source_metadata(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="normalized block snapshot",
+            data={
+                "snapshot": {
+                    "block_code": "ZXG",
+                    "symbols": [],
+                    "symbol_count": 0,
+                    "source": "tongdaxin.custom_sector",
+                    "source_metadata": {"sector_name": "空板块"},
+                }
+            },
+            warnings=[],
+        )
+        manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+        with patch.object(
+            type(manager.api_manager.block),
+            "read_watchlist_snapshot",
+            return_value=expected,
+        ):
+            result = manager.block_read_full(block_code="ZXG")
+
+        self.assertEqual(
+            result.data["read_full"],
+            {
+                "sector_name": "空板块",
+                "raw_member_count": None,
+                "duplicate_count": None,
+                "warnings_present": False,
+            },
+        )
+
     def test_task_block_read_watchlist_export_writes_snapshot_json(self) -> None:
         expected = Result(
             ok=True,

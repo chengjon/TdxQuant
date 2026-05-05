@@ -129,6 +129,7 @@ TdxQuant
 - `block_mutation` 标准摘要
 - `block sync` 标准摘要
 - `task block-read-watchlist`
+- `task block-read-full`
 - `task block-read-watchlist-export`
 - `task run --preset export-zxg-watchlist`
 - 本地 audit log artifact
@@ -203,6 +204,7 @@ TdxQuant
 
 - `block_sync`
 - `block_read_watchlist`
+- `block_read_full`
 - `sector_research`
 - `formula_scan`
 - `watchlist_overview`
@@ -232,6 +234,18 @@ TdxQuant
 - 底层能力仍然是 provider 级 `block.read_watchlist_snapshot`
 - task 层继续只补 `data.task` / `data.task_profile` / `data.timing` 这类标准 task metadata 与日常入口收口
 - 不在 task 层重定义 block read snapshot contract
+
+`block_read_full` 则是在同一 canonical snapshot 之上的高层读侧诊断任务：
+
+- 底层仍然只读取一次 provider 级 `block.read_watchlist_snapshot`
+- 继续保留 canonical `data.snapshot`
+- task 层只额外补 `data.read_full` 诊断摘要：
+  - `sector_name`
+  - `raw_member_count`
+  - `duplicate_count`
+  - `warnings_present`
+- 不在 task 层返回 raw rows
+- 不在 task 层引入专用导出或写回逻辑
 
 ### 2.2.1 `subscription-watch` worker bridge control plane
 

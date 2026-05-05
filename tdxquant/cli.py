@@ -995,6 +995,10 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_block_read_watchlist_parser.add_argument("--block-code", required=True)
     _add_task_common_arguments(task_block_read_watchlist_parser)
 
+    task_block_read_full_parser = task_subparsers.add_parser("block-read-full")
+    task_block_read_full_parser.add_argument("--block-code", required=True)
+    _add_task_common_arguments(task_block_read_full_parser)
+
     task_block_read_watchlist_export_parser = task_subparsers.add_parser("block-read-watchlist-export")
     task_block_read_watchlist_export_parser.add_argument("--block-code", required=True)
     task_block_read_watchlist_export_parser.add_argument("--output", dest="export_output", required=True)
@@ -3698,6 +3702,8 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
         )
     if args.task_command == "block-read-watchlist":
         return manager.block_read_watchlist(block_code=args.block_code)
+    if args.task_command == "block-read-full":
+        return manager.block_read_full(block_code=args.block_code)
     if args.task_command == "block-read-watchlist-export":
         return manager.block_read_watchlist_export(
             block_code=args.block_code,

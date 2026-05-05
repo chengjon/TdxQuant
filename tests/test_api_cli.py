@@ -964,6 +964,13 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.task_command, "block-read-watchlist")
         self.assertEqual(args.block_code, "ZXG")
 
+    def test_task_block_read_full_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "block-read-full", "--block-code", "ZXG"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "block-read-full")
+        self.assertEqual(args.block_code, "ZXG")
+
     def test_task_block_read_watchlist_export_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -3347,6 +3354,17 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertIs(result, expected)
         manager.block_read_watchlist.assert_called_once_with(block_code="ZXG")
+
+    def test_handle_task_block_read_full_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "block-read-full", "--block-code", "ZXG"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_full.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_full.assert_called_once_with(block_code="ZXG")
 
     def test_handle_task_block_read_watchlist_export_uses_task_manager(self) -> None:
         parser = build_parser()
