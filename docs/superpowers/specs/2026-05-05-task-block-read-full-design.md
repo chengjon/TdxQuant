@@ -166,14 +166,15 @@ Status: Draft for review
 
 ### 3. Response Shape
 
-顶层继续沿用现有 provider envelope 与 task metadata 约定。
+顶层继续沿用现有 `Result` envelope、manager metadata 与 task metadata 约定。
 
 成功时保留：
 
 - `success/code/message`
-- `warnings`
-- `artifacts`
 - `data.snapshot`
+- provider/manager metadata
+  - `data.manager`
+  - `data.api_profile`
 
 并追加：
 
@@ -194,42 +195,46 @@ Status: Draft for review
 
 #### `data.read_full`
 
-第一版只是一个**从成功 snapshot 直接派生**的 enriched read view，不引入 raw rows。
+第一版只是一个**从成功 snapshot 直接派生**的 diagnostics summary，不引入 raw rows，也不再把 `snapshot` 字段做第二次平铺。
 
 建议字段：
 
-- `block_code`
 - `sector_name`
-- `symbol_count`
 - `raw_member_count`
 - `duplicate_count`
-- `source`
-- `source_metadata`
 - `warnings_present`
 
 语义：
 
-- `block_code`
-  - 直接来自 `snapshot.block_code`
 - `sector_name`
   - 来自 `snapshot.source_metadata.sector_name`
-- `symbol_count`
-  - 直接来自 `snapshot.symbol_count`
 - `raw_member_count`
   - 来自 `snapshot.source_metadata.raw_member_count`
 - `duplicate_count`
   - 来自 `snapshot.source_metadata.duplicate_count`
-- `source`
-  - 直接来自 `snapshot.source`
-- `source_metadata`
-  - 原样保留
 - `warnings_present`
   - `len(warnings) > 0`
 
-也就是说：
+设计意图：
 
-- `snapshot` 仍是 canonical output
-- `read_full` 是 task-level diagnostics-oriented projection
+- `snapshot` 继续作为 source of truth
+- `read_full` 只放 task-level diagnostics-oriented summary
+- 调用方如果需要 canonical fields，应继续读取 `data.snapshot`
+
+#### Degraded snapshot handling
+
+`read_full` 的生成建立在 **snapshot 成功** 之上，但不要求 `source_metadata` 完全齐全。
+
+第一版 fallback 规则：
+
+- `snapshot` 成功且 `source_metadata` 缺少可选字段时
+  - 仍生成 `data.read_full`
+  - 对应字段设为 `None`
+- `snapshot` 成功且 `symbols=[]`
+  - 仍正常生成 `data.read_full`
+  - `raw_member_count` / `duplicate_count` 继续按 snapshot 提供的值或 `None`
+- 只有当底层 `read_watchlist_snapshot(...)` 本身失败时
+  - 才不生成 `data.read_full`
 
 ### 4. Failure Semantics
 
@@ -243,6 +248,7 @@ Status: Draft for review
 - 直接透传底层失败
 - 只追加标准 task metadata
 - **不**伪造 `data.read_full`
+- 不转换 error code，也不 catch/re-raise 成新的 task-specific failure
 
 这条规则的目的是避免出现：
 
@@ -272,6 +278,26 @@ python -m tdxquant.cli task block-read-full --block-code ZXG
 
 边界更清楚。
 
+需要单独说明的是：
+
+- 这条命令预计仍会复用 `_add_task_common_arguments(...)`
+- 因此会继续带有通用：
+  - `--output`
+
+这里的 `--output` 语义仍然只是：
+
+- 将整条命令的 JSON 结果写到文件
+
+它**不是**：
+
+- block read export 语义
+- `data.snapshot` 单独导出语义
+
+因此第一版“不支持 `--output`”的意思是：
+
+- 不支持把它当作领域级导出参数
+- 但不会移除现有通用 task JSON result output 能力
+
 ### 6. Testing
 
 第一版只补 focused task-layer tests，不重复验证底层 provider canonical read。
@@ -284,6 +310,14 @@ python -m tdxquant.cli task block-read-full --block-code ZXG
   - `manager.block.read_watchlist_snapshot(...)`
 - 成功时保留 `data.snapshot`
 - 成功时生成 `data.read_full`
+- 成功时：
+  - `read_full.sector_name == snapshot.source_metadata.sector_name`
+  - `read_full.raw_member_count == snapshot.source_metadata.raw_member_count`
+  - `read_full.duplicate_count == snapshot.source_metadata.duplicate_count`
+  - `read_full.warnings_present == (len(warnings) > 0)`
+- snapshot 成功但 `source_metadata` 部分缺失时
+  - `data.read_full` 仍生成
+  - 缺失字段为 `None`
 - 失败时不生成 `data.read_full`
 - task metadata 仍按现有方式附加
 
@@ -296,6 +330,17 @@ python -m tdxquant.cli task block-read-full --block-code ZXG
 - JSON contract：
   - 成功时输出保留 `data.snapshot` 并带 `data.read_full`
   - 失败时不输出 `data.read_full`
+
+### 7. Preset stance
+
+第一版不把 `block-read-full` 接进 task preset 体系。
+
+也就是说：
+
+- 不新增 `TASK_COMMAND_DEFAULT_PROFILES` 映射
+- 不新增 `runtime/task-presets.json` entry
+
+如果后续证明它是高频入口，再单独开一包做 preset / catalog productization。
 
 ## Error Handling Notes
 
