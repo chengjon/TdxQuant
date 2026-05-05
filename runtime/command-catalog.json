@@ -214,5 +214,11 @@
     "preset": "refresh-default",
     "description": "统一入口下的环境刷新模板。",
     "labels": ["task", "maintenance", "refresh"]
+  },
+  "export-zxg-watchlist": {
+    "source": "task",
+    "preset": "export-zxg-watchlist",
+    "description": "统一入口下的 ZXG 自选板块快照导出模板。",
+    "labels": ["task", "block", "watchlist", "export"]
   }
 }
