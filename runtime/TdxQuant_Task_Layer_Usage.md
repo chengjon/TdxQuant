@@ -326,8 +326,8 @@ python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 - `read-zxg-watchlist` 这类 preset 只提供静态 `block_code` 默认值
 - `read-zxg-full` 这类 preset 只提供静态 `block_code` 默认值
 - 如果命令行显式再传 `--block-code`，以命令行参数为准
-- 这仍然只是 `task block-read-full` 的日常命令模板；同一 preset 现在也已经通过 `catalog` entry `read-zxg-full` 暴露
-- 当前新增的是 preset-backed catalog 发现与触发，不引入 report / export 打包语义
+- `read-zxg-watchlist` 当前仍然只是 preset 入口，不带 catalog 暴露
+- `read-zxg-full` 现在也已经通过 `catalog` entry `read-zxg-full` 暴露；这里新增的是 preset-backed catalog 发现与触发，不引入 report / export 打包语义
 
 ### 4.6 板块公式扫描
 
