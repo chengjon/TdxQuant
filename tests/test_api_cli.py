@@ -3475,7 +3475,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertFalse(result.ok)
         self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
-        self.assertIn("block_code", result.message)
+        self.assertEqual(result.message, "task preset execution requires: block_code")
         mocked_manager.assert_not_called()
 
     def test_handle_task_run_rejects_block_read_watchlist_export_preset_missing_required_fields(self) -> None:
