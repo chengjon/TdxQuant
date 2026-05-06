@@ -374,6 +374,7 @@ def _add_task_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--api-profile")
     subparser.add_argument("--trade-profile")
     subparser.add_argument("--strategy-path")
+    subparser.add_argument("--block-code")
     subparser.add_argument("--port")
     subparser.add_argument("--baudrate", type=int)
     subparser.add_argument("--timeout", type=float)
@@ -3603,6 +3604,11 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
 
     if command_name == "block-read-watchlist-export":
         missing_required = [name for name in ("block_code", "export_output") if merged.get(name) in (None, "")]
+        if missing_required:
+            raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
+
+    if command_name == "block-read-full":
+        missing_required = [name for name in ("block_code",) if merged.get(name) in (None, "")]
         if missing_required:
             raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
 

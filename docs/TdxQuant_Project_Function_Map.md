@@ -131,6 +131,7 @@ TdxQuant
 - `task block-read-watchlist`
 - `task block-read-full`
 - `task block-read-watchlist-export`
+- `task run --preset read-zxg-full`
 - `task run --preset export-zxg-watchlist`
 - 本地 audit log artifact
 - 可选 `mutation_key` 关联键
@@ -220,6 +221,7 @@ TdxQuant
 - `guarded_trade_buy`
 - 稳定交易 task 已透传 `submission_key` 与 `max_price`
 - `task run --preset ...` 已支持同一组交易安全参数并保留显式 CLI 覆盖
+- `task block-read-full` 已支持静态 task preset 打包与显式 `--block-code` 覆盖，但仍不扩成 catalog / report / export 打包
 
 这层的目标不是补充新的底层函数，而是把多步骤流程收口成稳定任务。
 

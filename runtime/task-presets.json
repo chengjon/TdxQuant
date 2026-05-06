@@ -84,5 +84,12 @@
       "export_output": "runtime/exports/zxg.json",
       "overwrite": false
     }
+  },
+  "read-zxg-full": {
+    "command": "block-read-full",
+    "description": "读取 ZXG 板块完整诊断视图。",
+    "options": {
+      "block_code": "ZXG"
+    }
   }
 }

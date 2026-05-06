@@ -2929,6 +2929,26 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["presets"][0]["name"], "export-zxg-watchlist")
         self.assertEqual(result.data["presets"][0]["command"], "block-read-watchlist-export")
 
+    def test_handle_task_presets_lists_block_read_full_preset(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "presets"])
+        with patch(
+            "tdxquant.cli.load_task_presets",
+            return_value={
+                "read-zxg-full": {
+                    "command": "block-read-full",
+                    "description": "read zxg diagnostics",
+                    "options": {"block_code": "ZXG"},
+                }
+            },
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["preset_count"], 1)
+        self.assertEqual(result.data["presets"][0]["name"], "read-zxg-full")
+        self.assertEqual(result.data["presets"][0]["command"], "block-read-full")
+        self.assertEqual(result.data["presets"][0]["profile"], "default")
+
     def test_handle_task_run_uses_guarded_preset_defaults(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -3173,6 +3193,66 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
 
+    def test_task_run_parser_accepts_block_code_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-full", "--block-code", "ZXG"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "run")
+        self.assertEqual(args.preset, "read-zxg-full")
+        self.assertEqual(args.block_code, "ZXG")
+
+    def test_handle_task_run_uses_block_read_full_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-full"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_full.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-full",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "block_code": "ZXG",
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_full.assert_called_once_with(block_code="ZXG")
+
+    def test_handle_task_run_prefers_block_read_full_cli_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-full", "--block-code", "MYZXG"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_full.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-full",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "block_code": "ZXG",
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_full.assert_called_once_with(block_code="MYZXG")
+
     def test_handle_task_run_uses_block_read_watchlist_export_preset_defaults(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "run", "--preset", "export-zxg-watchlist"])
@@ -3265,6 +3345,29 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
         self.assertIn("export_output", result.message)
+
+    def test_handle_task_run_rejects_block_read_full_preset_missing_block_code(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-full"])
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-full",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {},
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager") as mocked_manager,
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "task preset execution requires: block_code")
+        mocked_manager.assert_not_called()
 
     def test_handle_task_sector_research_uses_task_manager(self) -> None:
         parser = build_parser()

@@ -155,7 +155,8 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `task block-read-full` 继续保留 canonical `data.snapshot`，只额外补 task-level `data.read_full` 诊断摘要
 - `task block-read-watchlist-export` 继续只把 `data.snapshot` 安全写到单文件 JSON，不反向定义新的 provider schema
 - `task block-read-watchlist-export` 已接入现有 task preset 体系，当前只支持静态 `block_code / export_output / overwrite`
-- `task block-read-full` 相关 preset / catalog / write-back 仍继续延期，不在这一步扩成更厚场景包装
+- `task block-read-full` 已接入同一套 task preset 体系，当前只做静态 `block_code` 打包与显式 CLI 覆盖
+- `task block-read-full` 的 catalog / report / write-back 打包仍继续延期，不在这一步扩成更厚场景包装
 - 避免在 task 层复制第二套 block sync result schema
 
 ### 方向 D：把订阅底层能力产品化成长期契约
@@ -400,8 +401,8 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 当前仍明确延期的，是围绕这条反向读取能力的更厚场景包装：
 
 - 直接写回上层系统
-- `catalog` / preset / report 层收口
-- `block-read-full` 的 preset / catalog 收口
+- `catalog` / report 层收口
+- `block-read-full` 的 catalog 收口
 - `block-read-full` 的 report 层收口
 
 ### Phase 1：Provider 基础 contract（已完成基础版）
