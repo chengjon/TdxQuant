@@ -1301,7 +1301,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.export_output, "runtime/exports/zxg-override.json")
         self.assertTrue(args.overwrite)
 
-    def test_task_run_parser_accepts_block_read_watchlist_block_code_override(self) -> None:
+    def test_task_run_parser_accepts_read_zxg_watchlist_block_code_override(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "run", "--preset", "read-zxg-watchlist", "--block-code", "ZXG"])
         self.assertEqual(args.command, "task")
