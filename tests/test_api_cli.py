@@ -3015,6 +3015,7 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["presets"][0]["name"], "read-zxg-watchlist")
         self.assertEqual(result.data["presets"][0]["command"], "block-read-watchlist")
         self.assertEqual(result.data["presets"][0]["profile"], "default")
+        self.assertEqual(result.data["presets"][0]["options"]["block_code"], "ZXG")
 
     def test_handle_task_run_uses_guarded_preset_defaults(self) -> None:
         parser = build_parser()
