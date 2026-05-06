@@ -2545,6 +2545,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         entry_names = [row["name"] for row in result.data["entries"]]
         self.assertIn("export-zxg-watchlist", entry_names)
 
+    def test_handle_catalog_list_default_includes_read_zxg_full_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entry_names = [entry["name"] for entry in result.data["entries"]]
+        self.assertIn("read-zxg-full", entry_names)
+
     def test_handle_catalog_list_returns_export_watchlist_entry_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--entry", "export-zxg-watchlist"])

@@ -220,5 +220,11 @@
     "preset": "export-zxg-watchlist",
     "description": "统一入口下的 ZXG 自选板块快照导出模板。",
     "labels": ["task", "block", "watchlist", "export"]
+  },
+  "read-zxg-full": {
+    "source": "task",
+    "preset": "read-zxg-full",
+    "description": "统一入口下的 ZXG 板块完整诊断视图模板。",
+    "labels": ["task", "block", "watchlist", "read"]
   }
 }
