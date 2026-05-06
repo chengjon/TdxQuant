@@ -1301,6 +1301,14 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.export_output, "runtime/exports/zxg-override.json")
         self.assertTrue(args.overwrite)
 
+    def test_task_run_parser_accepts_block_read_watchlist_block_code_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-watchlist", "--block-code", "ZXG"])
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "run")
+        self.assertEqual(args.preset, "read-zxg-watchlist")
+        self.assertEqual(args.block_code, "ZXG")
+
     def test_pingan_buy_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -3394,6 +3402,81 @@ class TaskCliDispatchTests(unittest.TestCase):
             output="runtime/exports/zxg-override.json",
             overwrite=True,
         )
+
+    def test_handle_task_run_uses_block_read_watchlist_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-watchlist"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_watchlist.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-watchlist",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "block_code": "ZXG",
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_watchlist.assert_called_once_with(block_code="ZXG")
+
+    def test_handle_task_run_prefers_block_read_watchlist_cli_overrides(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-watchlist", "--block-code", "MYZXG"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_read_watchlist.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-watchlist",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "block_code": "ZXG",
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_read_watchlist.assert_called_once_with(block_code="MYZXG")
+
+    def test_handle_task_run_rejects_block_read_watchlist_preset_missing_required_fields(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "read-zxg-watchlist"])
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-read-watchlist",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {},
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager") as mocked_manager,
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("block_code", result.message)
+        mocked_manager.assert_not_called()
 
     def test_handle_task_run_rejects_block_read_watchlist_export_preset_missing_required_fields(self) -> None:
         parser = build_parser()

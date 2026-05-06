@@ -3602,6 +3602,11 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
         merged["task_command"] = command_name
         return argparse.Namespace(**merged)
 
+    if command_name == "block-read-watchlist":
+        missing_required = [name for name in ("block_code",) if merged.get(name) in (None, "")]
+        if missing_required:
+            raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
+
     if command_name == "block-read-watchlist-export":
         missing_required = [name for name in ("block_code", "export_output") if merged.get(name) in (None, "")]
         if missing_required:
