@@ -88,6 +88,7 @@
   "read-zxg-watchlist": {
     "command": "block-read-watchlist",
     "description": "读取 ZXG 板块标准化快照。",
+    "api_profile": "safe_read",
     "options": {
       "block_code": "ZXG"
     }
