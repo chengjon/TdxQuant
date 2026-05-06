@@ -85,6 +85,13 @@
       "overwrite": false
     }
   },
+  "read-zxg-watchlist": {
+    "command": "block-read-watchlist",
+    "description": "读取 ZXG 板块标准化快照。",
+    "options": {
+      "block_code": "ZXG"
+    }
+  },
   "read-zxg-full": {
     "command": "block-read-full",
     "description": "读取 ZXG 板块完整诊断视图。",

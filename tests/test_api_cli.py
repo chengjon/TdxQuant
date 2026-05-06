@@ -2996,6 +2996,26 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["presets"][0]["command"], "block-read-full")
         self.assertEqual(result.data["presets"][0]["profile"], "default")
 
+    def test_handle_task_presets_lists_block_read_watchlist_preset(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "presets"])
+        with patch(
+            "tdxquant.cli.load_task_presets",
+            return_value={
+                "read-zxg-watchlist": {
+                    "command": "block-read-watchlist",
+                    "description": "read zxg watchlist snapshot",
+                    "options": {"block_code": "ZXG"},
+                }
+            },
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["preset_count"], 1)
+        self.assertEqual(result.data["presets"][0]["name"], "read-zxg-watchlist")
+        self.assertEqual(result.data["presets"][0]["command"], "block-read-watchlist")
+        self.assertEqual(result.data["presets"][0]["profile"], "default")
+
     def test_handle_task_run_uses_guarded_preset_defaults(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
