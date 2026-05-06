@@ -315,12 +315,15 @@ python -m tdxquant.cli task block-read-full --block-code ZXG --profile default
 如果你已经把固定板块代码收口为 task preset，也可以直接走 preset：
 
 ```bash
+python -m tdxquant.cli task run --preset read-zxg-watchlist
+python -m tdxquant.cli task run --preset read-zxg-watchlist --block-code MYZXG
 python -m tdxquant.cli task run --preset read-zxg-full
 python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 ```
 
 这里的语义保持和其他 `task run --preset ...` 一致：
 
+- `read-zxg-watchlist` 这类 preset 只提供静态 `block_code` 默认值
 - `read-zxg-full` 这类 preset 只提供静态 `block_code` 默认值
 - 如果命令行显式再传 `--block-code`，以命令行参数为准
 - 这仍然只是 `task block-read-full` 的日常命令模板；同一 preset 现在也已经通过 `catalog` entry `read-zxg-full` 暴露
@@ -745,6 +748,8 @@ python -m tdxquant.cli task run --preset task-buy-default --code 516820 --price 
 python -m tdxquant.cli task run --preset submit-once-default --code 516820 --price 0.35 --quantity 100
 python -m tdxquant.cli task run --preset submit-ready-default --code 516820 --price 0.35 --quantity 100
 python -m tdxquant.cli task run --preset confirm-current-default
+python -m tdxquant.cli task run --preset read-zxg-watchlist
+python -m tdxquant.cli task run --preset read-zxg-watchlist --block-code MYZXG
 python -m tdxquant.cli task run --preset read-zxg-full
 python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 ```
@@ -757,6 +762,7 @@ python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 - `trade-submit-ready`
 - `trade-confirm-current`
 - `guarded-trade-buy`
+- `block-read-watchlist`
 - `block-read-watchlist-export`
 - `block-read-full`
 
@@ -765,5 +771,6 @@ python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 - `task preset` 只是一层 CLI alias，最终仍然走既有稳定 `task` workflow。
 - preset 中定义的是命令级默认参数；如果命令行显式再传一次同名参数，以命令行参数为准。
 - `task profile` 负责 workflow 默认行为，`task preset` 负责日常命令模板。
+- `block-read-watchlist` 当前已支持这种静态 preset 打包；它仍然只是标准化 snapshot 读取入口，不引入 catalog / report / export 语义。
 - `block-read-full` 当前已支持这种静态 preset 打包，并通过同名 preset-backed catalog entry 暴露；仍不包含 report / export 打包。
 - `report` 类查询 workflow 已经有独立的 `report preset`，不建议再通过 `task preset` 重复配置。

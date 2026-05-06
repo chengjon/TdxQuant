@@ -129,6 +129,7 @@ TdxQuant
 - `block_mutation` 标准摘要
 - `block sync` 标准摘要
 - `task block-read-watchlist`
+- `task run --preset read-zxg-watchlist`
 - `task block-read-full`
 - `task block-read-watchlist-export`
 - `task run --preset read-zxg-full`
