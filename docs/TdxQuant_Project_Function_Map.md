@@ -131,8 +131,8 @@ TdxQuant
 - `task block-read-watchlist`
 - `task run --preset read-zxg-watchlist`
 - `task block-read-full`
-- `task block-read-watchlist-export`
 - `task run --preset read-zxg-full`
+- `task block-read-watchlist-export`
 - `task run --preset export-zxg-watchlist`
 - 本地 audit log artifact
 - 可选 `mutation_key` 关联键
