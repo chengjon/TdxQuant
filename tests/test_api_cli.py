@@ -2662,6 +2662,19 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(forwarded.task_command, "run")
         self.assertEqual(forwarded.preset, "export-zxg-watchlist")
 
+    def test_handle_catalog_read_zxg_full_entry_dispatches_through_task_subcommand(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--entry", "read-zxg-full"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        with patch("tdxquant.cli._handle_task_subcommand", return_value=expected) as mocked_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_handler.assert_called_once()
+        forwarded = mocked_handler.call_args.args[0]
+        self.assertEqual(forwarded.command, "task")
+        self.assertEqual(forwarded.task_command, "run")
+        self.assertEqual(forwarded.preset, "read-zxg-full")
+
     def test_handle_catalog_trade_entry_preserves_explicit_overrides(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
