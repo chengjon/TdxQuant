@@ -226,5 +226,11 @@
     "preset": "read-zxg-full",
     "description": "统一入口下的 ZXG 板块完整诊断视图模板。",
     "labels": ["task", "block", "watchlist", "read"]
+  },
+  "read-zxg-watchlist": {
+    "source": "task",
+    "preset": "read-zxg-watchlist",
+    "description": "统一入口下的 ZXG 板块标准化快照读取模板。",
+    "labels": ["task", "block", "watchlist", "read"]
   }
 }

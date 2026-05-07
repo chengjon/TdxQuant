@@ -2561,6 +2561,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         entry_names = [entry["name"] for entry in result.data["entries"]]
         self.assertIn("read-zxg-full", entry_names)
 
+    def test_handle_catalog_list_default_includes_read_zxg_watchlist_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entry_names = [entry["name"] for entry in result.data["entries"]]
+        self.assertIn("read-zxg-watchlist", entry_names)
+
     def test_handle_catalog_list_returns_export_watchlist_entry_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--entry", "export-zxg-watchlist"])
@@ -2583,6 +2591,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["entries"][0]["source"], "task")
         self.assertEqual(result.data["entries"][0]["preset"], "read-zxg-full")
         self.assertEqual(result.data["entries"][0]["command"], "block-read-full")
+
+    def test_handle_catalog_list_returns_read_zxg_watchlist_entry_metadata(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--entry", "read-zxg-watchlist"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["selected_entry"], "read-zxg-watchlist")
+        self.assertEqual(result.data["summary"]["entry_count"], 1)
+        self.assertEqual(result.data["entries"][0]["name"], "read-zxg-watchlist")
+        self.assertEqual(result.data["entries"][0]["source"], "task")
+        self.assertEqual(result.data["entries"][0]["preset"], "read-zxg-watchlist")
+        self.assertEqual(result.data["entries"][0]["command"], "block-read-watchlist")
 
     def test_handle_catalog_list_uses_stable_ordering(self) -> None:
         parser = build_parser()
@@ -2683,6 +2703,19 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(forwarded.task_command, "run")
         self.assertEqual(forwarded.preset, "read-zxg-full")
 
+    def test_handle_catalog_read_zxg_watchlist_entry_dispatches_through_task_subcommand(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--entry", "read-zxg-watchlist"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        with patch("tdxquant.cli._handle_task_subcommand", return_value=expected) as mocked_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_handler.assert_called_once()
+        forwarded = mocked_handler.call_args.args[0]
+        self.assertEqual(forwarded.command, "task")
+        self.assertEqual(forwarded.task_command, "run")
+        self.assertEqual(forwarded.preset, "read-zxg-watchlist")
+
     def test_handle_catalog_trade_entry_preserves_explicit_overrides(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -2763,6 +2796,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["dispatch"]["command_name"], "block-read-full")
         self.assertEqual(result.data["resolved_args"]["task_command"], "block-read-full")
         self.assertEqual(result.data["resolved_args"]["block_code"], "ZXG")
+        mocked_task_handler.assert_not_called()
+
+    def test_handle_catalog_plan_read_zxg_watchlist_returns_resolved_dispatch_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "read-zxg-watchlist"])
+        with patch("tdxquant.cli._handle_task_subcommand") as mocked_task_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "read-zxg-watchlist")
+        self.assertEqual(result.data["dispatch"]["source"], "task")
+        self.assertEqual(result.data["dispatch"]["command_group"], "task")
+        self.assertEqual(result.data["dispatch"]["command_name"], "block-read-watchlist")
+        self.assertEqual(result.data["resolved_args"]["profile"], "default")
+        self.assertEqual(result.data["resolved_args"]["api_profile"], "safe_read")
+        self.assertEqual(result.data["resolved_args"]["task_command"], "block-read-watchlist")
+        self.assertEqual(result.data["resolved_args"]["block_code"], "ZXG")
+        self.assertEqual(result.data["summary_view"]["resolved_args"]["profile"], "default")
+        self.assertEqual(result.data["summary_view"]["resolved_args"]["api_profile"], "safe_read")
         mocked_task_handler.assert_not_called()
 
     def test_handle_catalog_plan_bundle_returns_selected_steps_without_execution(self) -> None:
