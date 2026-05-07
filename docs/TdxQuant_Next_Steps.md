@@ -155,6 +155,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `task block-read-watchlist` 已接入现有 task preset 体系，当前固定 `block_code` 默认值与 `safe_read` API profile，并允许显式 CLI 覆盖 `block_code`
 - `task block-read-watchlist` 已接入同一套 preset-backed catalog 入口；当前只收口发现、预览与执行，不引入新的 catalog 参数层
 - `task block-read-full` 继续保留 canonical `data.snapshot`，只额外补 task-level `data.read_full` 诊断摘要
+- `read-zxg-review` 已接入同一套纯读 catalog bundle 入口，当前只把 `read-zxg-watchlist` 与 `read-zxg-full` 收口到同一条 bundle；顶层 `--block-code` 会统一覆盖两步，不引入 export / report / write-back 语义
 - `task block-read-watchlist-export` 继续只把 `data.snapshot` 安全写到单文件 JSON，不反向定义新的 provider schema
 - `task block-read-watchlist-export` 已接入现有 task preset 体系，当前只支持静态 `block_code / export_output / overwrite`
 - `task block-read-full` 已接入同一套 task preset 体系，当前只做静态 `block_code` 打包与显式 CLI 覆盖

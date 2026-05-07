@@ -773,4 +773,6 @@ python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 - `task profile` 负责 workflow 默认行为，`task preset` 负责日常命令模板。
 - `block-read-watchlist` 当前已支持这种轻量 preset 打包，并通过同名 preset-backed catalog entry 暴露；仍然只是标准化 snapshot 读取入口，不引入 report / export 语义。
 - `block-read-full` 当前已支持这种静态 preset 打包，并通过同名 preset-backed catalog entry 暴露；仍不包含 report / export 打包。
+- `read-zxg-review` 当前已作为纯读 catalog bundle 暴露；它只把 `read-zxg-watchlist` 与 `read-zxg-full` 收口到同一条日常入口，不引入 export / report / write-back 语义。
+- 对 `catalog plan/run --bundle read-zxg-review --block-code ...`，顶层 `block_code` 会统一覆盖到两步，而不会引入每步单独参数层。
 - `report` 类查询 workflow 已经有独立的 `report preset`，不建议再通过 `task preset` 重复配置。

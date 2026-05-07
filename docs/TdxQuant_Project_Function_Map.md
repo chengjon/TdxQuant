@@ -223,6 +223,7 @@ TdxQuant
 - 稳定交易 task 已透传 `submission_key` 与 `max_price`
 - `task run --preset ...` 已支持同一组交易安全参数并保留显式 CLI 覆盖
 - `task block-read-watchlist` 与 `task block-read-full` 现在都已支持静态 preset 打包、显式 `--block-code` 覆盖，以及各自的 preset-backed catalog 入口；其中 `read-zxg-watchlist` 还固定 `api_profile=safe_read`，仍不扩成 report / export 打包
+- `read-zxg-review` 现在作为纯读 catalog bundle，把 `read-zxg-watchlist` 与 `read-zxg-full` 收口成同一条两步日常入口；顶层 `--block-code` 会统一覆盖两步，仍不扩成 report / export / write-back 场景
 
 这层的目标不是补充新的底层函数，而是把多步骤流程收口成稳定任务。
 

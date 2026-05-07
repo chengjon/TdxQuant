@@ -33,6 +33,20 @@
       }
     ]
   },
+  "read-zxg-review": {
+    "description": "先读取 ZXG 标准化快照，再查看完整诊断视图。",
+    "labels": ["block", "watchlist", "read", "review"],
+    "steps": [
+      {
+        "name": "snapshot",
+        "entry": "read-zxg-watchlist"
+      },
+      {
+        "name": "full",
+        "entry": "read-zxg-full"
+      }
+    ]
+  },
   "morning-review": {
     "description": "开盘前刷新环境并查看当日交易日报。",
     "labels": ["morning", "review", "daily"],

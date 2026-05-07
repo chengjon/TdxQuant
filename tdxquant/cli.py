@@ -523,6 +523,7 @@ def _add_catalog_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--port")
     subparser.add_argument("--baudrate", type=int)
     subparser.add_argument("--timeout", type=float)
+    subparser.add_argument("--block-code")
     subparser.add_argument("--code")
     subparser.add_argument("--price")
     subparser.add_argument("--quantity", type=int)
@@ -2355,6 +2356,7 @@ def _serialize_catalog_namespace(args: argparse.Namespace) -> dict[str, object]:
 
 def _extract_catalog_key_fields(payload: dict[str, object]) -> dict[str, object]:
     keys = (
+        "block_code",
         "code",
         "price",
         "quantity",
