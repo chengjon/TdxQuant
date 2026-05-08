@@ -1,0 +1,52 @@
+{
+  "success": false,
+  "ok": false,
+  "code": "invalid_request",
+  "message": "rejected block sync because target block ZXG does not exist",
+  "capability": "block.sync_watchlist",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-block-sync-replace-rejected",
+  "started_at": "2026-05-03T10:10:00Z",
+  "finished_at": "2026-05-03T10:10:00Z",
+  "elapsed_ms": 0.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "sync": {
+      "schema_version": "2026-05-03",
+      "block_code": "ZXG",
+      "mode": "replace",
+      "create_if_missing": false,
+      "dry_run": false,
+      "show": true,
+      "status": "rejected",
+      "governance_decision": "reject",
+      "governance_reason": "missing_block",
+      "created_block": false,
+      "would_create_block": false,
+      "added_symbols": [
+        "000001.SZ"
+      ],
+      "removed_symbols": [],
+      "unchanged_symbols": [],
+      "desired_symbols": [
+        "000001.SZ"
+      ],
+      "observed_symbols": []
+    },
+    "artifacts": {
+      "audit_log_path": "runtime/block-sync/fixture-block-sync-replace-rejected.json"
+    }
+  },
+  "artifacts": [
+    {
+      "kind": "block_sync_audit",
+      "path": "runtime/block-sync/fixture-block-sync-replace-rejected.json"
+    }
+  ]
+}

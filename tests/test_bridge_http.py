@@ -16,8 +16,23 @@ class _FakeController:
     def __init__(self) -> None:
         self.start_calls: list[dict[str, object]] = []
         self.stop_calls: list[dict[str, object]] = []
+        self.status_calls: list[dict[str, object]] = []
+        self.control_status_calls = 0
+        self.status_handler = None
+        self.list_calls = 0
+        self.artifact_calls: list[dict[str, object]] = []
+        self.event_calls: list[dict[str, object]] = []
+        self.log_calls: list[dict[str, object]] = []
         self.start_result: dict[str, object] = {"ok": True, "result": {"run_id": "run-001", "state": "starting"}}
         self.stop_result: dict[str, object] = {"ok": True, "result": {"run_id": "run-001", "state": "stopped"}}
+        self.status_result: dict[str, object] = {
+            "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234, "reason": None},
+            "watch_status": {"run_id": "run-001", "event_count": 3},
+        }
+        self.list_result: dict[str, object] = {"active": None, "last_completed": None, "last_failed": None}
+        self.artifact_result: dict[str, object] = {"run_id": "run-001", "artifacts": {"run_dir": "/tmp/run-001"}}
+        self.events_result: dict[str, object] = {"run_id": "run-001", "events": []}
+        self.logs_result: dict[str, object] = {"run_id": "run-001", "lines": []}
 
     def start(self, **kwargs: object) -> dict[str, object]:
         self.start_calls.append(dict(kwargs))
@@ -26,6 +41,33 @@ class _FakeController:
     def stop(self, **kwargs: object) -> dict[str, object]:
         self.stop_calls.append(dict(kwargs))
         return dict(self.stop_result)
+
+    def status(self, **kwargs: object) -> dict[str, object]:
+        self.status_calls.append(dict(kwargs))
+        if self.status_handler is not None:
+            return dict(self.status_handler(**kwargs))
+        return dict(self.status_result)
+
+    def control_status(self) -> dict[str, object]:
+        self.control_status_calls += 1
+        payload = self.status()
+        return dict(payload.get("control") or {})
+
+    def list_runs(self) -> dict[str, object]:
+        self.list_calls += 1
+        return dict(self.list_result)
+
+    def artifacts(self, **kwargs: object) -> dict[str, object]:
+        self.artifact_calls.append(dict(kwargs))
+        return dict(self.artifact_result)
+
+    def events(self, **kwargs: object) -> dict[str, object]:
+        self.event_calls.append(dict(kwargs))
+        return dict(self.events_result)
+
+    def logs(self, **kwargs: object) -> dict[str, object]:
+        self.log_calls.append(dict(kwargs))
+        return dict(self.logs_result)
 
 
 class BridgeEnvelopeTests(unittest.TestCase):
@@ -117,7 +159,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         *,
         controller: _FakeController | None = None,
     ) -> tuple[BridgeHTTPServer, str, threading.Thread]:
-        server = BridgeHTTPServer(config, controller=controller or _FakeController())
+        server = BridgeHTTPServer(config, controller=controller)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         return server, f"http://127.0.0.1:{server.server_address[1]}", thread
@@ -275,6 +317,198 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=5)
 
+    def test_watch_status_preserves_reconnecting_runtime_fields(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            live_result = {
+                "control": {
+                    "state": "reconnecting",
+                    "active": True,
+                    "run_id": "run-001",
+                    "pid": 1234,
+                    "reason": None,
+                },
+                "watch_status": {
+                    "run_id": "run-001",
+                    "state": "reconnecting",
+                    "heartbeat_at": "2026-05-03T09:00:05+00:00",
+                    "last_event_ts": "2026-05-03T09:00:02+00:00",
+                    "reconnect_count": 1,
+                    "consecutive_reconnect_failures": 1,
+                    "last_error": {"code": "SESSION_LOST", "message": "session lost"},
+                },
+            }
+            historical_result = {
+                "control": dict(live_result["control"]),
+                "watch_status": {
+                    "run_id": "run-001",
+                    "state": "running",
+                    "event_count": 3,
+                },
+            }
+            controller.status_handler = lambda **kwargs: historical_result if kwargs.get("run_id") else live_result
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"]["watch_status"]["state"], "reconnecting")
+        self.assertEqual(payload["result"]["watch_status"]["reconnect_count"], 1)
+        self.assertEqual(payload["result"]["watch_status"]["last_error"]["code"], "SESSION_LOST")
+
+    def test_watch_status_preserves_degraded_runtime_fields(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            live_result = {
+                "control": {
+                    "state": "degraded",
+                    "active": True,
+                    "run_id": "run-001",
+                    "pid": 1234,
+                    "reason": None,
+                },
+                "watch_status": {
+                    "run_id": "run-001",
+                    "state": "degraded",
+                    "heartbeat_at": "2026-05-03T09:00:05+00:00",
+                    "last_event_ts": "2026-05-03T09:00:02+00:00",
+                    "degraded_since": "2026-05-03T09:00:03+00:00",
+                    "last_disconnect_at": "2026-05-03T09:00:03+00:00",
+                    "next_reconnect_at": "2026-05-03T09:00:08+00:00",
+                    "last_error": {"code": "RECONNECT_BACKOFF", "message": "retrying"},
+                },
+            }
+            historical_result = {
+                "control": dict(live_result["control"]),
+                "watch_status": {
+                    "run_id": "run-001",
+                    "state": "running",
+                    "event_count": 3,
+                },
+            }
+            controller.status_handler = lambda **kwargs: historical_result if kwargs.get("run_id") else live_result
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"]["watch_status"]["state"], "degraded")
+        self.assertEqual(payload["result"]["watch_status"]["degraded_since"], "2026-05-03T09:00:03+00:00")
+        self.assertEqual(payload["result"]["watch_status"]["last_error"]["code"], "RECONNECT_BACKOFF")
+
+    def test_watch_status_surfaces_stale_process_failure_projection(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            stale_result = {
+                "control": {
+                    "state": "failed",
+                    "active": False,
+                    "run_id": "run-001",
+                    "pid": None,
+                    "reason": "stale_process_state",
+                },
+                "watch_status": None,
+            }
+            status_reads = 0
+
+            def status_handler(**kwargs: object) -> dict[str, object]:
+                nonlocal status_reads
+                status_reads += 1
+                if status_reads == 1:
+                    return stale_result
+                return {
+                    "control": {
+                        "state": "running",
+                        "active": True,
+                        "run_id": "run-001",
+                        "pid": 1234,
+                        "reason": None,
+                    },
+                    "watch_status": {
+                        "run_id": "run-001",
+                        "state": "running",
+                        "event_count": 99,
+                    },
+                }
+
+            controller.status_handler = status_handler
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"]["control"]["state"], "failed")
+        self.assertFalse(payload["result"]["control"]["active"])
+        self.assertEqual(payload["result"]["control"]["reason"], "stale_process_state")
+        self.assertIsNone(payload["result"]["watch_status"])
+
+    def test_watch_status_rejects_missing_or_invalid_token_before_controller_read(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                with self.assertRaises(HTTPError) as missing_ctx:
+                    self._request(f"{base_url}/bridge/v1/watch/status")
+                missing_payload = json.loads(missing_ctx.exception.read().decode("utf-8"))
+                self.assertEqual(missing_ctx.exception.code, 401)
+                self.assertEqual(missing_payload["error"]["code"], "UNAUTHORIZED")
+
+                with self.assertRaises(HTTPError) as invalid_ctx:
+                    self._request(f"{base_url}/bridge/v1/watch/status", token="wrong-token")
+                invalid_payload = json.loads(invalid_ctx.exception.read().decode("utf-8"))
+                self.assertEqual(invalid_ctx.exception.code, 401)
+                self.assertEqual(invalid_payload["error"]["code"], "UNAUTHORIZED")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(controller.status_calls, [])
+
     def test_health_uses_reconciled_stale_background_state(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root_dir = Path(temp_dir)
@@ -302,6 +536,37 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=5)
 
+    def test_health_ignores_malformed_status_json_when_control_state_is_valid(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            run_dir = root_dir / "run-001"
+            run_dir.mkdir(parents=True)
+            pid = os.getpid()
+            (root_dir / "active.json").write_text(
+                json.dumps({"state": "running", "active": True, "run_id": "run-001", "pid": pid, "reason": None}),
+                encoding="utf-8",
+            )
+            (root_dir / "pid").write_text(f"{pid}\n", encoding="utf-8")
+            (run_dir / "status.json").write_text("{invalid json", encoding="utf-8")
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/health", token="secret-token")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["control"]["state"], "running")
+                self.assertEqual(payload["result"]["control"]["run_id"], "run-001")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
     def test_watch_status_uses_reconciled_stale_background_state(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root_dir = Path(temp_dir)
@@ -323,6 +588,34 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 self.assertTrue(payload["ok"])
                 self.assertEqual(payload["result"]["control"]["state"], "failed")
                 self.assertFalse(payload["result"]["control"]["active"])
+                self.assertIsNone(payload["result"]["watch_status"])
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_status_uses_reconciled_stale_reconnecting_background_state(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            (root_dir / "active.json").write_text(
+                json.dumps({"state": "reconnecting", "active": True, "run_id": "run-001", "pid": 1234, "reason": None}),
+                encoding="utf-8",
+            )
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["control"]["state"], "failed")
+                self.assertFalse(payload["result"]["control"]["active"])
+                self.assertEqual(payload["result"]["control"]["reason"], "stale_process_state")
                 self.assertIsNone(payload["result"]["watch_status"])
             finally:
                 server.shutdown()
@@ -362,7 +655,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=5)
 
-    def test_watch_status_reads_historical_status_when_run_id_is_explicit(self) -> None:
+    def test_watch_status_ignores_explicit_run_id_and_returns_controller_status_verbatim(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root_dir = Path(temp_dir)
             run_dir = root_dir / "run-001"
@@ -387,7 +680,9 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/status?run_id=run-001", token="secret-token")
                 self.assertTrue(payload["ok"])
-                self.assertEqual(payload["result"]["watch_status"]["event_count"], 3)
+                self.assertEqual(payload["result"]["control"]["run_id"], "run-001")
+                self.assertFalse(payload["result"]["control"]["active"])
+                self.assertIsNone(payload["result"]["watch_status"])
             finally:
                 server.shutdown()
                 server.server_close()
@@ -571,6 +866,37 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=5)
 
+    def test_watch_artifacts_uses_active_run_id_without_parsing_status_json(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            run_dir = root_dir / "run-001"
+            run_dir.mkdir(parents=True)
+            pid = os.getpid()
+            (root_dir / "active.json").write_text(
+                json.dumps({"state": "running", "active": True, "run_id": "run-001", "pid": pid, "reason": None}),
+                encoding="utf-8",
+            )
+            (root_dir / "pid").write_text(f"{pid}\n", encoding="utf-8")
+            (run_dir / "status.json").write_text("{invalid json", encoding="utf-8")
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/artifacts", token="secret-token")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["run_id"], "run-001")
+                self.assertTrue(payload["result"]["artifacts"]["status_path"].endswith("run-001/status.json"))
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
     def test_watch_events_requires_active_run_or_explicit_run_id(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root_dir = Path(temp_dir)
@@ -597,6 +923,38 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=5)
 
+    def test_watch_events_uses_active_run_id_without_parsing_status_json(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            run_dir = root_dir / "run-001"
+            run_dir.mkdir(parents=True)
+            pid = os.getpid()
+            (root_dir / "active.json").write_text(
+                json.dumps({"state": "running", "active": True, "run_id": "run-001", "pid": pid, "reason": None}),
+                encoding="utf-8",
+            )
+            (root_dir / "pid").write_text(f"{pid}\n", encoding="utf-8")
+            (run_dir / "status.json").write_text("{invalid json", encoding="utf-8")
+            (run_dir / "events.jsonl").write_text(json.dumps({"sequence": 1}) + "\n", encoding="utf-8")
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/events", token="secret-token")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["run_id"], "run-001")
+                self.assertEqual(payload["result"]["events"][0]["sequence"], 1)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
     def test_watch_logs_requires_active_run_or_explicit_run_id(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root_dir = Path(temp_dir)
@@ -618,6 +976,38 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 payload = json.loads(ctx.exception.read().decode("utf-8"))
                 self.assertEqual(ctx.exception.code, 400)
                 self.assertEqual(payload["error"]["message"], "watch logs require an active or explicit run_id")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_logs_uses_active_run_id_without_parsing_status_json(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            run_dir = root_dir / "run-001"
+            run_dir.mkdir(parents=True)
+            pid = os.getpid()
+            (root_dir / "active.json").write_text(
+                json.dumps({"state": "running", "active": True, "run_id": "run-001", "pid": pid, "reason": None}),
+                encoding="utf-8",
+            )
+            (root_dir / "pid").write_text(f"{pid}\n", encoding="utf-8")
+            (run_dir / "status.json").write_text("{invalid json", encoding="utf-8")
+            (run_dir / "runner.log").write_text("line-1\n", encoding="utf-8")
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/logs", token="secret-token")
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["run_id"], "run-001")
+                self.assertEqual(payload["result"]["lines"], ["line-1"])
             finally:
                 server.shutdown()
                 server.server_close()

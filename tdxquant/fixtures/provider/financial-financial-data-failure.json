@@ -1,0 +1,42 @@
+{
+  "success": false,
+  "ok": false,
+  "code": "execution_failed",
+  "message": "fetched financial data failed: upstream runtime unavailable",
+  "capability": "financial.financial_data",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-financial-financial-data-failure",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 15.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [],
+    "query_meta": {
+      "query_kind": "financial.financial_data",
+      "row_count": 0,
+      "requested_fields": [
+        "FN1",
+        "FN2"
+      ],
+      "returned_fields": [],
+      "symbols": [
+        "688318.SH"
+      ],
+      "date_range": {
+        "start": "20240101",
+        "end": "20241231"
+      },
+      "query_params": {
+        "report_type": "announce_time"
+      }
+    }
+  },
+  "artifacts": []
+}

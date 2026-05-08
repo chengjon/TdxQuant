@@ -636,8 +636,63 @@ def run_tdx_full_tick(stock_code: str, field_list: list[str], strategy_path: str
     return _run_tq_call("fetched TongDaXin full tick data", callback, strategy_path=strategy_path)
 
 
+def _query_rows_from_payload(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, dict) and payload.get("type") == "dataframe" and isinstance(payload.get("records"), list):
+        return [dict(item) for item in payload["records"] if isinstance(item, dict)]
+    if isinstance(payload, list):
+        rows: list[dict[str, Any]] = []
+        for item in payload:
+            if isinstance(item, dict):
+                rows.append(dict(item))
+            else:
+                rows.append({"value": item})
+        return rows
+    if isinstance(payload, dict):
+        return [dict(payload)]
+    return []
+
+
+def _returned_fields(rows: list[dict[str, Any]]) -> list[str]:
+    fields: list[str] = []
+    for row in rows:
+        for key in row:
+            if key not in fields:
+                fields.append(key)
+    return fields
+
+
+def _attach_query_rows(
+    result: Result,
+    *,
+    query_kind: str,
+    requested_fields: list[str],
+    query_params: dict[str, Any],
+    **selectors: Any,
+) -> Result:
+    if not result.ok:
+        return result
+    rows = _query_rows_from_payload(_extract_runtime_result_payload(result))
+    result.data["rows"] = rows
+    result.data["query_meta"] = {
+        "query_kind": query_kind,
+        "row_count": len(rows),
+        "requested_fields": list(requested_fields or []),
+        "returned_fields": _returned_fields(rows),
+        **selectors,
+        "query_params": dict(query_params),
+    }
+    return result
+
+
 def run_tdx_data_snapshot(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
-    return run_tdx_full_tick(stock_code=stock_code, field_list=field_list, strategy_path=strategy_path)
+    result = run_tdx_full_tick(stock_code=stock_code, field_list=field_list, strategy_path=strategy_path)
+    return _attach_query_rows(
+        result,
+        query_kind="market.snapshot",
+        requested_fields=field_list,
+        query_params={},
+        symbol=stock_code,
+    )
 
 
 def run_tdx_market_snapshot(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
@@ -671,7 +726,20 @@ def run_tdx_data_kline(
             fill_data=fill_data,
         )
 
-    return _run_tq_call("fetched TongDaXin kline data", callback, strategy_path=strategy_path)
+    result = _run_tq_call("fetched TongDaXin kline data", callback, strategy_path=strategy_path)
+    return _attach_query_rows(
+        result,
+        query_kind="market.kline",
+        requested_fields=field_list,
+        query_params={
+            "period": period,
+            "count": count,
+            "dividend_type": dividend_type,
+            "fill_data": fill_data,
+        },
+        symbols=list(stock_list),
+        date_range={"start": start_time, "end": end_time},
+    )
 
 
 def run_tdx_data_stock_info(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
@@ -711,7 +779,14 @@ def run_tdx_stock_list(market: str | None, list_type: int, strategy_path: str | 
         method = _require_tq_method(tq_class, "get_stock_list")
         return method(market=market, list_type=list_type)
 
-    return _run_tq_call("fetched TongDaXin stock list", callback, strategy_path=strategy_path)
+    result = _run_tq_call("fetched TongDaXin stock list", callback, strategy_path=strategy_path)
+    return _attach_query_rows(
+        result,
+        query_kind="meta.stock_list",
+        requested_fields=[],
+        query_params={"list_type": list_type},
+        market=market,
+    )
 
 
 def run_tdx_more_info(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
@@ -1129,12 +1204,12 @@ def run_tdx_create_sector(
         method = _require_tq_method(tq_class, "create_sector")
         return method(block_code=block_code, block_name=block_name)
 
-    result = _run_tq_call("created TongDaXin custom sector", callback, strategy_path=strategy_path)
     return apply_block_mutation_safety(
-        result,
         operation="create_sector",
         block_code=block_code,
         block_name=block_name,
+        execute_write=lambda: _run_tq_call("created TongDaXin custom sector", callback, strategy_path=strategy_path),
+        observed_state=lambda: _probe_custom_sector_state(block_code, strategy_path=strategy_path),
         mutation_key=mutation_key,
         audit_dir=audit_dir,
     )
@@ -1150,11 +1225,11 @@ def run_tdx_delete_sector(
         method = _require_tq_method(tq_class, "delete_sector")
         return method(block_code=block_code)
 
-    result = _run_tq_call("deleted TongDaXin custom sector", callback, strategy_path=strategy_path)
     return apply_block_mutation_safety(
-        result,
         operation="delete_sector",
         block_code=block_code,
+        execute_write=lambda: _run_tq_call("deleted TongDaXin custom sector", callback, strategy_path=strategy_path),
+        observed_state=lambda: _probe_custom_sector_state(block_code, strategy_path=strategy_path),
         mutation_key=mutation_key,
         audit_dir=audit_dir,
     )
@@ -1171,12 +1246,12 @@ def run_tdx_rename_sector(
         method = _require_tq_method(tq_class, "rename_sector")
         return method(block_code=block_code, block_name=block_name)
 
-    result = _run_tq_call("renamed TongDaXin custom sector", callback, strategy_path=strategy_path)
     return apply_block_mutation_safety(
-        result,
         operation="rename_sector",
         block_code=block_code,
         block_name=block_name,
+        execute_write=lambda: _run_tq_call("renamed TongDaXin custom sector", callback, strategy_path=strategy_path),
+        observed_state=lambda: _probe_custom_sector_state(block_code, strategy_path=strategy_path),
         mutation_key=mutation_key,
         audit_dir=audit_dir,
     )
@@ -1192,11 +1267,11 @@ def run_tdx_clear_sector(
         method = _require_tq_method(tq_class, "clear_sector")
         return method(block_code=block_code)
 
-    result = _run_tq_call("cleared TongDaXin custom sector members", callback, strategy_path=strategy_path)
     return apply_block_mutation_safety(
-        result,
         operation="clear_sector",
         block_code=block_code,
+        execute_write=lambda: _run_tq_call("cleared TongDaXin custom sector members", callback, strategy_path=strategy_path),
+        observed_state=lambda: _probe_custom_sector_state(block_code, strategy_path=strategy_path, include_stocks=True),
         mutation_key=mutation_key,
         audit_dir=audit_dir,
     )
@@ -1214,13 +1289,13 @@ def run_tdx_send_user_block(
         method = _require_tq_method(tq_class, "send_user_block")
         return method(block_code=block_code, stocks=stocks, show=show)
 
-    result = _run_tq_call("updated TongDaXin user block", callback, strategy_path=strategy_path)
     return apply_block_mutation_safety(
-        result,
         operation="send_user_block",
         block_code=block_code,
         stocks=stocks,
         show=show,
+        execute_write=lambda: _run_tq_call("updated TongDaXin user block", callback, strategy_path=strategy_path),
+        observed_state=lambda: _probe_custom_sector_state(block_code, strategy_path=strategy_path, include_stocks=True),
         mutation_key=mutation_key,
         audit_dir=audit_dir,
     )

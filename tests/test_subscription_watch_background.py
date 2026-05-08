@@ -16,6 +16,7 @@ from tdxquant.subscription_watch_background import (
     SubscriptionWatchBackgroundPaths,
     build_background_paths,
     reconcile_background_state,
+    read_active_payload,
     write_terminal_background_state,
 )
 
@@ -327,6 +328,36 @@ def test_reconcile_stale_stopping_state_defaults_to_graceful_stop_reason(tmp_pat
     assert paths.lock_path.exists()
 
 
+@pytest.mark.parametrize("state", ["reconnecting", "degraded"])
+def test_reconcile_marks_resilience_active_process_loss_as_failed(tmp_path: Path, state: str) -> None:
+    paths = build_background_paths(tmp_path)
+    paths.root_dir.mkdir(parents=True, exist_ok=True)
+    paths.pid_path.write_text("12345\n", encoding="utf-8")
+    paths.lock_path.write_text("locked\n", encoding="utf-8")
+    paths.active_path.write_text(
+        json.dumps(
+            {
+                "state": state,
+                "run_id": "run-resilience",
+                "pid": 12345,
+                "active": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    reconciled = reconcile_background_state(paths, pid_is_alive=lambda pid: False)
+    persisted = json.loads(paths.active_path.read_text(encoding="utf-8"))
+
+    assert reconciled["state"] == "failed"
+    assert reconciled["reason"] == "stale_process_state"
+    assert reconciled["active"] is False
+    assert reconciled["pid"] is None
+    assert persisted == reconciled
+    assert not paths.pid_path.exists()
+    assert paths.lock_path.exists()
+
+
 def test_start_rejects_when_active_state_is_running(tmp_path: Path) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     pid = os.getpid()
@@ -347,6 +378,29 @@ def test_start_rejects_when_active_state_is_running(tmp_path: Path) -> None:
     assert result["ok"] is False
     assert result["error"]["code"] == "ALREADY_RUNNING"
     assert result["error"]["details"]["run_id"] == "run-001"
+
+
+@pytest.mark.parametrize("state", ["reconnecting", "degraded"])
+def test_start_rejects_when_active_state_is_resilience_runtime_state(tmp_path: Path, state: str) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": state,
+            "run_id": "run-active",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
+    controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+
+    result = controller.start(stock_list=["600519.SH"])
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "ALREADY_RUNNING"
+    assert result["error"]["details"]["run_id"] == "run-active"
 
 
 def test_start_replays_current_active_run_for_same_idempotency_key(tmp_path: Path) -> None:
@@ -427,6 +481,33 @@ def test_start_returns_failure_when_runner_exits_during_startup(tmp_path: Path, 
     assert persisted["active"] is False
 
 
+def test_start_returns_start_timeout_when_runner_never_leaves_starting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(
+        root_dir=tmp_path,
+        python_executable="python",
+        start_timeout_seconds=0.0,
+    )
+
+    class FakeProcess:
+        pid = 4321
+
+    monkeypatch.setattr(controller, "_spawn_runner_process", lambda **kwargs: FakeProcess())
+    monkeypatch.setattr("tdxquant.subscription_watch_background.time.sleep", lambda _: None)
+    controller._pid_is_alive = Mock(return_value=True)
+
+    result = controller.start(stock_list=["600519.SH"])
+    persisted = read_active_payload(controller.paths)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "START_TIMEOUT"
+    assert result["error"]["details"]["run_id"] == persisted["run_id"]
+    assert result["error"]["details"]["state"] == "starting"
+    assert persisted["state"] == "starting"
+    assert persisted["active"] is True
+
+
 def test_stop_returns_run_id_and_coherent_terminal_state_when_process_exits(tmp_path: Path) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     pid = os.getpid()
@@ -452,6 +533,121 @@ def test_stop_returns_run_id_and_coherent_terminal_state_when_process_exits(tmp_
     assert persisted["state"] == "stopped"
     assert persisted["reason"] == "operator_stop"
     assert persisted["active"] is False
+
+
+def test_status_view_returns_explicit_empty_watch_status_when_no_run_is_active(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+
+    status_view = controller.status()
+
+    assert status_view["control"]["state"] == "stopped"
+    assert status_view["control"]["active"] is False
+    assert status_view["watch_status"] is None
+
+
+def test_status_view_returns_active_control_and_current_run_status(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    run_dir = tmp_path / "run-001"
+    run_dir.mkdir(parents=True)
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
+    controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    (run_dir / "status.json").write_text(
+        json.dumps({"run_id": "run-001", "state": "running", "event_count": 3}),
+        encoding="utf-8",
+    )
+
+    status_view = controller.status()
+
+    assert status_view["control"]["run_id"] == "run-001"
+    assert status_view["watch_status"]["event_count"] == 3
+
+
+def test_list_view_returns_active_last_completed_and_last_failed(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    active_run = tmp_path / "run-003"
+    completed_run = tmp_path / "run-002"
+    failed_run = tmp_path / "run-001"
+    active_run.mkdir(parents=True)
+    completed_run.mkdir(parents=True)
+    failed_run.mkdir(parents=True)
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-003",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
+    controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    (active_run / "status.json").write_text(
+        json.dumps({"run_id": "run-003", "state": "running"}),
+        encoding="utf-8",
+    )
+    (completed_run / "summary.json").write_text(
+        json.dumps({"run_id": "run-002", "final_state": "completed"}),
+        encoding="utf-8",
+    )
+    (failed_run / "summary.json").write_text(
+        json.dumps({"run_id": "run-001", "final_state": "failed"}),
+        encoding="utf-8",
+    )
+
+    list_view = controller.list_runs()
+
+    assert list_view["active"]["run_id"] == "run-003"
+    assert list_view["last_completed"]["run_id"] == "run-002"
+    assert list_view["last_failed"]["run_id"] == "run-001"
+
+
+def test_artifacts_view_returns_canonical_paths_for_explicit_run_id(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    run_dir = tmp_path / "run-001"
+    run_dir.mkdir(parents=True)
+
+    artifacts_view = controller.artifacts(run_id="run-001")
+
+    assert artifacts_view["run_id"] == "run-001"
+    assert artifacts_view["artifacts"]["run_dir"] == str(run_dir)
+    assert artifacts_view["artifacts"]["events_jsonl_path"] == str(run_dir / "events.jsonl")
+    assert artifacts_view["artifacts"]["events_csv_path"] == str(run_dir / "events.csv")
+    assert artifacts_view["artifacts"]["runner_log_path"] == str(run_dir / "runner.log")
+
+
+def test_events_and_logs_views_tail_canonical_run_artifacts(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    run_dir = tmp_path / "run-001"
+    run_dir.mkdir(parents=True)
+    (run_dir / "events.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"sequence": 1, "symbol": "000001"}),
+                json.dumps({"sequence": 2, "symbol": "000002"}),
+                json.dumps({"sequence": 3, "symbol": "000003"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "runner.log").write_text("line-1\nline-2\nline-3\n", encoding="utf-8")
+
+    events_view = controller.events(run_id="run-001", tail=2)
+    logs_view = controller.logs(run_id="run-001", tail=2)
+
+    assert [row["sequence"] for row in events_view["events"]] == [2, 3]
+    assert logs_view["lines"] == ["line-2", "line-3"]
 
 
 def test_reconcile_stale_stopping_state_preserves_graceful_stop_reason(tmp_path: Path) -> None:

@@ -12,9 +12,7 @@ from uuid import uuid4
 from .subscription_watch_background import (
     SubscriptionWatchBackgroundController,
     build_background_paths,
-    reconcile_background_state,
 )
-from .subscription_watch_run import build_subscription_watch_run_paths
 
 BRIDGE_VERSION = "v1"
 
@@ -171,7 +169,7 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
 
         try:
             if method == "GET" and parsed.path == "/bridge/v1/health":
-                control = self._background_state()
+                control = self.server.bridge_controller.control_status()
                 self._write_json(
                     200,
                     build_bridge_success(
@@ -263,128 +261,55 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         self._write_control_result(result, request_id=request_id)
 
     def _handle_watch_status(self, request_id: str) -> None:
-        control = self._background_state()
-        default_run_id = control.get("run_id") if bool(control.get("active")) else None
-        run_id = self._resolve_run_id(default_run_id=default_run_id)
-        watch_status = None
-        if run_id is not None:
-            run_paths = build_subscription_watch_run_paths(self.server.run_root_dir, run_id=run_id)
-            watch_status = self._read_json_file(run_paths.status_path)
+        result = self.server.bridge_controller.status()
         self._write_json(
             200,
             build_bridge_success(
                 worker_id=self.server.bridge_config.worker_id,
                 request_id=request_id,
-                result={
-                    "control": control,
-                    "watch_status": watch_status,
-                },
+                result=result,
             ),
         )
 
     def _handle_watch_list(self, request_id: str) -> None:
-        active_payload = self._background_state()
-        active = None
-        last_completed = None
-        last_failed = None
-
-        if isinstance(active_payload, dict):
-            active_run_id = self._optional_str(active_payload.get("run_id"))
-            if active_run_id is not None and bool(active_payload.get("active")):
-                run_paths = build_subscription_watch_run_paths(self.server.run_root_dir, run_id=active_run_id)
-                status_payload = self._read_json_file(run_paths.status_path)
-                active = {
-                    "run_id": active_run_id,
-                    "control": active_payload,
-                    "status": status_payload,
-                }
-
-        if self.server.run_root_dir.exists():
-            for child in sorted(self.server.run_root_dir.iterdir(), key=lambda item: item.name, reverse=True):
-                if not child.is_dir():
-                    continue
-                run_paths = build_subscription_watch_run_paths(self.server.run_root_dir, run_id=child.name)
-                summary_payload = self._read_json_file(run_paths.summary_path)
-                if not isinstance(summary_payload, dict):
-                    continue
-                final_state = self._optional_str(summary_payload.get("final_state"))
-                item = {
-                    "run_id": child.name,
-                    "summary": summary_payload,
-                }
-                if final_state == "completed" and last_completed is None:
-                    last_completed = item
-                elif final_state == "failed" and last_failed is None:
-                    last_failed = item
-                if last_completed is not None and last_failed is not None:
-                    break
-        self._write_json(
-            200,
-            build_bridge_success(
-                worker_id=self.server.bridge_config.worker_id,
-                request_id=request_id,
-                result={
-                    "active": active,
-                    "last_completed": last_completed,
-                    "last_failed": last_failed,
-                },
-            ),
-        )
+        result = self.server.bridge_controller.list_runs()
+        self._write_json(200, build_bridge_success(worker_id=self.server.bridge_config.worker_id, request_id=request_id, result=result))
 
     def _handle_watch_artifacts(self, request_id: str) -> None:
         run_id = self._resolve_run_id()
-        if run_id is None:
-            raise ValueError("watch artifacts require an active or explicit run_id")
-        run_paths = build_subscription_watch_run_paths(self.server.run_root_dir, run_id=run_id)
+        result = self.server.bridge_controller.artifacts(run_id=run_id)
         self._write_json(
             200,
             build_bridge_success(
                 worker_id=self.server.bridge_config.worker_id,
                 request_id=request_id,
-                result={
-                    "run_id": run_id,
-                    "artifacts": {
-                        "run_dir": str(run_paths.run_dir),
-                        "manifest_path": str(run_paths.manifest_path),
-                        "status_path": str(run_paths.status_path),
-                        "summary_path": str(run_paths.summary_path),
-                        "events_jsonl_path": str(run_paths.events_jsonl_path),
-                        "events_csv_path": str(run_paths.events_csv_path),
-                        "runner_log_path": str(run_paths.runner_log_path),
-                    },
-                },
+                result=result,
             ),
         )
 
     def _handle_watch_events(self, request_id: str) -> None:
         run_id = self._resolve_run_id()
-        if run_id is None:
-            raise ValueError("watch events require an active or explicit run_id")
         tail = self._query_int("tail", default=100)
-        run_paths = build_subscription_watch_run_paths(self.server.run_root_dir, run_id=run_id)
-        rows = self._read_jsonl_tail(run_paths.events_jsonl_path, limit=tail)
+        result = self.server.bridge_controller.events(run_id=run_id, tail=tail)
         self._write_json(
             200,
             build_bridge_success(
                 worker_id=self.server.bridge_config.worker_id,
                 request_id=request_id,
-                result={"run_id": run_id, "events": rows},
+                result=result,
             ),
         )
 
     def _handle_watch_logs(self, request_id: str) -> None:
         run_id = self._resolve_run_id()
-        if run_id is None:
-            raise ValueError("watch logs require an active or explicit run_id")
         tail = self._query_int("tail", default=200)
-        run_paths = build_subscription_watch_run_paths(self.server.run_root_dir, run_id=run_id)
-        lines = self._tail_lines(run_paths.runner_log_path, limit=tail)
+        result = self.server.bridge_controller.logs(run_id=run_id, tail=tail)
         self._write_json(
             200,
             build_bridge_success(
                 worker_id=self.server.bridge_config.worker_id,
                 request_id=request_id,
-                result={"run_id": run_id, "lines": lines},
+                result=result,
             ),
         )
 
@@ -438,23 +363,11 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         fallback = self._optional_str(default_run_id)
         if fallback:
             return fallback
-        active_payload = self._background_state()
+        active_payload = self.server.bridge_controller.control_status()
         active_run_id = self._optional_str(active_payload.get("run_id"))
         if active_run_id and bool(active_payload.get("active")):
             return active_run_id
         return None
-
-    def _background_state(self) -> dict[str, Any]:
-        payload = reconcile_background_state(self.server.background_paths)
-        if isinstance(payload, dict):
-            return payload
-        return {
-            "state": "stopped",
-            "active": False,
-            "run_id": None,
-            "pid": None,
-            "reason": None,
-        }
 
     def _query_int(self, name: str, *, default: int) -> int:
         parsed = urlparse(self.path)
@@ -483,32 +396,6 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return None
         text = str(value).strip()
         return text or None
-
-    @staticmethod
-    def _read_json_file(path: Path) -> dict[str, Any] | None:
-        if not path.exists():
-            return None
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        return payload if isinstance(payload, dict) else None
-
-    @staticmethod
-    def _read_jsonl_tail(path: Path, *, limit: int) -> list[dict[str, Any]]:
-        if not path.exists():
-            return []
-        rows: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines()[-max(limit, 0) :]:
-            if not line.strip():
-                continue
-            payload = json.loads(line)
-            if isinstance(payload, dict):
-                rows.append(payload)
-        return rows
-
-    @staticmethod
-    def _tail_lines(path: Path, *, limit: int) -> list[str]:
-        if not path.exists():
-            return []
-        return path.read_text(encoding="utf-8").splitlines()[-max(limit, 0) :]
 
     def _write_json(self, status_code: int, payload: dict[str, Any]) -> None:
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")

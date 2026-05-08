@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "listed securities",
+  "capability": "meta.stock_list",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-meta-stock-list-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 8.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "code": "000001",
+        "name": "平安银行"
+      },
+      {
+        "code": "000002",
+        "name": "万科A"
+      }
+    ],
+    "query_meta": {
+      "query_kind": "meta.stock_list",
+      "row_count": 2,
+      "requested_fields": [],
+      "returned_fields": [
+        "code",
+        "name"
+      ],
+      "market": "16",
+      "query_params": {
+        "list_type": 1
+      }
+    }
+  },
+  "artifacts": []
+}

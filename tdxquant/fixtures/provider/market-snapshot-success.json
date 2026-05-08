@@ -1,0 +1,43 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched market snapshot",
+  "capability": "market.snapshot",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-market-snapshot-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 12.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "000001.SZ",
+        "Now": 12.34,
+        "Volume": 567890,
+        "amount": 7000000
+      }
+    ],
+    "query_meta": {
+      "query_kind": "market.snapshot",
+      "row_count": 1,
+      "requested_fields": [],
+      "returned_fields": [
+        "symbol",
+        "Now",
+        "Volume",
+        "amount"
+      ],
+      "symbol": "000001.SZ",
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

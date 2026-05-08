@@ -63,3 +63,57 @@ def test_build_subscription_watch_payloads_use_stable_contract_fields(tmp_path: 
     assert status["output_paths"]["summary_path"].endswith("summary.json")
     assert summary["final_state"] == "completed"
     assert summary["stop_reason"] == "completed"
+
+
+def test_build_subscription_watch_payloads_include_resilience_fields(tmp_path: Path) -> None:
+    paths = build_subscription_watch_run_paths(tmp_path, run_id="run-001")
+
+    status = build_subscription_watch_status_payload(
+        paths=paths,
+        state="reconnecting",
+        started_at="2026-05-03T09:00:00+00:00",
+        updated_at="2026-05-03T09:00:05+00:00",
+        session_id="session-001",
+        event_count=2,
+        last_sequence=2,
+        last_event_ts="2026-05-03T09:00:02+00:00",
+        last_symbol="600519.SH",
+        warnings=[],
+        heartbeat_at="2026-05-03T09:00:05+00:00",
+        last_source_ts="2026-05-03T17:00:02+08:00",
+        reconnect_count=1,
+        consecutive_reconnect_failures=1,
+        last_disconnect_at="2026-05-03T09:00:03+00:00",
+        last_reconnect_at=None,
+        next_reconnect_at="2026-05-03T09:00:06+00:00",
+        degraded_since=None,
+        last_error={"code": "SESSION_LOST", "message": "session lost", "at": "2026-05-03T09:00:03+00:00"},
+    )
+    summary = build_subscription_watch_summary_payload(
+        paths=paths,
+        final_state="completed",
+        started_at="2026-05-03T09:00:00+00:00",
+        finished_at="2026-05-03T09:01:00+00:00",
+        elapsed_ms=60000.0,
+        session_id="session-001",
+        event_count=2,
+        symbol_count=1,
+        stop_reason="completed",
+        warning_count=0,
+        reconnect_count=1,
+        degraded_duration_ms=0.0,
+        final_last_error=None,
+    )
+
+    assert status["state"] == "reconnecting"
+    assert status["heartbeat_at"] == "2026-05-03T09:00:05+00:00"
+    assert status["last_event_ts"] == "2026-05-03T09:00:02+00:00"
+    assert status["next_reconnect_at"] == "2026-05-03T09:00:06+00:00"
+    assert status["last_error"] == {
+        "code": "SESSION_LOST",
+        "message": "session lost",
+        "at": "2026-05-03T09:00:03+00:00",
+    }
+    assert summary["reconnect_count"] == 1
+    assert summary["degraded_duration_ms"] == 0.0
+    assert summary["final_last_error"] is None

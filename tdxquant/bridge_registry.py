@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import errno
 import json
 import os
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
@@ -80,14 +82,22 @@ def call_worker(
     )
     try:
         with urlopen(request, timeout=5.0) as response:
-            return json.loads(response.read().decode("utf-8"))
+            raw_bytes = response.read()
+        try:
+            raw = raw_bytes.decode("utf-8")
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError("bridge worker returned invalid JSON payload") from exc
+        if not isinstance(payload, dict):
+            raise RuntimeError("bridge worker returned non-object JSON payload")
+        return payload
     except HTTPError as exc:
         error_payload = _try_read_json_error_body(exc)
         if error_payload is not None:
             return error_payload
         raise RuntimeError(f"bridge worker request failed with HTTP {exc.code}: {exc.reason}") from exc
     except URLError as exc:
-        raise RuntimeError(f"bridge worker request failed: {exc.reason}") from exc
+        raise RuntimeError(f"bridge worker request failed: {_normalize_url_error_reason(exc.reason)}") from exc
 
 
 def run_bridge_watch_status(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
@@ -96,6 +106,56 @@ def run_bridge_watch_status(*, registry_path: str | Path, worker_id: str) -> dic
         worker,
         method="GET",
         route="/bridge/v1/watch/status",
+        token=resolve_worker_token(worker),
+    )
+
+
+def run_bridge_health(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker(
+        worker,
+        method="GET",
+        route="/bridge/v1/health",
+        token=resolve_worker_token(worker),
+    )
+
+
+def run_bridge_watch_list(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker(
+        worker,
+        method="GET",
+        route="/bridge/v1/watch/list",
+        token=resolve_worker_token(worker),
+    )
+
+
+def run_bridge_watch_artifacts(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker(
+        worker,
+        method="GET",
+        route="/bridge/v1/watch/artifacts",
+        token=resolve_worker_token(worker),
+    )
+
+
+def run_bridge_watch_events(*, registry_path: str | Path, worker_id: str, tail: int | None = None) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker(
+        worker,
+        method="GET",
+        route=_build_route("/bridge/v1/watch/events", tail=tail),
+        token=resolve_worker_token(worker),
+    )
+
+
+def run_bridge_watch_logs(*, registry_path: str | Path, worker_id: str, tail: int | None = None) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker(
+        worker,
+        method="GET",
+        route=_build_route("/bridge/v1/watch/logs", tail=tail),
         token=resolve_worker_token(worker),
     )
 
@@ -144,6 +204,15 @@ def _resolve_worker(*, registry_path: str | Path, worker_id: str) -> BridgeWorke
     return select_worker(load_worker_registry(registry_path), worker_id=worker_id)
 
 
+def _build_route(path: str, *, tail: int | None = None) -> str:
+    query: dict[str, int] = {}
+    if tail is not None:
+        query["tail"] = tail
+    if not query:
+        return path
+    return f"{path}?{urlencode(query)}"
+
+
 def _validate_worker(worker: BridgeWorker) -> None:
     if not worker.worker_id:
         raise ValueError("worker registry entry requires worker_id")
@@ -170,3 +239,9 @@ def _try_read_json_error_body(error: HTTPError) -> dict[str, Any] | None:
     if isinstance(payload, dict):
         return payload
     return None
+
+
+def _normalize_url_error_reason(reason: object) -> str:
+    if isinstance(reason, OSError) and getattr(reason, "errno", None) == errno.ECONNREFUSED:
+        return "connection refused"
+    return str(reason)

@@ -84,6 +84,15 @@ def build_subscription_watch_status_payload(
     last_event_ts: str | None,
     last_symbol: str | None,
     warnings: list[str],
+    heartbeat_at: str | None = None,
+    last_source_ts: str | None = None,
+    reconnect_count: int = 0,
+    consecutive_reconnect_failures: int = 0,
+    last_disconnect_at: str | None = None,
+    last_reconnect_at: str | None = None,
+    next_reconnect_at: str | None = None,
+    degraded_since: str | None = None,
+    last_error: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": SUBSCRIPTION_WATCH_SCHEMA_VERSION,
@@ -97,6 +106,15 @@ def build_subscription_watch_status_payload(
         "last_sequence": last_sequence,
         "last_event_ts": last_event_ts,
         "last_symbol": last_symbol,
+        "heartbeat_at": heartbeat_at,
+        "last_source_ts": last_source_ts,
+        "reconnect_count": reconnect_count,
+        "consecutive_reconnect_failures": consecutive_reconnect_failures,
+        "last_disconnect_at": last_disconnect_at,
+        "last_reconnect_at": last_reconnect_at,
+        "next_reconnect_at": next_reconnect_at,
+        "degraded_since": degraded_since,
+        "last_error": dict(last_error) if last_error is not None else None,
         "output_paths": {
             "run_dir": str(paths.run_dir),
             "manifest_path": str(paths.manifest_path),
@@ -121,6 +139,9 @@ def build_subscription_watch_summary_payload(
     symbol_count: int,
     stop_reason: str,
     warning_count: int,
+    reconnect_count: int = 0,
+    degraded_duration_ms: float = 0.0,
+    final_last_error: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": SUBSCRIPTION_WATCH_SCHEMA_VERSION,
@@ -135,6 +156,9 @@ def build_subscription_watch_summary_payload(
         "session_id": session_id,
         "stop_reason": stop_reason,
         "warning_count": warning_count,
+        "reconnect_count": reconnect_count,
+        "degraded_duration_ms": degraded_duration_ms,
+        "final_last_error": dict(final_last_error) if final_last_error is not None else None,
         "artifacts": {
             "manifest_path": str(paths.manifest_path),
             "status_path": str(paths.status_path),

@@ -1,0 +1,47 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched stock transaction data",
+  "capability": "transaction.stock_transaction_data",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-transaction-stock-transaction-data-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 11.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "code": "600519.SH",
+        "GP01": 123.0
+      }
+    ],
+    "query_meta": {
+      "query_kind": "transaction.stock_transaction_data",
+      "row_count": 1,
+      "requested_fields": [
+        "GP01"
+      ],
+      "returned_fields": [
+        "code",
+        "GP01"
+      ],
+      "symbols": [
+        "600519.SH"
+      ],
+      "date_range": {
+        "start": "20240101",
+        "end": "20241231"
+      },
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

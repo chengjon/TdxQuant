@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import io
 import json
 import unittest
@@ -13,6 +14,11 @@ from tdxquant.bridge_registry import (
     call_worker,
     load_worker_registry,
     resolve_worker_token,
+    run_bridge_health,
+    run_bridge_watch_artifacts,
+    run_bridge_watch_events,
+    run_bridge_watch_list,
+    run_bridge_watch_logs,
     run_bridge_watch_start,
     select_worker,
 )
@@ -198,7 +204,129 @@ class BridgeRegistryTests(unittest.TestCase):
             },
         )
 
-    def test_call_worker_preserves_json_error_body_on_non_2xx_response(self) -> None:
+    def test_run_bridge_health_uses_health_route(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch("tdxquant.bridge_registry.call_worker", return_value={"ok": True, "result": {"status": "ok"}}) as mocked_call,
+        ):
+            payload = run_bridge_health(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"status": "ok"}})
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/health")
+
+    def test_run_bridge_watch_list_uses_list_route(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch("tdxquant.bridge_registry.call_worker", return_value={"ok": True, "result": {"active": None}}) as mocked_call,
+        ):
+            payload = run_bridge_watch_list(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"active": None}})
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/list")
+
+    def test_run_bridge_watch_artifacts_uses_artifacts_route(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch("tdxquant.bridge_registry.call_worker", return_value={"ok": True, "result": {"run_id": "run-001"}}) as mocked_call,
+        ):
+            payload = run_bridge_watch_artifacts(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"run_id": "run-001"}})
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/artifacts")
+
+    def test_run_bridge_watch_events_uses_tail_query_parameter(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch("tdxquant.bridge_registry.call_worker", return_value={"ok": True, "result": {"events": []}}) as mocked_call,
+        ):
+            payload = run_bridge_watch_events(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                tail=25,
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"events": []}})
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/events?tail=25")
+
+    def test_run_bridge_watch_logs_uses_tail_query_parameter(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch("tdxquant.bridge_registry.call_worker", return_value={"ok": True, "result": {"lines": []}}) as mocked_call,
+        ):
+            payload = run_bridge_watch_logs(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                tail=50,
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"lines": []}})
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/logs?tail=50")
+
+    def test_call_worker_returns_bridge_json_error_body_for_http_failures(self) -> None:
         worker = BridgeWorker(
             worker_id="worker-a",
             label="A",
@@ -210,17 +338,18 @@ class BridgeRegistryTests(unittest.TestCase):
         )
         error_payload = {
             "ok": False,
+            "result": None,
             "error": {
-                "code": "UNAUTHORIZED",
-                "message": "missing or invalid bearer token",
+                "code": "FORBIDDEN_SOURCE",
+                "message": "source ip is not allowed",
                 "details": {},
             },
             "meta": {"worker_id": "worker-a", "request_id": "req-1"},
         }
         http_error = HTTPError(
             url="http://127.0.0.1:8787/bridge/v1/watch/status",
-            code=401,
-            msg="Unauthorized",
+            code=403,
+            msg="Forbidden",
             hdrs=None,
             fp=io.BytesIO(json.dumps(error_payload).encode("utf-8")),
         )
@@ -234,6 +363,96 @@ class BridgeRegistryTests(unittest.TestCase):
             )
 
         self.assertEqual(payload, error_payload)
+
+    def test_call_worker_raises_runtime_error_for_invalid_json_success_body(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        class _InvalidJsonResponse:
+            def __enter__(self) -> "_InvalidJsonResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                del exc_type, exc, tb
+
+            def read(self) -> bytes:
+                return b"{not valid json"
+
+        with patch("tdxquant.bridge_registry.urlopen", return_value=_InvalidJsonResponse()):
+            with self.assertRaisesRegex(RuntimeError, "bridge worker returned invalid JSON payload"):
+                call_worker(
+                    worker,
+                    method="GET",
+                    route="/bridge/v1/watch/status",
+                    token="secret-token",
+                )
+
+    def test_call_worker_raises_runtime_error_for_invalid_utf8_success_body(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        class _InvalidUtf8Response:
+            def __enter__(self) -> "_InvalidUtf8Response":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                del exc_type, exc, tb
+
+            def read(self) -> bytes:
+                return b"\xff"
+
+        with patch("tdxquant.bridge_registry.urlopen", return_value=_InvalidUtf8Response()):
+            with self.assertRaisesRegex(RuntimeError, "bridge worker returned invalid JSON payload"):
+                call_worker(
+                    worker,
+                    method="GET",
+                    route="/bridge/v1/watch/status",
+                    token="secret-token",
+                )
+
+    def test_call_worker_raises_runtime_error_for_non_object_json_success_body(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        class _ArrayPayloadResponse:
+            def __enter__(self) -> "_ArrayPayloadResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                del exc_type, exc, tb
+
+            def read(self) -> bytes:
+                return b"[]"
+
+        with patch("tdxquant.bridge_registry.urlopen", return_value=_ArrayPayloadResponse()):
+            with self.assertRaisesRegex(RuntimeError, "bridge worker returned non-object JSON payload"):
+                call_worker(
+                    worker,
+                    method="GET",
+                    route="/bridge/v1/watch/status",
+                    token="secret-token",
+                )
 
     def test_call_worker_normalizes_non_json_http_error_body(self) -> None:
         worker = BridgeWorker(
@@ -262,7 +481,7 @@ class BridgeRegistryTests(unittest.TestCase):
                     token="secret-token",
                 )
 
-    def test_call_worker_normalizes_url_error(self) -> None:
+    def test_call_worker_raises_runtime_error_for_connection_refused(self) -> None:
         worker = BridgeWorker(
             worker_id="worker-a",
             label="A",
@@ -273,7 +492,9 @@ class BridgeRegistryTests(unittest.TestCase):
             enabled=True,
         )
 
-        with patch("tdxquant.bridge_registry.urlopen", side_effect=URLError("connection refused")):
+        transport_error = URLError(ConnectionRefusedError(errno.ECONNREFUSED, "Connection refused"))
+
+        with patch("tdxquant.bridge_registry.urlopen", side_effect=transport_error):
             with self.assertRaisesRegex(RuntimeError, "bridge worker request failed: connection refused"):
                 call_worker(
                     worker,

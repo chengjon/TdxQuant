@@ -1,0 +1,94 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "updated TongDaXin user block",
+  "capability": "block.sync_watchlist",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-block-sync-replace-applied",
+  "started_at": "2026-05-03T10:00:00Z",
+  "finished_at": "2026-05-03T10:00:01Z",
+  "elapsed_ms": 1000.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "sync": {
+      "schema_version": "2026-05-03",
+      "block_code": "ZXG",
+      "mode": "replace",
+      "create_if_missing": false,
+      "dry_run": false,
+      "show": true,
+      "status": "applied",
+      "governance_decision": "execute",
+      "governance_reason": "state_diff_detected",
+      "created_block": false,
+      "would_create_block": false,
+      "added_symbols": [
+        "600519.SH"
+      ],
+      "removed_symbols": [],
+      "unchanged_symbols": [
+        "000001.SZ"
+      ],
+      "desired_symbols": [
+        "000001.SZ",
+        "600519.SH"
+      ],
+      "observed_symbols": [
+        "000001.SZ"
+      ]
+    },
+    "block_mutation": {
+      "schema_version": "2026-05-02",
+      "mutation_id": "fixture-block-mutation-stage-001",
+      "mutation_key": "underlying-stage-001",
+      "operation": "send_user_block",
+      "status": "applied",
+      "governance_decision": "execute",
+      "governance_reason": "state_diff_detected",
+      "block_code": "ZXG",
+      "requested_stocks": [
+        "000001.SZ",
+        "600519.SH"
+      ],
+      "requested_stock_count": 2,
+      "show": true,
+      "desired_state": {
+        "block_code": "ZXG",
+        "exists": true,
+        "stocks": [
+          "000001.SZ",
+          "600519.SH"
+        ]
+      },
+      "observed_state": {
+        "block_code": "ZXG",
+        "exists": true,
+        "block_name": "自选股",
+        "stocks": [
+          "000001.SZ"
+        ],
+        "stock_count": 1
+      }
+    },
+    "artifacts": {
+      "audit_log_path": "runtime/block-sync/fixture-block-sync-001.json"
+    }
+  },
+  "artifacts": [
+    {
+      "kind": "block_sync_audit",
+      "path": "runtime/block-sync/fixture-block-sync-001.json"
+    },
+    {
+      "kind": "block_mutation_audit",
+      "path": "runtime/block-mutations/fixture-block-mutation-stage-001.json"
+    }
+  ]
+}

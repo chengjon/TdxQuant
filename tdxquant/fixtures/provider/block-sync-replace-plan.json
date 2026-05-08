@@ -1,0 +1,54 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "planned block sync",
+  "capability": "block.sync_watchlist",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-block-sync-replace-plan",
+  "started_at": "2026-05-03T10:15:00Z",
+  "finished_at": "2026-05-03T10:15:00Z",
+  "elapsed_ms": 0.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "sync": {
+      "schema_version": "2026-05-03",
+      "block_code": "ZXG",
+      "mode": "replace",
+      "create_if_missing": true,
+      "dry_run": true,
+      "show": true,
+      "status": "applied",
+      "governance_decision": "execute",
+      "governance_reason": "missing_block",
+      "created_block": false,
+      "would_create_block": true,
+      "added_symbols": [
+        "000001.SZ",
+        "600519.SH"
+      ],
+      "removed_symbols": [],
+      "unchanged_symbols": [],
+      "desired_symbols": [
+        "000001.SZ",
+        "600519.SH"
+      ],
+      "observed_symbols": []
+    },
+    "artifacts": {
+      "audit_log_path": "runtime/block-sync/fixture-block-sync-replace-plan.json"
+    }
+  },
+  "artifacts": [
+    {
+      "kind": "block_sync_audit",
+      "path": "runtime/block-sync/fixture-block-sync-replace-plan.json"
+    }
+  ]
+}

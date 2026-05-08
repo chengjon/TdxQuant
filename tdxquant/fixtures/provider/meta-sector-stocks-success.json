@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "listed sector stocks",
+  "capability": "meta.sector_stocks",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-meta-sector-stocks-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 9.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "code": "600519.SH",
+        "name": "贵州茅台"
+      }
+    ],
+    "query_meta": {
+      "query_kind": "meta.sector_stocks",
+      "row_count": 1,
+      "requested_fields": [],
+      "returned_fields": [
+        "code",
+        "name"
+      ],
+      "block_code": "钛金属",
+      "query_params": {
+        "block_type": 0,
+        "list_type": 1
+      }
+    }
+  },
+  "artifacts": []
+}

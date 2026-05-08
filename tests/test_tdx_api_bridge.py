@@ -8,12 +8,19 @@ import pandas as pd
 
 from tdxquant.api.bridge import (
     TdxRuntimeSubscriptionSession,
+    run_tdx_clear_sector,
+    run_tdx_block_sync,
     run_tdx_create_sector,
+    run_tdx_delete_sector,
+    run_tdx_data_kline,
+    run_tdx_data_snapshot,
     run_tdx_formula_screen,
     run_tdx_provider_capabilities,
     run_tdx_provider_doctor,
     run_tdx_provider_health,
+    run_tdx_rename_sector,
     run_tdx_send_user_block,
+    run_tdx_stock_list,
 )
 from tdxquant.models import ErrorCode, Result
 from tdxquant.tdx_api_bridge import run_tdx_data_sector_list, run_tdx_bridge_health, serialize_value
@@ -54,12 +61,147 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
         self.assertGreater(result.data["summary"]["total"], 0)
         capability_names = {item["name"] for item in result.data["capabilities"]}
         self.assertIn("formula.screen", capability_names)
+        self.assertIn("block.sync_watchlist", capability_names)
         first = result.data["capabilities"][0]
         self.assertIn("name", first)
         self.assertIn("capability_version", first)
         self.assertIn("stability", first)
         self.assertIn("side_effect_level", first)
         self.assertIn("entrypoints", first)
+
+    def test_provider_capabilities_exposes_query_metadata_for_hardened_queries(self) -> None:
+        result = run_tdx_provider_capabilities()
+        self.assertTrue(result.ok)
+        capabilities = {item["name"]: item for item in result.data["capabilities"]}
+
+        snapshot = capabilities["market.snapshot"]
+        self.assertEqual(
+            snapshot["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "market.snapshot",
+                        "selectors": ["symbol"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+
+        stock_list = capabilities["meta.stock_list"]
+        self.assertEqual(
+            stock_list["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "meta.stock_list",
+                        "selectors": ["market"],
+                        "query_params": ["list_type"],
+                    }
+                ],
+                "supports_requested_fields": False,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+
+        kline = capabilities["market.kline"]
+        self.assertEqual(
+            kline["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "market.kline",
+                        "selectors": ["symbols", "date_range"],
+                        "query_params": ["period", "count", "dividend_type", "fill_data"],
+                    }
+                ],
+                "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+
+    def test_run_tdx_data_snapshot_normalizes_raw_result_into_rows_and_query_meta(self) -> None:
+        raw = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": {"symbol": "688260.SH", "Now": 10.5, "Volume": 1000}},
+        )
+        with patch("tdxquant.api.bridge._run_tq_call", return_value=raw):
+            result = run_tdx_data_snapshot(stock_code="688260.SH", field_list=["Now", "Volume"])
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["rows"], [{"symbol": "688260.SH", "Now": 10.5, "Volume": 1000}])
+        self.assertEqual(
+            result.data["query_meta"],
+            {
+                "query_kind": "market.snapshot",
+                "row_count": 1,
+                "requested_fields": ["Now", "Volume"],
+                "returned_fields": ["symbol", "Now", "Volume"],
+                "symbol": "688260.SH",
+                "query_params": {},
+            },
+        )
+
+    def test_run_tdx_data_kline_normalizes_dataframe_payload(self) -> None:
+        raw = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "result": {
+                    "type": "dataframe",
+                    "index_name": "time",
+                    "records": [{"time": "2024-01-02", "close": 10.2}],
+                }
+            },
+        )
+        with patch("tdxquant.api.bridge._run_tq_call", return_value=raw):
+            result = run_tdx_data_kline(
+                stock_list=["688260.SH", "600519.SH"],
+                period="1d",
+                start_time="20240101",
+                end_time="20241231",
+                count=10,
+                dividend_type="back",
+                field_list=["close"],
+                fill_data=False,
+            )
+
+        self.assertEqual(result.data["rows"], [{"time": "2024-01-02", "close": 10.2}])
+        self.assertEqual(result.data["query_meta"]["query_kind"], "market.kline")
+        self.assertEqual(result.data["query_meta"]["symbols"], ["688260.SH", "600519.SH"])
+        self.assertEqual(result.data["query_meta"]["date_range"], {"start": "20240101", "end": "20241231"})
+        self.assertEqual(result.data["query_meta"]["requested_fields"], ["close"])
+        self.assertEqual(result.data["query_meta"]["returned_fields"], ["time", "close"])
+        self.assertEqual(
+            result.data["query_meta"]["query_params"],
+            {"period": "1d", "count": 10, "dividend_type": "back", "fill_data": False},
+        )
+
+    def test_run_tdx_stock_list_normalizes_query_params_and_empty_rows(self) -> None:
+        raw = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result": []})
+        with patch("tdxquant.api.bridge._run_tq_call", return_value=raw):
+            result = run_tdx_stock_list(market="16", list_type=1)
+
+        self.assertEqual(result.data["rows"], [])
+        self.assertEqual(
+            result.data["query_meta"],
+            {
+                "query_kind": "meta.stock_list",
+                "row_count": 0,
+                "requested_fields": [],
+                "returned_fields": [],
+                "market": "16",
+                "query_params": {"list_type": 1},
+            },
+        )
 
     def test_provider_health_returns_structured_diagnostic_payload(self) -> None:
         result = run_tdx_provider_health(window_key="通达信金融终端")
@@ -141,7 +283,11 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
 
     def test_block_mutation_wrapper_writes_audit_artifact_on_success(self) -> None:
         raw_result = Result(ok=True, code=ErrorCode.OK, message="created", data={"runtime": "ok"})
-        with TemporaryDirectory() as temp_dir, patch("tdxquant.api.bridge._run_tq_call", return_value=raw_result) as mocked:
+        with (
+            TemporaryDirectory() as temp_dir,
+            patch("tdxquant.api.bridge._run_tq_call", return_value=raw_result) as mocked,
+            patch("tdxquant.api.bridge._probe_custom_sector_state", return_value={"block_code": "CSBK", "exists": False}),
+        ):
             result = run_tdx_create_sector(
                 block_code="CSBK",
                 block_name="测试板块",
@@ -168,6 +314,56 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
             self.assertEqual(result._provider_artifacts[0]["kind"], "block_mutation_audit")
             self.assertEqual(result._provider_artifacts[0]["path"], str(audit_log_path))
 
+    def test_block_mutation_bridge_defers_create_sector_runtime_write_until_governance_execute(self) -> None:
+        governed_result = Result(ok=True, code=ErrorCode.OK, message="governed", data={})
+        with (
+            patch("tdxquant.api.bridge._run_tq_call") as mocked_run,
+            patch("tdxquant.api.bridge.apply_block_mutation_safety", return_value=governed_result) as mocked_govern,
+        ):
+            result = run_tdx_create_sector(
+                block_code="CSBK",
+                block_name="测试板块",
+                mutation_key="mk-001",
+                audit_dir="runtime/block-mutations",
+                strategy_path="strategy.py",
+            )
+
+        self.assertIs(result, governed_result)
+        mocked_run.assert_not_called()
+        mocked_govern.assert_called_once()
+        _, kwargs = mocked_govern.call_args
+        self.assertEqual(kwargs["operation"], "create_sector")
+        self.assertEqual(kwargs["block_code"], "CSBK")
+        self.assertEqual(kwargs["block_name"], "测试板块")
+        self.assertEqual(kwargs["mutation_key"], "mk-001")
+        self.assertEqual(kwargs["audit_dir"], "runtime/block-mutations")
+        self.assertTrue(callable(kwargs["execute_write"]))
+        self.assertTrue(callable(kwargs["observed_state"]))
+
+    def test_block_mutation_bridges_defer_runtime_write_until_governance_execute(self) -> None:
+        governed_result = Result(ok=True, code=ErrorCode.OK, message="governed", data={})
+        cases = [
+            ("delete_sector", run_tdx_delete_sector, {"block_code": "CSBK", "mutation_key": "mk-002", "audit_dir": "runtime/block-mutations", "strategy_path": "strategy.py"}),
+            ("rename_sector", run_tdx_rename_sector, {"block_code": "CSBK", "block_name": "测试板块重命名", "mutation_key": "mk-003", "audit_dir": "runtime/block-mutations", "strategy_path": "strategy.py"}),
+            ("clear_sector", run_tdx_clear_sector, {"block_code": "CSBK", "mutation_key": "mk-004", "audit_dir": "runtime/block-mutations", "strategy_path": "strategy.py"}),
+            ("send_user_block", run_tdx_send_user_block, {"block_code": "ZXG", "stocks": ["000001.SZ"], "show": True, "mutation_key": "mk-005", "audit_dir": "runtime/block-mutations", "strategy_path": "strategy.py"}),
+        ]
+
+        for operation, bridge_fn, kwargs in cases:
+            with self.subTest(operation=operation):
+                with (
+                    patch("tdxquant.api.bridge._run_tq_call") as mocked_run,
+                    patch("tdxquant.api.bridge.apply_block_mutation_safety", return_value=governed_result) as mocked_govern,
+                ):
+                    result = bridge_fn(**kwargs)
+
+                self.assertIs(result, governed_result)
+                mocked_run.assert_not_called()
+                mocked_govern.assert_called_once()
+                self.assertTrue(callable(mocked_govern.call_args.kwargs["execute_write"]))
+                self.assertTrue(callable(mocked_govern.call_args.kwargs["observed_state"]))
+                self.assertEqual(mocked_govern.call_args.kwargs["operation"], operation)
+
     def test_block_mutation_wrapper_writes_audit_artifact_on_failure(self) -> None:
         raw_result = Result(
             ok=False,
@@ -177,7 +373,14 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
             warnings=["runtime-warning"],
             next_action="retry later",
         )
-        with TemporaryDirectory() as temp_dir, patch("tdxquant.api.bridge._run_tq_call", return_value=raw_result):
+        with (
+            TemporaryDirectory() as temp_dir,
+            patch("tdxquant.api.bridge._run_tq_call", return_value=raw_result),
+            patch(
+                "tdxquant.api.bridge._probe_custom_sector_state",
+                return_value={"block_code": "ZXG", "exists": True, "stocks": ["000001.SZ"]},
+            ),
+        ):
             result = run_tdx_send_user_block(
                 block_code="ZXG",
                 stocks=["000001.SZ", "600519.SH"],
@@ -198,6 +401,36 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
             self.assertEqual(audit_payload["request"]["stocks"], ["000001.SZ", "600519.SH"])
             self.assertEqual(audit_payload["result"]["code"], ErrorCode.EXECUTION_FAILED.value)
             self.assertEqual(audit_payload["result"]["next_action"], "retry later")
+
+    def test_block_sync_bridge_forwards_sync_contract_to_orchestrator(self) -> None:
+        planned_result = Result(ok=True, code=ErrorCode.OK, message="planned", data={"sync": {"status": "applied"}})
+        with patch("tdxquant.api.bridge.sync_watchlist_to_block", return_value=planned_result) as mocked_sync:
+            result = run_tdx_block_sync(
+                block_code="ZXG",
+                symbols=["000001.SZ", "600519.SH"],
+                mode="merge",
+                create_if_missing=True,
+                dry_run=True,
+                show=False,
+                mutation_key="sync-001",
+                audit_dir="runtime/block-sync",
+                strategy_path="strategy.py",
+            )
+
+        self.assertIs(result, planned_result)
+        mocked_sync.assert_called_once()
+        kwargs = mocked_sync.call_args.kwargs
+        self.assertEqual(kwargs["block_code"], "ZXG")
+        self.assertEqual(kwargs["symbols"], ["000001.SZ", "600519.SH"])
+        self.assertEqual(kwargs["mode"], "merge")
+        self.assertTrue(kwargs["create_if_missing"])
+        self.assertTrue(kwargs["dry_run"])
+        self.assertFalse(kwargs["show"])
+        self.assertEqual(kwargs["mutation_key"], "sync-001")
+        self.assertEqual(kwargs["audit_dir"], "runtime/block-sync")
+        self.assertTrue(callable(kwargs["observed_state"]))
+        self.assertTrue(callable(kwargs["create_block"]))
+        self.assertTrue(callable(kwargs["sync_members"]))
 
 
 class _FakeTqSubscriptionRuntime:

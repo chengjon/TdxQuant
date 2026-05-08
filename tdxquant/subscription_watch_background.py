@@ -17,6 +17,7 @@ from .subscription_watch_run import build_subscription_watch_run_paths
 DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
 DEFAULT_START_TIMEOUT_SECONDS = 10
 DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
+ACTIVE_PROCESS_STATES = {"starting", "running", "reconnecting", "degraded", "stopping"}
 
 
 @dataclass(frozen=True)
@@ -159,7 +160,7 @@ def reconcile_background_state(
     if state == "starting" and startup_persistence_failed and payload_pid > 0 and pid_is_alive(payload_pid):
         return payload
 
-    if state in {"starting", "running", "stopping"} and (
+    if state in ACTIVE_PROCESS_STATES and (
         not pid_matches_owned_state or not pid_is_alive(payload_pid)
     ):
         return _normalize_terminal_payload(
@@ -190,7 +191,7 @@ def _build_active_payload(
 ) -> dict[str, Any]:
     return {
         "state": state,
-        "active": state in {"starting", "running", "stopping"},
+        "active": state in ACTIVE_PROCESS_STATES,
         "run_id": run_id,
         "pid": pid,
         "reason": reason,
@@ -226,6 +227,32 @@ def read_active_payload(paths: SubscriptionWatchBackgroundPaths) -> dict[str, An
     if not isinstance(payload, dict):
         return None
     return payload
+
+
+def _read_json_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload if isinstance(payload, dict) else None
+
+
+def _read_jsonl_tail(path: Path, *, limit: int) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines()[-max(limit, 0) :]:
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
+
+
+def _tail_lines(path: Path, *, limit: int) -> list[str]:
+    if not path.exists():
+        return []
+    return path.read_text(encoding="utf-8").splitlines()[-max(limit, 0) :]
 
 
 def write_background_state(
@@ -411,6 +438,31 @@ class SubscriptionWatchBackgroundController:
             result["replayed"] = True
         return {"ok": True, "result": result}
 
+    def _background_state(self) -> dict[str, Any]:
+        payload = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+        if isinstance(payload, dict):
+            return payload
+        return {
+            "state": "stopped",
+            "active": False,
+            "run_id": None,
+            "pid": None,
+            "reason": None,
+        }
+
+    def control_status(self) -> dict[str, Any]:
+        return self._background_state()
+
+    def _resolve_run_id(self, *, run_id: str | None = None) -> str | None:
+        explicit = str(run_id).strip() if run_id is not None else None
+        if explicit:
+            return explicit
+        current = self._background_state()
+        active_run_id = str(current.get("run_id") or "").strip()
+        if active_run_id and bool(current.get("active")):
+            return active_run_id
+        return None
+
     def _wait_for_startup_state(self, *, run_id: str, pid: int, runner_log_path: Path) -> dict[str, Any] | None:
         deadline = time.monotonic() + self.start_timeout_seconds
         while True:
@@ -495,7 +547,7 @@ class SubscriptionWatchBackgroundController:
                 }
             try:
                 current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
-                if current.get("state") in {"starting", "running", "stopping"}:
+                if current.get("state") in ACTIVE_PROCESS_STATES:
                     if idempotency_key and idempotency_key == current.get("idempotency_key"):
                         return self._current_start_result(current, replayed=True)
                     return {
@@ -554,7 +606,14 @@ class SubscriptionWatchBackgroundController:
                     runner_log_path=run_paths.runner_log_path,
                 )
                 if startup_state is None:
-                    return self._current_start_result(payload)
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "START_TIMEOUT",
+                            "message": "subscription-watch background runner did not reach a stable startup state within timeout",
+                            "details": payload,
+                        },
+                    }
                 if startup_state.get("state") == "failed":
                     return {
                         "ok": False,
@@ -580,7 +639,7 @@ class SubscriptionWatchBackgroundController:
                 }
             try:
                 current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
-                if current.get("state") not in {"starting", "running", "stopping"}:
+                if current.get("state") not in ACTIVE_PROCESS_STATES:
                     return {
                         "ok": True,
                         "result": {
@@ -678,3 +737,95 @@ class SubscriptionWatchBackgroundController:
                 }
             finally:
                 _release_control_lock(control_lock)
+
+    def status(self, *, run_id: str | None = None) -> dict[str, Any]:
+        control = self._background_state()
+        resolved_run_id = self._resolve_run_id(run_id=run_id)
+        watch_status = None
+        if resolved_run_id is not None:
+            run_paths = build_subscription_watch_run_paths(self.paths.root_dir, run_id=resolved_run_id)
+            watch_status = _read_json_file(run_paths.status_path)
+        return {
+            "control": control,
+            "watch_status": watch_status,
+        }
+
+    def list_runs(self) -> dict[str, Any]:
+        active_payload = self._background_state()
+        active = None
+        last_completed = None
+        last_failed = None
+
+        active_run_id = str(active_payload.get("run_id") or "").strip()
+        if active_run_id and bool(active_payload.get("active")):
+            run_paths = build_subscription_watch_run_paths(self.paths.root_dir, run_id=active_run_id)
+            status_payload = _read_json_file(run_paths.status_path)
+            active = {
+                "run_id": active_run_id,
+                "control": active_payload,
+                "status": status_payload,
+            }
+
+        if self.paths.root_dir.exists():
+            for child in sorted(self.paths.root_dir.iterdir(), key=lambda item: item.name, reverse=True):
+                if not child.is_dir():
+                    continue
+                run_paths = build_subscription_watch_run_paths(self.paths.root_dir, run_id=child.name)
+                summary_payload = _read_json_file(run_paths.summary_path)
+                if not isinstance(summary_payload, dict):
+                    continue
+                final_state = str(summary_payload.get("final_state") or "").strip()
+                item = {
+                    "run_id": child.name,
+                    "summary": summary_payload,
+                }
+                if final_state == "completed" and last_completed is None:
+                    last_completed = item
+                elif final_state == "failed" and last_failed is None:
+                    last_failed = item
+                if last_completed is not None and last_failed is not None:
+                    break
+
+        return {
+            "active": active,
+            "last_completed": last_completed,
+            "last_failed": last_failed,
+        }
+
+    def artifacts(self, *, run_id: str | None = None) -> dict[str, Any]:
+        resolved_run_id = self._resolve_run_id(run_id=run_id)
+        if resolved_run_id is None:
+            raise ValueError("watch artifacts require an active or explicit run_id")
+        run_paths = build_subscription_watch_run_paths(self.paths.root_dir, run_id=resolved_run_id)
+        return {
+            "run_id": resolved_run_id,
+            "artifacts": {
+                "run_dir": str(run_paths.run_dir),
+                "manifest_path": str(run_paths.manifest_path),
+                "status_path": str(run_paths.status_path),
+                "summary_path": str(run_paths.summary_path),
+                "events_jsonl_path": str(run_paths.events_jsonl_path),
+                "events_csv_path": str(run_paths.events_csv_path),
+                "runner_log_path": str(run_paths.runner_log_path),
+            },
+        }
+
+    def events(self, *, run_id: str | None = None, tail: int = 100) -> dict[str, Any]:
+        resolved_run_id = self._resolve_run_id(run_id=run_id)
+        if resolved_run_id is None:
+            raise ValueError("watch events require an active or explicit run_id")
+        run_paths = build_subscription_watch_run_paths(self.paths.root_dir, run_id=resolved_run_id)
+        return {
+            "run_id": resolved_run_id,
+            "events": _read_jsonl_tail(run_paths.events_jsonl_path, limit=tail),
+        }
+
+    def logs(self, *, run_id: str | None = None, tail: int = 200) -> dict[str, Any]:
+        resolved_run_id = self._resolve_run_id(run_id=run_id)
+        if resolved_run_id is None:
+            raise ValueError("watch logs require an active or explicit run_id")
+        run_paths = build_subscription_watch_run_paths(self.paths.root_dir, run_id=resolved_run_id)
+        return {
+            "run_id": resolved_run_id,
+            "lines": _tail_lines(run_paths.runner_log_path, limit=tail),
+        }

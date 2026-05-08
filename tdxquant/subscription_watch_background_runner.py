@@ -23,6 +23,24 @@ def _handle_sigterm(signum: int | None, frame: Any) -> None:
     raise KeyboardInterrupt()
 
 
+def _clear_terminal_next_reconnect_at(run_paths) -> None:
+    if not run_paths.status_path.exists():
+        return
+    try:
+        payload = json.loads(run_paths.status_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return
+    if not isinstance(payload, dict):
+        return
+    if str(payload.get("state") or "") not in {"completed", "interrupted", "failed"}:
+        return
+    if payload.get("next_reconnect_at") is None:
+        return
+    normalized = dict(payload)
+    normalized["next_reconnect_at"] = None
+    run_paths.status_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m tdxquant.subscription_watch_background_runner")
     parser.add_argument("--root-dir", required=True)
@@ -73,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
         if current_state.get("state") == "stopping":
             terminal_state = "stopped"
             terminal_reason = str(current_state.get("reason") or "operator_stop")
+        elif not result.ok and current_state.get("state") == "degraded":
+            terminal_state = "failed"
+            terminal_reason = str(current_state.get("reason") or "degraded_unrecovered")
         elif not result.ok:
             terminal_state = "failed"
             terminal_reason = "task_failed"
@@ -92,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
                 ensure_ascii=False,
             )
         )
+        if run_paths is not None:
+            _clear_terminal_next_reconnect_at(run_paths)
         exit_code = 0 if result.ok else 1
     except KeyboardInterrupt:
         terminal_state = "stopped"

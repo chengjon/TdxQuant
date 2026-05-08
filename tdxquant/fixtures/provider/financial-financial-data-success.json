@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched financial data",
+  "capability": "financial.financial_data",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-financial-financial-data-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 15.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "stock_code": "688318.SH",
+        "FN1": 1.23
+      }
+    ],
+    "query_meta": {
+      "query_kind": "financial.financial_data",
+      "row_count": 1,
+      "requested_fields": [
+        "FN1",
+        "FN2"
+      ],
+      "returned_fields": [
+        "stock_code",
+        "FN1"
+      ],
+      "symbols": [
+        "688318.SH"
+      ],
+      "date_range": {
+        "start": "20240101",
+        "end": "20241231"
+      },
+      "query_params": {
+        "report_type": "announce_time"
+      }
+    }
+  },
+  "artifacts": []
+}

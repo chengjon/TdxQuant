@@ -1,0 +1,56 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched market kline",
+  "capability": "market.kline",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-market-kline-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 20.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "time": "2024-01-02",
+        "close": 10.01
+      },
+      {
+        "time": "2024-01-03",
+        "close": 10.25
+      }
+    ],
+    "query_meta": {
+      "query_kind": "market.kline",
+      "row_count": 2,
+      "requested_fields": [
+        "close"
+      ],
+      "returned_fields": [
+        "time",
+        "close"
+      ],
+      "symbols": [
+        "000001.SZ"
+      ],
+      "date_range": {
+        "start": "20240101",
+        "end": "20240131"
+      },
+      "query_params": {
+        "period": "1d",
+        "count": -1,
+        "dividend_type": "none",
+        "fill_data": true
+      }
+    }
+  },
+  "artifacts": []
+}

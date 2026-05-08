@@ -11,6 +11,9 @@
   "session_id": "local-session-001",
   "stop_reason": "max_events",
   "warning_count": 0,
+  "reconnect_count": 0,
+  "degraded_duration_ms": 0.0,
+  "final_last_error": null,
   "artifacts": {
     "manifest_path": "runtime/subscription-watch/20260501T080000000000Z/manifest.json",
     "status_path": "runtime/subscription-watch/20260501T080000000000Z/status.json",

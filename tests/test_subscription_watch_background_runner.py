@@ -123,3 +123,79 @@ def test_main_persists_terminal_state_when_interrupted_during_early_setup(
     assert payload["state"] == "stopped"
     assert payload["reason"] == "keyboard_interrupt"
     assert payload["run_id"] == "run-early"
+
+
+def test_main_clears_next_reconnect_at_from_terminal_status_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = build_background_paths(tmp_path)
+
+    class FakeTaskManager:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+        def subscription_watch(self, **kwargs):
+            run_paths = build_subscription_watch_run_paths(tmp_path, run_id=kwargs["run_id"])
+            run_paths.run_dir.mkdir(parents=True, exist_ok=True)
+            run_paths.status_path.write_text(
+                json.dumps(
+                    {
+                        "run_id": kwargs["run_id"],
+                        "state": "completed",
+                        "next_reconnect_at": "2026-05-03T09:01:00+00:00",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                ok=True,
+                code="OK",
+                message="done",
+                data={"summary": {"interrupted": False}},
+            )
+
+    monkeypatch.setattr("tdxquant.subscription_watch_background_runner.TdxTaskManager", FakeTaskManager)
+
+    exit_code = main(["--root-dir", str(tmp_path), "--run-id", "run-001", "--code", "600519.SH"])
+    payload = json.loads(paths.active_path.read_text(encoding="utf-8"))
+    run_paths = build_subscription_watch_run_paths(tmp_path, run_id="run-001")
+    status_payload = json.loads(run_paths.status_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["state"] == "completed"
+    assert status_payload["state"] == "completed"
+    assert status_payload["next_reconnect_at"] is None
+
+
+def test_main_marks_degraded_failure_with_explicit_terminal_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = build_background_paths(tmp_path)
+
+    class FakeTaskManager:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+        def subscription_watch(self, **kwargs):
+            paths.active_path.write_text(
+                json.dumps(
+                    {
+                        "state": "degraded",
+                        "run_id": kwargs["run_id"],
+                        "pid": os.getpid(),
+                        "reason": None,
+                        "active": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return SimpleNamespace(ok=False, code="EXECUTION_FAILED", message="failed", data={"summary": {"interrupted": False}})
+
+    monkeypatch.setattr("tdxquant.subscription_watch_background_runner.TdxTaskManager", FakeTaskManager)
+
+    exit_code = main(["--root-dir", str(tmp_path), "--run-id", "run-degraded", "--code", "600519.SH"])
+    payload = json.loads(paths.active_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert payload["state"] == "failed"
+    assert payload["reason"] == "degraded_unrecovered"
