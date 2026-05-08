@@ -156,7 +156,6 @@ TdxQuant
 - 内置 provider replay fixture bundle
 - 稳定 fixture manifest / loader
 - `json` / `jsonl` sample 资产
-- `formula.screen` / `doctor` / `block mutation` / `block read snapshot` / `subscription event` representative fixtures
 - `formula.screen` / `doctor` / `query contract` / `block mutation` / `block sync` / `block read snapshot` / `subscription event` representative fixtures
 
 #### `financial`
@@ -341,8 +340,12 @@ TdxQuant
 - `catalog plan`
 - bundle 支持
 - bundle step 选择
+- bundle 顶层 `--block-code` override fanout
+- bundle fail-fast 执行语义
 - label 过滤
 - summary view
+- `read-zxg-review` 两步 block 读侧 review bundle
+- `read-zxg-review-and-export` 三步 block 读侧 review + export bundle
 
 `catalog` 的定位是统一日常入口目录，而不是新的业务管理层。
 
@@ -567,6 +570,18 @@ TdxQuant
 - 唯一命中回填完整 audit，候选查询按时间倒序返回
 - 基于本地日期的稳定单日审计聚合
 - 基于闭区间的稳定审计聚合
+
+## 3.6 当前收口快照（2026-05-09）
+
+本轮已把 `read-zxg-review-and-export` bundle 线、`block-read-full` 旧 worktree 线和 provider bridge hardening 线统一收口到 `main`：
+
+- `main` 已推送到 `origin/main`，当前只保留单一主 worktree 和单一 `main` 分支。
+- 过期 worktree / 分支已清理；`task2-block-read-full` 与 `task3-block-read-full-docs` 的残留改动经核对会回退已合入能力，因此已丢弃。
+- OpenSpec lifecycle 已归档并同步主规格；`openspec validate --all --strict` 当前为 `43 passed, 0 failed`。
+- `block-read-full` 已是完成态：manager、CLI、preset、catalog entry、OpenSpec 与 focused tests 均已闭合。
+- `read-zxg-review-and-export` 已是完成态：bundle definition、list / plan / run、`--block-code` fanout、fail-fast、summary-view omission 和 bundle 级导出参数拒绝均已锁定。
+- provider bridge runtime flows 已完成加固：query result normalization、block mutation governance deferral、subscription-watch background / bridge / replay fixture 相关测试已通过。
+- 本轮关键验证包括 `python -m pytest` focused suites 与 OpenSpec strict validation；直接运行裸 `pytest` 在当前环境下会受 import path 影响，推荐使用 `python -m pytest`。
 
 当前剩余重点进一步收缩为：
 
