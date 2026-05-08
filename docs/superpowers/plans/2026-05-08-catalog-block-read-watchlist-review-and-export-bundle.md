@@ -400,7 +400,7 @@ git commit -m "docs: sync review-and-export bundle docs and command catalog spec
 - Create: `openspec/changes/catalog-block-read-watchlist-review-and-export-bundle/specs/tdx-command-catalog/spec.md`
 - Archive later to: `openspec/changes/archive/YYYY-MM-DD-catalog-block-read-watchlist-review-and-export-bundle/`
 
-- [ ] **Step 1: Create the lifecycle change artifacts in an isolated worktree**
+- [x] **Step 1: Create the lifecycle change artifacts in an isolated worktree**
 
 Create:
 
@@ -419,7 +419,7 @@ The change should formalize:
 - the fail-fast stop-before-export behavior
 - the fact that `export_output` remains preset-owned
 
-- [ ] **Step 2: Validate the change**
+- [x] **Step 2: Validate the change**
 
 Run:
 
@@ -435,7 +435,7 @@ isComplete: true
 Change 'catalog-block-read-watchlist-review-and-export-bundle' is valid
 ```
 
-- [ ] **Step 3: Archive the lifecycle**
+- [x] **Step 3: Archive the lifecycle**
 
 First try:
 
@@ -462,7 +462,7 @@ Expected:
 {"changes":[]}
 ```
 
-- [ ] **Step 4: Commit the archived lifecycle**
+- [x] **Step 4: Commit the archived lifecycle**
 
 ```bash
 git add openspec/changes/archive/2026-05-08-catalog-block-read-watchlist-review-and-export-bundle
@@ -487,4 +487,3 @@ git commit -m "docs: archive review-and-export bundle change"
   - Bundle name is always `read-zxg-review-and-export`
   - Step entries are always `read-zxg-watchlist`, `read-zxg-full`, `export-zxg-watchlist`
   - Override field is always `block_code`
-

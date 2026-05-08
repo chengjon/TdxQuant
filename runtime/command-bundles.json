@@ -47,6 +47,24 @@
       }
     ]
   },
+  "read-zxg-review-and-export": {
+    "description": "先读取 ZXG 标准化快照，再查看完整诊断视图，最后导出 watchlist JSON。",
+    "labels": ["block", "watchlist", "read", "review", "export"],
+    "steps": [
+      {
+        "name": "snapshot",
+        "entry": "read-zxg-watchlist"
+      },
+      {
+        "name": "full",
+        "entry": "read-zxg-full"
+      },
+      {
+        "name": "export",
+        "entry": "export-zxg-watchlist"
+      }
+    ]
+  },
   "morning-review": {
     "description": "开盘前刷新环境并查看当日交易日报。",
     "labels": ["morning", "review", "daily"],

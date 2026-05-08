@@ -328,6 +328,30 @@ python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 - 如果命令行显式再传 `--block-code`，以命令行参数为准
 - `read-zxg-watchlist` 现在也已经通过 `catalog` entry `read-zxg-watchlist` 暴露；这里新增的是 preset-backed catalog 发现与触发，不引入 report / export 打包语义
 - `read-zxg-full` 现在也已经通过 `catalog` entry `read-zxg-full` 暴露；两者都继续复用现有 task preset 和 task dispatch，不引入新的 catalog 参数层
+- `export-zxg-watchlist` 继续只通过既有 task preset 暴露导出参数；当它被更高层 catalog bundle 复用时，`export_output` 仍由 preset 自身持有，不在 bundle 顶层再暴露第二套导出参数层
+- `read-zxg-review` 继续作为纯读 catalog bundle 暴露；它只把 `read-zxg-watchlist` 与 `read-zxg-full` 收口到同一条两步入口，不引入 export / write-back 语义
+
+如果你想把“读 snapshot + 看完整诊断 + 导出 snapshot JSON”收口成一条固定日常命令，也可以直接走 preset-backed catalog bundle：
+
+```bash
+python -m tdxquant.cli catalog plan --bundle read-zxg-review-and-export
+python -m tdxquant.cli catalog plan --bundle read-zxg-review-and-export --block-code MYZXG
+python -m tdxquant.cli catalog run --bundle read-zxg-review-and-export
+python -m tdxquant.cli catalog run --bundle read-zxg-review-and-export --block-code MYZXG
+```
+
+这个 bundle 当前固定按顺序串三步：
+
+1. `read-zxg-watchlist`
+2. `read-zxg-full`
+3. `export-zxg-watchlist`
+
+边界约定：
+
+- 顶层 `--block-code` 会统一扇出到三步，保证读取、诊断与导出针对同一个板块代码
+- 第三步仍然走既有 `export-zxg-watchlist` preset，因此 `export_output` 继续由 preset 固定持有，而不是由 bundle 顶层重新定义
+- bundle 只复用现有 catalog entry 和 task preset dispatch，不新增底层 block read/export workflow
+- 如果第二步 `read-zxg-full` 失败，bundle 会在导出前停止，不会继续执行第三步
 
 ### 4.6 板块公式扫描
 
@@ -773,6 +797,7 @@ python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 - `task profile` 负责 workflow 默认行为，`task preset` 负责日常命令模板。
 - `block-read-watchlist` 当前已支持这种轻量 preset 打包，并通过同名 preset-backed catalog entry 暴露；仍然只是标准化 snapshot 读取入口，不引入 report / export 语义。
 - `block-read-full` 当前已支持这种静态 preset 打包，并通过同名 preset-backed catalog entry 暴露；仍不包含 report / export 打包。
-- `read-zxg-review` 当前已作为纯读 catalog bundle 暴露；它只把 `read-zxg-watchlist` 与 `read-zxg-full` 收口到同一条日常入口，不引入 export / report / write-back 语义。
-- 对 `catalog plan/run --bundle read-zxg-review --block-code ...`，顶层 `block_code` 会统一覆盖到两步，而不会引入每步单独参数层。
+- `read-zxg-review-and-export` 当前已作为 block 读侧 catalog bundle 暴露；它顺序收口 `read-zxg-watchlist`、`read-zxg-full` 与 `export-zxg-watchlist` 三个既有 preset-backed entry。
+- 对 `catalog plan/run --bundle read-zxg-review-and-export --block-code ...`，顶层 `block_code` 会统一覆盖到三步，而不会引入每步单独参数层。
+- `read-zxg-review-and-export` 的导出目标仍由第三步 `export-zxg-watchlist` preset 固定持有；bundle 顶层不额外开放 `export_output` 覆盖层。
 - `report` 类查询 workflow 已经有独立的 `report preset`，不建议再通过 `task preset` 重复配置。

@@ -192,15 +192,34 @@ The system SHALL expose stable catalog bundles that compose preset-backed block 
 
 #### Scenario: Caller plans a block read watchlist review bundle
 - **WHEN** a caller executes `catalog plan --bundle read-zxg-review`
-- **THEN** the system MUST resolve both steps through the existing preset-backed entry workflow without executing the steps
+- **THEN** the system MUST resolve exactly two steps through the existing preset-backed entry workflow without executing the steps
 
 #### Scenario: Caller applies a top-level block code override to the review bundle
 - **WHEN** a caller executes `catalog plan` or `catalog run` for `read-zxg-review` with `--block-code <value>`
-- **THEN** the system MUST propagate that `block_code` override to both `read-zxg-watchlist` and `read-zxg-full`
+- **THEN** the system MUST propagate that `block_code` override to `read-zxg-watchlist` and `read-zxg-full`
 
 #### Scenario: Caller runs a block read watchlist review bundle
 - **WHEN** a caller executes `catalog run --bundle read-zxg-review`
-- **THEN** the system MUST dispatch both steps sequentially through the existing bundle workflow and stop if the first step fails
+- **THEN** the system MUST dispatch the two resolved steps sequentially through the existing bundle workflow and stop before `read-zxg-full` if `read-zxg-watchlist` fails
+
+### Requirement: Command catalog SHALL expose block read review-and-export bundles once the preset-backed entries are stable
+The system SHALL expose stable catalog bundles that compose preset-backed block read watchlist snapshot, diagnostics, and JSON export entries through the existing bundle workflow.
+
+#### Scenario: Caller lists block read review-and-export bundles
+- **WHEN** a caller lists catalog bundles after the stable `read-zxg-watchlist`, `read-zxg-full`, and `export-zxg-watchlist` task presets are available
+- **THEN** the catalog MUST include a bundle named `read-zxg-review-and-export`
+
+#### Scenario: Caller plans a block read review-and-export bundle
+- **WHEN** a caller executes `catalog plan --bundle read-zxg-review-and-export`
+- **THEN** the system MUST resolve exactly three steps through the existing preset-backed entry workflow without executing the steps
+
+#### Scenario: Caller applies a top-level block code override to the review-and-export bundle
+- **WHEN** a caller executes `catalog plan` or `catalog run` for `read-zxg-review-and-export` with `--block-code <value>`
+- **THEN** the system MUST propagate that `block_code` override to `read-zxg-watchlist`, `read-zxg-full`, and `export-zxg-watchlist`
+
+#### Scenario: Caller runs a block read review-and-export bundle
+- **WHEN** a caller executes `catalog run --bundle read-zxg-review-and-export`
+- **THEN** the system MUST dispatch all resolved steps sequentially through the existing bundle workflow and stop before the export step if `read-zxg-full` fails
 
 ### Requirement: Command catalog SHALL expose block read full task entries once the preset is stable
 The system SHALL expose stable catalog entries for preset-backed block read full diagnostics task workflows once those presets are available.
