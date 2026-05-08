@@ -19,7 +19,7 @@
   - `read-zxg-full`
   - `export-zxg-watchlist`
 - pure read bundle
-  - `read-zxg-review`
+  - `read-zxg-review`（已落地，是这条三步 bundle 的直接先例）
 
 因此，这一包的真实缺口不是新增底层能力，而是把现有三条稳定入口收成一条更高层、仍然无复杂参数模型的 catalog bundle：
 
@@ -158,6 +158,7 @@ V1 明确不支持：
 原因是：
 
 - `export_output` 当前属于有文件副作用的 task preset 默认值
+- `overwrite: false` 也继续由 `export-zxg-watchlist` preset 持有
 - 如果现在把它提升到 bundle 顶层，会立刻引入：
   - 路径覆盖语义
   - 三步中只有一步消费该参数的特殊规则
@@ -221,6 +222,9 @@ V1 的错误语义继续复用现有 catalog bundle 逻辑：
   - bundle 停止，返回失败
 - step 3 export task failure
   - bundle 返回失败
+- 如果 `export-zxg-watchlist` preset 指向的 JSON 文件已存在
+  - step 3 也会因为 `overwrite: false` 返回失败
+  - 这属于既有 export task 语义，不在 bundle 层另做特殊处理
 
 这条线不新增新的 bundle error schema。
 
@@ -248,6 +252,8 @@ V1 的必需改动只有这些：
 
 唯一例外是：
 
+- 当前 `tdxquant/cli.py` 已经因为 `read-zxg-review` 落地了 bundle-level `--block-code`
+  - 所以这条 change 不应再重复修改 catalog parser
 - 如果 focused tests 暴露现有 bundle runner 对三步 fanout 或 step short-circuit 存在缺口
 - 才最小化修补相应 runtime 逻辑
 
