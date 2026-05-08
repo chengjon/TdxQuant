@@ -1,0 +1,66 @@
+## ADDED Requirements
+
+### Requirement: Subscription watch background control SHALL enforce single-active lifecycle semantics
+The system SHALL provide a worker-local background control layer for `subscription-watch` that manages at most one active watch run at a time and governs `start` / `stop` behavior through file-backed state and process ownership.
+
+#### Scenario: Start request creates a new active background run when idle
+- **WHEN** a caller starts `subscription-watch` background control while the worker has no active run
+- **THEN** the system MUST create a fresh `run_id`, persist `active.json` and `pid` ownership state, and transition the run into `starting` or `running`
+
+#### Scenario: Same idempotency key replays the current active run
+- **WHEN** a caller retries `start` with the same `idempotency_key` while the current active run is still in `starting`, `running`, or `stopping`
+- **THEN** the system MUST return the same active `run_id` instead of creating a second background run
+
+#### Scenario: Different start request is rejected while a run is active
+- **WHEN** a caller sends a new `start` request while another background run is active and the request does not qualify for same-`idempotency_key` replay
+- **THEN** the system MUST reject the request with an `ALREADY_RUNNING`-style control error
+
+#### Scenario: Start request fails when runner does not leave startup state in time
+- **WHEN** a caller starts `subscription-watch` background control and the runner does not reach a stable post-start state within the configured startup timeout
+- **THEN** the system MUST return a stable failed result instead of reporting the run as successfully started
+- **AND** the failure MUST preserve the active run details needed for operator diagnosis
+
+#### Scenario: Stop request is a noop when no run is active
+- **WHEN** a caller sends `stop` and the worker has no run in `starting`, `running`, or `stopping`
+- **THEN** the system MUST return a successful noop result instead of raising a transport-level failure
+
+### Requirement: Subscription watch background control SHALL reconcile stale local process state
+The system SHALL normalize worker-local control state by reconciling `active.json`, `pid`, and process liveness before reporting status or deciding whether a run is still active.
+
+#### Scenario: Missing or mismatched owned pid marks an active run as stale
+- **WHEN** background control finds `active.json` claiming `starting`, `running`, or `stopping` but the owned `pid` file is missing, mismatched, or no longer alive
+- **THEN** the system MUST normalize the run to a terminal state instead of continuing to report it as active
+- **AND** the normalization reason MUST record stale-process semantics
+
+#### Scenario: Terminal runs release owned pid state
+- **WHEN** background control encounters a run already in `completed`, `failed`, or `stopped`
+- **THEN** the system MUST remove stale owned pid state and keep the terminal payload readable through `active.json`
+
+### Requirement: Subscription watch background control SHALL expose stable status and list read models
+The system SHALL expose worker-local read models for current background state and recent run summaries so transport layers do not have to reconstruct lifecycle semantics directly from scattered files.
+
+#### Scenario: Status view returns active control plus current run status
+- **WHEN** a caller asks for background watch status while a run is active
+- **THEN** the system MUST return the active control payload and the current run `status.json` payload for that `run_id`
+
+#### Scenario: Status view returns explicit empty watch status when no run is active
+- **WHEN** a caller asks for background watch status and no run is active
+- **THEN** the system MUST return a stable control payload showing no active run
+- **AND** the watch-status view MUST remain explicitly empty instead of silently falling back to the last historical run
+
+#### Scenario: List view returns active and recent terminal summaries
+- **WHEN** a caller asks for the background watch list view
+- **THEN** the system MUST return the current `active` view plus `last_completed` and `last_failed` summaries when available
+- **AND** the system MUST NOT require a full historical index in the first version
+
+### Requirement: Subscription watch background control SHALL derive diagnostics from canonical run artifacts
+The system SHALL derive artifact paths and diagnostic reads from the canonical `subscription-watch` run directory contract instead of inventing a second background-only artifact format.
+
+#### Scenario: Artifact view exposes canonical run bundle paths
+- **WHEN** a caller requests artifacts for the active run or an explicit `run_id`
+- **THEN** the system MUST return canonical paths for `manifest.json`, `status.json`, `summary.json`, `events.jsonl`, `events.csv`, and `runner.log`
+
+#### Scenario: Events and logs views read from canonical run artifacts
+- **WHEN** a caller requests recent events or logs for the active run or an explicit `run_id`
+- **THEN** the system MUST tail `events.jsonl` and `runner.log` from the canonical run directory for that run
+- **AND** the system MUST return machine-readable event rows and log lines without opening a live runtime session
