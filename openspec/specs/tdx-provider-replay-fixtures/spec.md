@@ -9,6 +9,8 @@ The system SHALL provide a stable built-in replay fixture bundle for the current
 #### Scenario: Consumer enumerates bundled replay fixtures
 - **WHEN** a caller requests the built-in provider replay fixture catalog
 - **THEN** the system MUST expose stable fixture names, capability identifiers, file formats, and descriptions for the bundled samples
+- **AND** the fixture catalog MUST include representative `block sync` outcomes for at least applied, noop, rejected, and dry-run plan paths
+- **AND** bundled block sync fixture names SHOULD follow a stable `block-sync-<mode>-<outcome>.json` naming pattern
 
 ### Requirement: Provider replay fixtures SHALL support both JSON and JSONL contracts
 The system SHALL support bundled replay samples for synchronous provider JSON responses and asynchronous provider event-row JSONL streams.
@@ -16,6 +18,7 @@ The system SHALL support bundled replay samples for synchronous provider JSON re
 #### Scenario: Consumer loads a JSON replay fixture
 - **WHEN** a caller loads a bundled synchronous provider fixture
 - **THEN** the system MUST return a parsed JSON object that matches the packaged sample
+- **AND** block sync fixtures MUST preserve the stabilized `sync` summary fields together with any exposed `block_mutation` governance metadata and audit-artifact descriptors
 
 #### Scenario: Consumer loads a JSONL replay fixture
 - **WHEN** a caller loads a bundled provider event fixture
@@ -27,4 +30,35 @@ The system SHALL keep the replay fixture bundle usable without TongDaXin runtime
 #### Scenario: Consumer uses fixture loader without live runtime
 - **WHEN** a caller loads a replay fixture on a machine without TongDaXin runtime access
 - **THEN** the loader MUST still work because it depends only on packaged local assets
+
+### Requirement: Provider replay fixtures SHALL cover representative query contracts for market, meta, financial, and transaction
+The system SHALL provide representative replay fixtures for the covered query domains so callers can validate hardened query contracts without live runtime access.
+
+#### Scenario: Query fixture catalog includes representative covered query fixtures
+- **WHEN** a caller enumerates the built-in replay fixture catalog
+- **THEN** the catalog MUST include representative fixtures for `market`, `meta`, `financial`, and `transaction` query capabilities
+- **AND** those representatives MUST cover at least success, empty-result, and failure outcomes across the covered query domains
+- **AND** the minimum representative set MUST include `market.snapshot`, `market.kline`, `meta.stock_list`, `meta.sector_stocks`, `financial.financial_data`, `financial.financial_data_by_date`, `transaction.stock_transaction_data`, and `transaction.market_transaction_data`
+
+#### Scenario: Query replay fixture preserves hardened query metadata
+- **WHEN** a caller loads a covered query replay fixture
+- **THEN** the fixture payload MUST preserve the hardened query metadata required by the provider query contract
+- **AND** the fixture MUST preserve any domain-native `rows` shape for that capability
+- **AND** the hardened metadata MUST live under `data.query_meta`
+
+### Requirement: Provider replay fixtures SHALL include representative subscription-watch resilience artifacts
+The system SHALL provide representative replay fixtures for subscription-watch reconnect and degraded runtime-state artifacts in addition to the existing completed-run samples.
+
+#### Scenario: Fixture catalog includes reconnecting and degraded status samples
+- **WHEN** a caller enumerates the built-in replay fixture catalog
+- **THEN** the catalog MUST include representative `subscription-watch` status fixtures for `reconnecting` and `degraded`
+
+#### Scenario: Fixture catalog includes a completed summary with reconnect history
+- **WHEN** a caller enumerates the built-in replay fixture catalog
+- **THEN** the catalog MUST include a representative completed `subscription-watch` summary that preserves reconnect history fields
+
+#### Scenario: Existing completed fixtures remain valid with additive resilience fields
+- **WHEN** a caller loads the existing completed `subscription-watch` status or summary fixture
+- **THEN** the fixture MUST remain valid for the pre-existing completed-run contract
+- **AND** any resilience fields added by this change MUST be additive compatibility extensions rather than a breaking schema rewrite
 

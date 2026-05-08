@@ -13,6 +13,10 @@ The system SHALL provide a nested `api` command group for query-oriented TdxQuan
 - **WHEN** a caller invokes the nested `api ipo-info` subcommand
 - **THEN** the CLI MUST dispatch the call through `TdxApiManager.meta.ipo_info(...)`
 
+#### Scenario: Caller invokes nested api block-sync command
+- **WHEN** a caller invokes `api block-sync`
+- **THEN** the CLI MUST dispatch the call through the manager-backed block sync capability
+
 ### Requirement: Query API CLI SHALL preserve existing flat command compatibility
 The system SHALL keep existing flat query commands functional while introducing the new nested `api` command group.
 
@@ -31,6 +35,10 @@ The system SHALL keep existing flat query commands functional while introducing 
 #### Scenario: Existing flat send-user-block command remains available during migration
 - **WHEN** a caller invokes `tdx-send-user-block` during the expansion phase after block lifecycle expansion
 - **THEN** that command MUST remain usable alongside the new custom-sector lifecycle commands
+
+#### Scenario: Caller invokes flat block-sync command during migration
+- **WHEN** a caller invokes `tdx-block-sync`
+- **THEN** the CLI MUST dispatch the call to the dedicated block sync wrapper while preserving existing block write commands
 
 ### Requirement: Query API CLI SHALL support profile-driven daily usage
 The system SHALL allow the nested `api` command group to accept a profile selection and standard output path controls for daily usage while emitting structured machine-readable output through the provider-facing synchronous result envelope.
@@ -334,4 +342,59 @@ The system SHALL emit the standardized block mutation summary and audit artifact
 #### Scenario: Flat bridge block write returns standardized mutation contract
 - **WHEN** a flat bridge block write command completes
 - **THEN** the JSON result MUST include the standardized `data.block_mutation` payload and audit artifact metadata
+
+### Requirement: Query API CLI SHALL emit hardened query metadata for existing query entrypoints
+The system SHALL preserve the stabilized query metadata contract on existing nested `api` and flat CLI query entrypoints for `market`, `meta`, `financial`, and `transaction`.
+
+#### Scenario: Nested api query returns hardened query metadata
+- **WHEN** a caller invokes a covered nested `api` query command
+- **THEN** the CLI JSON result MUST include the standardized query metadata under `data.query_meta` required by the provider query contract
+
+#### Scenario: Flat query command returns hardened query metadata
+- **WHEN** a caller invokes a covered flat query command
+- **THEN** the CLI JSON result MUST include the standardized query metadata under `data.query_meta` required by the provider query contract
+
+#### Scenario: CLI preserves non-breaking query hardening contract
+- **WHEN** a caller upgrades from the pre-hardening query contract to the hardened one
+- **THEN** the CLI MUST preserve the existing top-level provider envelope
+- **AND** new query metadata MUST be additive under `data.query_meta`
+
+### Requirement: Query API CLI SHALL preserve replay-mode contract parity for covered query commands
+The system SHALL keep replay-mode CLI query output contract-equivalent to live CLI query output for the covered query entrypoints.
+
+#### Scenario: Replay-mode nested api query preserves query metadata contract
+- **WHEN** a caller invokes a covered nested `api` query command with `--provider-mode replay`
+- **THEN** the CLI MUST return the same hardened `data.query_meta` shape as the live query contract for that capability
+
+#### Scenario: Replay-mode flat query preserves query metadata contract
+- **WHEN** a caller invokes a covered flat query command with `--provider-mode replay`
+- **THEN** the CLI MUST return the same hardened `data.query_meta` shape as the live query contract for that capability
+
+### Requirement: Query API CLI SHALL expose bridge remote-control read commands for subscription-watch control planes
+The system SHALL expose remote-control CLI read commands for the worker bridge control plane and keep them as transport-only JSON pass-through entrypoints.
+
+#### Scenario: Caller invokes bridge health
+- **WHEN** a caller invokes `tdxquant bridge health`
+- **THEN** the CLI MUST dispatch the call through the master-side bridge registry/client
+- **AND** stdout MUST print the resulting JSON payload unchanged
+
+#### Scenario: Caller invokes bridge watch-list or watch-artifacts
+- **WHEN** a caller invokes `tdxquant bridge watch-list` or `tdxquant bridge watch-artifacts`
+- **THEN** the CLI MUST dispatch the call through the master-side bridge registry/client
+- **AND** stdout MUST print the resulting JSON payload unchanged
+
+#### Scenario: Caller invokes bridge watch-events or watch-logs with tail
+- **WHEN** a caller invokes `tdxquant bridge watch-events --tail <n>` or `tdxquant bridge watch-logs --tail <n>`
+- **THEN** the CLI MUST pass the tail parameter through the master-side bridge registry/client route
+- **AND** stdout MUST print the resulting JSON payload unchanged
+
+#### Scenario: Bridge remote-control CLI preserves bridge error payload
+- **WHEN** the master-side bridge client returns a bridge failure payload with `ok=false`
+- **THEN** the CLI MUST print that JSON payload unchanged
+- **AND** it MUST return a failing exit code without rewriting the bridge `result` or `error` fields
+
+#### Scenario: Bridge watch-status remains an active-snapshot reader
+- **WHEN** a caller invokes `tdxquant bridge watch-status`
+- **THEN** the CLI MUST return the current controller-projected active snapshot for that worker
+- **AND** it MUST NOT reinterpret the command as a historical `run_id` lookup interface
 

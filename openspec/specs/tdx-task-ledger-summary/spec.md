@@ -1,4 +1,10 @@
-## ADDED Requirements
+# tdx-task-ledger-summary Specification
+
+## Purpose
+
+定义任务流水汇总能力，稳定读取连续任务 ledger，支持面向日常检查和下游自动化的结构化过滤、汇总与导出。
+
+## Requirements
 
 ### Requirement: Task ledger summary SHALL provide a stable workflow for consuming continuous task ledgers
 The system SHALL provide a stable task-facing workflow that reads continuous task ledger artifacts and returns structured summary data for daily inspection and downstream automation.

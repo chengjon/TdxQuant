@@ -1,4 +1,10 @@
-## ADDED Requirements
+# tdx-task-trade-period-report Specification
+
+## Purpose
+
+定义区间级交易报告任务能力，稳定读取连续任务流水，按本地日期范围过滤、聚合并输出可审计的区间 JSON 与 CSV 报告，支持单日和多日范围调用。
+
+## Requirements
 
 ### Requirement: Task trade period report SHALL provide a stable range-level ledger aggregation workflow
 The system SHALL provide a stable task-facing workflow that reads continuous task ledger artifacts, filters entries by local-date range, and returns structured aggregation data for that period.

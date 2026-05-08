@@ -8,7 +8,8 @@ The system SHALL define a stable provider-facing event-row contract for TongDaXi
 
 #### Scenario: Consumer reads a normalized subscription event row
 - **WHEN** a normalized subscription update row is emitted by the provider-facing subscription workflow
-- **THEN** the row MUST include `schema_version`, `session_id`, `provider_instance_id`, `subscription_id`, `sequence`, `event_type`, `symbol`, `source_ts`, `event_ts`, `reconnect_metadata`, and `payload`
+- **THEN** the row MUST include `schema_version`, `capability`, `run_id`, `session_id`, `provider_instance_id`, `subscription_id`, `sequence`, `event_type`, `symbol`, `source_ts`, `event_ts`, `reconnect_metadata`, and `payload`
+- **AND** `reconnect_metadata` MUST remain present even when the row has no reconnect-specific fields to report
 
 ### Requirement: Provider subscription event rows SHALL preserve raw callback context
 The system SHALL preserve the serialized raw callback context inside the normalized event row so consumers can inspect source payload details without depending on TongDaXin callback transport internals.
