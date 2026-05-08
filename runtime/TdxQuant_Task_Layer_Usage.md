@@ -329,6 +329,7 @@ python -m tdxquant.cli task run --preset read-zxg-full --block-code MYZXG
 - `read-zxg-watchlist` 现在也已经通过 `catalog` entry `read-zxg-watchlist` 暴露；这里新增的是 preset-backed catalog 发现与触发，不引入 report / export 打包语义
 - `read-zxg-full` 现在也已经通过 `catalog` entry `read-zxg-full` 暴露；两者都继续复用现有 task preset 和 task dispatch，不引入新的 catalog 参数层
 - `export-zxg-watchlist` 继续只通过既有 task preset 暴露导出参数；当它被更高层 catalog bundle 复用时，`export_output` 仍由 preset 自身持有，不在 bundle 顶层再暴露第二套导出参数层
+- `read-zxg-review` 继续作为纯读 catalog bundle 暴露；它只把 `read-zxg-watchlist` 与 `read-zxg-full` 收口到同一条两步入口，不引入 export / write-back 语义
 
 如果你想把“读 snapshot + 看完整诊断 + 导出 snapshot JSON”收口成一条固定日常命令，也可以直接走 preset-backed catalog bundle：
 

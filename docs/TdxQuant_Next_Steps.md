@@ -155,7 +155,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `task block-read-watchlist` 已接入现有 task preset 体系，当前固定 `block_code` 默认值与 `safe_read` API profile，并允许显式 CLI 覆盖 `block_code`
 - `task block-read-watchlist` 已接入同一套 preset-backed catalog 入口；当前只收口发现、预览与执行，不引入新的 catalog 参数层
 - `task block-read-full` 继续保留 canonical `data.snapshot`，只额外补 task-level `data.read_full` 诊断摘要
-- `read-zxg-review-and-export` 已接入同一套 block 读侧 catalog bundle 入口，当前按顺序收口 `read-zxg-watchlist`、`read-zxg-full` 与 `export-zxg-watchlist`；顶层 `--block-code` 会统一覆盖三步，但不新增 bundle 级 `export_output` 参数层
+- `read-zxg-review` 与 `read-zxg-review-and-export` 已接入同一套 block 读侧 catalog bundle 入口；前者只收口 `read-zxg-watchlist` 与 `read-zxg-full`，后者进一步把 `export-zxg-watchlist` 串进去；顶层 `--block-code` 会统一覆盖各自步骤，但不新增 bundle 级 `export_output` 参数层
 - `task block-read-watchlist-export` 继续只把 `data.snapshot` 安全写到单文件 JSON，不反向定义新的 provider schema
 - `task block-read-watchlist-export` 已接入现有 task preset 体系，当前只支持静态 `block_code / export_output / overwrite`，其中 `export_output` 继续由 preset 自身持有
 - `task block-read-full` 已接入同一套 task preset 体系，当前只做静态 `block_code` 打包与显式 CLI 覆盖
