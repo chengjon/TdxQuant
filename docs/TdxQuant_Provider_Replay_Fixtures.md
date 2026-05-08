@@ -18,7 +18,9 @@
 - `runtime.capabilities`
 - `runtime.health`
 - `runtime.doctor`
+- query contract representatives for `market / meta / financial / transaction`
 - `block.send_user_block` 的 mutation safety 结果（applied / noop / rejected）
+- `block.sync_watchlist` 的 sync result 结果（applied / noop / rejected / dry-run plan）
 - provider-level subscription event rows
 - `subscription-watch` run artifact bundle
 
@@ -69,9 +71,25 @@
 - `runtime-capabilities-success`
 - `runtime-health-degraded`
 - `runtime-doctor-degraded`
+- `market-snapshot-success`
+- `market-kline-success`
+- `market-kline-empty`
+- `meta-stock-list-success`
+- `meta-sector-stocks-success`
+- `meta-sector-stocks-empty`
+- `financial-financial-data-success`
+- `financial-financial-data-by-date-success`
+- `financial-financial-data-failure`
+- `transaction-stock-transaction-data-success`
+- `transaction-market-transaction-data-success`
+- `transaction-stock-transaction-data-failure`
 - `block-send-user-block-applied`
 - `block-send-user-block-noop`
 - `block-send-user-block-rejected`
+- `block-sync-replace-applied`
+- `block-sync-merge-noop`
+- `block-sync-replace-rejected`
+- `block-sync-replace-plan`
 - `subscription-event-batch`
 - `subscription-watch-events`
 - `subscription-watch-status-completed`
@@ -90,7 +108,16 @@
 - `runtime.capabilities`
 - `runtime.health`
 - `runtime.doctor`
+- `market.snapshot`
+- `market.kline`
+- `meta.stock_list`
+- `meta.sector_stocks`
+- `financial.financial_data`
+- `financial.financial_data_by_date`
+- `transaction.stock_transaction_data`
+- `transaction.market_transaction_data`
 - `block.send_user_block`
+- `block.sync_watchlist`
 
 当前支持的运行入口：
 
@@ -103,19 +130,37 @@
     - `tdxquant api capabilities --provider-mode replay`
     - `tdxquant api health --provider-mode replay`
     - `tdxquant api doctor --provider-mode replay`
+    - `tdxquant api snapshot --provider-mode replay`
+    - `tdxquant api kline --provider-mode replay`
+    - `tdxquant api stock-list --provider-mode replay`
+    - `tdxquant api sector-stocks --provider-mode replay`
+    - `tdxquant api financial-data --provider-mode replay`
+    - `tdxquant api financial-data-by-date --provider-mode replay`
+    - `tdxquant api stock-transaction-data --provider-mode replay`
+    - `tdxquant api market-transaction-data --provider-mode replay`
     - `tdxquant api formula-screen --provider-mode replay`
     - `tdxquant api send-user-block --provider-mode replay`
+    - `tdxquant api block-sync --provider-mode replay`
   - explicit reject example:
-    - `tdxquant api snapshot --provider-mode replay`
+    - `tdxquant api full-tick --provider-mode replay`
 - flat CLI
   - supported:
     - `tdxquant tdx-capabilities --provider-mode replay`
     - `tdxquant tdx-health --provider-mode replay`
     - `tdxquant tdx-doctor --provider-mode replay`
+    - `tdxquant tdx-data-snapshot --provider-mode replay`
+    - `tdxquant tdx-data-kline --provider-mode replay`
+    - `tdxquant tdx-data-stock-list --provider-mode replay`
+    - `tdxquant tdx-data-sector-stocks --provider-mode replay`
+    - `tdxquant tdx-data-financial --provider-mode replay`
+    - `tdxquant tdx-data-financial-by-date --provider-mode replay`
+    - `tdxquant tdx-data-stock-transaction --provider-mode replay`
+    - `tdxquant tdx-data-market-transaction --provider-mode replay`
     - `tdxquant tdx-formula-screen --provider-mode replay`
     - `tdxquant tdx-send-user-block --provider-mode replay`
+    - `tdxquant tdx-block-sync --provider-mode replay`
   - explicit reject example:
-    - `tdxquant tdx-data-kline --provider-mode replay`
+    - `tdxquant tdx-refresh-kline --provider-mode replay`
 - task
   - `tdxquant task subscription-watch --provider-mode replay`
 
@@ -173,6 +218,7 @@ watch_summary = load_provider_replay_fixture("subscription-watch-summary-complet
   - `data.summary.by_side_effect_level`
   - `data.grading.stability_levels`
   - `data.grading.side_effect_levels`
+  - representative query capability `query_metadata`
 - `runtime-health-degraded`
   - `data.context`
   - `data.checks`
@@ -220,6 +266,22 @@ watch_summary = load_provider_replay_fixture("subscription-watch-summary-complet
   - `status=rejected`
   - `governance_decision=reject`
   - `governance_reason=missing_block`
+
+其中 `block sync` fixtures 额外锁定这些结构：
+
+- `block-sync-replace-applied`
+  - `data.sync`
+  - `data.block_mutation`
+  - top-level `artifacts` 里的 `block_sync_audit`
+- `block-sync-merge-noop`
+  - `data.sync.status=noop`
+  - `data.sync.mode=merge`
+- `block-sync-replace-rejected`
+  - `data.sync.status=rejected`
+  - `data.sync.governance_reason=missing_block`
+- `block-sync-replace-plan`
+  - `data.sync.dry_run=true`
+  - `data.sync.would_create_block=true`
 
 ## 7. Subscription Watch Replay
 

@@ -148,6 +148,8 @@ def block_read_watchlist_export(
 
 其中 `data.export.error` 在 V1 采用简单字符串，用来承载人类可读的文件侧失败原因；V1 不再额外引入结构化子错误对象。
 
+V2 如需和顶层 `Result` 的 `code/message` 进一步对齐，可再把 `data.export.error` 扩展为结构化对象；这一点不属于 V1 contract。
+
 ## File Semantics
 
 ### Export content
@@ -218,6 +220,12 @@ V1 不实现“启动时清理历史残留临时文件”。
 
 这意味着 V1 不只是“先检查、再覆盖”，而是要把“拒绝覆盖”落实到最终发布步骤，避免把竞态下新出现的目标文件静默覆盖掉。
 
+V1 的实现与验证前提也一并固定为：
+
+- 以当前 Linux worker/runtime 环境为主
+- `overwrite=false` 的 no-clobber publish 可以通过标准库等价实现完成，例如 link/unlink 或等价方案
+- 不要求在 V1 中为 Windows 文件替换语义单独做兼容保证
+
 ## Capability / Replay Boundaries
 
 - 这是 task-layer 场景入口，不注册为新的 provider capability
@@ -240,6 +248,8 @@ focused tests 只覆盖这条 task：
 - 成功场景下 `data.export.overwritten` / `data.export.file_size` 语义固定
 - `--output` 指向目录或不可写路径时稳定失败
 - `overwrite=false` 时，如果目标文件在最终发布前被并发创建，必须稳定失败为 existing-file conflict
+
+对于最后一类 publish-time existing-file conflict，V1 测试可以使用受控的 `FileExistsError` 注入来稳定覆盖该语义；不要求用线程竞态测试去构造不可靠的时间窗口。
 
 ### CLI
 

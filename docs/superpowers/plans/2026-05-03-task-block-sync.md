@@ -4,7 +4,7 @@
 
 **Goal:** Add a thin `task block-sync` entrypoint that reuses the existing provider-level `block.sync_watchlist` capability without redefining its machine contract.
 
-**Architecture:** Keep the implementation deliberately thin. Add `TdxTaskManager.block_sync(...)` as a direct wrapper around `TdxApiManager.block.sync_watchlist(...)`, add `tdxquant task block-sync ...` parser/dispatch wiring, and update task-layer docs. Do not add presets, catalog entries, file-import parsing, or task-only artifact formats.
+**Architecture:** Keep the implementation deliberately thin. Add `TdxTaskManager.block_sync(...)` as a direct wrapper around `TdxApiManager.block.sync_watchlist(...)` using the existing `_capture_task_timing(...)` + `_attach_task_metadata(...)` task pattern, add `tdxquant task block-sync ...` parser/dispatch wiring, and update task-layer docs. Do not add presets, catalog entries, file-import parsing, or task-only artifact formats.
 
 **Tech Stack:** Python 3, existing `TdxTaskManager` / `TdxApiManager`, argparse CLI, unittest/pytest test suites, existing Result/error contract.
 
@@ -15,7 +15,7 @@
 - Modify: `tdxquant/api/task.py`
   - Add `TdxTaskManager.block_sync(...)` as a thin wrapper that attaches normal task metadata and forwards directly to `self.api_manager.block.sync_watchlist(...)`.
 - Modify: `tdxquant/cli.py`
-  - Add `task block-sync` parser wiring.
+  - Add `task block-sync` parser wiring using the existing task-subparser pattern plus `_add_block_sync_arguments(...)`.
   - Add `_handle_task_subcommand(...)` dispatch branch that calls `manager.block_sync(...)`.
 - Modify: `tests/test_api_manager.py`
   - Add focused `TdxTaskManager.block_sync(...)` tests that verify forwarding and metadata, without re-testing sync orchestration.
@@ -322,7 +322,7 @@ git commit -m "feat: add task block sync cli entrypoint"
 
 Add a new section to `runtime/TdxQuant_Task_Layer_Usage.md` after the existing task workflow sections:
 
-```markdown
+````markdown
 ### 4.x Block Sync
 
 ```bash
@@ -339,6 +339,7 @@ python -m tdxquant.cli task block-sync \
 - `--create-if-missing`
 - `--dry-run`
 - `--mutation-key`
+- `--audit-dir`
 - `--show`
 - `--api-profile`
 - `--strategy-path`
@@ -355,7 +356,7 @@ python -m tdxquant.cli task block-sync \
 - task preset
 - catalog entry
 ```
-```
+````
 
 - [ ] **Step 2: Update roadmap/docs to mark task-level block-sync as the next completed scene entry**
 

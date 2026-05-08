@@ -108,6 +108,8 @@ Status: Draft for review
 
 不新增新的 bridge 调用路径，不允许 task 层绕开 manager。
 
+`strategy_path` 继续沿用现有 `TdxTaskManager(..., strategy_path=...)` / task profile 的构造方式传入 `TdxApiManager`，不额外成为 `block_sync(...)` 方法签名里的显式参数。
+
 ### 2. Request Shape
 
 第一版 task 层只接受显式参数，不支持文件导入。
@@ -115,7 +117,7 @@ Status: Draft for review
 输入字段：
 
 - `block_code`
-- `stock[]`
+- `symbols`
 - `mode`
   - `replace` 默认
   - `merge`
@@ -125,30 +127,39 @@ Status: Draft for review
   - 默认 `false`
 - `mutation_key`
   - 可选
+- `audit_dir`
+  - 可选，透传到底层
 - `show`
-  - 透传到底层
+  - 透传到底层，默认保持 `true`
 
 语义：
 
-- `stock[]` 直接作为用户显式传入的 symbols 列表
+- Python API 使用 `symbols`，与 provider-level `block.sync_watchlist(...)` 保持一致
+- CLI 继续保留 repeatable `--stock` 参数，解析后映射到 task 层的 `symbols`
 - task 层不负责从文件解析 watchlist
 - 代码规范化、去重、diff 计算、治理决策都继续由 provider-level `block.sync_watchlist` 负责
+- `audit_dir` 只是 passthrough；如果省略，继续使用底层默认审计目录
+- `show` 第一版继续保持 `true`，与 `api block-sync` / `tdx-block-sync` / provider-level 默认行为一致，避免 task 入口单独偏离现有桌面交互语义
 
 ### 3. Response Shape
 
-task 层返回值直接沿用 provider-level `block sync` 结果结构：
+task 层返回值直接沿用 provider-level `block sync` 结果结构，并按现有 task 约定补齐 task metadata：
 
 - `success/code/message`
 - `data.sync`
 - `data.block_mutation`
 - `artifacts`
+- `data.task`
+- `data.task_profile`
+- `data.timing`
 
-task 层至多允许补很薄的 task 语义，比如：
+也就是说，`TdxTaskManager.block_sync(...)` 应继续走现有 task wrapper 模式：
 
-- `task_name = "block-sync"`
-- `invoked_via = "task"`
+- `_capture_task_timing("task.block_sync", ...)`
+- `_attach_task_metadata(..., task_name="block_sync", timing=timing)`
 
-但**不**改变主结构，也不把结果改造成独立 task-only schema。
+而不是做一个不带 task metadata 的例外实现。  
+这仍然是“薄包装”，因为 task 层只是附加统一 task 运行元数据，不改写底层 sync/governance 结果结构。
 
 这意味着：
 
@@ -198,6 +209,13 @@ python -m tdxquant.cli task block-sync \
 - `catalog run block-sync-*`
 
 这样能确保 CLI 只是 task contract 的直接映射，不引入多层入口耦合。
+
+注册方式继续沿用现有 task 子命令模式：
+
+- `task_subparsers.add_parser("block-sync")`
+- `--stock` 采用 repeatable `action="append"`
+- 复用 `_add_block_sync_arguments(...)`
+- 再复用 `_add_task_common_arguments(...)`
 
 ### 6. Testing
 

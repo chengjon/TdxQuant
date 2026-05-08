@@ -22,12 +22,13 @@
 
 `block` 写能力会改变 TongDaXin 客户端本地状态，因此返回结果不能只停留在普通 `success / code / message`。
 
-当前第一版 block mutation safety contract 解决 4 件事：
+当前 block mutation safety contract 解决 5 件事：
 
 - 返回稳定的 `data.block_mutation` 摘要
 - 为每次写尝试落本地 JSON 审计文件
 - 在结果中暴露 audit artifact
 - 保留可选 `mutation_key` 作为跨系统关联键
+- 对真实状态已达目标、冲突拒绝、执行失败给出稳定 machine-readable 结果
 
 ## 2. Canonical Payload Additions
 
@@ -36,15 +37,29 @@
 ```json
 {
   "block_mutation": {
-    "schema_version": "2026-04-28",
+    "schema_version": "2026-05-02",
     "mutation_id": "7cdb0d7f7a4b47fcbb1a60871bb0f6a0",
     "mutation_key": "watchlist-sync-20260428-01",
     "operation": "send_user_block",
     "status": "applied",
+    "governance_decision": "execute",
+    "governance_reason": "state_diff_detected",
     "block_code": "ZXG",
     "requested_stocks": ["000001.SZ", "600519.SH"],
     "requested_stock_count": 2,
-    "show": true
+    "show": true,
+    "desired_state": {
+      "block_code": "ZXG",
+      "exists": true,
+      "stocks": ["000001.SZ", "600519.SH"]
+    },
+    "observed_state": {
+      "block_code": "ZXG",
+      "exists": true,
+      "block_name": "自选股",
+      "stocks": ["000001.SZ"],
+      "stock_count": 1
+    }
   },
   "artifacts": {
     "audit_log_path": "runtime/block-mutations/20260428T120001123456Z-send_user_block-ZXG-7cdb0d7f.json"
@@ -86,6 +101,8 @@
 当前 `status` 取值：
 
 - `applied`
+- `noop`
+- `rejected`
 - `failed`
 
 ### `mutation_key`
@@ -102,9 +119,15 @@
 - 自动重复写拦截
 - 强幂等执行语义
 
+当前治理层已支持：
+
+- 本地 `mutation_key` replay 短路
+- 本地 `mutation_key` 冲突拒绝
+- 真实状态感知的 `noop / rejected / applied / failed` 结果
+
 ## 4. Audit Artifact
 
-每次支持的 `block` 写动作，都会写一份本地 JSON 审计文件，包括失败尝试。
+每次支持的 `block` 写动作，都会写一份本地 JSON 审计文件，包括 `applied / noop / rejected / failed`。
 
 审计文件至少包含：
 
@@ -114,6 +137,10 @@
 - `mutation_key`
 - `operation`
 - `status`
+- `governance_decision`
+- `governance_reason`
+- `desired_state`
+- `observed_state`
 - `request`
 - `result`
 
@@ -124,8 +151,11 @@
 当前第一版 contract 还没有做这些增强：
 
 - 覆盖写 / 增量写的显式策略枚举
-- 基于 `mutation_key` 的自动 skip
-- 预读客户端状态后的重复写保护
-- block sync task / daemon
+- 面向文件导入或双向同步的上层 orchestration
+
+其中：
+
+- `watchlist -> TongDaXin block` 的单向 provider-level block sync contract 已经独立落到 `TdxQuant_Provider_Block_Sync_Contract.md`
+- 本文只继续约束底层 governed write 行为，而不重述更高层 sync contract
 
 这些属于下一阶段治理增强，不属于本包范围。

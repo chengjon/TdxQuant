@@ -4,6 +4,12 @@
 
 它关注的是 task lifecycle、artifact 和运行状态。
 
+截至 `2026-05-03`，live runtime resilience contract 也已经进入这一层：
+
+- 同一次 live run 在断线恢复前后保持同一个 `run_id`
+- 同一次 live run 持续写同一个 `events.jsonl`
+- reconnect / degraded 通过 `status.json` / `summary.json` 暴露，而不是拆成新 run
+
 若只关心“单条事件行长什么样”，见：
 
 - [TdxQuant_Provider_Subscription_Event_Contract.md](/opt/iflow/TdxQuant/docs/TdxQuant_Provider_Subscription_Event_Contract.md)
@@ -135,13 +141,25 @@ CLI:
 - `event_count`
 - `unique_symbols`
 - `unique_symbol_count`
-- `last_event_at`
+- `last_event_ts`
+- `heartbeat_at`
+- `last_source_ts`
+- `reconnect_count`
+- `consecutive_reconnect_failures`
+- `last_disconnect_at`
+- `last_reconnect_at`
+- `next_reconnect_at`
+- `degraded_since`
+- `last_error`
 - `artifacts`
 
 `state` 当前可能值：
 
 - `starting`
 - `running`
+- `reconnecting`
+- `degraded`
+- `stopping`
 - `completed`
 - `interrupted`
 - `failed`
@@ -155,6 +173,19 @@ CLI:
 - `completed`
 
 在 replay mode 下，当前默认 built-in source 的 completed run 会保留 fixture 自带的 `stop_reason`，例如 `max_events`。
+
+这些 resilience 字段的当前语义为：
+
+- `heartbeat_at`：主循环最近一次确认仍在推进
+- `last_event_ts`：最近一次成功落盘 event 的时间
+- `last_source_ts`：最近一次上游 event 自带时间
+- `reconnect_count`：当前 run 内累计恢复次数
+- `consecutive_reconnect_failures`：当前连续恢复失败次数
+- `last_disconnect_at`：最近一次确认订阅失效的时间
+- `last_reconnect_at`：最近一次恢复成功时间
+- `next_reconnect_at`：下一次计划恢复探测时间；在当前 background/bridge terminal persistence 中会清空为 `null`
+- `degraded_since`：进入 `degraded` 的时间
+- `last_error`：最近一次恢复失败的结构化错误
 
 ## 7. Completion Summary
 
@@ -183,6 +214,12 @@ CLI:
 - `events_jsonl_path`
 - `events_csv_path`
 - `summary_path`
+
+`summary.json` 当前也会增量补充 resilience 摘要字段：
+
+- `reconnect_count`
+- `degraded_duration_ms`
+- `final_last_error`
 
 在 replay mode 下，这些 artifact key 当前有稳定 alias 语义：
 
@@ -231,11 +268,38 @@ bridge 访问前提当前也是 contract 的一部分：
 - worker 侧会按 `master_allowlist` 做 source-IP allowlist 校验
 - 任一前置条件不满足时，bridge 会直接拒绝请求，不进入 watch control 逻辑
 
+## 8.1 Bridge Integration Regression Surface
+
+- worker-local background control 仍是 watch runtime state 的唯一真源
+- `GET /bridge/v1/watch/status` 只做 controller 读模型投影，不生成 bridge-only watch state
+- `/bridge/v1/health` 以及 active `run_id` fallback 使用 control-only read path，不扫描额外运行态文件来推导 watch state
+- Master 侧 registry/client 错误按 transport 语义归类，例如 `invalid JSON`、`connection refused`、`HTTP non-JSON failure`；它们不能被解释为 task runtime failure
+- bridge auth / allowlist 拒绝同样属于 transport-scoped failure，不改变 watch runtime state
+- CLI `bridge health`、`bridge watch-status`、`bridge watch-list`、`bridge watch-artifacts`、`bridge watch-events`、`bridge watch-logs` 直接输出 Master 侧 client 收到的 JSON payload，不做二次改写
+
+这层 bridge 只做 transport / background-control shell，不重新定义 watch lifecycle。
+因此当 live run 从 `watch_status.state=running -> reconnecting -> degraded -> running` 变化时：
+
+- `run_id` 不变
+- `events.jsonl` 不轮换
+- bridge / background / foreground 读取的是同一份 runtime 状态语义
+
+这里要区分两层状态：
+
+- `control.state` 描述 worker-local background process / control-plane 状态
+- `watch_status.state` 描述 `subscription-watch` task 的运行态摘要；`reconnecting` / `degraded` 属于这一层 runtime-state summary
+
 当前 `watch-start` / `watch-status` 还有两条稳定控制面语义：
 
 - `watch-start` 会把 `stock_list`、`max_events`、`max_seconds`、`poll_interval` 以及可选 `idempotency_key` 透传到 worker-local background controller；若请求本身不可能形成有效 run，会在 spawn 前直接返回 `INVALID_REQUEST`
 - `watch-start` 在当前 active run 上支持 same-`idempotency_key` replay；同键重试返回同一个 active `run_id`，而不是新的 `ALREADY_RUNNING`
-- `watch-status` 在**未显式提供 `run_id`** 时只返回当前 active snapshot；若当前没有 active watch，则 `watch_status` 明确为 `null`，不会静默回退到历史 `status.json`
+- `watch-status` 只返回当前 controller projection / active snapshot；当前实现会忽略显式 `run_id`，若没有 active watch，则 `watch_status` 明确为 `null`，不会静默回退到历史 `status.json`
+
+截至 `2026-05-03`，bridge 侧这些读取行为也已经有了明确边界：
+
+- worker-local background controller 拥有 `status / list / artifacts / events / logs` 的本地读模型
+- bridge 只负责 HTTP transport、`Authorization` / allowlist 校验和结果 envelope 映射；其中 `watch/status` 是 controller 输出的 verbatim projection
+- bridge 不再被视为“自行扫描本地文件系统拼装状态”的契约拥有者
 
 这一版明确**不做**：
 
