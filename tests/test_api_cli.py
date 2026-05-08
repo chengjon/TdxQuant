@@ -2561,6 +2561,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         bundle_names = [row["name"] for row in result.data["bundles"]]
         self.assertIn("read-zxg-review", bundle_names)
 
+    def test_handle_catalog_bundle_list_includes_read_zxg_review_and_export(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        bundle_names = [row["name"] for row in result.data["bundles"]]
+        self.assertIn("read-zxg-review-and-export", bundle_names)
+
     def test_handle_catalog_bundle_list_returns_read_zxg_review_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "read-zxg-review"])
@@ -2570,6 +2578,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["bundles"][0]["name"], "read-zxg-review")
         self.assertEqual(result.data["bundles"][0]["steps"][0]["entry"], "read-zxg-watchlist")
         self.assertEqual(result.data["bundles"][0]["steps"][1]["entry"], "read-zxg-full")
+
+    def test_handle_catalog_bundle_list_returns_read_zxg_review_and_export_metadata(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "read-zxg-review-and-export"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["selected_bundle"], "read-zxg-review-and-export")
+        self.assertEqual(result.data["bundles"][0]["name"], "read-zxg-review-and-export")
+        self.assertEqual(len(result.data["bundles"][0]["steps"]), 3)
+        self.assertEqual(result.data["bundles"][0]["steps"][0]["entry"], "read-zxg-watchlist")
+        self.assertEqual(result.data["bundles"][0]["steps"][1]["entry"], "read-zxg-full")
+        self.assertEqual(result.data["bundles"][0]["steps"][2]["entry"], "export-zxg-watchlist")
 
     def test_handle_catalog_list_default_includes_export_watchlist_entry(self) -> None:
         parser = build_parser()
@@ -2872,6 +2892,22 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][1]["resolved_args"]["block_code"], "ZXG")
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_read_zxg_review_and_export_bundle_returns_resolved_steps(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--bundle", "read-zxg-review-and-export"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "read-zxg-review-and-export")
+        self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 3)
+        self.assertEqual(result.data["steps"][0]["entry"], "read-zxg-watchlist")
+        self.assertEqual(result.data["steps"][1]["entry"], "read-zxg-full")
+        self.assertEqual(result.data["steps"][2]["entry"], "export-zxg-watchlist")
+        self.assertEqual(result.data["steps"][0]["resolved_args"]["block_code"], "ZXG")
+        self.assertEqual(result.data["steps"][1]["resolved_args"]["block_code"], "ZXG")
+        self.assertEqual(result.data["steps"][2]["resolved_args"]["block_code"], "ZXG")
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_read_zxg_review_bundle_applies_block_code_override_to_both_steps(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "plan", "--bundle", "read-zxg-review", "--block-code", "MYZXG", "--view", "summary"])
@@ -2882,6 +2918,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][1]["resolved_args"]["block_code"], "MYZXG")
         self.assertEqual(result.data["summary_view"]["steps"][0]["resolved_args"]["block_code"], "MYZXG")
         self.assertEqual(result.data["summary_view"]["steps"][1]["resolved_args"]["block_code"], "MYZXG")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_read_zxg_review_and_export_bundle_applies_block_code_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "plan", "--bundle", "read-zxg-review-and-export", "--block-code", "MYZXG", "--view", "summary"]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["steps"][0]["resolved_args"]["block_code"], "MYZXG")
+        self.assertEqual(result.data["steps"][1]["resolved_args"]["block_code"], "MYZXG")
+        self.assertEqual(result.data["steps"][2]["resolved_args"]["block_code"], "MYZXG")
+        self.assertEqual(result.data["steps"][2]["resolved_args"]["export_output"], "runtime/exports/zxg.json")
+        self.assertEqual(result.data["summary_view"]["steps"][0]["resolved_args"]["block_code"], "MYZXG")
+        self.assertEqual(result.data["summary_view"]["steps"][1]["resolved_args"]["block_code"], "MYZXG")
+        self.assertEqual(result.data["summary_view"]["steps"][2]["resolved_args"]["block_code"], "MYZXG")
+        self.assertEqual(result.data["summary_view"]["steps"][2]["resolved_args"]["export_output"], "runtime/exports/zxg.json")
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_bundle_dispatches_steps_sequentially(self) -> None:
