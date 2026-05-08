@@ -3081,6 +3081,83 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(mocked_dispatch.call_count, 1)
         self.assertEqual(result.data["catalog_bundle"]["failed_step"]["entry"], "read-zxg-watchlist")
 
+    def test_handle_catalog_read_zxg_review_and_export_bundle_dispatches_steps_sequentially(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "read-zxg-review-and-export"])
+        bundle = {
+            "description": "snapshot then full then export",
+            "steps": [
+                {"index": 1, "name": "snapshot", "entry": "read-zxg-watchlist", "source": "task", "preset": "read-zxg-watchlist", "description": "", "options": {}},
+                {"index": 2, "name": "full", "entry": "read-zxg-full", "source": "task", "preset": "read-zxg-full", "description": "", "options": {}},
+                {"index": 3, "name": "export", "entry": "export-zxg-watchlist", "source": "task", "preset": "export-zxg-watchlist", "description": "", "options": {}},
+            ],
+        }
+        with patch("tdxquant.cli.resolve_command_bundle", return_value=bundle), patch(
+            "tdxquant.cli._dispatch_catalog_resolved_entry",
+            side_effect=[
+                Result(ok=True, code=ErrorCode.OK, message="snapshot-ok"),
+                Result(ok=True, code=ErrorCode.OK, message="full-ok"),
+                Result(ok=True, code=ErrorCode.OK, message="export-ok"),
+            ],
+        ) as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(mocked_dispatch.call_count, 3)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "read-zxg-review-and-export")
+        self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 3)
+
+    def test_handle_catalog_read_zxg_review_and_export_bundle_applies_block_code_override_to_all_steps(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "read-zxg-review-and-export", "--block-code", "MYZXG"])
+        bundle = {
+            "description": "snapshot then full then export",
+            "steps": [
+                {"index": 1, "name": "snapshot", "entry": "read-zxg-watchlist", "source": "task", "preset": "read-zxg-watchlist", "description": "", "options": {}},
+                {"index": 2, "name": "full", "entry": "read-zxg-full", "source": "task", "preset": "read-zxg-full", "description": "", "options": {}},
+                {"index": 3, "name": "export", "entry": "export-zxg-watchlist", "source": "task", "preset": "export-zxg-watchlist", "description": "", "options": {}},
+            ],
+        }
+        with patch("tdxquant.cli.resolve_command_bundle", return_value=bundle), patch(
+            "tdxquant.cli._dispatch_catalog_resolved_entry",
+            side_effect=[
+                Result(ok=True, code=ErrorCode.OK, message="snapshot-ok"),
+                Result(ok=True, code=ErrorCode.OK, message="full-ok"),
+                Result(ok=True, code=ErrorCode.OK, message="export-ok"),
+            ],
+        ) as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(mocked_dispatch.call_count, 3)
+        first_args = mocked_dispatch.call_args_list[0].kwargs["args"]
+        second_args = mocked_dispatch.call_args_list[1].kwargs["args"]
+        third_args = mocked_dispatch.call_args_list[2].kwargs["args"]
+        self.assertEqual(first_args.block_code, "MYZXG")
+        self.assertEqual(second_args.block_code, "MYZXG")
+        self.assertEqual(third_args.block_code, "MYZXG")
+
+    def test_handle_catalog_read_zxg_review_and_export_bundle_stops_before_export_when_full_step_fails(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "run", "--bundle", "read-zxg-review-and-export"])
+        bundle = {
+            "description": "snapshot then full then export",
+            "steps": [
+                {"index": 1, "name": "snapshot", "entry": "read-zxg-watchlist", "source": "task", "preset": "read-zxg-watchlist", "description": "", "options": {}},
+                {"index": 2, "name": "full", "entry": "read-zxg-full", "source": "task", "preset": "read-zxg-full", "description": "", "options": {}},
+                {"index": 3, "name": "export", "entry": "export-zxg-watchlist", "source": "task", "preset": "export-zxg-watchlist", "description": "", "options": {}},
+            ],
+        }
+        with patch("tdxquant.cli.resolve_command_bundle", return_value=bundle), patch(
+            "tdxquant.cli._dispatch_catalog_resolved_entry",
+            side_effect=[
+                Result(ok=True, code=ErrorCode.OK, message="snapshot-ok"),
+                Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message="full-failed"),
+            ],
+        ) as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(mocked_dispatch.call_count, 2)
+        self.assertEqual(result.data["catalog_bundle"]["failed_step"]["entry"], "read-zxg-full")
+
     def test_handle_catalog_bundle_only_step_executes_selected_step(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "run", "--bundle", "guarded-review-buy", "--only-step", "review"])
