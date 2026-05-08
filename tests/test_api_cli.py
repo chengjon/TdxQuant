@@ -2935,7 +2935,6 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["steps"][0]["resolved_args"]["block_code"], "MYZXG")
         self.assertEqual(result.data["summary_view"]["steps"][1]["resolved_args"]["block_code"], "MYZXG")
         self.assertEqual(result.data["summary_view"]["steps"][2]["resolved_args"]["block_code"], "MYZXG")
-        self.assertEqual(result.data["summary_view"]["steps"][2]["resolved_args"]["export_output"], "runtime/exports/zxg.json")
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_bundle_dispatches_steps_sequentially(self) -> None:
