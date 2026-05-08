@@ -3103,6 +3103,9 @@ class ApiCliDispatchTests(unittest.TestCase):
             result = _handle_catalog_subcommand(args)
         self.assertTrue(result.ok)
         self.assertEqual(mocked_dispatch.call_count, 3)
+        self.assertEqual(mocked_dispatch.call_args_list[0].kwargs["entry_name"], "read-zxg-watchlist")
+        self.assertEqual(mocked_dispatch.call_args_list[1].kwargs["entry_name"], "read-zxg-full")
+        self.assertEqual(mocked_dispatch.call_args_list[2].kwargs["entry_name"], "export-zxg-watchlist")
         self.assertEqual(result.data["catalog_bundle"]["name"], "read-zxg-review-and-export")
         self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 3)
 
@@ -3128,6 +3131,9 @@ class ApiCliDispatchTests(unittest.TestCase):
             result = _handle_catalog_subcommand(args)
         self.assertTrue(result.ok)
         self.assertEqual(mocked_dispatch.call_count, 3)
+        self.assertEqual(mocked_dispatch.call_args_list[0].kwargs["entry_name"], "read-zxg-watchlist")
+        self.assertEqual(mocked_dispatch.call_args_list[1].kwargs["entry_name"], "read-zxg-full")
+        self.assertEqual(mocked_dispatch.call_args_list[2].kwargs["entry_name"], "export-zxg-watchlist")
         first_args = mocked_dispatch.call_args_list[0].kwargs["args"]
         second_args = mocked_dispatch.call_args_list[1].kwargs["args"]
         third_args = mocked_dispatch.call_args_list[2].kwargs["args"]
