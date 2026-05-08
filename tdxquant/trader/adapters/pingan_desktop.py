@@ -50,8 +50,6 @@ class PingAnDesktopTraderGateway:
         side = request.side if isinstance(request.side, OrderSide) else OrderSide(str(request.side).lower())
         if not self.port:
             raise ValueError("PingAnDesktopTraderGateway requires a serial port")
-        if side == OrderSide.SELL and self.execution_mode == "submit_once":
-            raise NotImplementedError("PingAnDesktopTraderGateway sell submit_once flow is not implemented yet")
         if side == OrderSide.SELL:
             result = self._require_manager().pingan.sell(
                 port=self.port,
@@ -65,7 +63,7 @@ class PingAnDesktopTraderGateway:
                 submission_key=request.submission_key,
                 max_price=self.max_price,
             )
-            adapter_step = "pingan_sell"
+            adapter_step = "pingan_sell_submit_once" if self.execution_mode == "submit_once" else "pingan_sell"
         elif self.execution_mode == "submit_once":
             result = self._require_manager().pingan.buy_submit_once(
                 port=self.port,

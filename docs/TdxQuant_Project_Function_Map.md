@@ -375,7 +375,9 @@ TdxQuant
 当前已落地的交易方向能力包括：
 
 - 平安证券买入流程
+- 平安证券卖出流程
 - 平安证券 submit-once 流程
+- `PingAnDesktopTraderGateway` 的 `side=sell + execution_mode=submit_once` 兼容路由
 - 买入确认推进
 - 结果窗关闭
 - 交易状态回填
@@ -405,6 +407,7 @@ TdxQuant
   - `TdxTradeManager.pingan.confirm_current(...)`
   - `TdxTradeManager.pingan.dialog_readiness(...)`
   - `TdxTradeManager.pingan.buy(...)`
+  - `TdxTradeManager.pingan.sell(...)`
   - `TdxTradeManager.pingan.buy_submit_once(...)`
 - CLI：
   - `tdxquant trade health ...`
@@ -581,6 +584,7 @@ TdxQuant
 - `block-read-full` 已是完成态：manager、CLI、preset、catalog entry、OpenSpec 与 focused tests 均已闭合。
 - `read-zxg-review-and-export` 已是完成态：bundle definition、list / plan / run、`--block-code` fanout、fail-fast、summary-view omission 和 bundle 级导出参数拒绝均已锁定。
 - provider bridge runtime flows 已完成加固：query result normalization、block mutation governance deferral、subscription-watch background / bridge / replay fixture 相关测试已通过。
+- PingAn desktop trader gateway 已补齐 `side=sell + execution_mode=submit_once` 的兼容路由：不再抛 `NotImplementedError`，而是复用既有 `TdxTradeManager.pingan.sell(...)` 执行链并记录 `pingan_sell_submit_once` adapter event。
 - 本轮关键验证包括 `python -m pytest` focused suites 与 OpenSpec strict validation；直接运行裸 `pytest` 在当前环境下会受 import path 影响，推荐使用 `python -m pytest`。
 
 当前剩余重点进一步收缩为：

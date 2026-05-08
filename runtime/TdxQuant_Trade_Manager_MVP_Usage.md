@@ -22,7 +22,7 @@ M1 的证券 trader 主线只覆盖普通 A 股现货限价 `buy/sell` 与本地
   - 负责 canonical 下单、订单查询、成交查询、同日成交恢复
 - `PingAnDesktopTraderGateway`
   - 第一号证券 gateway 实现
-  - 当前已接入 `side=buy` 与 `submit_once` 兼容执行模式
+  - 当前已接入 `side=buy/sell`，其中 `submit_once` 兼容执行模式下的 `side=sell` 复用既有 PingAn sell 执行链
 - `TraderStore`
   - canonical runtime 存储
   - 负责 `order-events` / `order-snapshots` / `trade-fills`
@@ -32,6 +32,9 @@ M1 的证券 trader 主线只覆盖普通 A 股现货限价 `buy/sell` 与本地
 - `manager.pingan.buy_submit_once(...)`
   - 对应完整提交确认路径
   - 底层调用 `run_pingan_buy_submit_once(...)`
+- `manager.pingan.sell(...)`
+  - 对应稳定快速卖出路径
+  - 底层调用 `run_pingan_sell_fast(...)`
 
 ## 默认产物
 
@@ -40,7 +43,7 @@ M1 的证券 trader 主线只覆盖普通 A 股现货限价 `buy/sell` 与本地
 - 追加事件日志：
   - `runtime/pingan-order-events.jsonl`
 
-每次 `pingan-buy` 或 `pingan-buy-submit-once` 成功或失败后，manager 都会回填这两个文件。
+每次 `pingan-buy`、`pingan-buy-submit-once` 或 canonical trader 下单路径成功或失败后，manager 都会回填这两个文件。
 
 新增 canonical trader 产物：
 
@@ -131,7 +134,7 @@ python -m tdxquant.cli trade trade-query
 
 首批边界：
 
-- `trade order-place` 当前只接受普通 A 股现货限价单
+- `trade order-place` 当前只接受普通 A 股现货限价买卖单
 - `trade order-query` / `trade trade-query` 当前只查询 canonical trader store 中的本地 tracked-order / trade
 - 不承诺完整券商委托页 / 成交页抓取
 
@@ -155,6 +158,6 @@ python -m tdxquant.cli trade run --preset submit-once-default --code 516820 --pr
 
 ## 后续建议
 
-- 下一步优先补 `side=sell` 的 PingAn 桌面执行链路
-- 再补 canonical `sync_today_trades` 的更完整恢复来源
+- 后续如需要更细分的 sell submit-ready / confirm-current 边界，再单独拆 PingAn 桌面卖出分步链路
+- 继续补 canonical `sync_today_trades` 的更完整恢复来源
 - 后续阶段再扩展撤单、账户、持仓与更强的同步能力

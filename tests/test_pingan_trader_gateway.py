@@ -147,3 +147,27 @@ class PingAnDesktopTraderGatewayTests(unittest.TestCase):
         self.assertEqual(placement.snapshot.gateway_order_id, "B202604300002")
         self.assertEqual(manager.pingan.buy_submit_once_calls[0]["submission_key"], "submit-001")
         self.assertEqual(placement.adapter_events[0]["step"], "pingan_buy_submit_once")
+
+    def test_place_order_routes_submit_once_sell_to_existing_sell_flow(self) -> None:
+        manager = _FakeTradeManager()
+        gateway = PingAnDesktopTraderGateway(manager=manager, port="COM3", execution_mode="submit_once")
+        request = SecurityOrderRequest(
+            broker="pingan_desktop",
+            client_order_id="client-004",
+            symbol="000001",
+            market="SZ",
+            side=OrderSide.SELL,
+            quantity=100,
+            limit_price=Decimal("10.50"),
+            submission_key="submit-sell-001",
+        )
+
+        placement = gateway.place_order(request)
+
+        self.assertEqual(placement.snapshot.gateway_order_id, "S202604300001")
+        self.assertEqual(placement.snapshot.broker_order_id, "S202604300001")
+        self.assertEqual(placement.snapshot.status, OrderStatus.SUBMITTED)
+        self.assertEqual(placement.snapshot.side, OrderSide.SELL)
+        self.assertEqual(len(manager.pingan.buy_submit_once_calls), 0)
+        self.assertEqual(manager.pingan.sell_calls[0]["submission_key"], "submit-sell-001")
+        self.assertEqual(placement.adapter_events[0]["step"], "pingan_sell_submit_once")
