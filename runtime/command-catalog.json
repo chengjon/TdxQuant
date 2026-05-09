@@ -83,6 +83,12 @@
     "description": "统一入口下的当日 buy 异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "buy", "exceptions", "diagnostics"]
   },
+  "audit-daily-sell-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-sell-exceptions",
+    "description": "统一入口下的当日 sell 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "sell", "exceptions", "diagnostics"]
+  },
   "audit-daily-submit-path-exceptions": {
     "source": "report",
     "preset": "audit-daily-submit-path-exceptions",
@@ -148,6 +154,12 @@
     "preset": "audit-period-buy-exceptions",
     "description": "统一入口下的区间 buy 异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "buy", "exceptions", "diagnostics"]
+  },
+  "audit-period-sell-exceptions": {
+    "source": "report",
+    "preset": "audit-period-sell-exceptions",
+    "description": "统一入口下的区间 sell 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "sell", "exceptions", "diagnostics"]
   },
   "audit-period-submit-path-exceptions": {
     "source": "report",

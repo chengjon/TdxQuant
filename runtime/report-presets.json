@@ -136,6 +136,17 @@
       "statuses": ["rejected", "failed"]
     }
   },
+  "audit-daily-sell-exceptions": {
+    "command": "audit-daily",
+    "description": "当日 sell rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "method": "sell",
+      "statuses": ["rejected", "failed"]
+    }
+  },
   "audit-daily-submit-path-exceptions": {
     "command": "audit-daily",
     "description": "当日 buy_submit_once + confirm_current rejected + failed trade_audit 异常复盘。",
@@ -248,6 +259,17 @@
       "timezone": "Asia/Shanghai",
       "recent_limit": 50,
       "method": "buy",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-sell-exceptions": {
+    "command": "audit-period",
+    "description": "区间 sell rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "method": "sell",
       "statuses": ["rejected", "failed"]
     }
   },

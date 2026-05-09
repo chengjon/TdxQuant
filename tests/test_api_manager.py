@@ -145,6 +145,17 @@ class ApiContextTests(unittest.TestCase):
         )
         self.assertEqual(presets["audit-period-buy-exceptions"]["options"]["method"], "buy")
 
+    def test_runtime_report_presets_include_sell_trade_audit_exception_presets(self) -> None:
+        presets = load_report_presets()
+        self.assertIn("audit-daily-sell-exceptions", presets)
+        self.assertIn("audit-period-sell-exceptions", presets)
+        self.assertEqual(presets["audit-daily-sell-exceptions"]["options"]["method"], "sell")
+        self.assertEqual(
+            presets["audit-daily-sell-exceptions"]["options"]["statuses"],
+            ["rejected", "failed"],
+        )
+        self.assertEqual(presets["audit-period-sell-exceptions"]["options"]["method"], "sell")
+
     def test_runtime_report_presets_include_submit_path_trade_audit_exception_presets(self) -> None:
         presets = load_report_presets()
         self.assertIn("audit-daily-submit-path-exceptions", presets)
@@ -348,6 +359,13 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(entries["audit-daily-buy-exceptions"]["preset"], "audit-daily-buy-exceptions")
         self.assertEqual(entries["audit-period-buy-exceptions"]["preset"], "audit-period-buy-exceptions")
 
+    def test_runtime_command_catalog_includes_sell_trade_audit_exception_entries(self) -> None:
+        entries = load_command_catalog()
+        self.assertIn("audit-daily-sell-exceptions", entries)
+        self.assertIn("audit-period-sell-exceptions", entries)
+        self.assertEqual(entries["audit-daily-sell-exceptions"]["preset"], "audit-daily-sell-exceptions")
+        self.assertEqual(entries["audit-period-sell-exceptions"]["preset"], "audit-period-sell-exceptions")
+
     def test_runtime_command_catalog_includes_submit_path_trade_audit_exception_entries(self) -> None:
         entries = load_command_catalog()
         self.assertIn("audit-daily-submit-path-exceptions", entries)
@@ -540,6 +558,17 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-buy-exceptions")
         self.assertEqual(followup["steps"][0]["entry"], "guarded-buy")
         self.assertEqual(followup["steps"][1]["entry"], "audit-daily-buy-exceptions")
+
+    def test_runtime_command_bundles_include_sell_trade_audit_exception_bundle(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("audit-sell-exception-diagnostics", bundles)
+        diagnostics = resolve_command_bundle(
+            "audit-sell-exception-diagnostics",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
+        self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-sell-exceptions")
 
     def test_runtime_command_bundles_include_submit_path_trade_audit_exception_bundles(self) -> None:
         bundles = load_command_bundles()
