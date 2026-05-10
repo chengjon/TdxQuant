@@ -275,6 +275,20 @@
       }
     ]
   },
+  "audit-pingan-sell-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 sell rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "sell", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-sell-exceptions"
+      }
+    ]
+  },
   "audit-submit-path-exception-diagnostics": {
     "description": "先看最近失败台账，再回看当日 submit path rejected + failed trade_audit 异常复盘。",
     "labels": ["diagnostics", "audit", "submit-path", "exceptions", "review"],

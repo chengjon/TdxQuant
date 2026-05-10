@@ -45,6 +45,7 @@
   - `audit-daily-buy-exceptions`
   - `audit-daily-pingan-buy-exceptions`
   - `audit-daily-sell-exceptions`
+  - `audit-daily-pingan-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-pingan-order-exceptions`
@@ -61,6 +62,7 @@
   - `audit-period-buy-exceptions`
   - `audit-period-pingan-buy-exceptions`
   - `audit-period-sell-exceptions`
+  - `audit-period-pingan-sell-exceptions`
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
   - `audit-period-pingan-order-exceptions`
@@ -78,6 +80,7 @@
   - `audit-daily-buy-exceptions`
   - `audit-daily-pingan-buy-exceptions`
   - `audit-daily-sell-exceptions`
+  - `audit-daily-pingan-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-pingan-order-exceptions`
@@ -94,6 +97,7 @@
   - `audit-period-buy-exceptions`
   - `audit-period-pingan-buy-exceptions`
   - `audit-period-sell-exceptions`
+  - `audit-period-pingan-sell-exceptions`
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
   - `audit-period-pingan-order-exceptions`
@@ -111,6 +115,7 @@
   - `audit-buy-exception-diagnostics`
   - `audit-pingan-buy-exception-diagnostics`
   - `audit-sell-exception-diagnostics`
+  - `audit-pingan-sell-exception-diagnostics`
   - `audit-submit-path-exception-diagnostics`
   - `audit-pingan-submit-path-exception-diagnostics`
   - `audit-pingan-order-exception-diagnostics`
@@ -256,6 +261,7 @@ CLI 层额外支持：
 - 多方法 `methods` OR 过滤
 - 第一组 submit path 组合视角：`buy_submit_once + confirm_current`
 - 第一组 broker-scoped buy 组合视角：`pingan + buy + rejected|failed`
+- 第一组 broker-scoped sell 组合视角：`pingan + sell + rejected|failed`
 - 第一组 broker-scoped confirm 组合视角：`pingan + confirm_current + rejected|failed`
 - 第一组 broker-scoped submit-once 组合视角：`pingan + buy_submit_once + rejected|failed`
 - 第一组 broker-scoped submit path 组合视角：`pingan + buy_submit_once + confirm_current + rejected|failed`
