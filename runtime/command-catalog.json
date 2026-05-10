@@ -83,6 +83,12 @@
     "description": "统一入口下的当日 buy_submit_once 异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "submit-once", "exceptions", "diagnostics"]
   },
+  "audit-daily-pingan-submit-once-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-pingan-submit-once-exceptions",
+    "description": "统一入口下的当日平安券商 buy_submit_once 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "submit-once", "exceptions", "diagnostics"]
+  },
   "audit-daily-buy-exceptions": {
     "source": "report",
     "preset": "audit-daily-buy-exceptions",
@@ -166,6 +172,12 @@
     "preset": "audit-period-submit-once-exceptions",
     "description": "统一入口下的区间 buy_submit_once 异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "submit-once", "exceptions", "diagnostics"]
+  },
+  "audit-period-pingan-submit-once-exceptions": {
+    "source": "report",
+    "preset": "audit-period-pingan-submit-once-exceptions",
+    "description": "统一入口下的区间平安券商 buy_submit_once 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "submit-once", "exceptions", "diagnostics"]
   },
   "audit-period-buy-exceptions": {
     "source": "report",

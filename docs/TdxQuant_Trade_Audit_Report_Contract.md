@@ -41,6 +41,7 @@
   - `audit-daily-confirm-exceptions`
   - `audit-daily-pingan-confirm-exceptions`
   - `audit-daily-submit-once-exceptions`
+  - `audit-daily-pingan-submit-once-exceptions`
   - `audit-daily-buy-exceptions`
   - `audit-daily-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
@@ -55,6 +56,7 @@
   - `audit-period-confirm-exceptions`
   - `audit-period-pingan-confirm-exceptions`
   - `audit-period-submit-once-exceptions`
+  - `audit-period-pingan-submit-once-exceptions`
   - `audit-period-buy-exceptions`
   - `audit-period-sell-exceptions`
   - `audit-period-submit-path-exceptions`
@@ -70,6 +72,7 @@
   - `audit-daily-confirm-exceptions`
   - `audit-daily-pingan-confirm-exceptions`
   - `audit-daily-submit-once-exceptions`
+  - `audit-daily-pingan-submit-once-exceptions`
   - `audit-daily-buy-exceptions`
   - `audit-daily-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
@@ -84,6 +87,7 @@
   - `audit-period-confirm-exceptions`
   - `audit-period-pingan-confirm-exceptions`
   - `audit-period-submit-once-exceptions`
+  - `audit-period-pingan-submit-once-exceptions`
   - `audit-period-buy-exceptions`
   - `audit-period-sell-exceptions`
   - `audit-period-submit-path-exceptions`
@@ -99,6 +103,7 @@
   - `audit-confirm-exception-diagnostics`
   - `audit-pingan-confirm-exception-diagnostics`
   - `audit-submit-once-exception-diagnostics`
+  - `audit-pingan-submit-once-exception-diagnostics`
   - `audit-buy-exception-diagnostics`
   - `audit-sell-exception-diagnostics`
   - `audit-submit-path-exception-diagnostics`
@@ -111,6 +116,7 @@
   - `confirm-exception-review`
   - `confirm-pingan-exception-review`
   - `submit-once-exception-review`
+  - `submit-once-pingan-exception-review`
   - `guarded-buy-exception-review`
   - `confirm-submit-path-exception-review`
   - `confirm-pingan-submit-path-exception-review`
@@ -244,6 +250,7 @@ CLI 层额外支持：
 - 多方法 `methods` OR 过滤
 - 第一组 submit path 组合视角：`buy_submit_once + confirm_current`
 - 第一组 broker-scoped confirm 组合视角：`pingan + confirm_current + rejected|failed`
+- 第一组 broker-scoped submit-once 组合视角：`pingan + buy_submit_once + rejected|failed`
 - 第一组 broker-scoped submit path 组合视角：`pingan + buy_submit_once + confirm_current + rejected|failed`
 
 这一版还没有提供：
