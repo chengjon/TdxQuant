@@ -44,6 +44,7 @@
   - `audit-daily-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
+  - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
   - `audit-period-confirmed`
   - `audit-period-rejected`
@@ -56,6 +57,7 @@
   - `audit-period-sell-exceptions`
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
+  - `audit-period-pingan-order-exceptions`
 - catalog entries：
   - `audit-daily-review`
   - `audit-daily-confirmed`
@@ -69,6 +71,7 @@
   - `audit-daily-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
+  - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
   - `audit-period-confirmed`
   - `audit-period-rejected`
@@ -81,6 +84,7 @@
   - `audit-period-sell-exceptions`
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
+  - `audit-period-pingan-order-exceptions`
 - diagnostic / follow-up bundles：
   - `audit-diagnostics`
   - `audit-rejection-diagnostics`
@@ -94,6 +98,7 @@
   - `audit-sell-exception-diagnostics`
   - `audit-submit-path-exception-diagnostics`
   - `audit-pingan-submit-path-exception-diagnostics`
+  - `audit-pingan-order-exception-diagnostics`
   - `confirm-audit-review`
   - `confirm-complete-review`
   - `confirm-exception-review`
