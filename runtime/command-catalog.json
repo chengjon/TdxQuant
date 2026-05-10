@@ -65,6 +65,12 @@
     "description": "统一入口下的当日异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "exceptions", "diagnostics"]
   },
+  "audit-daily-pingan-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-pingan-exceptions",
+    "description": "统一入口下的当日平安券商异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "exceptions", "diagnostics"]
+  },
   "audit-daily-confirm-exceptions": {
     "source": "report",
     "preset": "audit-daily-confirm-exceptions",
@@ -166,6 +172,12 @@
     "preset": "audit-period-exceptions",
     "description": "统一入口下的区间异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "exceptions", "diagnostics"]
+  },
+  "audit-period-pingan-exceptions": {
+    "source": "report",
+    "preset": "audit-period-pingan-exceptions",
+    "description": "统一入口下的区间平安券商异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "exceptions", "diagnostics"]
   },
   "audit-period-confirm-exceptions": {
     "source": "report",

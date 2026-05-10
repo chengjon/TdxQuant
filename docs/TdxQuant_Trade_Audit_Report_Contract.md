@@ -38,6 +38,7 @@
   - `audit-daily-replayed`
   - `audit-daily-failed`
   - `audit-daily-exceptions`
+  - `audit-daily-pingan-exceptions`
   - `audit-daily-confirm-exceptions`
   - `audit-daily-pingan-confirm-exceptions`
   - `audit-daily-submit-once-exceptions`
@@ -55,6 +56,7 @@
   - `audit-period-replayed`
   - `audit-period-failed`
   - `audit-period-exceptions`
+  - `audit-period-pingan-exceptions`
   - `audit-period-confirm-exceptions`
   - `audit-period-pingan-confirm-exceptions`
   - `audit-period-submit-once-exceptions`
@@ -73,6 +75,7 @@
   - `audit-daily-replayed`
   - `audit-daily-failed`
   - `audit-daily-exceptions`
+  - `audit-daily-pingan-exceptions`
   - `audit-daily-confirm-exceptions`
   - `audit-daily-pingan-confirm-exceptions`
   - `audit-daily-submit-once-exceptions`
@@ -90,6 +93,7 @@
   - `audit-period-replayed`
   - `audit-period-failed`
   - `audit-period-exceptions`
+  - `audit-period-pingan-exceptions`
   - `audit-period-confirm-exceptions`
   - `audit-period-pingan-confirm-exceptions`
   - `audit-period-submit-once-exceptions`
@@ -108,6 +112,7 @@
   - `audit-replay-review`
   - `audit-failure-diagnostics`
   - `audit-exception-diagnostics`
+  - `audit-pingan-exception-diagnostics`
   - `audit-confirm-exception-diagnostics`
   - `audit-pingan-confirm-exception-diagnostics`
   - `audit-submit-once-exception-diagnostics`
@@ -261,6 +266,7 @@ CLI 层额外支持：
 - 多方法 `methods` OR 过滤
 - 第一组 submit path 组合视角：`buy_submit_once + confirm_current`
 - 第一组 broker-scoped buy 组合视角：`pingan + buy + rejected|failed`
+- 第一组 broker-scoped exception 组合视角：`pingan + rejected|failed`
 - 第一组 broker-scoped sell 组合视角：`pingan + sell + rejected|failed`
 - 第一组 broker-scoped confirm 组合视角：`pingan + confirm_current + rejected|failed`
 - 第一组 broker-scoped submit-once 组合视角：`pingan + buy_submit_once + rejected|failed`

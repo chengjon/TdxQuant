@@ -112,6 +112,17 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(presets["audit-daily-exceptions"]["options"]["statuses"], ["rejected", "failed"])
         self.assertEqual(presets["audit-period-exceptions"]["options"]["statuses"], ["rejected", "failed"])
 
+    def test_runtime_report_presets_include_pingan_trade_audit_exception_presets(self) -> None:
+        presets = load_report_presets()
+        self.assertIn("audit-daily-pingan-exceptions", presets)
+        self.assertIn("audit-period-pingan-exceptions", presets)
+        self.assertEqual(presets["audit-daily-pingan-exceptions"]["options"]["broker"], "pingan")
+        self.assertEqual(
+            presets["audit-daily-pingan-exceptions"]["options"]["statuses"],
+            ["rejected", "failed"],
+        )
+        self.assertEqual(presets["audit-period-pingan-exceptions"]["options"]["broker"], "pingan")
+
     def test_runtime_report_presets_include_confirm_oriented_trade_audit_exception_presets(self) -> None:
         presets = load_report_presets()
         self.assertIn("audit-daily-confirm-exceptions", presets)
@@ -404,6 +415,19 @@ class ApiContextTests(unittest.TestCase):
         self.assertIn("audit-period-exceptions", entries)
         self.assertEqual(entries["audit-daily-exceptions"]["preset"], "audit-daily-exceptions")
 
+    def test_runtime_command_catalog_includes_pingan_trade_audit_exception_entries(self) -> None:
+        entries = load_command_catalog()
+        self.assertIn("audit-daily-pingan-exceptions", entries)
+        self.assertIn("audit-period-pingan-exceptions", entries)
+        self.assertEqual(
+            entries["audit-daily-pingan-exceptions"]["preset"],
+            "audit-daily-pingan-exceptions",
+        )
+        self.assertEqual(
+            entries["audit-period-pingan-exceptions"]["preset"],
+            "audit-period-pingan-exceptions",
+        )
+
     def test_runtime_command_catalog_includes_confirm_oriented_trade_audit_exception_entries(self) -> None:
         entries = load_command_catalog()
         self.assertIn("audit-daily-confirm-exceptions", entries)
@@ -619,6 +643,17 @@ class ApiContextTests(unittest.TestCase):
         )
         self.assertEqual(exception["steps"][0]["entry"], "recent-failures")
         self.assertEqual(exception["steps"][1]["entry"], "audit-daily-exceptions")
+
+    def test_runtime_command_bundles_include_pingan_trade_audit_exception_bundle(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("audit-pingan-exception-diagnostics", bundles)
+        diagnostics = resolve_command_bundle(
+            "audit-pingan-exception-diagnostics",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
+        self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-pingan-exceptions")
 
     def test_runtime_command_bundles_include_confirm_oriented_trade_audit_exception_bundles(self) -> None:
         bundles = load_command_bundles()
