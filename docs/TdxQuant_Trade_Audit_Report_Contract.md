@@ -99,6 +99,8 @@
   - `audit-submit-path-exception-diagnostics`
   - `audit-pingan-submit-path-exception-diagnostics`
   - `audit-pingan-order-exception-diagnostics`
+  - `submit-ready-audit-review`
+  - `submit-ready-exception-review`
   - `confirm-audit-review`
   - `confirm-complete-review`
   - `confirm-exception-review`

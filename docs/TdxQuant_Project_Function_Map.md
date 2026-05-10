@@ -570,7 +570,7 @@ TdxQuant
 - audit bundles：`audit-diagnostics` / `audit-rejection-diagnostics` / `audit-confirmed-review` / `audit-replay-review` / `audit-failure-diagnostics` / `audit-exception-diagnostics` / `audit-confirm-exception-diagnostics` / `audit-submit-once-exception-diagnostics` / `audit-buy-exception-diagnostics` / `audit-sell-exception-diagnostics` / `audit-submit-path-exception-diagnostics` / `audit-pingan-submit-path-exception-diagnostics` / `audit-pingan-order-exception-diagnostics`
 - task presets：`submit-ready-default` / `confirm-current-default`
 - split-step catalog entries：`task-submit-ready` / `task-confirm-current`
-- split-step bundles：`confirm-audit-review` / `confirm-complete-review` / `confirm-exception-review` / `submit-once-exception-review` / `guarded-buy-exception-review` / `confirm-submit-path-exception-review` / `confirm-pingan-submit-path-exception-review`
+- split-step bundles：`submit-ready-audit-review` / `submit-ready-exception-review` / `confirm-audit-review` / `confirm-complete-review` / `confirm-exception-review` / `submit-once-exception-review` / `guarded-buy-exception-review` / `confirm-submit-path-exception-review` / `confirm-pingan-submit-path-exception-review`
 - 基于 `audit_id` / `contract_no` / `submission_key` / `code` 的稳定审计查询
 - 唯一命中回填完整 audit，候选查询按时间倒序返回
 - 基于本地日期的稳定单日审计聚合
@@ -589,6 +589,7 @@ TdxQuant
 - PingAn desktop trader gateway 已补齐 `side=sell + execution_mode=submit_once` 的兼容路由：不再抛 `NotImplementedError`，而是复用既有 `TdxTradeManager.pingan.sell(...)` 执行链并记录 `pingan_sell_submit_once` adapter event。
 - trade_audit 日常诊断入口已补齐 sell 维度：新增 `audit-daily-sell-exceptions` / `audit-period-sell-exceptions` report presets、catalog entries 和 `audit-sell-exception-diagnostics` bundle。
 - trade_audit 多维诊断入口已补齐平安订单侧 buy/sell 组合：新增 `audit-daily-pingan-order-exceptions` / `audit-period-pingan-order-exceptions` report presets、catalog entries 和 `audit-pingan-order-exception-diagnostics` bundle。
+- 分步交易 workflow 的 submit-ready follow-up 已补齐：新增 `submit-ready-audit-review` 与 `submit-ready-exception-review` catalog bundles，复用既有 `task-submit-ready` 和 audit report entry。
 - 本轮关键验证包括 `python -m pytest` focused suites 与 OpenSpec strict validation；直接运行裸 `pytest` 在当前环境下会受 import path 影响，推荐使用 `python -m pytest`。
 
 当前剩余重点进一步收缩为：
