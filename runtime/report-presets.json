@@ -53,6 +53,16 @@
       "recent_limit": 20
     }
   },
+  "audit-daily-pingan-review": {
+    "command": "audit-daily",
+    "description": "当日平安券商 trade_audit 复盘，保留最近 20 条审计摘要。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan"
+    }
+  },
   "audit-daily-confirmed": {
     "command": "audit-daily",
     "description": "当日已确认 trade_audit 复盘。",
@@ -292,6 +302,16 @@
     "options": {
       "timezone": "Asia/Shanghai",
       "recent_limit": 50
+    }
+  },
+  "audit-period-pingan-review": {
+    "command": "audit-period",
+    "description": "区间平安券商 trade_audit 复盘模板，适合配合 --start-date/--end-date 覆盖日期范围。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan"
     }
   },
   "audit-period-confirmed": {

@@ -35,6 +35,12 @@
     "description": "统一入口下的当日 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "review"]
   },
+  "audit-daily-pingan-review": {
+    "source": "report",
+    "preset": "audit-daily-pingan-review",
+    "description": "统一入口下的当日平安券商 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "review"]
+  },
   "audit-daily-confirmed": {
     "source": "report",
     "preset": "audit-daily-confirmed",
@@ -166,6 +172,12 @@
     "preset": "audit-period-review",
     "description": "统一入口下的区间 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "review"]
+  },
+  "audit-period-pingan-review": {
+    "source": "report",
+    "preset": "audit-period-pingan-review",
+    "description": "统一入口下的区间平安券商 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "review"]
   },
   "audit-period-confirmed": {
     "source": "report",

@@ -33,6 +33,7 @@
 
 - report presets：
   - `audit-daily-review`
+  - `audit-daily-pingan-review`
   - `audit-daily-confirmed`
   - `audit-daily-pingan-confirmed`
   - `audit-daily-rejected`
@@ -55,6 +56,7 @@
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
+  - `audit-period-pingan-review`
   - `audit-period-confirmed`
   - `audit-period-pingan-confirmed`
   - `audit-period-rejected`
@@ -78,6 +80,7 @@
   - `audit-period-pingan-order-exceptions`
 - catalog entries：
   - `audit-daily-review`
+  - `audit-daily-pingan-review`
   - `audit-daily-confirmed`
   - `audit-daily-pingan-confirmed`
   - `audit-daily-rejected`
@@ -100,6 +103,7 @@
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
+  - `audit-period-pingan-review`
   - `audit-period-confirmed`
   - `audit-period-pingan-confirmed`
   - `audit-period-rejected`
@@ -123,6 +127,7 @@
   - `audit-period-pingan-order-exceptions`
 - diagnostic / follow-up bundles：
   - `audit-diagnostics`
+  - `audit-pingan-review`
   - `audit-rejection-diagnostics`
   - `audit-pingan-rejection-diagnostics`
   - `audit-confirmed-review`
@@ -286,6 +291,7 @@ CLI 层额外支持：
 - 多方法 `methods` OR 过滤
 - 第一组 submit path 组合视角：`buy_submit_once + confirm_current`
 - 第一组 broker-scoped buy 组合视角：`pingan + buy + rejected|failed`
+- 第一组 broker-scoped 全状态复盘视角：`pingan`
 - 第一组 broker-scoped exception 组合视角：`pingan + rejected|failed`
 - 第一组 broker-scoped 单状态诊断视角：`pingan + rejected` / `pingan + failed`
 - 第一组 broker-scoped 单状态复盘视角：`pingan + confirmed` / `pingan + replayed`

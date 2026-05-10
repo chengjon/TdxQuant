@@ -82,6 +82,15 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(presets["audit-daily-review"]["command"], "audit-daily")
         self.assertEqual(presets["audit-period-review"]["command"], "audit-period")
 
+    def test_runtime_report_presets_include_pingan_trade_audit_review_presets(self) -> None:
+        presets = load_report_presets()
+        self.assertIn("audit-daily-pingan-review", presets)
+        self.assertIn("audit-period-pingan-review", presets)
+        self.assertEqual(presets["audit-daily-pingan-review"]["command"], "audit-daily")
+        self.assertEqual(presets["audit-daily-pingan-review"]["options"]["broker"], "pingan")
+        self.assertEqual(presets["audit-period-pingan-review"]["command"], "audit-period")
+        self.assertEqual(presets["audit-period-pingan-review"]["options"]["broker"], "pingan")
+
     def test_runtime_report_presets_include_rejected_trade_audit_presets(self) -> None:
         presets = load_report_presets()
         self.assertIn("audit-daily-rejected", presets)
@@ -409,6 +418,14 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(entries["audit-daily-review"]["source"], "report")
         self.assertEqual(entries["audit-daily-review"]["preset"], "audit-daily-review")
 
+    def test_runtime_command_catalog_includes_pingan_trade_audit_review_entries(self) -> None:
+        entries = load_command_catalog()
+        self.assertIn("audit-daily-pingan-review", entries)
+        self.assertIn("audit-period-pingan-review", entries)
+        self.assertEqual(entries["audit-daily-pingan-review"]["source"], "report")
+        self.assertEqual(entries["audit-daily-pingan-review"]["preset"], "audit-daily-pingan-review")
+        self.assertEqual(entries["audit-period-pingan-review"]["preset"], "audit-period-pingan-review")
+
     def test_runtime_command_catalog_includes_rejected_trade_audit_entries(self) -> None:
         entries = load_command_catalog()
         self.assertIn("audit-daily-rejected", entries)
@@ -622,6 +639,17 @@ class ApiContextTests(unittest.TestCase):
         resolved = resolve_command_bundle("audit-diagnostics", bundles=bundles, entries=load_command_catalog())
         self.assertEqual(resolved["steps"][0]["entry"], "recent-failures")
         self.assertEqual(resolved["steps"][1]["entry"], "audit-daily-review")
+
+    def test_runtime_command_bundles_include_pingan_trade_audit_review_bundle(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("audit-pingan-review", bundles)
+        resolved = resolve_command_bundle(
+            "audit-pingan-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(resolved["steps"][0]["entry"], "recent-failures")
+        self.assertEqual(resolved["steps"][1]["entry"], "audit-daily-pingan-review")
 
     def test_runtime_command_bundles_include_richer_trade_audit_bundles(self) -> None:
         bundles = load_command_bundles()
