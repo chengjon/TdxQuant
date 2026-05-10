@@ -149,6 +149,20 @@
       }
     ]
   },
+  "audit-pingan-confirmed-review": {
+    "description": "查看当日成功成交日报并回看当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["audit", "pingan", "confirmed", "review", "followup"],
+    "steps": [
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirmed"
+      }
+    ]
+  },
   "audit-replay-review": {
     "description": "查看最近台账摘要并回看当日 replayed trade_audit 复盘。",
     "labels": ["audit", "replayed", "review", "followup"],
@@ -160,6 +174,20 @@
       {
         "name": "audit",
         "entry": "audit-daily-replayed"
+      }
+    ]
+  },
+  "audit-pingan-replay-review": {
+    "description": "查看最近台账摘要并回看当日平安券商 replayed trade_audit 复盘。",
+    "labels": ["audit", "pingan", "replayed", "review", "followup"],
+    "steps": [
+      {
+        "name": "ledger",
+        "entry": "recent-ledger"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-replayed"
       }
     ]
   },

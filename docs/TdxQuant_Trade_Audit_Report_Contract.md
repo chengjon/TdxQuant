@@ -34,9 +34,11 @@
 - report presets：
   - `audit-daily-review`
   - `audit-daily-confirmed`
+  - `audit-daily-pingan-confirmed`
   - `audit-daily-rejected`
   - `audit-daily-pingan-rejected`
   - `audit-daily-replayed`
+  - `audit-daily-pingan-replayed`
   - `audit-daily-failed`
   - `audit-daily-pingan-failed`
   - `audit-daily-exceptions`
@@ -54,9 +56,11 @@
   - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
   - `audit-period-confirmed`
+  - `audit-period-pingan-confirmed`
   - `audit-period-rejected`
   - `audit-period-pingan-rejected`
   - `audit-period-replayed`
+  - `audit-period-pingan-replayed`
   - `audit-period-failed`
   - `audit-period-pingan-failed`
   - `audit-period-exceptions`
@@ -75,9 +79,11 @@
 - catalog entries：
   - `audit-daily-review`
   - `audit-daily-confirmed`
+  - `audit-daily-pingan-confirmed`
   - `audit-daily-rejected`
   - `audit-daily-pingan-rejected`
   - `audit-daily-replayed`
+  - `audit-daily-pingan-replayed`
   - `audit-daily-failed`
   - `audit-daily-pingan-failed`
   - `audit-daily-exceptions`
@@ -95,9 +101,11 @@
   - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
   - `audit-period-confirmed`
+  - `audit-period-pingan-confirmed`
   - `audit-period-rejected`
   - `audit-period-pingan-rejected`
   - `audit-period-replayed`
+  - `audit-period-pingan-replayed`
   - `audit-period-failed`
   - `audit-period-pingan-failed`
   - `audit-period-exceptions`
@@ -118,7 +126,9 @@
   - `audit-rejection-diagnostics`
   - `audit-pingan-rejection-diagnostics`
   - `audit-confirmed-review`
+  - `audit-pingan-confirmed-review`
   - `audit-replay-review`
+  - `audit-pingan-replay-review`
   - `audit-failure-diagnostics`
   - `audit-pingan-failure-diagnostics`
   - `audit-exception-diagnostics`
@@ -278,6 +288,7 @@ CLI 层额外支持：
 - 第一组 broker-scoped buy 组合视角：`pingan + buy + rejected|failed`
 - 第一组 broker-scoped exception 组合视角：`pingan + rejected|failed`
 - 第一组 broker-scoped 单状态诊断视角：`pingan + rejected` / `pingan + failed`
+- 第一组 broker-scoped 单状态复盘视角：`pingan + confirmed` / `pingan + replayed`
 - 第一组 broker-scoped sell 组合视角：`pingan + sell + rejected|failed`
 - 第一组 broker-scoped confirm 组合视角：`pingan + confirm_current + rejected|failed`
 - 第一组 broker-scoped submit-once 组合视角：`pingan + buy_submit_once + rejected|failed`

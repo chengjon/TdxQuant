@@ -41,6 +41,12 @@
     "description": "统一入口下的当日已确认 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "confirmed"]
   },
+  "audit-daily-pingan-confirmed": {
+    "source": "report",
+    "preset": "audit-daily-pingan-confirmed",
+    "description": "统一入口下的当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "confirmed"]
+  },
   "audit-daily-rejected": {
     "source": "report",
     "preset": "audit-daily-rejected",
@@ -58,6 +64,12 @@
     "preset": "audit-daily-replayed",
     "description": "统一入口下的当日 replayed trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "replayed", "review"]
+  },
+  "audit-daily-pingan-replayed": {
+    "source": "report",
+    "preset": "audit-daily-pingan-replayed",
+    "description": "统一入口下的当日平安券商 replayed trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "replayed", "review"]
   },
   "audit-daily-failed": {
     "source": "report",
@@ -161,6 +173,12 @@
     "description": "统一入口下的区间已确认 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "confirmed"]
   },
+  "audit-period-pingan-confirmed": {
+    "source": "report",
+    "preset": "audit-period-pingan-confirmed",
+    "description": "统一入口下的区间平安券商已确认 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "confirmed"]
+  },
   "audit-period-rejected": {
     "source": "report",
     "preset": "audit-period-rejected",
@@ -178,6 +196,12 @@
     "preset": "audit-period-replayed",
     "description": "统一入口下的区间 replayed trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "replayed", "review"]
+  },
+  "audit-period-pingan-replayed": {
+    "source": "report",
+    "preset": "audit-period-pingan-replayed",
+    "description": "统一入口下的区间平安券商 replayed trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "replayed", "review"]
   },
   "audit-period-failed": {
     "source": "report",

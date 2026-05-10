@@ -98,6 +98,17 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(presets["audit-daily-replayed"]["options"]["status"], "replayed")
         self.assertEqual(presets["audit-period-replayed"]["options"]["status"], "replayed")
 
+    def test_runtime_report_presets_include_pingan_confirmed_and_replayed_trade_audit_presets(self) -> None:
+        presets = load_report_presets()
+        self.assertIn("audit-daily-pingan-confirmed", presets)
+        self.assertIn("audit-period-pingan-confirmed", presets)
+        self.assertIn("audit-daily-pingan-replayed", presets)
+        self.assertIn("audit-period-pingan-replayed", presets)
+        self.assertEqual(presets["audit-daily-pingan-confirmed"]["options"]["broker"], "pingan")
+        self.assertEqual(presets["audit-daily-pingan-confirmed"]["options"]["status"], "confirmed")
+        self.assertEqual(presets["audit-period-pingan-replayed"]["options"]["broker"], "pingan")
+        self.assertEqual(presets["audit-period-pingan-replayed"]["options"]["status"], "replayed")
+
     def test_runtime_report_presets_include_failed_trade_audit_presets(self) -> None:
         presets = load_report_presets()
         self.assertIn("audit-daily-failed", presets)
@@ -413,6 +424,15 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(entries["audit-period-confirmed"]["preset"], "audit-period-confirmed")
         self.assertEqual(entries["audit-daily-replayed"]["preset"], "audit-daily-replayed")
 
+    def test_runtime_command_catalog_includes_pingan_confirmed_and_replayed_trade_audit_entries(self) -> None:
+        entries = load_command_catalog()
+        self.assertIn("audit-daily-pingan-confirmed", entries)
+        self.assertIn("audit-period-pingan-confirmed", entries)
+        self.assertIn("audit-daily-pingan-replayed", entries)
+        self.assertIn("audit-period-pingan-replayed", entries)
+        self.assertEqual(entries["audit-daily-pingan-confirmed"]["preset"], "audit-daily-pingan-confirmed")
+        self.assertEqual(entries["audit-period-pingan-replayed"]["preset"], "audit-period-pingan-replayed")
+
     def test_runtime_command_catalog_includes_failed_trade_audit_entries(self) -> None:
         entries = load_command_catalog()
         self.assertIn("audit-daily-failed", entries)
@@ -641,6 +661,25 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(confirmed["steps"][1]["entry"], "audit-daily-confirmed")
         self.assertEqual(replayed["steps"][0]["entry"], "recent-ledger")
         self.assertEqual(replayed["steps"][1]["entry"], "audit-daily-replayed")
+
+    def test_runtime_command_bundles_include_pingan_confirmed_and_replayed_trade_audit_review_bundles(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("audit-pingan-confirmed-review", bundles)
+        self.assertIn("audit-pingan-replay-review", bundles)
+        confirmed = resolve_command_bundle(
+            "audit-pingan-confirmed-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        replayed = resolve_command_bundle(
+            "audit-pingan-replay-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(confirmed["steps"][0]["entry"], "daily-success")
+        self.assertEqual(confirmed["steps"][1]["entry"], "audit-daily-pingan-confirmed")
+        self.assertEqual(replayed["steps"][0]["entry"], "recent-ledger")
+        self.assertEqual(replayed["steps"][1]["entry"], "audit-daily-pingan-replayed")
 
     def test_runtime_command_bundles_include_failed_trade_audit_bundle(self) -> None:
         bundles = load_command_bundles()

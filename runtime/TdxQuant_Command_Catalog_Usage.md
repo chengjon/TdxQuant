@@ -292,8 +292,12 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 排障时先看最近失败台账，再回看当日拒单 trade_audit 诊断
 - `audit-confirmed-review`
   - 查看当日成功成交日报并回看当日已确认 trade_audit 复盘
+- `audit-pingan-confirmed-review`
+  - 查看当日成功成交日报并回看当日平安券商已确认 trade_audit 复盘
 - `audit-replay-review`
   - 查看最近台账摘要并回看当日 replayed trade_audit 复盘
+- `audit-pingan-replay-review`
+  - 查看最近台账摘要并回看当日平安券商 replayed trade_audit 复盘
 - `audit-failure-diagnostics`
   - 先看最近失败台账，再回看当日 failed trade_audit 诊断复盘
 - `audit-exception-diagnostics`

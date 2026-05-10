@@ -63,6 +63,17 @@
       "status": "confirmed"
     }
   },
+  "audit-daily-pingan-confirmed": {
+    "command": "audit-daily",
+    "description": "当日平安券商已确认 trade_audit 复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
+      "status": "confirmed"
+    }
+  },
   "audit-daily-rejected": {
     "command": "audit-daily",
     "description": "当日拒单 trade_audit 诊断复盘。",
@@ -91,6 +102,17 @@
     "options": {
       "timezone": "Asia/Shanghai",
       "recent_limit": 20,
+      "status": "replayed"
+    }
+  },
+  "audit-daily-pingan-replayed": {
+    "command": "audit-daily",
+    "description": "当日平安券商 replayed trade_audit 复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
       "status": "replayed"
     }
   },
@@ -282,6 +304,17 @@
       "status": "confirmed"
     }
   },
+  "audit-period-pingan-confirmed": {
+    "command": "audit-period",
+    "description": "区间平安券商已确认 trade_audit 复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
+      "status": "confirmed"
+    }
+  },
   "audit-period-rejected": {
     "command": "audit-period",
     "description": "区间拒单 trade_audit 诊断复盘模板。",
@@ -310,6 +343,17 @@
     "options": {
       "timezone": "Asia/Shanghai",
       "recent_limit": 50,
+      "status": "replayed"
+    }
+  },
+  "audit-period-pingan-replayed": {
+    "command": "audit-period",
+    "description": "区间平安券商 replayed trade_audit 复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
       "status": "replayed"
     }
   },
