@@ -653,6 +653,25 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
         self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-pingan-order-exceptions")
 
+    def test_runtime_command_bundles_include_pingan_confirm_trade_audit_exception_bundles(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("audit-pingan-confirm-exception-diagnostics", bundles)
+        self.assertIn("confirm-pingan-exception-review", bundles)
+        diagnostics = resolve_command_bundle(
+            "audit-pingan-confirm-exception-diagnostics",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        followup = resolve_command_bundle(
+            "confirm-pingan-exception-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
+        self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-pingan-confirm-exceptions")
+        self.assertEqual(followup["steps"][0]["entry"], "task-confirm-current")
+        self.assertEqual(followup["steps"][1]["entry"], "audit-daily-pingan-confirm-exceptions")
+
     def test_runtime_command_bundles_include_split_step_confirm_followup_bundle(self) -> None:
         bundles = load_command_bundles()
         self.assertIn("confirm-audit-review", bundles)

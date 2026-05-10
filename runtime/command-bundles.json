@@ -191,6 +191,20 @@
       }
     ]
   },
+  "audit-pingan-confirm-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 confirm_current rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "confirm", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-exceptions"
+      }
+    ]
+  },
   "audit-submit-once-exception-diagnostics": {
     "description": "先看最近失败台账，再回看当日 buy_submit_once rejected + failed trade_audit 异常复盘。",
     "labels": ["diagnostics", "audit", "submit-once", "exceptions", "review"],
@@ -388,6 +402,20 @@
       {
         "name": "audit",
         "entry": "audit-daily-confirm-exceptions"
+      }
+    ]
+  },
+  "confirm-pingan-exception-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 confirm_current rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "confirm", "pingan", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-exceptions"
       }
     ]
   },

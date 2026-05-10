@@ -71,6 +71,12 @@
     "description": "统一入口下的当日 confirm_current 异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "confirm", "exceptions", "diagnostics"]
   },
+  "audit-daily-pingan-confirm-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-pingan-confirm-exceptions",
+    "description": "统一入口下的当日平安券商 confirm_current 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "confirm", "exceptions", "diagnostics"]
+  },
   "audit-daily-submit-once-exceptions": {
     "source": "report",
     "preset": "audit-daily-submit-once-exceptions",
@@ -148,6 +154,12 @@
     "preset": "audit-period-confirm-exceptions",
     "description": "统一入口下的区间 confirm_current 异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "confirm", "exceptions", "diagnostics"]
+  },
+  "audit-period-pingan-confirm-exceptions": {
+    "source": "report",
+    "preset": "audit-period-pingan-confirm-exceptions",
+    "description": "统一入口下的区间平安券商 confirm_current 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "confirm", "exceptions", "diagnostics"]
   },
   "audit-period-submit-once-exceptions": {
     "source": "report",
