@@ -95,6 +95,12 @@
     "description": "统一入口下的当日 buy 异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "buy", "exceptions", "diagnostics"]
   },
+  "audit-daily-pingan-buy-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-pingan-buy-exceptions",
+    "description": "统一入口下的当日平安券商 buy 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "buy", "exceptions", "diagnostics"]
+  },
   "audit-daily-sell-exceptions": {
     "source": "report",
     "preset": "audit-daily-sell-exceptions",
@@ -184,6 +190,12 @@
     "preset": "audit-period-buy-exceptions",
     "description": "统一入口下的区间 buy 异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "buy", "exceptions", "diagnostics"]
+  },
+  "audit-period-pingan-buy-exceptions": {
+    "source": "report",
+    "preset": "audit-period-pingan-buy-exceptions",
+    "description": "统一入口下的区间平安券商 buy 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "buy", "exceptions", "diagnostics"]
   },
   "audit-period-sell-exceptions": {
     "source": "report",

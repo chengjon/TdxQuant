@@ -160,6 +160,18 @@
       "statuses": ["rejected", "failed"]
     }
   },
+  "audit-daily-pingan-buy-exceptions": {
+    "command": "audit-daily",
+    "description": "当日平安券商 buy rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
+      "method": "buy",
+      "statuses": ["rejected", "failed"]
+    }
+  },
   "audit-daily-sell-exceptions": {
     "command": "audit-daily",
     "description": "当日 sell rejected + failed trade_audit 异常复盘。",
@@ -318,6 +330,18 @@
     "options": {
       "timezone": "Asia/Shanghai",
       "recent_limit": 50,
+      "method": "buy",
+      "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-pingan-buy-exceptions": {
+    "command": "audit-period",
+    "description": "区间平安券商 buy rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
       "method": "buy",
       "statuses": ["rejected", "failed"]
     }

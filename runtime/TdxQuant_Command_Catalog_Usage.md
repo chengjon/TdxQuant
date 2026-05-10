@@ -308,6 +308,8 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 先看最近失败台账，再回看当日平安券商 buy_submit_once rejected + failed trade_audit 异常复盘
 - `audit-buy-exception-diagnostics`
   - 先看最近失败台账，再回看当日 buy rejected + failed trade_audit 异常复盘
+- `audit-pingan-buy-exception-diagnostics`
+  - 先看最近失败台账，再回看当日平安券商 buy rejected + failed trade_audit 异常复盘
 - `audit-sell-exception-diagnostics`
   - 先看最近失败台账，再回看当日 sell rejected + failed trade_audit 异常复盘
 - `audit-submit-path-exception-diagnostics`
@@ -338,6 +340,8 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 完整提交流程后继续回看当日平安券商 buy_submit_once rejected + failed trade_audit 异常复盘
 - `guarded-buy-exception-review`
   - 受保护买入后继续回看当日 buy rejected + failed trade_audit 异常复盘
+- `guarded-pingan-buy-exception-review`
+  - 受保护买入后继续回看当日平安券商 buy rejected + failed trade_audit 异常复盘
 - `confirm-submit-path-exception-review`
   - 推进当前确认框后继续回看当日 submit path rejected + failed trade_audit 异常复盘
 - `confirm-pingan-submit-path-exception-review`

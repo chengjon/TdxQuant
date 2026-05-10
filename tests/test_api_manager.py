@@ -166,6 +166,18 @@ class ApiContextTests(unittest.TestCase):
         )
         self.assertEqual(presets["audit-period-buy-exceptions"]["options"]["method"], "buy")
 
+    def test_runtime_report_presets_include_pingan_buy_trade_audit_exception_presets(self) -> None:
+        presets = load_report_presets()
+        self.assertIn("audit-daily-pingan-buy-exceptions", presets)
+        self.assertIn("audit-period-pingan-buy-exceptions", presets)
+        self.assertEqual(presets["audit-daily-pingan-buy-exceptions"]["options"]["broker"], "pingan")
+        self.assertEqual(presets["audit-daily-pingan-buy-exceptions"]["options"]["method"], "buy")
+        self.assertEqual(
+            presets["audit-daily-pingan-buy-exceptions"]["options"]["statuses"],
+            ["rejected", "failed"],
+        )
+        self.assertEqual(presets["audit-period-pingan-buy-exceptions"]["options"]["broker"], "pingan")
+
     def test_runtime_report_presets_include_sell_trade_audit_exception_presets(self) -> None:
         presets = load_report_presets()
         self.assertIn("audit-daily-sell-exceptions", presets)
@@ -414,6 +426,19 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(entries["audit-daily-buy-exceptions"]["preset"], "audit-daily-buy-exceptions")
         self.assertEqual(entries["audit-period-buy-exceptions"]["preset"], "audit-period-buy-exceptions")
 
+    def test_runtime_command_catalog_includes_pingan_buy_trade_audit_exception_entries(self) -> None:
+        entries = load_command_catalog()
+        self.assertIn("audit-daily-pingan-buy-exceptions", entries)
+        self.assertIn("audit-period-pingan-buy-exceptions", entries)
+        self.assertEqual(
+            entries["audit-daily-pingan-buy-exceptions"]["preset"],
+            "audit-daily-pingan-buy-exceptions",
+        )
+        self.assertEqual(
+            entries["audit-period-pingan-buy-exceptions"]["preset"],
+            "audit-period-pingan-buy-exceptions",
+        )
+
     def test_runtime_command_catalog_includes_sell_trade_audit_exception_entries(self) -> None:
         entries = load_command_catalog()
         self.assertIn("audit-daily-sell-exceptions", entries)
@@ -645,6 +670,25 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-buy-exceptions")
         self.assertEqual(followup["steps"][0]["entry"], "guarded-buy")
         self.assertEqual(followup["steps"][1]["entry"], "audit-daily-buy-exceptions")
+
+    def test_runtime_command_bundles_include_pingan_buy_trade_audit_exception_bundles(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("audit-pingan-buy-exception-diagnostics", bundles)
+        self.assertIn("guarded-pingan-buy-exception-review", bundles)
+        diagnostics = resolve_command_bundle(
+            "audit-pingan-buy-exception-diagnostics",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        followup = resolve_command_bundle(
+            "guarded-pingan-buy-exception-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
+        self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-pingan-buy-exceptions")
+        self.assertEqual(followup["steps"][0]["entry"], "guarded-buy")
+        self.assertEqual(followup["steps"][1]["entry"], "audit-daily-pingan-buy-exceptions")
 
     def test_runtime_command_bundles_include_sell_trade_audit_exception_bundle(self) -> None:
         bundles = load_command_bundles()

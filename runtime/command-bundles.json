@@ -247,6 +247,20 @@
       }
     ]
   },
+  "audit-pingan-buy-exception-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 buy rejected + failed trade_audit 异常复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "buy", "exceptions", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-exceptions"
+      }
+    ]
+  },
   "audit-sell-exception-diagnostics": {
     "description": "先看最近失败台账，再回看当日 sell rejected + failed trade_audit 异常复盘。",
     "labels": ["diagnostics", "audit", "sell", "exceptions", "review"],
@@ -472,6 +486,20 @@
       {
         "name": "audit",
         "entry": "audit-daily-buy-exceptions"
+      }
+    ]
+  },
+  "guarded-pingan-buy-exception-review": {
+    "description": "受保护买入后继续回看当日平安券商 buy rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "buy", "pingan", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-exceptions"
       }
     ]
   },
