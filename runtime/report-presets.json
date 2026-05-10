@@ -73,6 +73,17 @@
       "status": "rejected"
     }
   },
+  "audit-daily-pingan-rejected": {
+    "command": "audit-daily",
+    "description": "当日平安券商拒单 trade_audit 诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
+      "status": "rejected"
+    }
+  },
   "audit-daily-replayed": {
     "command": "audit-daily",
     "description": "当日 replayed trade_audit 复盘。",
@@ -90,6 +101,17 @@
     "options": {
       "timezone": "Asia/Shanghai",
       "recent_limit": 20,
+      "status": "failed"
+    }
+  },
+  "audit-daily-pingan-failed": {
+    "command": "audit-daily",
+    "description": "当日平安券商 failed trade_audit 诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
       "status": "failed"
     }
   },
@@ -270,6 +292,17 @@
       "status": "rejected"
     }
   },
+  "audit-period-pingan-rejected": {
+    "command": "audit-period",
+    "description": "区间平安券商拒单 trade_audit 诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
+      "status": "rejected"
+    }
+  },
   "audit-period-replayed": {
     "command": "audit-period",
     "description": "区间 replayed trade_audit 复盘模板。",
@@ -287,6 +320,17 @@
     "options": {
       "timezone": "Asia/Shanghai",
       "recent_limit": 50,
+      "status": "failed"
+    }
+  },
+  "audit-period-pingan-failed": {
+    "command": "audit-period",
+    "description": "区间平安券商 failed trade_audit 诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
       "status": "failed"
     }
   },

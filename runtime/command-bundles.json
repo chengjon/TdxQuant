@@ -121,6 +121,20 @@
       }
     ]
   },
+  "audit-pingan-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商拒单 trade_audit 诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-rejected"
+      }
+    ]
+  },
   "audit-confirmed-review": {
     "description": "查看当日成功成交日报并回看当日已确认 trade_audit 复盘。",
     "labels": ["audit", "confirmed", "review", "followup"],
@@ -160,6 +174,20 @@
       {
         "name": "audit",
         "entry": "audit-daily-failed"
+      }
+    ]
+  },
+  "audit-pingan-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 failed trade_audit 诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-failed"
       }
     ]
   },

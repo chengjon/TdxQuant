@@ -47,6 +47,12 @@
     "description": "统一入口下的当日拒单 trade_audit 诊断复盘。",
     "labels": ["report", "audit", "daily", "rejected", "diagnostics"]
   },
+  "audit-daily-pingan-rejected": {
+    "source": "report",
+    "preset": "audit-daily-pingan-rejected",
+    "description": "统一入口下的当日平安券商拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "rejected", "diagnostics"]
+  },
   "audit-daily-replayed": {
     "source": "report",
     "preset": "audit-daily-replayed",
@@ -58,6 +64,12 @@
     "preset": "audit-daily-failed",
     "description": "统一入口下的当日 failed trade_audit 诊断复盘。",
     "labels": ["report", "audit", "daily", "failed", "diagnostics"]
+  },
+  "audit-daily-pingan-failed": {
+    "source": "report",
+    "preset": "audit-daily-pingan-failed",
+    "description": "统一入口下的当日平安券商 failed trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "failed", "diagnostics"]
   },
   "audit-daily-exceptions": {
     "source": "report",
@@ -155,6 +167,12 @@
     "description": "统一入口下的区间拒单 trade_audit 诊断复盘模板。",
     "labels": ["report", "audit", "period", "rejected", "diagnostics"]
   },
+  "audit-period-pingan-rejected": {
+    "source": "report",
+    "preset": "audit-period-pingan-rejected",
+    "description": "统一入口下的区间平安券商拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "rejected", "diagnostics"]
+  },
   "audit-period-replayed": {
     "source": "report",
     "preset": "audit-period-replayed",
@@ -166,6 +184,12 @@
     "preset": "audit-period-failed",
     "description": "统一入口下的区间 failed trade_audit 诊断复盘模板。",
     "labels": ["report", "audit", "period", "failed", "diagnostics"]
+  },
+  "audit-period-pingan-failed": {
+    "source": "report",
+    "preset": "audit-period-pingan-failed",
+    "description": "统一入口下的区间平安券商 failed trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "failed", "diagnostics"]
   },
   "audit-period-exceptions": {
     "source": "report",
