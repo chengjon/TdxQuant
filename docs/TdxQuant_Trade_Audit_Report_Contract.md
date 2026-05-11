@@ -154,6 +154,7 @@
   - `submit-ready-pingan-audit-review`
   - `submit-ready-pingan-exception-review`
   - `confirm-audit-review`
+  - `confirm-pingan-audit-review`
   - `confirm-complete-review`
   - `confirm-exception-review`
   - `confirm-pingan-exception-review`

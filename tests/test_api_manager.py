@@ -953,6 +953,17 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(resolved["steps"][0]["entry"], "task-confirm-current")
         self.assertEqual(resolved["steps"][1]["entry"], "audit-daily-review")
 
+    def test_runtime_command_bundles_include_split_step_confirm_pingan_followup_bundle(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("confirm-pingan-audit-review", bundles)
+        resolved = resolve_command_bundle(
+            "confirm-pingan-audit-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(resolved["steps"][0]["entry"], "task-confirm-current")
+        self.assertEqual(resolved["steps"][1]["entry"], "audit-daily-pingan-review")
+
     def test_runtime_command_bundles_include_split_step_submit_ready_followup_bundles(self) -> None:
         bundles = load_command_bundles()
         self.assertIn("submit-ready-audit-review", bundles)
