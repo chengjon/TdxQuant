@@ -725,6 +725,42 @@
       }
     ]
   },
+  "guarded-buy-complete-review": {
+    "description": "受保护买入后继续查看当日成功成交日报和已确认 trade_audit 复盘。",
+    "labels": ["trading", "buy", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirmed"
+      }
+    ]
+  },
+  "guarded-pingan-buy-complete-review": {
+    "description": "受保护买入后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["trading", "buy", "pingan", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirmed"
+      }
+    ]
+  },
   "guarded-buy-exception-review": {
     "description": "受保护买入后继续回看当日 buy rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "buy", "audit", "exceptions", "followup"],

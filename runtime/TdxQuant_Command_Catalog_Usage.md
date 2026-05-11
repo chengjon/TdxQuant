@@ -372,6 +372,10 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 受保护买入后继续回看当日 trade_audit 复盘
 - `guarded-pingan-buy-audit-review`
   - 受保护买入后继续回看当日平安券商 trade_audit 复盘
+- `guarded-buy-complete-review`
+  - 受保护买入后继续查看当日成功成交日报和已确认 trade_audit 复盘
+- `guarded-pingan-buy-complete-review`
+  - 受保护买入后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘
 - `guarded-buy-exception-review`
   - 受保护买入后继续回看当日 buy rejected + failed trade_audit 异常复盘
 - `guarded-pingan-buy-exception-review`
