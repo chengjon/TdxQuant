@@ -856,6 +856,25 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(followup["steps"][0]["entry"], "guarded-buy")
         self.assertEqual(followup["steps"][1]["entry"], "audit-daily-buy-exceptions")
 
+    def test_runtime_command_bundles_include_guarded_buy_trade_audit_review_bundles(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("guarded-buy-audit-review", bundles)
+        self.assertIn("guarded-pingan-buy-audit-review", bundles)
+        review = resolve_command_bundle(
+            "guarded-buy-audit-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        pingan_review = resolve_command_bundle(
+            "guarded-pingan-buy-audit-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(review["steps"][0]["entry"], "guarded-buy")
+        self.assertEqual(review["steps"][1]["entry"], "audit-daily-review")
+        self.assertEqual(pingan_review["steps"][0]["entry"], "guarded-buy")
+        self.assertEqual(pingan_review["steps"][1]["entry"], "audit-daily-pingan-review")
+
     def test_runtime_command_bundles_include_pingan_buy_trade_audit_exception_bundles(self) -> None:
         bundles = load_command_bundles()
         self.assertIn("audit-pingan-buy-exception-diagnostics", bundles)
