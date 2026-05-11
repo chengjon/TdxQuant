@@ -161,6 +161,8 @@
   - `confirm-pingan-exception-review`
   - `submit-once-audit-review`
   - `submit-once-pingan-audit-review`
+  - `submit-once-complete-review`
+  - `submit-once-pingan-complete-review`
   - `submit-once-exception-review`
   - `submit-once-pingan-exception-review`
   - `guarded-buy-audit-review`

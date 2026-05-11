@@ -485,6 +485,42 @@
       }
     ]
   },
+  "submit-once-complete-review": {
+    "description": "完整提交流程后继续查看当日成功成交日报和已确认 trade_audit 复盘。",
+    "labels": ["trading", "submit", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirmed"
+      }
+    ]
+  },
+  "submit-once-pingan-complete-review": {
+    "description": "完整提交流程后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["trading", "submit", "pingan", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirmed"
+      }
+    ]
+  },
   "submit-ready-audit-review": {
     "description": "推进到提交确认前边界后回看当日 trade_audit 复盘。",
     "labels": ["trading", "submit-ready", "audit", "followup"],

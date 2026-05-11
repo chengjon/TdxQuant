@@ -849,6 +849,27 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(pingan_review["steps"][0]["entry"], "task-submit-once")
         self.assertEqual(pingan_review["steps"][1]["entry"], "audit-daily-pingan-review")
 
+    def test_runtime_command_bundles_include_submit_once_complete_review_bundles(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("submit-once-complete-review", bundles)
+        self.assertIn("submit-once-pingan-complete-review", bundles)
+        complete = resolve_command_bundle(
+            "submit-once-complete-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        pingan_complete = resolve_command_bundle(
+            "submit-once-pingan-complete-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(complete["steps"][0]["entry"], "task-submit-once")
+        self.assertEqual(complete["steps"][1]["entry"], "daily-success")
+        self.assertEqual(complete["steps"][2]["entry"], "audit-daily-confirmed")
+        self.assertEqual(pingan_complete["steps"][0]["entry"], "task-submit-once")
+        self.assertEqual(pingan_complete["steps"][1]["entry"], "daily-success")
+        self.assertEqual(pingan_complete["steps"][2]["entry"], "audit-daily-pingan-confirmed")
+
     def test_runtime_command_bundles_include_buy_trade_audit_exception_bundles(self) -> None:
         bundles = load_command_bundles()
         self.assertIn("audit-buy-exception-diagnostics", bundles)
