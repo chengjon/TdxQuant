@@ -964,6 +964,25 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(exception_review["steps"][0]["entry"], "task-submit-ready")
         self.assertEqual(exception_review["steps"][1]["entry"], "audit-daily-exceptions")
 
+    def test_runtime_command_bundles_include_split_step_submit_ready_pingan_followup_bundles(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("submit-ready-pingan-audit-review", bundles)
+        self.assertIn("submit-ready-pingan-exception-review", bundles)
+        audit_review = resolve_command_bundle(
+            "submit-ready-pingan-audit-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        exception_review = resolve_command_bundle(
+            "submit-ready-pingan-exception-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(audit_review["steps"][0]["entry"], "task-submit-ready")
+        self.assertEqual(audit_review["steps"][1]["entry"], "audit-daily-pingan-review")
+        self.assertEqual(exception_review["steps"][0]["entry"], "task-submit-ready")
+        self.assertEqual(exception_review["steps"][1]["entry"], "audit-daily-pingan-exceptions")
+
     def test_resolve_command_bundle_validates_steps_and_referenced_entries(self) -> None:
         bundles = {
             "refresh-review": {
