@@ -54,6 +54,7 @@
   - `audit-daily-pingan-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
+  - `audit-daily-order-exceptions`
   - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
   - `audit-period-pingan-review`
@@ -77,6 +78,7 @@
   - `audit-period-pingan-sell-exceptions`
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
+  - `audit-period-order-exceptions`
   - `audit-period-pingan-order-exceptions`
 - catalog entries：
   - `audit-daily-review`
@@ -101,6 +103,7 @@
   - `audit-daily-pingan-sell-exceptions`
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
+  - `audit-daily-order-exceptions`
   - `audit-daily-pingan-order-exceptions`
   - `audit-period-review`
   - `audit-period-pingan-review`
@@ -124,6 +127,7 @@
   - `audit-period-pingan-sell-exceptions`
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
+  - `audit-period-order-exceptions`
   - `audit-period-pingan-order-exceptions`
 - diagnostic / follow-up bundles：
   - `audit-diagnostics`
@@ -148,6 +152,7 @@
   - `audit-pingan-sell-exception-diagnostics`
   - `audit-submit-path-exception-diagnostics`
   - `audit-pingan-submit-path-exception-diagnostics`
+  - `audit-order-exception-diagnostics`
   - `audit-pingan-order-exception-diagnostics`
   - `submit-ready-audit-review`
   - `submit-ready-exception-review`
@@ -302,6 +307,7 @@ CLI 层额外支持：
 - 单方法 `method`
 - 多方法 `methods` OR 过滤
 - 第一组 submit path 组合视角：`buy_submit_once + confirm_current`
+- 第一组 order path 组合视角：`buy + sell`
 - 第一组 broker-scoped buy 组合视角：`pingan + buy + rejected|failed`
 - 第一组 broker-scoped 全状态复盘视角：`pingan`
 - 第一组 broker-scoped exception 组合视角：`pingan + rejected|failed`
@@ -311,6 +317,7 @@ CLI 层额外支持：
 - 第一组 broker-scoped confirm 组合视角：`pingan + confirm_current + rejected|failed`
 - 第一组 broker-scoped submit-once 组合视角：`pingan + buy_submit_once + rejected|failed`
 - 第一组 broker-scoped submit path 组合视角：`pingan + buy_submit_once + confirm_current + rejected|failed`
+- 第一组 broker-scoped order path 组合视角：`pingan + buy + sell + rejected|failed`
 
 这一版还没有提供：
 

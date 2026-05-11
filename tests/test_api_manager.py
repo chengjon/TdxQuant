@@ -302,6 +302,27 @@ class ApiContextTests(unittest.TestCase):
             "pingan",
         )
 
+    def test_runtime_report_presets_include_order_trade_audit_exception_presets(self) -> None:
+        presets = load_report_presets()
+        self.assertIn("audit-daily-order-exceptions", presets)
+        self.assertIn("audit-period-order-exceptions", presets)
+        self.assertEqual(
+            presets["audit-daily-order-exceptions"]["options"]["methods"],
+            ["buy", "sell"],
+        )
+        self.assertEqual(
+            presets["audit-daily-order-exceptions"]["options"]["statuses"],
+            ["rejected", "failed"],
+        )
+        self.assertEqual(
+            presets["audit-period-order-exceptions"]["options"]["methods"],
+            ["buy", "sell"],
+        )
+        self.assertEqual(
+            presets["audit-period-order-exceptions"]["options"]["statuses"],
+            ["rejected", "failed"],
+        )
+
     def test_resolve_report_preset_prefers_explicit_overrides(self) -> None:
         presets = {
             "daily-review": {
@@ -583,6 +604,19 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(
             entries["audit-period-pingan-order-exceptions"]["preset"],
             "audit-period-pingan-order-exceptions",
+        )
+
+    def test_runtime_command_catalog_includes_order_trade_audit_exception_entries(self) -> None:
+        entries = load_command_catalog()
+        self.assertIn("audit-daily-order-exceptions", entries)
+        self.assertIn("audit-period-order-exceptions", entries)
+        self.assertEqual(
+            entries["audit-daily-order-exceptions"]["preset"],
+            "audit-daily-order-exceptions",
+        )
+        self.assertEqual(
+            entries["audit-period-order-exceptions"]["preset"],
+            "audit-period-order-exceptions",
         )
 
     def test_runtime_command_catalog_includes_split_step_trade_entries(self) -> None:
@@ -1018,6 +1052,17 @@ class ApiContextTests(unittest.TestCase):
         )
         self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
         self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-pingan-order-exceptions")
+
+    def test_runtime_command_bundles_include_order_trade_audit_exception_bundle(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("audit-order-exception-diagnostics", bundles)
+        diagnostics = resolve_command_bundle(
+            "audit-order-exception-diagnostics",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
+        self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-order-exceptions")
 
     def test_runtime_command_bundles_include_pingan_confirm_trade_audit_exception_bundles(self) -> None:
         bundles = load_command_bundles()
