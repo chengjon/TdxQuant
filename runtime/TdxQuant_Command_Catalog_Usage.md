@@ -354,6 +354,10 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 推进当前确认框后继续回看当日 confirm_current rejected + failed trade_audit 异常复盘
 - `confirm-pingan-exception-review`
   - 推进当前确认框后继续回看当日平安券商 confirm_current rejected + failed trade_audit 异常复盘
+- `submit-once-audit-review`
+  - 完整提交流程后继续回看当日 trade_audit 复盘
+- `submit-once-pingan-audit-review`
+  - 完整提交流程后继续回看当日平安券商 trade_audit 复盘
 - `submit-once-exception-review`
   - 完整提交流程后继续回看当日 buy_submit_once rejected + failed trade_audit 异常复盘
 - `submit-once-pingan-exception-review`

@@ -457,6 +457,34 @@
       }
     ]
   },
+  "submit-once-audit-review": {
+    "description": "完整提交流程后继续回看当日 trade_audit 复盘。",
+    "labels": ["trading", "submit", "audit", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-review"
+      }
+    ]
+  },
+  "submit-once-pingan-audit-review": {
+    "description": "完整提交流程后继续回看当日平安券商 trade_audit 复盘。",
+    "labels": ["trading", "submit", "pingan", "audit", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-review"
+      }
+    ]
+  },
   "submit-ready-audit-review": {
     "description": "推进到提交确认前边界后回看当日 trade_audit 复盘。",
     "labels": ["trading", "submit-ready", "audit", "followup"],
