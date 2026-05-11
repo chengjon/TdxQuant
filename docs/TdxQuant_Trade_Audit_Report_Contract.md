@@ -156,6 +156,7 @@
   - `confirm-audit-review`
   - `confirm-pingan-audit-review`
   - `confirm-complete-review`
+  - `confirm-pingan-complete-review`
   - `confirm-exception-review`
   - `confirm-pingan-exception-review`
   - `submit-once-audit-review`

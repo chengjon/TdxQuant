@@ -587,6 +587,24 @@
       }
     ]
   },
+  "confirm-pingan-complete-review": {
+    "description": "推进当前确认框后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["trading", "confirm", "pingan", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirmed"
+      }
+    ]
+  },
   "confirm-exception-review": {
     "description": "推进当前确认框后继续回看当日 confirm_current rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "confirm", "audit", "exceptions", "followup"],

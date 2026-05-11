@@ -671,6 +671,18 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(confirm["steps"][1]["entry"], "daily-success")
         self.assertEqual(confirm["steps"][2]["entry"], "audit-daily-confirmed")
 
+    def test_runtime_command_bundles_include_pingan_confirm_complete_review_bundle(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("confirm-pingan-complete-review", bundles)
+        resolved = resolve_command_bundle(
+            "confirm-pingan-complete-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(resolved["steps"][0]["entry"], "task-confirm-current")
+        self.assertEqual(resolved["steps"][1]["entry"], "daily-success")
+        self.assertEqual(resolved["steps"][2]["entry"], "audit-daily-pingan-confirmed")
+
     def test_runtime_command_bundles_include_confirmed_and_replayed_trade_audit_review_bundles(self) -> None:
         bundles = load_command_bundles()
         self.assertIn("audit-confirmed-review", bundles)
