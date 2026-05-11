@@ -173,6 +173,18 @@
     "description": "统一入口下的当日平安券商 buy + sell 异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "pingan", "order", "exceptions", "diagnostics"]
   },
+  "audit-daily-pingan-order-rejected": {
+    "source": "report",
+    "preset": "audit-daily-pingan-order-rejected",
+    "description": "统一入口下的当日平安券商 buy + sell 拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "order", "rejected", "diagnostics"]
+  },
+  "audit-daily-pingan-order-failed": {
+    "source": "report",
+    "preset": "audit-daily-pingan-order-failed",
+    "description": "统一入口下的当日平安券商 buy + sell 失败 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "order", "failed", "diagnostics"]
+  },
   "audit-period-review": {
     "source": "report",
     "preset": "audit-period-review",
@@ -316,6 +328,18 @@
     "preset": "audit-period-pingan-order-exceptions",
     "description": "统一入口下的区间平安券商 buy + sell 异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "pingan", "order", "exceptions", "diagnostics"]
+  },
+  "audit-period-pingan-order-rejected": {
+    "source": "report",
+    "preset": "audit-period-pingan-order-rejected",
+    "description": "统一入口下的区间平安券商 buy + sell 拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "order", "rejected", "diagnostics"]
+  },
+  "audit-period-pingan-order-failed": {
+    "source": "report",
+    "preset": "audit-period-pingan-order-failed",
+    "description": "统一入口下的区间平安券商 buy + sell 失败 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "order", "failed", "diagnostics"]
   },
   "balanced-buy": {
     "source": "trade",

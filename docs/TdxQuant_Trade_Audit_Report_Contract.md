@@ -56,6 +56,8 @@
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-order-exceptions`
   - `audit-daily-pingan-order-exceptions`
+  - `audit-daily-pingan-order-rejected`
+  - `audit-daily-pingan-order-failed`
   - `audit-period-review`
   - `audit-period-pingan-review`
   - `audit-period-confirmed`
@@ -80,6 +82,8 @@
   - `audit-period-pingan-submit-path-exceptions`
   - `audit-period-order-exceptions`
   - `audit-period-pingan-order-exceptions`
+  - `audit-period-pingan-order-rejected`
+  - `audit-period-pingan-order-failed`
 - catalog entries：
   - `audit-daily-review`
   - `audit-daily-pingan-review`
@@ -105,6 +109,8 @@
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-order-exceptions`
   - `audit-daily-pingan-order-exceptions`
+  - `audit-daily-pingan-order-rejected`
+  - `audit-daily-pingan-order-failed`
   - `audit-period-review`
   - `audit-period-pingan-review`
   - `audit-period-confirmed`
@@ -129,6 +135,8 @@
   - `audit-period-pingan-submit-path-exceptions`
   - `audit-period-order-exceptions`
   - `audit-period-pingan-order-exceptions`
+  - `audit-period-pingan-order-rejected`
+  - `audit-period-pingan-order-failed`
 - diagnostic / follow-up bundles：
   - `audit-diagnostics`
   - `audit-pingan-review`
@@ -154,6 +162,8 @@
   - `audit-pingan-submit-path-exception-diagnostics`
   - `audit-order-exception-diagnostics`
   - `audit-pingan-order-exception-diagnostics`
+  - `audit-pingan-order-rejection-diagnostics`
+  - `audit-pingan-order-failure-diagnostics`
   - `submit-ready-audit-review`
   - `submit-ready-exception-review`
   - `submit-ready-pingan-audit-review`
@@ -318,6 +328,7 @@ CLI 层额外支持：
 - 第一组 broker-scoped submit-once 组合视角：`pingan + buy_submit_once + rejected|failed`
 - 第一组 broker-scoped submit path 组合视角：`pingan + buy_submit_once + confirm_current + rejected|failed`
 - 第一组 broker-scoped order path 组合视角：`pingan + buy + sell + rejected|failed`
+- 第一组 broker-scoped order single-status 组合视角：`pingan + buy + sell + rejected` / `pingan + buy + sell + failed`
 
 这一版还没有提供：
 
