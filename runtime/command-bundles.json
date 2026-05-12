@@ -317,6 +317,62 @@
       }
     ]
   },
+  "audit-submit-once-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 buy_submit_once rejected trade_audit 拒单诊断复盘。",
+    "labels": ["diagnostics", "audit", "submit-once", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-once-rejected"
+      }
+    ]
+  },
+  "audit-submit-once-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 buy_submit_once failed trade_audit 失败诊断复盘。",
+    "labels": ["diagnostics", "audit", "submit-once", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-once-failed"
+      }
+    ]
+  },
+  "audit-pingan-submit-once-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 buy_submit_once rejected trade_audit 拒单诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "submit-once", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-once-rejected"
+      }
+    ]
+  },
+  "audit-pingan-submit-once-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 buy_submit_once failed trade_audit 失败诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "submit-once", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-once-failed"
+      }
+    ]
+  },
   "audit-buy-exception-diagnostics": {
     "description": "先看最近失败台账，再回看当日 buy rejected + failed trade_audit 异常复盘。",
     "labels": ["diagnostics", "audit", "buy", "exceptions", "review"],
@@ -988,6 +1044,62 @@
       {
         "name": "audit",
         "entry": "audit-daily-pingan-submit-once-exceptions"
+      }
+    ]
+  },
+  "submit-once-rejection-review": {
+    "description": "完整提交流程后继续回看当日 buy_submit_once rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-once-rejected"
+      }
+    ]
+  },
+  "submit-once-failure-review": {
+    "description": "完整提交流程后继续回看当日 buy_submit_once failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-once-failed"
+      }
+    ]
+  },
+  "submit-once-pingan-rejection-review": {
+    "description": "完整提交流程后继续回看当日平安券商 buy_submit_once rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit", "pingan", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-once-rejected"
+      }
+    ]
+  },
+  "submit-once-pingan-failure-review": {
+    "description": "完整提交流程后继续回看当日平安券商 buy_submit_once failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit", "pingan", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-once-failed"
       }
     ]
   },
