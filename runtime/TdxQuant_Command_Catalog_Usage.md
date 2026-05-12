@@ -328,8 +328,16 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 先看最近失败台账，再回看当日平安券商 sell rejected + failed trade_audit 异常复盘
 - `audit-submit-path-exception-diagnostics`
   - 先看最近失败台账，再回看当日 submit path rejected + failed trade_audit 异常复盘
+- `audit-submit-path-rejection-diagnostics`
+  - 先看最近失败台账，再回看当日 submit path rejected trade_audit 拒单诊断复盘
+- `audit-submit-path-failure-diagnostics`
+  - 先看最近失败台账，再回看当日 submit path failed trade_audit 失败诊断复盘
 - `audit-pingan-submit-path-exception-diagnostics`
   - 先看最近失败台账，再回看当日平安券商 submit path rejected + failed trade_audit 异常复盘
+- `audit-pingan-submit-path-rejection-diagnostics`
+  - 先看最近失败台账，再回看当日平安券商 submit path rejected trade_audit 拒单诊断复盘
+- `audit-pingan-submit-path-failure-diagnostics`
+  - 先看最近失败台账，再回看当日平安券商 submit path failed trade_audit 失败诊断复盘
 - `audit-order-exception-diagnostics`
   - 先看最近失败台账，再回看当日 buy + sell rejected + failed trade_audit 异常复盘
 - `audit-order-rejection-diagnostics`
@@ -442,6 +450,14 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 推进当前确认框后继续回看当日 submit path rejected + failed trade_audit 异常复盘
 - `confirm-pingan-submit-path-exception-review`
   - 推进当前确认框后继续回看当日平安券商 submit path rejected + failed trade_audit 异常复盘
+- `confirm-submit-path-rejection-review`
+  - 推进当前确认框后继续回看当日 submit path rejected trade_audit 拒单诊断复盘
+- `confirm-submit-path-failure-review`
+  - 推进当前确认框后继续回看当日 submit path failed trade_audit 失败诊断复盘
+- `confirm-pingan-submit-path-rejection-review`
+  - 推进当前确认框后继续回看当日平安券商 submit path rejected trade_audit 拒单诊断复盘
+- `confirm-pingan-submit-path-failure-review`
+  - 推进当前确认框后继续回看当日平安券商 submit path failed trade_audit 失败诊断复盘
 
 推荐用法：
 

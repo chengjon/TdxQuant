@@ -161,6 +161,30 @@
     "description": "统一入口下的当日平安券商 submit path 异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "pingan", "submit-path", "exceptions", "diagnostics"]
   },
+  "audit-daily-submit-path-rejected": {
+    "source": "report",
+    "preset": "audit-daily-submit-path-rejected",
+    "description": "统一入口下的当日 submit path 拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "submit-path", "rejected", "diagnostics"]
+  },
+  "audit-daily-submit-path-failed": {
+    "source": "report",
+    "preset": "audit-daily-submit-path-failed",
+    "description": "统一入口下的当日 submit path 失败 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "submit-path", "failed", "diagnostics"]
+  },
+  "audit-daily-pingan-submit-path-rejected": {
+    "source": "report",
+    "preset": "audit-daily-pingan-submit-path-rejected",
+    "description": "统一入口下的当日平安券商 submit path 拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "submit-path", "rejected", "diagnostics"]
+  },
+  "audit-daily-pingan-submit-path-failed": {
+    "source": "report",
+    "preset": "audit-daily-pingan-submit-path-failed",
+    "description": "统一入口下的当日平安券商 submit path 失败 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "submit-path", "failed", "diagnostics"]
+  },
   "audit-daily-order-exceptions": {
     "source": "report",
     "preset": "audit-daily-order-exceptions",
@@ -328,6 +352,30 @@
     "preset": "audit-period-pingan-submit-path-exceptions",
     "description": "统一入口下的区间平安券商 submit path 异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "pingan", "submit-path", "exceptions", "diagnostics"]
+  },
+  "audit-period-submit-path-rejected": {
+    "source": "report",
+    "preset": "audit-period-submit-path-rejected",
+    "description": "统一入口下的区间 submit path 拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "submit-path", "rejected", "diagnostics"]
+  },
+  "audit-period-submit-path-failed": {
+    "source": "report",
+    "preset": "audit-period-submit-path-failed",
+    "description": "统一入口下的区间 submit path 失败 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "submit-path", "failed", "diagnostics"]
+  },
+  "audit-period-pingan-submit-path-rejected": {
+    "source": "report",
+    "preset": "audit-period-pingan-submit-path-rejected",
+    "description": "统一入口下的区间平安券商 submit path 拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "submit-path", "rejected", "diagnostics"]
+  },
+  "audit-period-pingan-submit-path-failed": {
+    "source": "report",
+    "preset": "audit-period-pingan-submit-path-failed",
+    "description": "统一入口下的区间平安券商 submit path 失败 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "submit-path", "failed", "diagnostics"]
   },
   "audit-period-order-exceptions": {
     "source": "report",

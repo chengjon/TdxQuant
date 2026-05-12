@@ -167,7 +167,11 @@
   - `audit-sell-exception-diagnostics`
   - `audit-pingan-sell-exception-diagnostics`
   - `audit-submit-path-exception-diagnostics`
+  - `audit-submit-path-rejection-diagnostics`
+  - `audit-submit-path-failure-diagnostics`
   - `audit-pingan-submit-path-exception-diagnostics`
+  - `audit-pingan-submit-path-rejection-diagnostics`
+  - `audit-pingan-submit-path-failure-diagnostics`
   - `audit-order-exception-diagnostics`
   - `audit-order-rejection-diagnostics`
   - `audit-order-failure-diagnostics`
@@ -222,6 +226,10 @@
   - `guarded-pingan-buy-order-failure-review`
   - `confirm-submit-path-exception-review`
   - `confirm-pingan-submit-path-exception-review`
+  - `confirm-submit-path-rejection-review`
+  - `confirm-submit-path-failure-review`
+  - `confirm-pingan-submit-path-rejection-review`
+  - `confirm-pingan-submit-path-failure-review`
 
 ## 2. 当前目标
 
