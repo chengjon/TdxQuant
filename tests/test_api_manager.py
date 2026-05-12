@@ -1274,6 +1274,23 @@ class ApiContextTests(unittest.TestCase):
                 self.assertEqual(resolved["steps"][0]["entry"], "task-confirm-current")
                 self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
 
+    def test_runtime_command_bundles_include_guarded_buy_order_exception_followups(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "guarded-buy-order-exception-review": "audit-daily-order-exceptions",
+            "guarded-pingan-buy-order-exception-review": "audit-daily-pingan-order-exceptions",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                self.assertEqual(resolved["steps"][0]["entry"], "guarded-buy")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
+
     def test_resolve_command_bundle_validates_steps_and_referenced_entries(self) -> None:
         bundles = {
             "refresh-review": {

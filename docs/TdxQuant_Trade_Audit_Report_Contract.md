@@ -202,6 +202,8 @@
   - `guarded-pingan-buy-complete-review`
   - `guarded-buy-exception-review`
   - `guarded-pingan-buy-exception-review`
+  - `guarded-buy-order-exception-review`
+  - `guarded-pingan-buy-order-exception-review`
   - `confirm-submit-path-exception-review`
   - `confirm-pingan-submit-path-exception-review`
 
