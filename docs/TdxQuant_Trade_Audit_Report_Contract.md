@@ -178,6 +178,8 @@
   - `submit-ready-exception-review`
   - `submit-ready-pingan-audit-review`
   - `submit-ready-pingan-exception-review`
+  - `submit-ready-order-exception-review`
+  - `submit-ready-pingan-order-exception-review`
   - `confirm-audit-review`
   - `confirm-pingan-audit-review`
   - `confirm-complete-review`
