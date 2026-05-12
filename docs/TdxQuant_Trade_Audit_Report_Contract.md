@@ -216,6 +216,10 @@
   - `guarded-pingan-buy-exception-review`
   - `guarded-buy-order-exception-review`
   - `guarded-pingan-buy-order-exception-review`
+  - `guarded-buy-order-rejection-review`
+  - `guarded-buy-order-failure-review`
+  - `guarded-pingan-buy-order-rejection-review`
+  - `guarded-pingan-buy-order-failure-review`
   - `confirm-submit-path-exception-review`
   - `confirm-pingan-submit-path-exception-review`
 

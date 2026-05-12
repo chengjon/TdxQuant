@@ -1139,6 +1139,62 @@
       }
     ]
   },
+  "guarded-buy-order-rejection-review": {
+    "description": "受保护买入后继续回看当日 buy + sell rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "buy", "order", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-order-rejected"
+      }
+    ]
+  },
+  "guarded-buy-order-failure-review": {
+    "description": "受保护买入后继续回看当日 buy + sell failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "buy", "order", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-order-failed"
+      }
+    ]
+  },
+  "guarded-pingan-buy-order-rejection-review": {
+    "description": "受保护买入后继续回看当日平安券商 buy + sell rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "buy", "pingan", "order", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-order-rejected"
+      }
+    ]
+  },
+  "guarded-pingan-buy-order-failure-review": {
+    "description": "受保护买入后继续回看当日平安券商 buy + sell failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "buy", "pingan", "order", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-order-failed"
+      }
+    ]
+  },
   "confirm-submit-path-exception-review": {
     "description": "推进当前确认框后继续回看当日 submit path rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "confirm", "submit-path", "audit", "exceptions", "followup"],
