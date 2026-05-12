@@ -192,6 +192,10 @@
   - `confirm-pingan-exception-review`
   - `confirm-order-exception-review`
   - `confirm-pingan-order-exception-review`
+  - `confirm-order-rejection-review`
+  - `confirm-order-failure-review`
+  - `confirm-pingan-order-rejection-review`
+  - `confirm-pingan-order-failure-review`
   - `submit-once-audit-review`
   - `submit-once-pingan-audit-review`
   - `submit-once-complete-review`
