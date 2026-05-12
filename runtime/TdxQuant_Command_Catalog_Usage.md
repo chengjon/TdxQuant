@@ -336,8 +336,16 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 先看最近失败台账，再回看当日平安券商 buy_submit_once failed trade_audit 失败诊断复盘
 - `audit-buy-exception-diagnostics`
   - 先看最近失败台账，再回看当日 buy rejected + failed trade_audit 异常复盘
+- `audit-buy-rejection-diagnostics`
+  - 先看最近失败台账，再回看当日 buy rejected trade_audit 拒单诊断复盘
+- `audit-buy-failure-diagnostics`
+  - 先看最近失败台账，再回看当日 buy failed trade_audit 失败诊断复盘
 - `audit-pingan-buy-exception-diagnostics`
   - 先看最近失败台账，再回看当日平安券商 buy rejected + failed trade_audit 异常复盘
+- `audit-pingan-buy-rejection-diagnostics`
+  - 先看最近失败台账，再回看当日平安券商 buy rejected trade_audit 拒单诊断复盘
+- `audit-pingan-buy-failure-diagnostics`
+  - 先看最近失败台账，再回看当日平安券商 buy failed trade_audit 失败诊断复盘
 - `audit-sell-exception-diagnostics`
   - 先看最近失败台账，再回看当日 sell rejected + failed trade_audit 异常复盘
 - `audit-pingan-sell-exception-diagnostics`
@@ -464,8 +472,16 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 受保护买入后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘
 - `guarded-buy-exception-review`
   - 受保护买入后继续回看当日 buy rejected + failed trade_audit 异常复盘
+- `guarded-buy-rejection-review`
+  - 受保护买入后继续回看当日 buy rejected trade_audit 拒单诊断复盘
+- `guarded-buy-failure-review`
+  - 受保护买入后继续回看当日 buy failed trade_audit 失败诊断复盘
 - `guarded-pingan-buy-exception-review`
   - 受保护买入后继续回看当日平安券商 buy rejected + failed trade_audit 异常复盘
+- `guarded-pingan-buy-rejection-review`
+  - 受保护买入后继续回看当日平安券商 buy rejected trade_audit 拒单诊断复盘
+- `guarded-pingan-buy-failure-review`
+  - 受保护买入后继续回看当日平安券商 buy failed trade_audit 失败诊断复盘
 - `guarded-buy-order-exception-review`
   - 受保护买入后继续回看当日 buy + sell rejected + failed trade_audit 异常复盘
 - `guarded-pingan-buy-order-exception-review`

@@ -457,6 +457,62 @@
       }
     ]
   },
+  "audit-buy-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 buy rejected trade_audit 拒单诊断复盘。",
+    "labels": ["diagnostics", "audit", "buy", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-buy-rejected"
+      }
+    ]
+  },
+  "audit-buy-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 buy failed trade_audit 失败诊断复盘。",
+    "labels": ["diagnostics", "audit", "buy", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-buy-failed"
+      }
+    ]
+  },
+  "audit-pingan-buy-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 buy rejected trade_audit 拒单诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "buy", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-rejected"
+      }
+    ]
+  },
+  "audit-pingan-buy-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 buy failed trade_audit 失败诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "buy", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-failed"
+      }
+    ]
+  },
   "audit-sell-exception-diagnostics": {
     "description": "先看最近失败台账，再回看当日 sell rejected + failed trade_audit 异常复盘。",
     "labels": ["diagnostics", "audit", "sell", "exceptions", "review"],
@@ -1388,6 +1444,62 @@
       {
         "name": "audit",
         "entry": "audit-daily-pingan-buy-exceptions"
+      }
+    ]
+  },
+  "guarded-buy-rejection-review": {
+    "description": "受保护买入后继续回看当日 buy rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "buy", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-buy-rejected"
+      }
+    ]
+  },
+  "guarded-buy-failure-review": {
+    "description": "受保护买入后继续回看当日 buy failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "buy", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-buy-failed"
+      }
+    ]
+  },
+  "guarded-pingan-buy-rejection-review": {
+    "description": "受保护买入后继续回看当日平安券商 buy rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "buy", "pingan", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-rejected"
+      }
+    ]
+  },
+  "guarded-pingan-buy-failure-review": {
+    "description": "受保护买入后继续回看当日平安券商 buy failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "buy", "pingan", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "guarded-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-failed"
       }
     ]
   },
