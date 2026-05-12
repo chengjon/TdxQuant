@@ -200,6 +200,10 @@
   - `submit-once-pingan-exception-review`
   - `submit-once-order-exception-review`
   - `submit-once-pingan-order-exception-review`
+  - `submit-once-order-rejection-review`
+  - `submit-once-order-failure-review`
+  - `submit-once-pingan-order-rejection-review`
+  - `submit-once-pingan-order-failure-review`
   - `guarded-buy-audit-review`
   - `guarded-pingan-buy-audit-review`
   - `guarded-buy-complete-review`

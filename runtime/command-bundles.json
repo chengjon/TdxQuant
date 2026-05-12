@@ -907,6 +907,62 @@
       }
     ]
   },
+  "submit-once-order-rejection-review": {
+    "description": "完整提交流程后继续回看当日 buy + sell rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit", "order", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-order-rejected"
+      }
+    ]
+  },
+  "submit-once-order-failure-review": {
+    "description": "完整提交流程后继续回看当日 buy + sell failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit", "order", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-order-failed"
+      }
+    ]
+  },
+  "submit-once-pingan-order-rejection-review": {
+    "description": "完整提交流程后继续回看当日平安券商 buy + sell rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit", "pingan", "order", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-order-rejected"
+      }
+    ]
+  },
+  "submit-once-pingan-order-failure-review": {
+    "description": "完整提交流程后继续回看当日平安券商 buy + sell failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit", "pingan", "order", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-order-failed"
+      }
+    ]
+  },
   "guarded-buy-audit-review": {
     "description": "受保护买入后继续回看当日 trade_audit 复盘。",
     "labels": ["trading", "buy", "audit", "followup"],

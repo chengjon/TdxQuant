@@ -1276,6 +1276,25 @@ class ApiContextTests(unittest.TestCase):
                 self.assertEqual(resolved["steps"][0]["entry"], "task-submit-once")
                 self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
 
+    def test_runtime_command_bundles_include_submit_once_order_status_followups(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "submit-once-order-rejection-review": "audit-daily-order-rejected",
+            "submit-once-order-failure-review": "audit-daily-order-failed",
+            "submit-once-pingan-order-rejection-review": "audit-daily-pingan-order-rejected",
+            "submit-once-pingan-order-failure-review": "audit-daily-pingan-order-failed",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                self.assertEqual(resolved["steps"][0]["entry"], "task-submit-once")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
+
     def test_runtime_command_bundles_include_confirm_order_exception_followups(self) -> None:
         bundles = load_command_bundles()
         expected = {
