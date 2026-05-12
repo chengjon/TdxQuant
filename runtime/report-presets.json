@@ -294,6 +294,28 @@
       "statuses": ["rejected", "failed"]
     }
   },
+  "audit-daily-order-rejected": {
+    "command": "audit-daily",
+    "description": "当日 buy + sell rejected trade_audit 拒单诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "methods": ["buy", "sell"],
+      "status": "rejected"
+    }
+  },
+  "audit-daily-order-failed": {
+    "command": "audit-daily",
+    "description": "当日 buy + sell failed trade_audit 失败诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "methods": ["buy", "sell"],
+      "status": "failed"
+    }
+  },
   "audit-daily-pingan-order-exceptions": {
     "command": "audit-daily",
     "description": "当日平安券商 buy + sell rejected + failed trade_audit 异常复盘。",
@@ -578,6 +600,28 @@
       "recent_limit": 50,
       "methods": ["buy", "sell"],
       "statuses": ["rejected", "failed"]
+    }
+  },
+  "audit-period-order-rejected": {
+    "command": "audit-period",
+    "description": "区间 buy + sell rejected trade_audit 拒单诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "methods": ["buy", "sell"],
+      "status": "rejected"
+    }
+  },
+  "audit-period-order-failed": {
+    "command": "audit-period",
+    "description": "区间 buy + sell failed trade_audit 失败诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "methods": ["buy", "sell"],
+      "status": "failed"
     }
   },
   "audit-period-pingan-order-exceptions": {

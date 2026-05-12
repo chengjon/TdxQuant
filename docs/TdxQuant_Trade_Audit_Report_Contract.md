@@ -55,6 +55,8 @@
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-order-exceptions`
+  - `audit-daily-order-rejected`
+  - `audit-daily-order-failed`
   - `audit-daily-pingan-order-exceptions`
   - `audit-daily-pingan-order-rejected`
   - `audit-daily-pingan-order-failed`
@@ -81,6 +83,8 @@
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
   - `audit-period-order-exceptions`
+  - `audit-period-order-rejected`
+  - `audit-period-order-failed`
   - `audit-period-pingan-order-exceptions`
   - `audit-period-pingan-order-rejected`
   - `audit-period-pingan-order-failed`
@@ -108,6 +112,8 @@
   - `audit-daily-submit-path-exceptions`
   - `audit-daily-pingan-submit-path-exceptions`
   - `audit-daily-order-exceptions`
+  - `audit-daily-order-rejected`
+  - `audit-daily-order-failed`
   - `audit-daily-pingan-order-exceptions`
   - `audit-daily-pingan-order-rejected`
   - `audit-daily-pingan-order-failed`
@@ -134,6 +140,8 @@
   - `audit-period-submit-path-exceptions`
   - `audit-period-pingan-submit-path-exceptions`
   - `audit-period-order-exceptions`
+  - `audit-period-order-rejected`
+  - `audit-period-order-failed`
   - `audit-period-pingan-order-exceptions`
   - `audit-period-pingan-order-rejected`
   - `audit-period-pingan-order-failed`
@@ -161,6 +169,8 @@
   - `audit-submit-path-exception-diagnostics`
   - `audit-pingan-submit-path-exception-diagnostics`
   - `audit-order-exception-diagnostics`
+  - `audit-order-rejection-diagnostics`
+  - `audit-order-failure-diagnostics`
   - `audit-pingan-order-exception-diagnostics`
   - `audit-pingan-order-rejection-diagnostics`
   - `audit-pingan-order-failure-diagnostics`
@@ -318,6 +328,7 @@ CLI 层额外支持：
 - 多方法 `methods` OR 过滤
 - 第一组 submit path 组合视角：`buy_submit_once + confirm_current`
 - 第一组 order path 组合视角：`buy + sell`
+- 第一组 order single-status 组合视角：`buy + sell + rejected` / `buy + sell + failed`
 - 第一组 broker-scoped buy 组合视角：`pingan + buy + rejected|failed`
 - 第一组 broker-scoped 全状态复盘视角：`pingan`
 - 第一组 broker-scoped exception 组合视角：`pingan + rejected|failed`

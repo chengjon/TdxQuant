@@ -339,6 +339,22 @@ class ApiContextTests(unittest.TestCase):
                 self.assertEqual(options["methods"], ["buy", "sell"])
                 self.assertEqual(options["status"], status)
 
+    def test_runtime_report_presets_include_order_single_status_presets(self) -> None:
+        presets = load_report_presets()
+        expected = {
+            "audit-daily-order-rejected": "rejected",
+            "audit-period-order-rejected": "rejected",
+            "audit-daily-order-failed": "failed",
+            "audit-period-order-failed": "failed",
+        }
+        for preset, status in expected.items():
+            with self.subTest(preset=preset):
+                self.assertIn(preset, presets)
+                options = presets[preset]["options"]
+                self.assertEqual(options["methods"], ["buy", "sell"])
+                self.assertEqual(options["status"], status)
+                self.assertNotIn("broker", options)
+
     def test_resolve_report_preset_prefers_explicit_overrides(self) -> None:
         presets = {
             "daily-review": {
@@ -642,6 +658,19 @@ class ApiContextTests(unittest.TestCase):
             "audit-period-pingan-order-rejected",
             "audit-daily-pingan-order-failed",
             "audit-period-pingan-order-failed",
+        ]
+        for entry in expected:
+            with self.subTest(entry=entry):
+                self.assertIn(entry, entries)
+                self.assertEqual(entries[entry]["preset"], entry)
+
+    def test_runtime_command_catalog_includes_order_single_status_entries(self) -> None:
+        entries = load_command_catalog()
+        expected = [
+            "audit-daily-order-rejected",
+            "audit-period-order-rejected",
+            "audit-daily-order-failed",
+            "audit-period-order-failed",
         ]
         for entry in expected:
             with self.subTest(entry=entry):
@@ -1098,6 +1127,23 @@ class ApiContextTests(unittest.TestCase):
         expected = {
             "audit-pingan-order-rejection-diagnostics": "audit-daily-pingan-order-rejected",
             "audit-pingan-order-failure-diagnostics": "audit-daily-pingan-order-failed",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                diagnostics = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                self.assertEqual(diagnostics["steps"][0]["entry"], "recent-failures")
+                self.assertEqual(diagnostics["steps"][1]["entry"], audit_entry)
+
+    def test_runtime_command_bundles_include_order_single_status_bundles(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "audit-order-rejection-diagnostics": "audit-daily-order-rejected",
+            "audit-order-failure-diagnostics": "audit-daily-order-failed",
         }
         for bundle, audit_entry in expected.items():
             with self.subTest(bundle=bundle):
