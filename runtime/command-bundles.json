@@ -675,6 +675,62 @@
       }
     ]
   },
+  "submit-ready-order-rejection-review": {
+    "description": "推进到提交确认前边界后继续回看当日 buy + sell rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit-ready", "order", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "submit_ready",
+        "entry": "task-submit-ready"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-order-rejected"
+      }
+    ]
+  },
+  "submit-ready-order-failure-review": {
+    "description": "推进到提交确认前边界后继续回看当日 buy + sell failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit-ready", "order", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "submit_ready",
+        "entry": "task-submit-ready"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-order-failed"
+      }
+    ]
+  },
+  "submit-ready-pingan-order-rejection-review": {
+    "description": "推进到提交确认前边界后继续回看当日平安券商 buy + sell rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit-ready", "pingan", "order", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "submit_ready",
+        "entry": "task-submit-ready"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-order-rejected"
+      }
+    ]
+  },
+  "submit-ready-pingan-order-failure-review": {
+    "description": "推进到提交确认前边界后继续回看当日平安券商 buy + sell failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit-ready", "pingan", "order", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "submit_ready",
+        "entry": "task-submit-ready"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-order-failed"
+      }
+    ]
+  },
   "confirm-audit-review": {
     "description": "推进当前确认框后回看当日 trade_audit 复盘。",
     "labels": ["trading", "confirm", "audit", "followup"],

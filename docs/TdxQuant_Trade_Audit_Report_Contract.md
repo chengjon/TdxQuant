@@ -180,6 +180,10 @@
   - `submit-ready-pingan-exception-review`
   - `submit-ready-order-exception-review`
   - `submit-ready-pingan-order-exception-review`
+  - `submit-ready-order-rejection-review`
+  - `submit-ready-order-failure-review`
+  - `submit-ready-pingan-order-rejection-review`
+  - `submit-ready-pingan-order-failure-review`
   - `confirm-audit-review`
   - `confirm-pingan-audit-review`
   - `confirm-complete-review`
