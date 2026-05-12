@@ -186,6 +186,8 @@
   - `confirm-pingan-complete-review`
   - `confirm-exception-review`
   - `confirm-pingan-exception-review`
+  - `confirm-order-exception-review`
+  - `confirm-pingan-order-exception-review`
   - `submit-once-audit-review`
   - `submit-once-pingan-audit-review`
   - `submit-once-complete-review`

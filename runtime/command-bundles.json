@@ -767,6 +767,34 @@
       }
     ]
   },
+  "confirm-order-exception-review": {
+    "description": "推进当前确认框后继续回看当日 buy + sell rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "confirm", "order", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-order-exceptions"
+      }
+    ]
+  },
+  "confirm-pingan-order-exception-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 buy + sell rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "confirm", "pingan", "order", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-order-exceptions"
+      }
+    ]
+  },
   "submit-once-exception-review": {
     "description": "完整提交流程后继续回看当日 buy_submit_once rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "submit", "audit", "exceptions", "followup"],
