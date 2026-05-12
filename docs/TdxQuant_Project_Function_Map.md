@@ -492,7 +492,7 @@ TdxQuant
 
 ### 3.1 订阅能力产品化
 
-底层 session 和第一版前台 task 都已经完成，当前可直接使用：
+底层 session 和第一版前台 task、worker bridge control plane 都已经完成，当前可直接使用：
 
 - `task subscription-watch`
 - 持有持久订阅 session
@@ -504,8 +504,10 @@ TdxQuant
 
 后续剩余工作主要转向：
 
-- daemon / `start / stop / status / list`
-- replay / fake fixture
+- 订阅事件流的更高层 transport wrapper，而不是基础 `start / stop / status / list`
+- `subscribe_hq` / `unsubscribe_hq` / `get_subscribe_hq_stock_list` 的 query-style one-shot CLI 收口
+- reconnect metadata 细化
+- replay / fake fixture 与 integration hardening
 
 ### 3.2 统一治理补齐
 
@@ -520,8 +522,9 @@ TdxQuant
 
 其中，`formula.screen` 已经成为第一条稳定业务 contract，后续剩余重点会转向：
 
-- replay / fake / contract test 夹具
+- 更大范围的 replay / fake / contract test 覆盖
 - 更强的 `block` 重复写保护与同步策略
+- 文件导入式 watchlist 适配与更高阶的 block 写入入口
 
 其中第一版 replay fixture bundle 也已落地，后续剩余重点收缩为：
 
@@ -591,13 +594,13 @@ TdxQuant
 - audit bundles：`audit-diagnostics` / `audit-pingan-review` / `audit-rejection-diagnostics` / `audit-pingan-rejection-diagnostics` / `audit-confirmed-review` / `audit-pingan-confirmed-review` / `audit-replay-review` / `audit-pingan-replay-review` / `audit-failure-diagnostics` / `audit-pingan-failure-diagnostics` / `audit-exception-diagnostics` / `audit-pingan-exception-diagnostics` / `audit-confirm-exception-diagnostics` / `audit-confirm-rejection-diagnostics` / `audit-confirm-failure-diagnostics` / `audit-pingan-confirm-exception-diagnostics` / `audit-pingan-confirm-rejection-diagnostics` / `audit-pingan-confirm-failure-diagnostics` / `audit-submit-once-exception-diagnostics` / `audit-submit-once-rejection-diagnostics` / `audit-submit-once-failure-diagnostics` / `audit-pingan-submit-once-exception-diagnostics` / `audit-pingan-submit-once-rejection-diagnostics` / `audit-pingan-submit-once-failure-diagnostics` / `audit-buy-exception-diagnostics` / `audit-buy-rejection-diagnostics` / `audit-buy-failure-diagnostics` / `audit-pingan-buy-exception-diagnostics` / `audit-pingan-buy-rejection-diagnostics` / `audit-pingan-buy-failure-diagnostics` / `audit-sell-exception-diagnostics` / `audit-pingan-sell-exception-diagnostics` / `audit-submit-path-exception-diagnostics` / `audit-submit-path-rejection-diagnostics` / `audit-submit-path-failure-diagnostics` / `audit-pingan-submit-path-exception-diagnostics` / `audit-pingan-submit-path-rejection-diagnostics` / `audit-pingan-submit-path-failure-diagnostics` / `audit-order-exception-diagnostics` / `audit-order-rejection-diagnostics` / `audit-order-failure-diagnostics` / `audit-pingan-order-exception-diagnostics` / `audit-pingan-order-rejection-diagnostics` / `audit-pingan-order-failure-diagnostics`
 - task presets：`submit-ready-default` / `confirm-current-default`
 - split-step catalog entries：`task-submit-ready` / `task-confirm-current`
-- split-step bundles：`submit-ready-audit-review` / `submit-ready-exception-review` / `submit-ready-pingan-audit-review` / `submit-ready-pingan-exception-review` / `submit-ready-order-exception-review` / `submit-ready-pingan-order-exception-review` / `submit-ready-order-rejection-review` / `submit-ready-order-failure-review` / `submit-ready-pingan-order-rejection-review` / `submit-ready-pingan-order-failure-review` / `confirm-audit-review` / `confirm-pingan-audit-review` / `confirm-complete-review` / `confirm-pingan-complete-review` / `confirm-exception-review` / `confirm-pingan-exception-review` / `confirm-rejection-review` / `confirm-failure-review` / `confirm-pingan-rejection-review` / `confirm-pingan-failure-review` / `confirm-order-exception-review` / `confirm-pingan-order-exception-review` / `confirm-order-rejection-review` / `confirm-order-failure-review` / `confirm-pingan-order-rejection-review` / `confirm-pingan-order-failure-review` / `submit-once-audit-review` / `submit-once-pingan-audit-review` / `submit-once-complete-review` / `submit-once-pingan-complete-review` / `submit-once-exception-review` / `submit-once-pingan-exception-review` / `submit-once-rejection-review` / `submit-once-failure-review` / `submit-once-pingan-rejection-review` / `submit-once-pingan-failure-review` / `submit-once-order-exception-review` / `submit-once-pingan-order-exception-review` / `submit-once-order-rejection-review` / `submit-once-order-failure-review` / `submit-once-pingan-order-rejection-review` / `submit-once-pingan-order-failure-review` / `guarded-buy-audit-review` / `guarded-pingan-buy-audit-review` / `guarded-buy-complete-review` / `guarded-pingan-buy-complete-review` / `guarded-buy-exception-review` / `guarded-buy-rejection-review` / `guarded-buy-failure-review` / `guarded-pingan-buy-exception-review` / `guarded-pingan-buy-rejection-review` / `guarded-pingan-buy-failure-review` / `guarded-buy-order-exception-review` / `guarded-pingan-buy-order-exception-review` / `guarded-buy-order-rejection-review` / `guarded-buy-order-failure-review` / `guarded-pingan-buy-order-rejection-review` / `guarded-pingan-buy-order-failure-review` / `confirm-submit-path-exception-review` / `confirm-pingan-submit-path-exception-review` / `confirm-submit-path-rejection-review` / `confirm-submit-path-failure-review` / `confirm-pingan-submit-path-rejection-review` / `confirm-pingan-submit-path-failure-review`
+- split-step bundles：`submit-ready-audit-review` / `submit-ready-exception-review` / `submit-ready-pingan-audit-review` / `submit-ready-pingan-exception-review` / `submit-ready-order-exception-review` / `submit-ready-pingan-order-exception-review` / `submit-ready-order-rejection-review` / `submit-ready-order-failure-review` / `submit-ready-pingan-order-rejection-review` / `submit-ready-pingan-order-failure-review` / `submit-ready-submit-path-exception-review` / `submit-ready-pingan-submit-path-exception-review` / `submit-ready-submit-path-rejection-review` / `submit-ready-submit-path-failure-review` / `submit-ready-pingan-submit-path-rejection-review` / `submit-ready-pingan-submit-path-failure-review` / `confirm-audit-review` / `confirm-pingan-audit-review` / `confirm-complete-review` / `confirm-pingan-complete-review` / `confirm-exception-review` / `confirm-pingan-exception-review` / `confirm-rejection-review` / `confirm-failure-review` / `confirm-pingan-rejection-review` / `confirm-pingan-failure-review` / `confirm-order-exception-review` / `confirm-pingan-order-exception-review` / `confirm-order-rejection-review` / `confirm-order-failure-review` / `confirm-pingan-order-rejection-review` / `confirm-pingan-order-failure-review` / `submit-once-audit-review` / `submit-once-pingan-audit-review` / `submit-once-complete-review` / `submit-once-pingan-complete-review` / `submit-once-exception-review` / `submit-once-pingan-exception-review` / `submit-once-rejection-review` / `submit-once-failure-review` / `submit-once-pingan-rejection-review` / `submit-once-pingan-failure-review` / `submit-once-order-exception-review` / `submit-once-pingan-order-exception-review` / `submit-once-order-rejection-review` / `submit-once-order-failure-review` / `submit-once-pingan-order-rejection-review` / `submit-once-pingan-order-failure-review` / `guarded-buy-audit-review` / `guarded-pingan-buy-audit-review` / `guarded-buy-complete-review` / `guarded-pingan-buy-complete-review` / `guarded-buy-exception-review` / `guarded-buy-rejection-review` / `guarded-buy-failure-review` / `guarded-pingan-buy-exception-review` / `guarded-pingan-buy-rejection-review` / `guarded-pingan-buy-failure-review` / `guarded-buy-order-exception-review` / `guarded-pingan-buy-order-exception-review` / `guarded-buy-order-rejection-review` / `guarded-buy-order-failure-review` / `guarded-pingan-buy-order-rejection-review` / `guarded-pingan-buy-order-failure-review` / `confirm-submit-path-exception-review` / `confirm-pingan-submit-path-exception-review` / `confirm-submit-path-rejection-review` / `confirm-submit-path-failure-review` / `confirm-pingan-submit-path-rejection-review` / `confirm-pingan-submit-path-failure-review`
 - 基于 `audit_id` / `contract_no` / `submission_key` / `code` 的稳定审计查询
 - 唯一命中回填完整 audit，候选查询按时间倒序返回
 - 基于本地日期的稳定单日审计聚合
 - 基于闭区间的稳定审计聚合
 
-## 3.6 当前收口快照（2026-05-09）
+### 3.4 当前收口快照（2026-05-09）
 
 本轮已把 `read-zxg-review-and-export` bundle 线、`block-read-full` 旧 worktree 线和 provider bridge hardening 线统一收口到 `main`：
 
@@ -630,6 +633,7 @@ TdxQuant
 - 分步交易 workflow 的 PingAn submit-ready follow-up 已补齐：新增 `submit-ready-pingan-audit-review` 与 `submit-ready-pingan-exception-review` catalog bundles，复用既有 `task-submit-ready` 和 PingAn audit report entry。
 - 分步交易 workflow 的 submit-ready order exception follow-up 已补齐：新增 `submit-ready-order-exception-review` 与 `submit-ready-pingan-order-exception-review` catalog bundles，复用既有 `task-submit-ready` 和 order exception audit review entry。
 - 分步交易 workflow 的 submit-ready order single-status follow-up 已补齐：新增 `submit-ready-order-rejection-review` / `submit-ready-order-failure-review` / `submit-ready-pingan-order-rejection-review` / `submit-ready-pingan-order-failure-review` catalog bundles，复用既有 `task-submit-ready` 和 order single-status audit review entry。
+- 分步交易 workflow 的 submit-ready submit path follow-up 已补齐：新增 `submit-ready-submit-path-exception-review` / `submit-ready-pingan-submit-path-exception-review` / `submit-ready-submit-path-rejection-review` / `submit-ready-submit-path-failure-review` / `submit-ready-pingan-submit-path-rejection-review` / `submit-ready-pingan-submit-path-failure-review` catalog bundles，复用既有 `task-submit-ready` 和 submit path audit review entry。
 - 分步交易 workflow 的 PingAn confirm-current full review follow-up 已补齐：新增 `confirm-pingan-audit-review` catalog bundle，复用既有 `task-confirm-current` 和 `audit-daily-pingan-review`。
 - 分步交易 workflow 的 confirm-current single-status follow-up 已补齐：新增 `confirm-rejection-review` / `confirm-failure-review` / `confirm-pingan-rejection-review` / `confirm-pingan-failure-review` catalog bundles，复用既有 `task-confirm-current` 和 confirm-current single-status audit review entry。
 - 分步交易 workflow 的 confirm-current order exception follow-up 已补齐：新增 `confirm-order-exception-review` 与 `confirm-pingan-order-exception-review` catalog bundles，复用既有 `task-confirm-current` 和 order exception audit review entry。
@@ -652,7 +656,17 @@ TdxQuant
 - `trade_audit` 更高阶的 broker / method / status 多维 diagnostics 组合扩展
 - 分步交易 workflow 的更多日常 follow-up 组合扩展
 
-### 3.4 场景任务继续沉淀
+### 3.5 当前明确未实现/仍延期的功能（2026-05-12）
+
+对照前面的开发方案，当前还没有完全收口的功能主要集中在这些方向：
+
+- 订阅事件流的二层 transport contract 仍未稳定：`subscribe_hq` / `unsubscribe_hq` / `get_subscribe_hq_stock_list` 目前仍以持久 session、前台 `task subscription-watch` 和 bridge 控制面消费，query-style one-shot CLI 还没有补齐；`reconnect metadata` 结构和 HTTP / SSE 推送语义也还在继续收口。
+- `block` 写入的高阶治理仍未完全产品化：文件导入式 watchlist 适配、更高阶的覆盖写 / 增量写任务入口、重复写保护与同步策略仍是后续重点。
+- `trade_audit` 还有更高阶的组合未铺完：更丰富的 broker / method / status diagnostics 组合、审计目录索引缓存，以及跨 `trade_audit` / task ledger / submission ledger 的组合查询仍未实现。
+- `desktop trade` 的完整券商能力仍然刻意后置：撤单、资金、持仓和原生推送 API 不在当前主线，当前只保留普通 A 股现货限价买卖与本地 tracked-order / trade query。
+- 更厚的日常入口收口还在进行中：更强的 `subscription-watch` 长跑包装、更多 catalog 预览 / 发现能力，以及更多任务 / 报表组合入口仍属于下一阶段。
+
+### 3.6 场景任务继续沉淀
 
 后续会继续把高频流程沉淀成稳定任务，而不是让调用方自己拼原子命令，例如：
 
@@ -661,7 +675,7 @@ TdxQuant
 - 周期查询转报表任务
 - 组合查询任务
 
-### 3.5 日常入口继续收口
+### 3.7 日常入口继续收口
 
 后续 `catalog` 的工作重点应是收口已稳定能力，而不是扩成新的治理层：
 

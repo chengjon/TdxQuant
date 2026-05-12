@@ -204,6 +204,12 @@
   - `submit-ready-order-failure-review`
   - `submit-ready-pingan-order-rejection-review`
   - `submit-ready-pingan-order-failure-review`
+  - `submit-ready-submit-path-exception-review`
+  - `submit-ready-pingan-submit-path-exception-review`
+  - `submit-ready-submit-path-rejection-review`
+  - `submit-ready-submit-path-failure-review`
+  - `submit-ready-pingan-submit-path-rejection-review`
+  - `submit-ready-pingan-submit-path-failure-review`
   - `confirm-audit-review`
   - `confirm-pingan-audit-review`
   - `confirm-complete-review`
