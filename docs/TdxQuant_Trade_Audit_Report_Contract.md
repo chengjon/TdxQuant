@@ -242,6 +242,12 @@
   - `submit-once-order-failure-review`
   - `submit-once-pingan-order-rejection-review`
   - `submit-once-pingan-order-failure-review`
+  - `submit-once-submit-path-exception-review`
+  - `submit-once-pingan-submit-path-exception-review`
+  - `submit-once-submit-path-rejection-review`
+  - `submit-once-submit-path-failure-review`
+  - `submit-once-pingan-submit-path-rejection-review`
+  - `submit-once-pingan-submit-path-failure-review`
   - `guarded-buy-audit-review`
   - `guarded-pingan-buy-audit-review`
   - `guarded-buy-complete-review`

@@ -1822,6 +1822,42 @@ class ApiContextTests(unittest.TestCase):
                 self.assertEqual(resolved["steps"][0]["entry"], "task-submit-once")
                 self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
 
+    def test_runtime_command_bundles_include_submit_once_submit_path_exception_followups(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "submit-once-submit-path-exception-review": "audit-daily-submit-path-exceptions",
+            "submit-once-pingan-submit-path-exception-review": "audit-daily-pingan-submit-path-exceptions",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                self.assertEqual(resolved["steps"][0]["entry"], "task-submit-once")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
+
+    def test_runtime_command_bundles_include_submit_once_submit_path_status_followups(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "submit-once-submit-path-rejection-review": "audit-daily-submit-path-rejected",
+            "submit-once-submit-path-failure-review": "audit-daily-submit-path-failed",
+            "submit-once-pingan-submit-path-rejection-review": "audit-daily-pingan-submit-path-rejected",
+            "submit-once-pingan-submit-path-failure-review": "audit-daily-pingan-submit-path-failed",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                self.assertEqual(resolved["steps"][0]["entry"], "task-submit-once")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
+
     def test_runtime_command_bundles_include_confirm_order_exception_followups(self) -> None:
         bundles = load_command_bundles()
         expected = {

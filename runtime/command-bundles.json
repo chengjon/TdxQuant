@@ -1495,6 +1495,90 @@
       }
     ]
   },
+  "submit-once-submit-path-exception-review": {
+    "description": "完整提交流程后继续回看当日 submit path rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "submit", "submit-path", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-path-exceptions"
+      }
+    ]
+  },
+  "submit-once-pingan-submit-path-exception-review": {
+    "description": "完整提交流程后继续回看当日平安券商 submit path rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "submit", "pingan", "submit-path", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-path-exceptions"
+      }
+    ]
+  },
+  "submit-once-submit-path-rejection-review": {
+    "description": "完整提交流程后继续回看当日 submit path rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit", "submit-path", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-path-rejected"
+      }
+    ]
+  },
+  "submit-once-submit-path-failure-review": {
+    "description": "完整提交流程后继续回看当日 submit path failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit", "submit-path", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-submit-path-failed"
+      }
+    ]
+  },
+  "submit-once-pingan-submit-path-rejection-review": {
+    "description": "完整提交流程后继续回看当日平安券商 submit path rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "submit", "pingan", "submit-path", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-path-rejected"
+      }
+    ]
+  },
+  "submit-once-pingan-submit-path-failure-review": {
+    "description": "完整提交流程后继续回看当日平安券商 submit path failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "submit", "pingan", "submit-path", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-submit-once"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-submit-path-failed"
+      }
+    ]
+  },
   "guarded-buy-audit-review": {
     "description": "受保护买入后继续回看当日 trade_audit 复盘。",
     "labels": ["trading", "buy", "audit", "followup"],
