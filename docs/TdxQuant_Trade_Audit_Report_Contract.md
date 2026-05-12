@@ -159,7 +159,11 @@
   - `audit-exception-diagnostics`
   - `audit-pingan-exception-diagnostics`
   - `audit-confirm-exception-diagnostics`
+  - `audit-confirm-rejection-diagnostics`
+  - `audit-confirm-failure-diagnostics`
   - `audit-pingan-confirm-exception-diagnostics`
+  - `audit-pingan-confirm-rejection-diagnostics`
+  - `audit-pingan-confirm-failure-diagnostics`
   - `audit-submit-once-exception-diagnostics`
   - `audit-submit-once-rejection-diagnostics`
   - `audit-submit-once-failure-diagnostics`
@@ -198,6 +202,10 @@
   - `confirm-pingan-complete-review`
   - `confirm-exception-review`
   - `confirm-pingan-exception-review`
+  - `confirm-rejection-review`
+  - `confirm-failure-review`
+  - `confirm-pingan-rejection-review`
+  - `confirm-pingan-failure-review`
   - `confirm-order-exception-review`
   - `confirm-pingan-order-exception-review`
   - `confirm-order-rejection-review`

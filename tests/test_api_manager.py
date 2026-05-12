@@ -165,6 +165,35 @@ class ApiContextTests(unittest.TestCase):
         )
         self.assertEqual(presets["audit-period-confirm-exceptions"]["options"]["method"], "confirm_current")
 
+    def test_runtime_report_presets_include_confirm_trade_audit_status_presets(self) -> None:
+        presets = load_report_presets()
+        expected = {
+            "audit-daily-confirm-rejected": "rejected",
+            "audit-period-confirm-rejected": "rejected",
+            "audit-daily-confirm-failed": "failed",
+            "audit-period-confirm-failed": "failed",
+        }
+        for preset, status in expected.items():
+            with self.subTest(preset=preset):
+                self.assertIn(preset, presets)
+                self.assertEqual(presets[preset]["options"]["method"], "confirm_current")
+                self.assertEqual(presets[preset]["options"]["status"], status)
+
+    def test_runtime_report_presets_include_pingan_confirm_trade_audit_status_presets(self) -> None:
+        presets = load_report_presets()
+        expected = {
+            "audit-daily-pingan-confirm-rejected": "rejected",
+            "audit-period-pingan-confirm-rejected": "rejected",
+            "audit-daily-pingan-confirm-failed": "failed",
+            "audit-period-pingan-confirm-failed": "failed",
+        }
+        for preset, status in expected.items():
+            with self.subTest(preset=preset):
+                self.assertIn(preset, presets)
+                self.assertEqual(presets[preset]["options"]["broker"], "pingan")
+                self.assertEqual(presets[preset]["options"]["method"], "confirm_current")
+                self.assertEqual(presets[preset]["options"]["status"], status)
+
     def test_runtime_report_presets_include_submit_once_trade_audit_exception_presets(self) -> None:
         presets = load_report_presets()
         self.assertIn("audit-daily-submit-once-exceptions", presets)
@@ -609,6 +638,32 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(entries["audit-daily-confirm-exceptions"]["preset"], "audit-daily-confirm-exceptions")
         self.assertEqual(entries["audit-period-confirm-exceptions"]["preset"], "audit-period-confirm-exceptions")
 
+    def test_runtime_command_catalog_includes_confirm_trade_audit_status_entries(self) -> None:
+        entries = load_command_catalog()
+        expected = [
+            "audit-daily-confirm-rejected",
+            "audit-period-confirm-rejected",
+            "audit-daily-confirm-failed",
+            "audit-period-confirm-failed",
+        ]
+        for entry in expected:
+            with self.subTest(entry=entry):
+                self.assertIn(entry, entries)
+                self.assertEqual(entries[entry]["preset"], entry)
+
+    def test_runtime_command_catalog_includes_pingan_confirm_trade_audit_status_entries(self) -> None:
+        entries = load_command_catalog()
+        expected = [
+            "audit-daily-pingan-confirm-rejected",
+            "audit-period-pingan-confirm-rejected",
+            "audit-daily-pingan-confirm-failed",
+            "audit-period-pingan-confirm-failed",
+        ]
+        for entry in expected:
+            with self.subTest(entry=entry):
+                self.assertIn(entry, entries)
+                self.assertEqual(entries[entry]["preset"], entry)
+
     def test_runtime_command_catalog_includes_submit_once_trade_audit_exception_entries(self) -> None:
         entries = load_command_catalog()
         self.assertIn("audit-daily-submit-once-exceptions", entries)
@@ -999,6 +1054,50 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(diagnostics["steps"][1]["entry"], "audit-daily-confirm-exceptions")
         self.assertEqual(followup["steps"][0]["entry"], "task-confirm-current")
         self.assertEqual(followup["steps"][1]["entry"], "audit-daily-confirm-exceptions")
+
+    def test_runtime_command_bundles_include_confirm_trade_audit_status_bundles(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "audit-confirm-rejection-diagnostics": "audit-daily-confirm-rejected",
+            "audit-confirm-failure-diagnostics": "audit-daily-confirm-failed",
+            "confirm-rejection-review": "audit-daily-confirm-rejected",
+            "confirm-failure-review": "audit-daily-confirm-failed",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                if bundle.startswith("audit-"):
+                    self.assertEqual(resolved["steps"][0]["entry"], "recent-failures")
+                else:
+                    self.assertEqual(resolved["steps"][0]["entry"], "task-confirm-current")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
+
+    def test_runtime_command_bundles_include_pingan_confirm_trade_audit_status_bundles(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "audit-pingan-confirm-rejection-diagnostics": "audit-daily-pingan-confirm-rejected",
+            "audit-pingan-confirm-failure-diagnostics": "audit-daily-pingan-confirm-failed",
+            "confirm-pingan-rejection-review": "audit-daily-pingan-confirm-rejected",
+            "confirm-pingan-failure-review": "audit-daily-pingan-confirm-failed",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                if bundle.startswith("audit-"):
+                    self.assertEqual(resolved["steps"][0]["entry"], "recent-failures")
+                else:
+                    self.assertEqual(resolved["steps"][0]["entry"], "task-confirm-current")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
 
     def test_runtime_command_bundles_include_submit_once_trade_audit_exception_bundles(self) -> None:
         bundles = load_command_bundles()

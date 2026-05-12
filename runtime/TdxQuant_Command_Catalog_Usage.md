@@ -312,8 +312,16 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 先看最近失败台账，再回看当日平安券商 failed trade_audit 诊断复盘
 - `audit-confirm-exception-diagnostics`
   - 先看最近失败台账，再回看当日 confirm_current rejected + failed trade_audit 异常复盘
+- `audit-confirm-rejection-diagnostics`
+  - 先看最近失败台账，再回看当日 confirm_current rejected trade_audit 拒单诊断复盘
+- `audit-confirm-failure-diagnostics`
+  - 先看最近失败台账，再回看当日 confirm_current failed trade_audit 失败诊断复盘
 - `audit-pingan-confirm-exception-diagnostics`
   - 先看最近失败台账，再回看当日平安券商 confirm_current rejected + failed trade_audit 异常复盘
+- `audit-pingan-confirm-rejection-diagnostics`
+  - 先看最近失败台账，再回看当日平安券商 confirm_current rejected trade_audit 拒单诊断复盘
+- `audit-pingan-confirm-failure-diagnostics`
+  - 先看最近失败台账，再回看当日平安券商 confirm_current failed trade_audit 失败诊断复盘
 - `audit-submit-once-exception-diagnostics`
   - 先看最近失败台账，再回看当日 buy_submit_once rejected + failed trade_audit 异常复盘
 - `audit-submit-once-rejection-diagnostics`
@@ -394,6 +402,14 @@ python -m tdxquant.cli catalog plan --bundle guarded-review-buy --only-step revi
   - 推进当前确认框后继续回看当日 confirm_current rejected + failed trade_audit 异常复盘
 - `confirm-pingan-exception-review`
   - 推进当前确认框后继续回看当日平安券商 confirm_current rejected + failed trade_audit 异常复盘
+- `confirm-rejection-review`
+  - 推进当前确认框后继续回看当日 confirm_current rejected trade_audit 拒单诊断复盘
+- `confirm-failure-review`
+  - 推进当前确认框后继续回看当日 confirm_current failed trade_audit 失败诊断复盘
+- `confirm-pingan-rejection-review`
+  - 推进当前确认框后继续回看当日平安券商 confirm_current rejected trade_audit 拒单诊断复盘
+- `confirm-pingan-failure-review`
+  - 推进当前确认框后继续回看当日平安券商 confirm_current failed trade_audit 失败诊断复盘
 - `confirm-order-exception-review`
   - 推进当前确认框后继续回看当日 buy + sell rejected + failed trade_audit 异常复盘
 - `confirm-pingan-order-exception-review`

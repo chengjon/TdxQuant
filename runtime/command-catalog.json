@@ -113,6 +113,30 @@
     "description": "统一入口下的当日平安券商 confirm_current 异常 trade_audit 复盘。",
     "labels": ["report", "audit", "daily", "pingan", "confirm", "exceptions", "diagnostics"]
   },
+  "audit-daily-confirm-rejected": {
+    "source": "report",
+    "preset": "audit-daily-confirm-rejected",
+    "description": "统一入口下的当日 confirm_current 拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "confirm", "rejected", "diagnostics"]
+  },
+  "audit-daily-confirm-failed": {
+    "source": "report",
+    "preset": "audit-daily-confirm-failed",
+    "description": "统一入口下的当日 confirm_current 失败 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "confirm", "failed", "diagnostics"]
+  },
+  "audit-daily-pingan-confirm-rejected": {
+    "source": "report",
+    "preset": "audit-daily-pingan-confirm-rejected",
+    "description": "统一入口下的当日平安券商 confirm_current 拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "confirm", "rejected", "diagnostics"]
+  },
+  "audit-daily-pingan-confirm-failed": {
+    "source": "report",
+    "preset": "audit-daily-pingan-confirm-failed",
+    "description": "统一入口下的当日平安券商 confirm_current 失败 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "confirm", "failed", "diagnostics"]
+  },
   "audit-daily-submit-once-exceptions": {
     "source": "report",
     "preset": "audit-daily-submit-once-exceptions",
@@ -328,6 +352,30 @@
     "preset": "audit-period-pingan-confirm-exceptions",
     "description": "统一入口下的区间平安券商 confirm_current 异常 trade_audit 复盘模板。",
     "labels": ["report", "audit", "period", "pingan", "confirm", "exceptions", "diagnostics"]
+  },
+  "audit-period-confirm-rejected": {
+    "source": "report",
+    "preset": "audit-period-confirm-rejected",
+    "description": "统一入口下的区间 confirm_current 拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "confirm", "rejected", "diagnostics"]
+  },
+  "audit-period-confirm-failed": {
+    "source": "report",
+    "preset": "audit-period-confirm-failed",
+    "description": "统一入口下的区间 confirm_current 失败 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "confirm", "failed", "diagnostics"]
+  },
+  "audit-period-pingan-confirm-rejected": {
+    "source": "report",
+    "preset": "audit-period-pingan-confirm-rejected",
+    "description": "统一入口下的区间平安券商 confirm_current 拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "confirm", "rejected", "diagnostics"]
+  },
+  "audit-period-pingan-confirm-failed": {
+    "source": "report",
+    "preset": "audit-period-pingan-confirm-failed",
+    "description": "统一入口下的区间平安券商 confirm_current 失败 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "confirm", "failed", "diagnostics"]
   },
   "audit-period-submit-once-exceptions": {
     "source": "report",

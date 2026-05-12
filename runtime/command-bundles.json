@@ -289,6 +289,62 @@
       }
     ]
   },
+  "audit-confirm-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 confirm_current rejected trade_audit 拒单诊断复盘。",
+    "labels": ["diagnostics", "audit", "confirm", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirm-rejected"
+      }
+    ]
+  },
+  "audit-confirm-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日 confirm_current failed trade_audit 失败诊断复盘。",
+    "labels": ["diagnostics", "audit", "confirm", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirm-failed"
+      }
+    ]
+  },
+  "audit-pingan-confirm-rejection-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 confirm_current rejected trade_audit 拒单诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "confirm", "rejected", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-rejected"
+      }
+    ]
+  },
+  "audit-pingan-confirm-failure-diagnostics": {
+    "description": "先看最近失败台账，再回看当日平安券商 confirm_current failed trade_audit 失败诊断复盘。",
+    "labels": ["diagnostics", "audit", "pingan", "confirm", "failed", "review"],
+    "steps": [
+      {
+        "name": "failures",
+        "entry": "recent-failures"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-failed"
+      }
+    ]
+  },
   "audit-submit-once-exception-diagnostics": {
     "description": "先看最近失败台账，再回看当日 buy_submit_once rejected + failed trade_audit 异常复盘。",
     "labels": ["diagnostics", "audit", "submit-once", "exceptions", "review"],
@@ -932,6 +988,62 @@
       {
         "name": "audit",
         "entry": "audit-daily-pingan-confirm-exceptions"
+      }
+    ]
+  },
+  "confirm-rejection-review": {
+    "description": "推进当前确认框后继续回看当日 confirm_current rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "confirm", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirm-rejected"
+      }
+    ]
+  },
+  "confirm-failure-review": {
+    "description": "推进当前确认框后继续回看当日 confirm_current failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "confirm", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirm-failed"
+      }
+    ]
+  },
+  "confirm-pingan-rejection-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 confirm_current rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "confirm", "pingan", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-rejected"
+      }
+    ]
+  },
+  "confirm-pingan-failure-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 confirm_current failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "confirm", "pingan", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-failed"
       }
     ]
   },
