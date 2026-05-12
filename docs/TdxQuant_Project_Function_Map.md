@@ -565,6 +565,7 @@ TdxQuant
 - `trade_audit` 日常入口已覆盖 `buy + rejected|failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 buy single-status `buy + rejected` / `buy + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 `sell + rejected|failed` 的多维异常视角
+- `trade_audit` 日常入口已覆盖 sell single-status `sell + rejected` / `sell + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 submit path `buy_submit_once + confirm_current + rejected|failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 submit path single-status `buy_submit_once|confirm_current + rejected` / `buy_submit_once|confirm_current + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 order path `buy|sell + rejected|failed` 的多维异常视角
@@ -576,6 +577,7 @@ TdxQuant
 - `trade_audit` 日常入口已覆盖 broker-scoped single-status diagnostics `pingan + rejected` / `pingan + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped single-status review `pingan + confirmed` / `pingan + replayed` 的多维复盘视角
 - `trade_audit` 日常入口已覆盖 broker-scoped sell path `pingan + sell + rejected|failed` 的多维异常视角
+- `trade_audit` 日常入口已覆盖 broker-scoped sell single-status `pingan + sell + rejected` / `pingan + sell + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped confirm path `pingan + confirm_current + rejected|failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped confirm-current single-status `pingan + confirm_current + rejected` / `pingan + confirm_current + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped submit-once path `pingan + buy_submit_once + rejected|failed` 的多维异常视角
@@ -615,6 +617,7 @@ TdxQuant
 - trade_audit 多维诊断入口的 buy single-status 诊断入口已补齐：新增 `audit-daily-buy-rejected` / `audit-period-buy-rejected` / `audit-daily-buy-failed` / `audit-period-buy-failed` / `audit-daily-pingan-buy-rejected` / `audit-period-pingan-buy-rejected` / `audit-daily-pingan-buy-failed` / `audit-period-pingan-buy-failed` report presets、catalog entries 和对应 diagnostics bundles。
 - 受保护买入 workflow 的 guarded-buy buy single-status follow-up 已补齐：新增 `guarded-buy-rejection-review` / `guarded-buy-failure-review` / `guarded-pingan-buy-rejection-review` / `guarded-pingan-buy-failure-review` catalog bundles，复用既有 `guarded-buy` 和 buy single-status audit review entry。
 - trade_audit 多维诊断入口已补齐平安卖出侧 sell 组合：新增 `audit-daily-pingan-sell-exceptions` / `audit-period-pingan-sell-exceptions` report presets、catalog entries 和 `audit-pingan-sell-exception-diagnostics` bundle。
+- trade_audit 多维诊断入口的 sell single-status 诊断入口已补齐：新增 `audit-daily-sell-rejected` / `audit-period-sell-rejected` / `audit-daily-sell-failed` / `audit-period-sell-failed` / `audit-daily-pingan-sell-rejected` / `audit-period-pingan-sell-rejected` / `audit-daily-pingan-sell-failed` / `audit-period-pingan-sell-failed` report presets、catalog entries 和对应 diagnostics bundles。
 - trade_audit 多维诊断入口已补齐平安确认侧 confirm_current 组合：新增 `audit-daily-pingan-confirm-exceptions` / `audit-period-pingan-confirm-exceptions` report presets、catalog entries 和 `audit-pingan-confirm-exception-diagnostics` bundle。
 - trade_audit 多维诊断入口的 confirm-current single-status 诊断入口已补齐：新增 `audit-daily-confirm-rejected` / `audit-period-confirm-rejected` / `audit-daily-confirm-failed` / `audit-period-confirm-failed` / `audit-daily-pingan-confirm-rejected` / `audit-period-pingan-confirm-rejected` / `audit-daily-pingan-confirm-failed` / `audit-period-pingan-confirm-failed` report presets、catalog entries 和对应 diagnostics bundles。
 - trade_audit 多维诊断入口已补齐平安提交侧 buy_submit_once 组合：新增 `audit-daily-pingan-submit-once-exceptions` / `audit-period-pingan-submit-once-exceptions` report presets、catalog entries 和 `audit-pingan-submit-once-exception-diagnostics` bundle。

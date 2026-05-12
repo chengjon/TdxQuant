@@ -177,7 +177,11 @@
   - `audit-pingan-buy-rejection-diagnostics`
   - `audit-pingan-buy-failure-diagnostics`
   - `audit-sell-exception-diagnostics`
+  - `audit-sell-rejection-diagnostics`
+  - `audit-sell-failure-diagnostics`
   - `audit-pingan-sell-exception-diagnostics`
+  - `audit-pingan-sell-rejection-diagnostics`
+  - `audit-pingan-sell-failure-diagnostics`
   - `audit-submit-path-exception-diagnostics`
   - `audit-submit-path-rejection-diagnostics`
   - `audit-submit-path-failure-diagnostics`

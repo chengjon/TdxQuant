@@ -364,6 +364,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `trade_audit` 日常入口已覆盖 `buy + rejected|failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 buy single-status `buy + rejected` / `buy + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 `sell + rejected|failed` 的多维异常视角
+- `trade_audit` 日常入口已覆盖 sell single-status `sell + rejected` / `sell + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 submit path `buy_submit_once + confirm_current + rejected|failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 submit path single-status `buy_submit_once|confirm_current + rejected` / `buy_submit_once|confirm_current + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped buy path `pingan + buy + rejected|failed` 的多维异常视角
@@ -373,6 +374,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - `trade_audit` 日常入口已覆盖 broker-scoped single-status diagnostics `pingan + rejected` / `pingan + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped single-status review `pingan + confirmed` / `pingan + replayed` 的多维复盘视角
 - `trade_audit` 日常入口已覆盖 broker-scoped sell path `pingan + sell + rejected|failed` 的多维异常视角
+- `trade_audit` 日常入口已覆盖 broker-scoped sell single-status `pingan + sell + rejected` / `pingan + sell + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped confirm path `pingan + confirm_current + rejected|failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped confirm-current single-status `pingan + confirm_current + rejected` / `pingan + confirm_current + failed` 的多维异常视角
 - `trade_audit` 日常入口已覆盖 broker-scoped submit-once path `pingan + buy_submit_once + rejected|failed` 的多维异常视角
