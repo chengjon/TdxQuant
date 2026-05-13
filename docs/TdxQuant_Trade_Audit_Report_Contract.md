@@ -270,6 +270,12 @@
   - `guarded-buy-order-failure-review`
   - `guarded-pingan-buy-order-rejection-review`
   - `guarded-pingan-buy-order-failure-review`
+  - `guarded-buy-submit-path-exception-review`
+  - `guarded-pingan-buy-submit-path-exception-review`
+  - `guarded-buy-submit-path-rejection-review`
+  - `guarded-buy-submit-path-failure-review`
+  - `guarded-pingan-buy-submit-path-rejection-review`
+  - `guarded-pingan-buy-submit-path-failure-review`
   - `confirm-submit-path-exception-review`
   - `confirm-pingan-submit-path-exception-review`
   - `confirm-submit-path-rejection-review`

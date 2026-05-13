@@ -1970,6 +1970,27 @@ class ApiContextTests(unittest.TestCase):
                 self.assertEqual(resolved["steps"][0]["entry"], "guarded-buy")
                 self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
 
+    def test_runtime_command_bundles_include_guarded_buy_submit_path_followups(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "guarded-buy-submit-path-exception-review": "audit-daily-submit-path-exceptions",
+            "guarded-buy-submit-path-rejection-review": "audit-daily-submit-path-rejected",
+            "guarded-buy-submit-path-failure-review": "audit-daily-submit-path-failed",
+            "guarded-pingan-buy-submit-path-exception-review": "audit-daily-pingan-submit-path-exceptions",
+            "guarded-pingan-buy-submit-path-rejection-review": "audit-daily-pingan-submit-path-rejected",
+            "guarded-pingan-buy-submit-path-failure-review": "audit-daily-pingan-submit-path-failed",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                self.assertEqual(resolved["steps"][0]["entry"], "guarded-buy")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
+
     def test_resolve_command_bundle_validates_steps_and_referenced_entries(self) -> None:
         bundles = {
             "refresh-review": {
