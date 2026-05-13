@@ -195,8 +195,10 @@
   - `audit-pingan-order-rejection-diagnostics`
   - `audit-pingan-order-failure-diagnostics`
   - `submit-ready-audit-review`
+  - `submit-ready-complete-review`
   - `submit-ready-exception-review`
   - `submit-ready-pingan-audit-review`
+  - `submit-ready-pingan-complete-review`
   - `submit-ready-pingan-exception-review`
   - `submit-ready-rejection-review`
   - `submit-ready-failure-review`

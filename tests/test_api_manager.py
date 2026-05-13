@@ -1733,6 +1733,27 @@ class ApiContextTests(unittest.TestCase):
                 self.assertEqual(resolved["steps"][0]["entry"], "task-submit-ready")
                 self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
 
+    def test_runtime_command_bundles_include_submit_ready_complete_review_bundles(self) -> None:
+        bundles = load_command_bundles()
+        self.assertIn("submit-ready-complete-review", bundles)
+        self.assertIn("submit-ready-pingan-complete-review", bundles)
+        complete = resolve_command_bundle(
+            "submit-ready-complete-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        pingan_complete = resolve_command_bundle(
+            "submit-ready-pingan-complete-review",
+            bundles=bundles,
+            entries=load_command_catalog(),
+        )
+        self.assertEqual(complete["steps"][0]["entry"], "task-submit-ready")
+        self.assertEqual(complete["steps"][1]["entry"], "daily-success")
+        self.assertEqual(complete["steps"][2]["entry"], "audit-daily-confirmed")
+        self.assertEqual(pingan_complete["steps"][0]["entry"], "task-submit-ready")
+        self.assertEqual(pingan_complete["steps"][1]["entry"], "daily-success")
+        self.assertEqual(pingan_complete["steps"][2]["entry"], "audit-daily-pingan-confirmed")
+
     def test_runtime_command_bundles_include_submit_ready_order_exception_followups(self) -> None:
         bundles = load_command_bundles()
         expected = {

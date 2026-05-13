@@ -885,6 +885,24 @@
       }
     ]
   },
+  "submit-ready-complete-review": {
+    "description": "推进到提交确认前边界后继续查看当日成功成交日报和已确认 trade_audit 复盘。",
+    "labels": ["trading", "submit-ready", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "submit_ready",
+        "entry": "task-submit-ready"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-confirmed"
+      }
+    ]
+  },
   "submit-ready-exception-review": {
     "description": "推进到提交确认前边界后继续回看当日 rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "submit-ready", "audit", "exceptions", "followup"],
@@ -910,6 +928,24 @@
       {
         "name": "audit",
         "entry": "audit-daily-pingan-review"
+      }
+    ]
+  },
+  "submit-ready-pingan-complete-review": {
+    "description": "推进到提交确认前边界后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["trading", "submit-ready", "pingan", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "submit_ready",
+        "entry": "task-submit-ready"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirmed"
       }
     ]
   },
