@@ -198,6 +198,10 @@
   - `submit-ready-exception-review`
   - `submit-ready-pingan-audit-review`
   - `submit-ready-pingan-exception-review`
+  - `submit-ready-rejection-review`
+  - `submit-ready-failure-review`
+  - `submit-ready-pingan-rejection-review`
+  - `submit-ready-pingan-failure-review`
   - `submit-ready-order-exception-review`
   - `submit-ready-pingan-order-exception-review`
   - `submit-ready-order-rejection-review`

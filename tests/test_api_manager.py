@@ -1714,6 +1714,25 @@ class ApiContextTests(unittest.TestCase):
         self.assertEqual(exception_review["steps"][0]["entry"], "task-submit-ready")
         self.assertEqual(exception_review["steps"][1]["entry"], "audit-daily-pingan-exceptions")
 
+    def test_runtime_command_bundles_include_submit_ready_trade_audit_status_followups(self) -> None:
+        bundles = load_command_bundles()
+        expected = {
+            "submit-ready-rejection-review": "audit-daily-rejected",
+            "submit-ready-failure-review": "audit-daily-failed",
+            "submit-ready-pingan-rejection-review": "audit-daily-pingan-rejected",
+            "submit-ready-pingan-failure-review": "audit-daily-pingan-failed",
+        }
+        for bundle, audit_entry in expected.items():
+            with self.subTest(bundle=bundle):
+                self.assertIn(bundle, bundles)
+                resolved = resolve_command_bundle(
+                    bundle,
+                    bundles=bundles,
+                    entries=load_command_catalog(),
+                )
+                self.assertEqual(resolved["steps"][0]["entry"], "task-submit-ready")
+                self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
+
     def test_runtime_command_bundles_include_submit_ready_order_exception_followups(self) -> None:
         bundles = load_command_bundles()
         expected = {
