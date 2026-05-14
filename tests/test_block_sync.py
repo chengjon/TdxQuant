@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -283,3 +284,138 @@ class BlockSyncTests(unittest.TestCase):
                 ["create_sector", "send_user_block"],
             )
             self.assertEqual(result.next_action, "retry later")
+
+    def test_write_policy_merge_dry_run_maps_to_merge_plan_without_runtime_writes(self) -> None:
+        create_block = Mock(return_value=Result(ok=True, code=ErrorCode.OK, message="created", data={}))
+        sync_members = Mock(return_value=Result(ok=True, code=ErrorCode.OK, message="synced", data={}))
+        with TemporaryDirectory() as temp_dir:
+            result = sync_watchlist_to_block(
+                block_code="ZXG",
+                symbols=["600519.SH"],
+                write_policy="merge_dry_run",
+                create_if_missing=False,
+                show=True,
+                observed_state=lambda: {"block_code": "ZXG", "exists": True, "stocks": ["000001.SZ"]},
+                create_block=create_block,
+                sync_members=sync_members,
+                audit_dir=temp_dir,
+            )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.data["sync"]["write_policy"], "merge_dry_run")
+            self.assertEqual(result.data["sync"]["mode"], "merge")
+            self.assertTrue(result.data["sync"]["dry_run"])
+            self.assertEqual(result.data["sync"]["desired_symbols"], ["000001.SZ", "600519.SH"])
+            create_block.assert_not_called()
+            sync_members.assert_not_called()
+
+    def test_write_policy_rejects_conflicting_explicit_mode(self) -> None:
+        sync_members = Mock(return_value=Result(ok=True, code=ErrorCode.OK, message="synced", data={}))
+        with TemporaryDirectory() as temp_dir:
+            result = sync_watchlist_to_block(
+                block_code="ZXG",
+                symbols=["600519.SH"],
+                mode="replace",
+                write_policy="merge",
+                create_if_missing=False,
+                observed_state=lambda: {"block_code": "ZXG", "exists": True, "stocks": []},
+                create_block=None,
+                sync_members=sync_members,
+                audit_dir=temp_dir,
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+            self.assertEqual(result.data["sync"]["governance_reason"], "invalid_write_policy")
+            self.assertEqual(result.data["sync"]["write_policy"], "merge")
+            self.assertEqual(result.data["sync"]["mode"], "merge")
+            sync_members.assert_not_called()
+
+    def test_mutation_key_replay_includes_machine_readable_replay_metadata(self) -> None:
+        sync_members = Mock(return_value=Result(ok=True, code=ErrorCode.OK, message="synced", data={}))
+        with TemporaryDirectory() as temp_dir:
+            first = sync_watchlist_to_block(
+                block_code="ZXG",
+                symbols=["000001.SZ"],
+                write_policy="replace_dry_run",
+                create_if_missing=False,
+                mutation_key="sync-002",
+                observed_state=lambda: {"block_code": "ZXG", "exists": True, "stocks": []},
+                create_block=None,
+                sync_members=sync_members,
+                audit_dir=temp_dir,
+            )
+            second = sync_watchlist_to_block(
+                block_code="ZXG",
+                symbols=["000001.SZ"],
+                write_policy="replace_dry_run",
+                create_if_missing=False,
+                mutation_key="sync-002",
+                observed_state=lambda: {"block_code": "ZXG", "exists": True, "stocks": []},
+                create_block=None,
+                sync_members=sync_members,
+                audit_dir=temp_dir,
+            )
+
+            self.assertTrue(first.ok)
+            self.assertTrue(second.ok)
+            replay = second.data["mutation_key_replay"]
+            self.assertEqual(replay["mutation_key"], "sync-002")
+            self.assertTrue(replay["replayed"])
+            self.assertEqual(replay["prior_request"]["write_policy"], "replace_dry_run")
+            self.assertEqual(second.data["sync"]["governance_reason"], "mutation_key_replay")
+
+    def test_mutation_key_conflict_includes_prior_and_current_policy_requests(self) -> None:
+        sync_members = Mock(return_value=Result(ok=True, code=ErrorCode.OK, message="synced", data={}))
+        with TemporaryDirectory() as temp_dir:
+            sync_watchlist_to_block(
+                block_code="ZXG",
+                symbols=["000001.SZ"],
+                write_policy="replace_dry_run",
+                create_if_missing=False,
+                mutation_key="sync-003",
+                observed_state=lambda: {"block_code": "ZXG", "exists": True, "stocks": []},
+                create_block=None,
+                sync_members=sync_members,
+                audit_dir=temp_dir,
+            )
+            conflict = sync_watchlist_to_block(
+                block_code="ZXG",
+                symbols=["600519.SH"],
+                write_policy="merge_dry_run",
+                create_if_missing=False,
+                mutation_key="sync-003",
+                observed_state=lambda: {"block_code": "ZXG", "exists": True, "stocks": []},
+                create_block=None,
+                sync_members=sync_members,
+                audit_dir=temp_dir,
+            )
+
+            self.assertFalse(conflict.ok)
+            self.assertEqual(conflict.data["sync"]["governance_reason"], "mutation_key_conflict")
+            metadata = conflict.data["mutation_key_conflict"]
+            self.assertEqual(metadata["mutation_key"], "sync-003")
+            self.assertEqual(metadata["prior_request"]["write_policy"], "replace_dry_run")
+            self.assertEqual(metadata["current_request"]["write_policy"], "merge_dry_run")
+            self.assertEqual(metadata["current_request"]["mode"], "merge")
+
+    def test_audit_artifact_includes_write_policy_metadata(self) -> None:
+        sync_members = Mock(return_value=Result(ok=True, code=ErrorCode.OK, message="synced", data={}))
+        with TemporaryDirectory() as temp_dir:
+            result = sync_watchlist_to_block(
+                block_code="ZXG",
+                symbols=["600519.SH"],
+                write_policy="merge_dry_run",
+                create_if_missing=False,
+                observed_state=lambda: {"block_code": "ZXG", "exists": True, "stocks": ["000001.SZ"]},
+                create_block=None,
+                sync_members=sync_members,
+                audit_dir=temp_dir,
+            )
+            audit_path = Path(result.data["artifacts"]["audit_log_path"])
+            payload = json.loads(audit_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(payload["normalized_request"]["write_policy"], "merge_dry_run")
+            self.assertEqual(payload["sync"]["write_policy"], "merge_dry_run")
+            self.assertEqual(payload["sync"]["mode"], "merge")
+            self.assertTrue(payload["sync"]["dry_run"])

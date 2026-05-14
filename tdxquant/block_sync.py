@@ -11,6 +11,12 @@ from .models import ErrorCode, Result
 from .result_contract import format_rfc3339, utc_now
 
 BLOCK_SYNC_SCHEMA_VERSION = "2026-05-03"
+BLOCK_SYNC_WRITE_POLICIES: dict[str, tuple[str, bool]] = {
+    "replace": ("replace", False),
+    "merge": ("merge", False),
+    "replace_dry_run": ("replace", True),
+    "merge_dry_run": ("merge", True),
+}
 
 
 def _normalize_stock_list(values: list[str] | None) -> list[str]:
@@ -49,15 +55,52 @@ def _canonical_sync_request(
     create_if_missing: bool,
     dry_run: bool,
     show: bool,
+    write_policy: str,
 ) -> dict[str, Any]:
     return {
         "block_code": block_code,
         "symbols": _normalize_stock_list(symbols),
+        "write_policy": write_policy,
         "mode": mode,
         "create_if_missing": create_if_missing,
         "dry_run": dry_run,
         "show": show,
     }
+
+
+def _policy_from_mode(mode: str, dry_run: bool) -> str:
+    return f"{mode}_dry_run" if dry_run else mode
+
+
+def _resolve_write_policy(
+    *,
+    write_policy: str | None,
+    mode: str | None,
+    dry_run: bool | None,
+) -> tuple[str, str, bool, str | None]:
+    if write_policy is None:
+        resolved_mode = (mode or "replace").strip().lower()
+        resolved_dry_run = bool(dry_run) if dry_run is not None else False
+        return _policy_from_mode(resolved_mode, resolved_dry_run), resolved_mode, resolved_dry_run, None
+
+    resolved_policy = str(write_policy).strip().lower()
+    policy_mapping = BLOCK_SYNC_WRITE_POLICIES.get(resolved_policy)
+    if policy_mapping is None:
+        fallback_mode = (mode or "replace").strip().lower()
+        fallback_dry_run = bool(dry_run) if dry_run is not None else False
+        return resolved_policy, fallback_mode, fallback_dry_run, f"unsupported block sync write_policy: {write_policy}"
+
+    policy_mode, policy_dry_run = policy_mapping
+    explicit_mode = mode.strip().lower() if isinstance(mode, str) and mode.strip() else None
+    if explicit_mode is not None and explicit_mode != policy_mode:
+        return resolved_policy, policy_mode, policy_dry_run, (
+            f"write_policy {resolved_policy} conflicts with mode {explicit_mode}"
+        )
+    if dry_run is not None and bool(dry_run) != policy_dry_run:
+        return resolved_policy, policy_mode, policy_dry_run, (
+            f"write_policy {resolved_policy} conflicts with dry_run {bool(dry_run)}"
+        )
+    return resolved_policy, policy_mode, policy_dry_run, None
 
 
 def _iter_audit_payloads(audit_dir: Path) -> list[dict[str, Any]]:
@@ -114,10 +157,12 @@ def _build_sync_summary(
     unchanged_symbols: list[str],
     desired_symbols: list[str],
     observed_symbols: list[str],
+    write_policy: str | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": BLOCK_SYNC_SCHEMA_VERSION,
         "block_code": block_code,
+        "write_policy": write_policy or _policy_from_mode(mode, dry_run),
         "mode": mode,
         "create_if_missing": create_if_missing,
         "dry_run": dry_run,
@@ -189,10 +234,11 @@ def sync_watchlist_to_block(
     *,
     block_code: str,
     symbols: list[str],
-    mode: str = "replace",
+    mode: str | None = None,
     create_if_missing: bool = False,
-    dry_run: bool = False,
+    dry_run: bool | None = None,
     show: bool = True,
+    write_policy: str | None = None,
     mutation_key: str | None = None,
     observed_state: dict[str, Any] | Result | Callable[[], dict[str, Any] | Result],
     create_block: Callable[[], Result] | None,
@@ -201,21 +247,27 @@ def sync_watchlist_to_block(
 ) -> Result:
     sync_id = uuid4().hex
     resolved_audit_dir = _resolve_block_sync_audit_dir(audit_dir)
+    resolved_write_policy, resolved_mode, resolved_dry_run, policy_error = _resolve_write_policy(
+        write_policy=write_policy,
+        mode=mode,
+        dry_run=dry_run,
+    )
     normalized_request = _canonical_sync_request(
         block_code=block_code,
         symbols=symbols,
-        mode=mode,
+        mode=resolved_mode,
         create_if_missing=create_if_missing,
-        dry_run=dry_run,
+        dry_run=resolved_dry_run,
         show=show,
+        write_policy=resolved_write_policy,
     )
     desired_input_symbols = normalized_request["symbols"]
 
-    if mode not in {"replace", "merge"}:
+    if policy_error is not None:
         invalid_result = Result(
             ok=False,
             code=ErrorCode.INVALID_REQUEST,
-            message=f"unsupported block sync mode: {mode}",
+            message=policy_error,
             data={},
         )
         return _finalize_sync_result(
@@ -227,9 +279,43 @@ def sync_watchlist_to_block(
             observed_state={"block_code": block_code, "exists": False, "stocks": []},
             sync_summary=_build_sync_summary(
                 block_code=block_code,
-                mode=mode,
+                mode=resolved_mode,
                 create_if_missing=create_if_missing,
-                dry_run=dry_run,
+                dry_run=resolved_dry_run,
+                show=show,
+                status="rejected",
+                governance_decision="reject",
+                governance_reason="invalid_write_policy",
+                created_block=False,
+                would_create_block=False,
+                added_symbols=[],
+                removed_symbols=[],
+                unchanged_symbols=[],
+                desired_symbols=desired_input_symbols,
+                observed_symbols=[],
+                write_policy=resolved_write_policy,
+            ),
+        )
+
+    if resolved_mode not in {"replace", "merge"}:
+        invalid_result = Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message=f"unsupported block sync mode: {resolved_mode}",
+            data={},
+        )
+        return _finalize_sync_result(
+            invalid_result,
+            sync_id=sync_id,
+            mutation_key=mutation_key,
+            audit_dir=resolved_audit_dir,
+            normalized_request=normalized_request,
+            observed_state={"block_code": block_code, "exists": False, "stocks": []},
+            sync_summary=_build_sync_summary(
+                block_code=block_code,
+                mode=resolved_mode,
+                create_if_missing=create_if_missing,
+                dry_run=resolved_dry_run,
                 show=show,
                 status="rejected",
                 governance_decision="reject",
@@ -241,6 +327,7 @@ def sync_watchlist_to_block(
                 unchanged_symbols=[],
                 desired_symbols=[],
                 observed_symbols=[],
+                write_policy=resolved_write_policy,
             ),
         )
 
@@ -260,9 +347,9 @@ def sync_watchlist_to_block(
             observed_state={"block_code": block_code, "exists": False, "stocks": []},
             sync_summary=_build_sync_summary(
                 block_code=block_code,
-                mode=mode,
+                mode=resolved_mode,
                 create_if_missing=create_if_missing,
-                dry_run=dry_run,
+                dry_run=resolved_dry_run,
                 show=show,
                 status="rejected",
                 governance_decision="reject",
@@ -274,6 +361,7 @@ def sync_watchlist_to_block(
                 unchanged_symbols=[],
                 desired_symbols=[],
                 observed_symbols=[],
+                write_policy=resolved_write_policy,
             ),
         )
 
@@ -283,6 +371,12 @@ def sync_watchlist_to_block(
             prior_request = prior_payload.get("normalized_request")
             if prior_request == normalized_request:
                 replay_result = Result(ok=True, code=ErrorCode.OK, message="skipped duplicate block sync replay", data={})
+                replay_result.data["mutation_key_replay"] = {
+                    "mutation_key": mutation_key,
+                    "replayed": True,
+                    "prior_sync_id": prior_payload.get("sync_id"),
+                    "prior_request": copy.deepcopy(prior_request) if isinstance(prior_request, dict) else prior_request,
+                }
                 return _finalize_sync_result(
                     replay_result,
                     sync_id=sync_id,
@@ -292,9 +386,9 @@ def sync_watchlist_to_block(
                     observed_state={"source": "mutation_key_history"},
                     sync_summary=_build_sync_summary(
                         block_code=block_code,
-                        mode=mode,
+                        mode=resolved_mode,
                         create_if_missing=create_if_missing,
-                        dry_run=dry_run,
+                        dry_run=resolved_dry_run,
                         show=show,
                         status="noop",
                         governance_decision="skip",
@@ -306,13 +400,21 @@ def sync_watchlist_to_block(
                         unchanged_symbols=[],
                         desired_symbols=desired_input_symbols,
                         observed_symbols=[],
+                        write_policy=resolved_write_policy,
                     ),
                 )
             conflict_result = Result(
                 ok=False,
                 code=ErrorCode.INVALID_REQUEST,
                 message=f"mutation_key {mutation_key} conflicts with a different prior block sync request",
-                data={},
+                data={
+                    "mutation_key_conflict": {
+                        "mutation_key": mutation_key,
+                        "prior_sync_id": prior_payload.get("sync_id"),
+                        "prior_request": copy.deepcopy(prior_request) if isinstance(prior_request, dict) else prior_request,
+                        "current_request": copy.deepcopy(normalized_request),
+                    }
+                },
                 next_action="Use a new mutation_key for a different block sync request.",
             )
             return _finalize_sync_result(
@@ -324,9 +426,9 @@ def sync_watchlist_to_block(
                 observed_state={"source": "mutation_key_history"},
                 sync_summary=_build_sync_summary(
                     block_code=block_code,
-                    mode=mode,
+                    mode=resolved_mode,
                     create_if_missing=create_if_missing,
-                    dry_run=dry_run,
+                    dry_run=resolved_dry_run,
                     show=show,
                     status="rejected",
                     governance_decision="reject",
@@ -338,6 +440,7 @@ def sync_watchlist_to_block(
                     unchanged_symbols=[],
                     desired_symbols=desired_input_symbols,
                     observed_symbols=[],
+                    write_policy=resolved_write_policy,
                 ),
             )
 
@@ -360,9 +463,9 @@ def sync_watchlist_to_block(
             observed_state={"source": "state_probe", "available": False},
             sync_summary=_build_sync_summary(
                 block_code=block_code,
-                mode=mode,
+                mode=resolved_mode,
                 create_if_missing=create_if_missing,
-                dry_run=dry_run,
+                dry_run=resolved_dry_run,
                 show=show,
                 status="failed",
                 governance_decision="reject",
@@ -374,6 +477,7 @@ def sync_watchlist_to_block(
                 unchanged_symbols=[],
                 desired_symbols=[],
                 observed_symbols=[],
+                write_policy=resolved_write_policy,
             ),
         )
 
@@ -382,7 +486,7 @@ def sync_watchlist_to_block(
     exists = bool(normalized_observed_state.get("exists", False))
     would_create_block = not exists and create_if_missing
 
-    if mode == "replace":
+    if resolved_mode == "replace":
         desired_symbols = desired_input_symbols
     else:
         desired_symbols = _normalize_stock_list([*observed_symbols, *desired_input_symbols])
@@ -390,7 +494,7 @@ def sync_watchlist_to_block(
     observed_set = set(observed_symbols)
     desired_set = set(desired_symbols)
     added_symbols = sorted(desired_set - observed_set)
-    removed_symbols = sorted(observed_set - desired_set) if mode == "replace" else []
+    removed_symbols = sorted(observed_set - desired_set) if resolved_mode == "replace" else []
     unchanged_symbols = sorted(observed_set & desired_set)
 
     if not exists and not create_if_missing:
@@ -410,9 +514,9 @@ def sync_watchlist_to_block(
             observed_state=normalized_observed_state,
             sync_summary=_build_sync_summary(
                 block_code=block_code,
-                mode=mode,
+                mode=resolved_mode,
                 create_if_missing=create_if_missing,
-                dry_run=dry_run,
+                dry_run=resolved_dry_run,
                 show=show,
                 status="rejected",
                 governance_decision="reject",
@@ -424,6 +528,7 @@ def sync_watchlist_to_block(
                 unchanged_symbols=unchanged_symbols,
                 desired_symbols=desired_symbols,
                 observed_symbols=observed_symbols,
+                write_policy=resolved_write_policy,
             ),
         )
 
@@ -438,9 +543,9 @@ def sync_watchlist_to_block(
             observed_state=normalized_observed_state,
             sync_summary=_build_sync_summary(
                 block_code=block_code,
-                mode=mode,
+                mode=resolved_mode,
                 create_if_missing=create_if_missing,
-                dry_run=dry_run,
+                dry_run=resolved_dry_run,
                 show=show,
                 status="noop",
                 governance_decision="skip",
@@ -452,10 +557,11 @@ def sync_watchlist_to_block(
                 unchanged_symbols=unchanged_symbols,
                 desired_symbols=desired_symbols,
                 observed_symbols=observed_symbols,
+                write_policy=resolved_write_policy,
             ),
         )
 
-    if dry_run:
+    if resolved_dry_run:
         plan_result = Result(ok=True, code=ErrorCode.OK, message="planned block sync", data={})
         return _finalize_sync_result(
             plan_result,
@@ -466,7 +572,7 @@ def sync_watchlist_to_block(
             observed_state=normalized_observed_state,
             sync_summary=_build_sync_summary(
                 block_code=block_code,
-                mode=mode,
+                mode=resolved_mode,
                 create_if_missing=create_if_missing,
                 dry_run=True,
                 show=show,
@@ -480,6 +586,7 @@ def sync_watchlist_to_block(
                 unchanged_symbols=unchanged_symbols,
                 desired_symbols=desired_symbols,
                 observed_symbols=observed_symbols,
+                write_policy=resolved_write_policy,
             ),
         )
 
@@ -503,7 +610,7 @@ def sync_watchlist_to_block(
                 observed_state=normalized_observed_state,
                 sync_summary=_build_sync_summary(
                     block_code=block_code,
-                    mode=mode,
+                    mode=resolved_mode,
                     create_if_missing=create_if_missing,
                     dry_run=False,
                     show=show,
@@ -517,6 +624,7 @@ def sync_watchlist_to_block(
                     unchanged_symbols=unchanged_symbols,
                     desired_symbols=desired_symbols,
                     observed_symbols=observed_symbols,
+                    write_policy=resolved_write_policy,
                 ),
             )
         create_result = create_block()
@@ -532,7 +640,7 @@ def sync_watchlist_to_block(
                 observed_state=normalized_observed_state,
                 sync_summary=_build_sync_summary(
                     block_code=block_code,
-                    mode=mode,
+                    mode=resolved_mode,
                     create_if_missing=create_if_missing,
                     dry_run=False,
                     show=show,
@@ -546,6 +654,7 @@ def sync_watchlist_to_block(
                     unchanged_symbols=unchanged_symbols,
                     desired_symbols=desired_symbols,
                     observed_symbols=observed_symbols,
+                    write_policy=resolved_write_policy,
                 ),
                 underlying_artifacts=underlying_artifacts,
                 stage_results=stage_results,
@@ -564,7 +673,7 @@ def sync_watchlist_to_block(
         observed_state=normalized_observed_state,
         sync_summary=_build_sync_summary(
             block_code=block_code,
-            mode=mode,
+            mode=resolved_mode,
             create_if_missing=create_if_missing,
             dry_run=False,
             show=show,
@@ -578,6 +687,7 @@ def sync_watchlist_to_block(
             unchanged_symbols=unchanged_symbols,
             desired_symbols=desired_symbols,
             observed_symbols=observed_symbols,
+            write_policy=resolved_write_policy,
         ),
         underlying_artifacts=underlying_artifacts,
         stage_results=stage_results,

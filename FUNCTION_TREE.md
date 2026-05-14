@@ -49,10 +49,10 @@ TdxQuant
 │   ├── TdxTradeManager / TradeService / PingAn gateway [已实现]
 │   ├── PingAn buy / sell / submit_once / confirm [部分实现]
 │   └── trade audit / ledger / safety governance [部分实现]
-└── E. 已设计但不可当作当前可用的能力 [已设计/待实现]
+└── E. 待闭合与下一阶段能力 [分状态登记]
     ├── subscription HTTP/SSE 推送语义
     ├── provider HTTP replay service / daemon fake provider
-    ├── block 文件导入式 watchlist 与高阶写入任务
+    ├── block 文件导入式 watchlist 与写策略硬化/高阶入口
     ├── 更完整的 formula capability-specific contract
     ├── 更厚的日常 task/report/catalog 组合入口
     └── 更高阶 trade_audit 聚合与跨 ledger 查询
@@ -133,7 +133,7 @@ TdxQuant
 | E-01 | subscription query-style one-shot CLI | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `query-style one-shot CLI [未实现/延期]` | 不代表当前可用；当前可用入口是 session、foreground `subscription-watch` 和 worker bridge control plane。 |
 | E-02 | subscription HTTP/SSE 推送语义 | `[部分实现]` | `tdxquant/bridge_http.py` 已新增 `GET /bridge/v1/watch/events/stream` SSE 投影；`tdxquant/bridge_registry.py` 已新增 master-side stream helper；`tdxquant/fixtures/provider/subscription-watch-event-stream-frames.jsonl` 与 `tests/test_bridge_http.py` / `tests/test_bridge_registry.py` / `tests/test_replay_fixtures.py` 已覆盖代表性帧 | 当前是 read-only bridge event-stream v1，投影现有 run artifacts 与 controller state；不重写 `subscription-watch` artifact contract，不改变 worker registry/auth 语义，也不代表多 worker 调度或更高层协调协议已完成。 |
 | E-03 | block 文件导入式 watchlist 适配 | `[部分实现]` | `tdxquant/block_watchlist_import.py` 支持 JSON import schema、parser/validator、dry-run plan、`sync_watchlist_import_file(...)` 接线；`tests/test_block_watchlist_import.py` | 当前是 JSON-only core adapter；不含 CSV/TXT、CLI/catalog/task wrapper、双向同步或源文件回写，也不绕过现有 `block.sync_watchlist` 安全边界。 |
-| E-04 | block 覆盖写/增量写高阶任务入口 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `覆盖写 / 增量写高阶任务入口 [未实现/延期]` | 不代表当前可用；现有写入必须通过已实现的 mutation/sync 安全边界。 |
+| E-04 | block 覆盖写/增量写高阶任务入口 | `[部分实现]` | `tdxquant/block_sync.py` 支持显式 `write_policy`、`mode`/`dry_run` 兼容解析、mutation_key replay/conflict 元数据和 audit policy 字段；`tests/test_block_sync.py` 覆盖策略映射、冲突反馈与审计字段；OpenSpec `block-sync-write-policy-hardening` | 当前完成底层 `block.sync_watchlist` 写策略 contract 和重复写保护反馈；仍不包含 CLI/catalog/task 高阶入口，也不新增 provider schema 或绕过既有 mutation/sync 安全边界。 |
 | E-05 | provider HTTP replay service | `[部分实现]` | `tdxquant/provider_transport_replay.py` 提供 `GET /provider/v1/replay/health`、`fixtures`、`result`、`watch/status`、`watch/events`、`watch/events/stream`；`tests/test_provider_transport_replay.py` | 当前是 fixture-backed、read-only、标准库 HTTP replay service；不新增业务 capability，不改变 CLI subprocess replay 语义，也不等同于 live Windows provider/bridge。 |
 | E-06 | daemon fake provider | `[部分实现]` | `ProviderTransportReplayHTTPServer` 支持 bearer token、allowlist、watch status/events/SSE fake provider 投影；`subscription-watch-event-stream-delayed-playback.jsonl` | 当前 fake provider 只覆盖离线只读 replay transport；没有 start/stop 生命周期控制、真实调度、真实行情会话或长期守护进程管理。 |
 | E-07 | wider capability replay coverage | `[部分实现]` | 已有 `40` 个 provider fixture；`docs/TdxQuant_Project_Function_Map.md` 标记 `wider capability replay coverage [部分覆盖]` | 部分能力有代表性 fixture；新增/边缘 capability 仍需补样例、契约和测试。 |
