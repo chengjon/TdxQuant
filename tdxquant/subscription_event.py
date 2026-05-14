@@ -53,6 +53,7 @@ def build_subscription_event_row(
     sequence: int,
     symbol: str | None = None,
     source_ts: str | None = None,
+    reconnect_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     serialized_payload = serialize_value(payload)
     resolved_symbol = symbol or extract_subscription_symbol(serialized_payload)
@@ -69,7 +70,7 @@ def build_subscription_event_row(
         "symbol": resolved_symbol,
         "source_ts": resolved_source_ts,
         "event_ts": _now_utc_iso(),
-        "reconnect_metadata": {},
+        "reconnect_metadata": dict(reconnect_metadata or {}),
         "payload": serialized_payload,
     }
 
@@ -83,6 +84,7 @@ def normalize_subscription_event_rows(
     run_id: str,
     capability: str = SUBSCRIPTION_EVENT_CAPABILITY,
     start_sequence: int,
+    reconnect_metadata: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     serialized = serialize_value(raw_payload)
     rows: list[dict[str, Any]] = []
@@ -105,6 +107,7 @@ def normalize_subscription_event_rows(
                         sequence=next_sequence,
                         symbol=key,
                         source_ts=extract_subscription_source_ts(item_payload, fallback_source_ts),
+                        reconnect_metadata=reconnect_metadata,
                     )
                 )
                 next_sequence += 1
@@ -122,6 +125,7 @@ def normalize_subscription_event_rows(
                     capability=capability,
                     sequence=next_sequence,
                     symbol=resolved_symbol,
+                    reconnect_metadata=reconnect_metadata,
                 )
             )
             return rows
@@ -137,6 +141,7 @@ def normalize_subscription_event_rows(
                     run_id=run_id,
                     capability=capability,
                     sequence=next_sequence,
+                    reconnect_metadata=reconnect_metadata,
                 )
             )
             next_sequence += 1
@@ -151,6 +156,7 @@ def normalize_subscription_event_rows(
             run_id=run_id,
             capability=capability,
             sequence=next_sequence,
+            reconnect_metadata=reconnect_metadata,
         )
     )
     return rows

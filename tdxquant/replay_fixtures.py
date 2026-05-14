@@ -236,6 +236,13 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "subscription-watch-events.jsonl",
     },
     {
+        "name": "subscription-watch-event-stream-frames",
+        "capability": "subscription.watch",
+        "format": "jsonl",
+        "description": "Representative bridge SSE frame payloads for subscription-watch event stream transport.",
+        "relative_path": "subscription-watch-event-stream-frames.jsonl",
+    },
+    {
         "name": "subscription-watch-status-completed",
         "capability": "subscription.watch",
         "format": "json",

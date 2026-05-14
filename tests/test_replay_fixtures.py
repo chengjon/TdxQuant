@@ -155,6 +155,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("subscription-watch-status-reconnecting", names)
         self.assertIn("subscription-watch-status-degraded", names)
         self.assertIn("subscription-watch-summary-with-reconnect", names)
+        self.assertIn("subscription-watch-event-stream-frames", names)
 
     def test_load_subscription_watch_reconnecting_status_fixture(self) -> None:
         payload = load_provider_replay_fixture("subscription-watch-status-reconnecting")
@@ -181,6 +182,19 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["reconnect_count"], 1)
         self.assertEqual(payload["degraded_duration_ms"], 0.0)
         self.assertIsNone(payload["final_last_error"])
+
+    def test_load_subscription_watch_event_stream_fixture(self) -> None:
+        rows = load_provider_replay_fixture("subscription-watch-event-stream-frames")
+        self.assertGreaterEqual(len(rows), 5)
+        frame_types = {row["frame_type"] for row in rows}
+        self.assertIn("quote", frame_types)
+        self.assertIn("status", frame_types)
+        self.assertIn("heartbeat", frame_types)
+        self.assertIn("terminal", frame_types)
+        quote = next(row for row in rows if row["frame_type"] == "quote")
+        self.assertIn("event", quote)
+        self.assertEqual(quote["event"]["capability"], "subscription.watch")
+        self.assertEqual(quote["event"]["reconnect_metadata"]["reconnect_count"], 1)
 
     def test_load_block_mutation_fixture_returns_provider_artifact_descriptor(self) -> None:
         payload = load_provider_replay_fixture("block-send-user-block-applied")

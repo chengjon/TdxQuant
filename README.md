@@ -1,3 +1,7 @@
+> 功能状态入口：当前项目的唯一“功能全景图 + 状态注册表”是 [`FUNCTION_TREE.md`](FUNCTION_TREE.md)。
+>
+> 本 README 只说明当前分支定位和常用入口；具体功能是否已实现、部分实现、已设计待实现或属于非目标边界，以 `FUNCTION_TREE.md` 为准。
+
 ## 当前分支定位
 
 这条分支当前以 `WSL <-> Windows TDX bridge` 为主目标。

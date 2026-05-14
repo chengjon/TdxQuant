@@ -1,5 +1,11 @@
 # TdxQuant 接口能力覆盖矩阵
 
+> 状态源说明：本文是接口覆盖对照矩阵，不是功能状态注册表。
+>
+> 当前“已实现 / 部分实现 / 已设计待实现 / 非目标边界”的唯一准入口是根目录 [`FUNCTION_TREE.md`](../FUNCTION_TREE.md)。
+>
+> 本文中的“已覆盖 / 部分覆盖 / 未覆盖 / 不纳入当前 query manager”只说明接口覆盖口径；如与 `FUNCTION_TREE.md` 的功能状态不一致，以 `FUNCTION_TREE.md` 为准。
+
 本文对照 [docs/TdxQuant接口说明文档.md](/opt/iflow/TdxQuant/docs/TdxQuant接口说明文档.md:1)，梳理当前项目对文档中公开能力的覆盖情况。
 
 统计口径：
@@ -67,7 +73,7 @@
 
 ## 2. 部分覆盖能力
 
-这些能力已经有稳定的 bridge + manager 路径，但尚未扩展到 one-shot CLI 或 task/daemon 长驻入口。
+这些能力已经有稳定的 bridge + manager 路径，并且已经有 `subscription-watch` 前台任务与 worker bridge 控制面；剩余缺口主要是 query-style one-shot CLI、transport wrapper 和更高阶 replay / fake provider。
 
 | 文档能力 | 当前状态 | 当前入口 | 归属层 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -266,7 +272,7 @@
 
 当前状态：
 
-- 部分完成
+- foreground + bridge slice 已完成，transport / replay / 控制入口仍部分覆盖
 
 已落地入口：
 
@@ -280,14 +286,15 @@
 
 剩余目标：
 
-- task / daemon 形态的长驻订阅入口
-- 如有需要，再补带事件落盘语义的 CLI 控制入口
+- query-style one-shot CLI 或等价控制入口
+- `HTTP / SSE` 或同类事件流 transport wrapper
+- replay / fake provider / delayed playback 形态的订阅测试控制面
 
 理由：
 
 - `send_warn` 是一次性写入动作，已经可以沿 `runtime` 子域平滑收口
 - `subscribe_hq / unsubscribe_hq / get_subscribe_hq_stock_list` 已通过持久 session 进入 manager 管理层
-- 当前尚未解决的是“如何把持久 session 暴露为日常命令入口”，而不是底层订阅治理本身
+- 当前剩余问题已经不是“是否能暴露为日常任务”，而是如何稳定 transport wrapper、replay / fake provider 和 query-style 控制面
 
 ## 7. 当前建议结论
 
@@ -296,6 +303,6 @@
 1. `api kline` 和显式 Tick 入口已完成
 2. `get_trading_dates / refresh_kline / download_file` 已完成，并已进入 `runtime` 子域
 3. `block` 生命周期闭环已完成
-4. 参考数据、财务 / 交易数据面、`send_warn` 与 manager 级订阅持久 session 已完成；下一步应转向 task / daemon 形态的订阅入口
+4. 参考数据、财务 / 交易数据面、`send_warn`、manager 级订阅持久 session、`subscription-watch` 前台任务与 worker bridge 控制面已完成；下一步应转向订阅 transport wrapper、replay / fake provider、文件导入式 block sync 和更高阶治理入口
 
 这样推进最符合当前总方案中“先补 query manager 覆盖与统一治理，再扩大场景层与入口层”的方向。

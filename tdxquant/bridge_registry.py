@@ -100,6 +100,37 @@ def call_worker(
         raise RuntimeError(f"bridge worker request failed: {_normalize_url_error_reason(exc.reason)}") from exc
 
 
+def call_worker_text(
+    worker: BridgeWorker,
+    *,
+    method: str,
+    route: str,
+    token: str,
+    body: dict[str, Any] | None = None,
+) -> str:
+    request = Request(
+        f"http://{worker.host}:{worker.port}{route}",
+        method=method,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        data=None if body is None else json.dumps(body).encode("utf-8"),
+    )
+    try:
+        with urlopen(request, timeout=5.0) as response:
+            return response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_payload = _try_read_json_error_body(exc)
+        if error_payload is not None:
+            return json.dumps(error_payload, ensure_ascii=False)
+        raise RuntimeError(f"bridge worker request failed with HTTP {exc.code}: {exc.reason}") from exc
+    except UnicodeDecodeError as exc:
+        raise RuntimeError("bridge worker returned invalid text payload") from exc
+    except URLError as exc:
+        raise RuntimeError(f"bridge worker request failed: {_normalize_url_error_reason(exc.reason)}") from exc
+
+
 def run_bridge_watch_status(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
     worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
     return call_worker(
@@ -146,6 +177,30 @@ def run_bridge_watch_events(*, registry_path: str | Path, worker_id: str, tail: 
         worker,
         method="GET",
         route=_build_route("/bridge/v1/watch/events", tail=tail),
+        token=resolve_worker_token(worker),
+    )
+
+
+def run_bridge_watch_event_stream(
+    *,
+    registry_path: str | Path,
+    worker_id: str,
+    run_id: str | None = None,
+    from_cursor: str | None = None,
+    follow: bool | None = None,
+    heartbeat_seconds: int | None = None,
+) -> str:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker_text(
+        worker,
+        method="GET",
+        route=_build_route(
+            "/bridge/v1/watch/events/stream",
+            run_id=run_id,
+            **{"from": from_cursor},
+            follow=None if follow is None else str(follow).lower(),
+            heartbeat_seconds=heartbeat_seconds,
+        ),
         token=resolve_worker_token(worker),
     )
 
@@ -204,10 +259,13 @@ def _resolve_worker(*, registry_path: str | Path, worker_id: str) -> BridgeWorke
     return select_worker(load_worker_registry(registry_path), worker_id=worker_id)
 
 
-def _build_route(path: str, *, tail: int | None = None) -> str:
-    query: dict[str, int] = {}
+def _build_route(path: str, *, tail: int | None = None, **params: Any) -> str:
+    query: dict[str, Any] = {}
     if tail is not None:
         query["tail"] = tail
+    for key, value in params.items():
+        if value is not None:
+            query[key] = value
     if not query:
         return path
     return f"{path}?{urlencode(query)}"

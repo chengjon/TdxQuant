@@ -17,6 +17,7 @@ from tdxquant.bridge_registry import (
     run_bridge_health,
     run_bridge_watch_artifacts,
     run_bridge_watch_events,
+    run_bridge_watch_event_stream,
     run_bridge_watch_list,
     run_bridge_watch_logs,
     run_bridge_watch_start,
@@ -300,6 +301,37 @@ class BridgeRegistryTests(unittest.TestCase):
 
         self.assertEqual(payload, {"ok": True, "result": {"events": []}})
         self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/events?tail=25")
+
+    def test_run_bridge_watch_event_stream_uses_stream_route_and_cursor_query(self) -> None:
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch("tdxquant.bridge_registry.call_worker_text", return_value="event: heartbeat\n\n") as mocked_call,
+        ):
+            payload = run_bridge_watch_event_stream(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                run_id="run-001",
+                from_cursor="run-001:event:7",
+                follow=False,
+                heartbeat_seconds=5,
+            )
+
+        self.assertEqual(payload, "event: heartbeat\n\n")
+        self.assertEqual(
+            mocked_call.call_args.kwargs["route"],
+            "/bridge/v1/watch/events/stream?run_id=run-001&from=run-001%3Aevent%3A7&follow=false&heartbeat_seconds=5",
+        )
 
     def test_run_bridge_watch_logs_uses_tail_query_parameter(self) -> None:
         worker = BridgeWorker(

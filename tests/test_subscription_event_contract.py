@@ -69,3 +69,23 @@ class SubscriptionEventContractTests(unittest.TestCase):
         )
         self.assertEqual(rows[0]["symbol"], None)
         self.assertEqual(rows[0]["payload"], "raw-event")
+
+    def test_reconnect_metadata_is_additive_when_provided(self) -> None:
+        rows = normalize_subscription_event_rows(
+            {"symbol": "000001.SZ", "Now": 10.01},
+            session_id="session-1",
+            provider_instance_id="provider-1",
+            subscription_id="sub-1",
+            run_id="run-1",
+            start_sequence=1,
+            reconnect_metadata={
+                "reconnect_count": 2,
+                "session_generation": 3,
+                "last_disconnect_at": "2026-05-14T01:00:00+00:00",
+                "last_reconnect_at": "2026-05-14T01:00:03+00:00",
+                "degraded_since": None,
+            },
+        )
+
+        self.assertEqual(rows[0]["reconnect_metadata"]["reconnect_count"], 2)
+        self.assertEqual(rows[0]["reconnect_metadata"]["session_generation"], 3)

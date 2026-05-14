@@ -183,6 +183,28 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         with urlopen(request, timeout=5) as response:
             return json.loads(response.read().decode("utf-8"))
 
+    def _request_text(
+        self,
+        url: str,
+        *,
+        token: str | None = None,
+    ) -> tuple[str, str]:
+        headers: dict[str, str] = {}
+        if token is not None:
+            headers["Authorization"] = f"Bearer {token}"
+        request = Request(url, headers=headers, method="GET")
+        with urlopen(request, timeout=5) as response:
+            return response.headers.get_content_type(), response.read().decode("utf-8")
+
+    @staticmethod
+    def _parse_sse_payloads(raw: str) -> list[dict[str, object]]:
+        payloads: list[dict[str, object]] = []
+        for block in raw.strip().split("\n\n"):
+            for line in block.splitlines():
+                if line.startswith("data: "):
+                    payloads.append(json.loads(line.removeprefix("data: ")))
+        return payloads
+
     def test_health_requires_bearer_token(self) -> None:
         with TemporaryDirectory() as temp_dir:
             config = BridgeConfig(
@@ -367,6 +389,64 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["watch_status"]["state"], "reconnecting")
         self.assertEqual(payload["result"]["watch_status"]["reconnect_count"], 1)
         self.assertEqual(payload["result"]["watch_status"]["last_error"]["code"], "SESSION_LOST")
+
+    def test_watch_event_stream_projects_status_and_event_rows_as_sse(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {"state": "reconnecting", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {
+                    "run_id": "run-001",
+                    "state": "reconnecting",
+                    "reconnect_count": 1,
+                    "last_disconnect_at": "2026-05-14T01:00:00+00:00",
+                    "last_reconnect_at": None,
+                    "next_reconnect_at": "2026-05-14T01:00:05+00:00",
+                    "degraded_since": None,
+                    "last_error": {"code": "SESSION_LOST", "message": "session lost"},
+                },
+            }
+            controller.events_result = {
+                "run_id": "run-001",
+                "events": [
+                    {
+                        "schema_version": "subscription.event.v1",
+                        "capability": "subscription.watch",
+                        "run_id": "run-001",
+                        "sequence": 7,
+                        "event_type": "quote_update",
+                        "symbol": "000001.SZ",
+                        "reconnect_metadata": {"reconnect_count": 1},
+                        "payload": {"Now": 10.01},
+                    }
+                ],
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                content_type, raw = self._request_text(
+                    f"{base_url}/bridge/v1/watch/events/stream?run_id=run-001&follow=false",
+                    token="secret-token",
+                )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(content_type, "text/event-stream")
+        payloads = self._parse_sse_payloads(raw)
+        self.assertEqual(payloads[0]["frame_type"], "status")
+        self.assertEqual(payloads[0]["reconnect"]["reconnect_count"], 1)
+        self.assertEqual(payloads[1]["frame_type"], "quote")
+        self.assertEqual(payloads[1]["event"]["sequence"], 7)
+        self.assertEqual(payloads[1]["event"]["reconnect_metadata"]["reconnect_count"], 1)
 
     def test_watch_status_preserves_degraded_runtime_fields(self) -> None:
         with TemporaryDirectory() as temp_dir:

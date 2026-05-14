@@ -1,5 +1,11 @@
 # TdxQuant 面向 MyStocks 的下一步开发与改进方向
 
+> 状态源说明：本文是面向 MyStocks 反馈的 next-step 背景说明，不是独立 `ROADMAP.md`，也不是功能状态注册表。
+>
+> 当前“已实现 / 部分实现 / 已设计待实现 / 非目标边界”的唯一准入口是根目录 [`FUNCTION_TREE.md`](../FUNCTION_TREE.md)。
+>
+> 本文中的“下一步 / 优先级 / 目标 / 建议”等表述只表示 MyStocks 反馈下的设计输入；如与 `FUNCTION_TREE.md` 不一致，以 `FUNCTION_TREE.md` 为准。
+
 本文基于以下材料整理：
 
 - [TdxQuant_Project_Function_Map.md](/opt/iflow/TdxQuant/docs/TdxQuant_Project_Function_Map.md)
@@ -223,7 +229,9 @@ MyStocks 接受板块写能力，但要求它晚于只读能力，并且必须�
 
 ## 4. 建议的开发顺序
 
-基于 MyStocks 的反馈，建议本项目按以下顺序推进：
+基于 MyStocks 的反馈，建议本项目按以下顺序推进。
+
+截至 `2026-05-13`，第 1 到第 4 阶段的基础版已经落地：provider JSON contract、capability discovery / health / doctor、`formula.screen`、query provider-ready、`subscription-watch` foreground + bridge slice、block mutation safety 与 `block.sync_watchlist` 都已经进入当前主线。后续重点应从“从 0 到 1 补入口”转为“补 transport / replay / 文件导入 / 写策略这些集成硬化面”。
 
 ### 第 1 阶段：Provider 基础治理
 
@@ -231,30 +239,35 @@ MyStocks 接受板块写能力，但要求它晚于只读能力，并且必须�
 - 固定错误码与版本字段
 - 补 capability doctor / runtime doctor / health probe
 - 强化 query path / trade path 边界文档
+- 当前状态：基础版已完成，后续只做 contract hardening
 
 ### 第 2 阶段：只读能力 provider-ready
 
 - 统一 `formula / market / meta / financial / transaction` 输出
 - 补批量调用 metadata
 - 验证 Windows provider 下的可用性与稳定性
+- 当前状态：主查询面已完成基础 contract，后续转向更大范围 replay / integration coverage
 
 ### 第 3 阶段：订阅产品化
 
 - 推出 `subscription-watch`
 - 固定 JSONL 事件包络
 - 提供 session 状态、状态文件与恢复信息
+- 当前状态：foreground task 和 worker bridge slice 已完成，后续转向 `HTTP / SSE` transport、reconnect metadata 和 replay / delayed playback
 
 ### 第 4 阶段：板块同步准备
 
 - 补 block 写入审计
 - 补失败反馈
 - 补幂等或重复写保护
+- 当前状态：基础写入治理和 `watchlist -> TongDaXin block` 已完成，后续转向文件导入式 watchlist、覆盖写 / 增量写策略和更强重复写保护
 
 ### 第 5 阶段：交易线单独治理
 
 - 仅保留在 `experimental`
 - 继续做风险控制、审计和健康检查
 - 不纳入当前对 MyStocks 的主线集成目标
+- 当前状态：交易安全与审计基础已经较完整；撤单、资金、持仓、broker-native push API 仍不应进入 MyStocks 主接入路径
 
 ## 5. 不建议当前优先推进的内容
 
@@ -271,18 +284,30 @@ MyStocks 接受板块写能力，但要求它晚于只读能力，并且必须�
 
 为便于真正落地，建议后续将工作拆成独立 change，而不是混成一个大包。
 
-建议候选方向：
+截至 `2026-05-13`，早期候选里的 `provider-result-contract`、`provider-health-doctor`、`task-runtime-subscription-watch`、`block-mutation-safety` 和 `trade-safety-hardening` 都已经完成基础版。面向 MyStocks 的后续候选方向应更新为：
 
-1. `provider-result-contract`
-   - 统一 JSON 包络、错误码、schema version、capability version
-2. `provider-health-doctor`
-   - 平台、TongDaXin、DLL、subscription、window/HID 探测
-3. `task-runtime-subscription-watch`
-   - JSONL 事件流、状态文件、session 管理
-4. `block-mutation-safety`
-   - 审计、失败反馈、幂等/重复写防护
-5. `trade-safety-hardening`
-   - 仅面向实验交易线的风险治理补强
+1. `subscription-transport-event-stream`
+   - 优先级：P0
+   - 目标：固定 `HTTP / SSE` 或同等 transport wrapper、`reconnect metadata` 和状态摘要
+   - 非范围：不重写 `subscription-watch` artifact contract，不把交易线带入订阅主线
+2. `provider-transport-replay-fixtures`
+   - 优先级：P0
+   - 目标：提供 HTTP replay service、daemon fake provider、delayed playback sample，支撑 MyStocks 侧 contract test
+   - 非范围：不新增业务 capability，不改变现有 CLI subprocess replay 语义
+3. `block-watchlist-file-import`
+   - 优先级：P1
+   - 目标：固定 watchlist 输入文件 schema、校验错误、dry-run 输出，并接到 `block.sync_watchlist`
+   - 非范围：不做双向同步，不直接写回 MyStocks
+4. `block-sync-write-policy-hardening`
+   - 优先级：P1
+   - 目标：明确覆盖写 / 增量写 policy、冲突反馈和 `mutation_key` replay / conflict 边界
+   - 非范围：不重做 `block.read_watchlist_snapshot`，不把 task 层扩成新 provider schema
+5. `catalog-discovery-preview-hardening`
+   - 优先级：P2
+   - 目标：增强可发现性、plan / preview 和 label 过滤，方便人工/运维使用稳定入口
+   - 非范围：不把 `catalog` 变成 MyStocks 正式集成协议
+
+交易相关的 `desktop-trade-extended-broker-capabilities` 仍只作为 TdxQuant 内部隔离交易线候选，不建议作为 MyStocks 当前主线工作包。
 
 这些名字只是建议，重点是按能力边界拆小，而不是一次性推进。
 

@@ -1,5 +1,11 @@
 # TdxQuant API 顶层管理体系・整体方案规划
 
+> 状态源说明：本文是 API/manager 分层设计方案，不是功能状态注册表。
+>
+> 当前“已实现 / 部分实现 / 已设计待实现 / 非目标边界”的唯一准入口是根目录 [`FUNCTION_TREE.md`](../FUNCTION_TREE.md)。
+>
+> 本文中的“已完成 / 当前 / 规划 / 要求”等表述只用于解释 API 体系设计；如与 `FUNCTION_TREE.md` 的状态注册表不一致，以 `FUNCTION_TREE.md` 为准。
+
 本文是对项目总方案的对齐版，目标是让上位规划与当前已经落地的 `TdxApiManager`、`TdxTaskManager`、`TdxTradeManager`、`catalog` 和桌面交易 capability 保持一致。
 
 ## 一、核心设计原则
@@ -218,6 +224,8 @@
 
 后续工作不应继续泛化为“所有层一起推进”，而应分主线排优先级。
 
+截至 `2026-05-13`，查询主线覆盖、provider 基础治理、`subscription-watch` foreground + bridge slice、block 基础读写治理和交易安全基础治理都已经完成第一版。当前下一步不应再回到“补更多原子查询函数”，而应围绕 transport / replay / 文件导入 / 写策略 / audit 索引这些集成硬化面推进。
+
 ### 第一优先：查询主线收口
 
 1. 对照 `docs/TdxQuant接口说明文档.md` 建立能力覆盖矩阵。
@@ -283,7 +291,7 @@
 - `session.unsubscribe_hq(...)`
 - `session.get_subscribe_hq_stock_list()`
 
-因此，“查询主线收口”的下一优先项不再是继续补 runtime 的一次性动作，也不再是补订阅底层生命周期本身，而是转向 block 生命周期闭环、后续数据面扩展，以及最终的 task / daemon 订阅入口问题。
+因此，“查询主线收口”的下一优先项不再是继续补 runtime 的一次性动作，也不再是补订阅底层生命周期本身。`subscription-watch` 前台任务和 worker bridge 控制面已经完成第一版，后续应转向订阅 transport wrapper、replay / fake provider、文件导入式 block sync、写策略硬化和 audit 索引这类集成硬化问题。
 
 同日，`block` 子域也已完成第一轮生命周期闭环，当前已纳入：
 
@@ -345,7 +353,7 @@
 - `tdx-data-market-transaction`
 - `tdx-data-market-transaction-by-date`
 
-这意味着财务 / 交易数据面在当前接口说明文档范围内已经完成标准入口收口。后续查询主线如果继续推进，不应再回到交易数据分片本身；runtime 层的一次性告警与 manager 级订阅持久 session 也已完成，后续重点应转向 task / daemon 订阅入口或其它更高层公共能力。
+这意味着财务 / 交易数据面在当前接口说明文档范围内已经完成标准入口收口。后续查询主线如果继续推进，不应再回到交易数据分片本身；runtime 层的一次性告警、manager 级订阅持久 session、`subscription-watch` 前台任务和 worker bridge 控制面也已完成，后续重点应转向订阅 transport wrapper、HTTP / SSE 推送语义、replay / fake provider 硬化和 query-style 控制入口。
 
 ## 六、关键边界约定
 

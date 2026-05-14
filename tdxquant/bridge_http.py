@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
@@ -15,6 +16,9 @@ from .subscription_watch_background import (
 )
 
 BRIDGE_VERSION = "v1"
+WATCH_EVENT_STREAM_SCHEMA_VERSION = "tdx.bridge.watch.event_stream.v1"
+WATCH_EVENT_STREAM_TRANSPORT = "sse"
+WATCH_TERMINAL_STATES = {"completed", "interrupted", "failed", "stopped"}
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,43 @@ def build_bridge_failure(
             "request_id": request_id,
         },
     }
+
+
+def _now_utc_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _build_watch_event_stream_frame(
+    *,
+    run_id: str | None,
+    frame_type: str,
+    cursor: str,
+    event: dict[str, Any] | None = None,
+    status: dict[str, Any] | None = None,
+    reconnect: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    frame: dict[str, Any] = {
+        "schema_version": WATCH_EVENT_STREAM_SCHEMA_VERSION,
+        "transport": WATCH_EVENT_STREAM_TRANSPORT,
+        "run_id": run_id,
+        "cursor": cursor,
+        "frame_type": frame_type,
+        "emitted_at": _now_utc_iso(),
+    }
+    if event is not None:
+        frame["event"] = event
+    if status is not None:
+        frame["status"] = status
+    if reconnect is not None:
+        frame["reconnect"] = reconnect
+    return frame
+
+
+def _encode_sse_frame(frame: dict[str, Any]) -> str:
+    payload = json.dumps(frame, ensure_ascii=False, separators=(",", ":"))
+    cursor = str(frame.get("cursor") or "")
+    frame_type = str(frame.get("frame_type") or "message")
+    return f"id: {cursor}\nevent: {frame_type}\ndata: {payload}\n\n"
 
 
 def load_bridge_config(config_path: str | Path) -> BridgeConfig:
@@ -198,6 +239,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if method == "GET" and parsed.path == "/bridge/v1/watch/artifacts":
                 self._handle_watch_artifacts(request_id)
                 return
+            if method == "GET" and parsed.path == "/bridge/v1/watch/events/stream":
+                self._handle_watch_event_stream(request_id)
+                return
             if method == "GET" and parsed.path == "/bridge/v1/watch/events":
                 self._handle_watch_events(request_id)
                 return
@@ -300,6 +344,22 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             ),
         )
 
+    def _handle_watch_event_stream(self, request_id: str) -> None:
+        run_id = self._resolve_run_id()
+        tail = self._query_int("tail", default=100)
+        heartbeat_seconds = self._query_int("heartbeat_seconds", default=15)
+        status_result = self.server.bridge_controller.status()
+        events_result = self.server.bridge_controller.events(run_id=run_id, tail=tail)
+        frames = self._build_watch_event_stream_frames(
+            request_id=request_id,
+            run_id=run_id,
+            status_result=status_result,
+            events_result=events_result,
+            from_cursor=self._stream_resume_cursor(),
+            heartbeat_seconds=heartbeat_seconds,
+        )
+        self._write_sse(200, frames)
+
     def _handle_watch_logs(self, request_id: str) -> None:
         run_id = self._resolve_run_id()
         tail = self._query_int("tail", default=200)
@@ -369,6 +429,128 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return active_run_id
         return None
 
+    def _stream_resume_cursor(self) -> str | None:
+        parsed = urlparse(self.path)
+        query = parse_qs(parsed.query)
+        explicit = self._optional_str(query.get("from", [None])[0])
+        if explicit:
+            return explicit
+        return self._optional_str(self.headers.get("Last-Event-ID"))
+
+    def _build_watch_event_stream_frames(
+        self,
+        *,
+        request_id: str,
+        run_id: str | None,
+        status_result: dict[str, Any],
+        events_result: dict[str, Any],
+        from_cursor: str | None,
+        heartbeat_seconds: int,
+    ) -> list[dict[str, Any]]:
+        control = status_result.get("control") if isinstance(status_result.get("control"), dict) else {}
+        watch_status = (
+            status_result.get("watch_status") if isinstance(status_result.get("watch_status"), dict) else {}
+        )
+        resolved_run_id = (
+            run_id
+            or self._optional_str(watch_status.get("run_id"))
+            or self._optional_str(control.get("run_id"))
+            or self._optional_str(events_result.get("run_id"))
+        )
+        status_projection = {
+            "request_id": request_id,
+            "control": control,
+            "watch_status": watch_status,
+        }
+        reconnect_projection = self._build_reconnect_projection(watch_status)
+        frames: list[dict[str, Any]] = [
+            _build_watch_event_stream_frame(
+                run_id=resolved_run_id,
+                frame_type="status",
+                cursor=f"{resolved_run_id or 'unknown'}:status",
+                status=status_projection,
+                reconnect=reconnect_projection,
+            )
+        ]
+
+        raw_events = events_result.get("events") if isinstance(events_result.get("events"), list) else []
+        requested_sequence = self._event_sequence_from_cursor(from_cursor)
+        event_sequences = [
+            int(item["sequence"])
+            for item in raw_events
+            if isinstance(item, dict) and isinstance(item.get("sequence"), int)
+        ]
+        if requested_sequence is not None and event_sequences and min(event_sequences) > requested_sequence + 1:
+            raise ValueError("stream cursor is no longer available")
+
+        emitted_quote = False
+        for index, item in enumerate(raw_events, start=1):
+            if not isinstance(item, dict):
+                continue
+            sequence = item.get("sequence")
+            if isinstance(sequence, int):
+                if requested_sequence is not None and sequence <= requested_sequence:
+                    continue
+                cursor = f"{resolved_run_id or item.get('run_id') or 'unknown'}:event:{sequence}"
+            else:
+                cursor = f"{resolved_run_id or item.get('run_id') or 'unknown'}:event:{index}"
+            frames.append(
+                _build_watch_event_stream_frame(
+                    run_id=self._optional_str(item.get("run_id")) or resolved_run_id,
+                    frame_type="quote",
+                    cursor=cursor,
+                    event=item,
+                )
+            )
+            emitted_quote = True
+
+        if not emitted_quote and heartbeat_seconds > 0:
+            frames.append(
+                _build_watch_event_stream_frame(
+                    run_id=resolved_run_id,
+                    frame_type="heartbeat",
+                    cursor=f"{resolved_run_id or 'unknown'}:heartbeat",
+                    status=status_projection,
+                    reconnect=reconnect_projection,
+                )
+            )
+
+        state = self._optional_str(watch_status.get("state")) or self._optional_str(control.get("state"))
+        if state in WATCH_TERMINAL_STATES:
+            frames.append(
+                _build_watch_event_stream_frame(
+                    run_id=resolved_run_id,
+                    frame_type="terminal",
+                    cursor=f"{resolved_run_id or 'unknown'}:terminal",
+                    status=status_projection,
+                    reconnect=reconnect_projection,
+                )
+            )
+        return frames
+
+    @staticmethod
+    def _event_sequence_from_cursor(cursor: str | None) -> int | None:
+        if not cursor or ":event:" not in cursor:
+            return None
+        raw_value = cursor.rsplit(":event:", 1)[-1]
+        try:
+            return int(raw_value)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _build_reconnect_projection(watch_status: dict[str, Any]) -> dict[str, Any]:
+        keys = [
+            "reconnect_count",
+            "consecutive_reconnect_failures",
+            "last_disconnect_at",
+            "last_reconnect_at",
+            "next_reconnect_at",
+            "degraded_since",
+            "last_error",
+        ]
+        return {key: watch_status.get(key) for key in keys if key in watch_status}
+
     def _query_int(self, name: str, *, default: int) -> int:
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
@@ -401,6 +583,15 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _write_sse(self, status_code: int, frames: list[dict[str, Any]]) -> None:
+        encoded = "".join(_encode_sse_frame(frame) for frame in frames).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)

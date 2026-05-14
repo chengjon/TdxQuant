@@ -1,8 +1,14 @@
 # TdxQuant Next Steps
 
-本文是 `TdxQuant` 项目的统一下一步开发与改进方向说明。
+> 状态源说明：本文保留为 next-step 背景和输入资料，不是独立 `ROADMAP.md`，也不是功能状态注册表。
+>
+> 当前“已实现 / 部分实现 / 已设计待实现 / 非目标边界”的唯一准入口是根目录 [`FUNCTION_TREE.md`](../FUNCTION_TREE.md)。
+>
+> 本文中的“下一步 / canonical next steps / 路线图”等表述只表示设计输入和历史决策背景；如与 `FUNCTION_TREE.md` 不一致，以 `FUNCTION_TREE.md` 为准。
 
-它不是 `mystocks` 或 `quantix-rust` 的项目文档，而是基于两个上层项目的反馈，整理出的 **TdxQuant 自身 canonical next steps**，用于帮助上层项目提前对齐：
+本文是 `TdxQuant` 项目的下一步开发与改进方向背景说明。
+
+它不是 `mystocks` 或 `quantix-rust` 的项目文档，而是基于两个上层项目的反馈，整理出的 **TdxQuant 自身 next-step 输入资料**，用于帮助上层项目提前对齐：
 
 - TdxQuant 接下来会补哪些能力
 - 哪些接口会优先稳定
@@ -16,7 +22,7 @@
 - TdxQuant 自身开发者
 - 依赖或准备接入 TdxQuant 的上层系统
 
-它的作用不是复述所有讨论过程，而是把当前已经收敛出的结论固化成一份项目级路线图。
+它的作用不是复述所有讨论过程，而是把当前已经收敛出的结论固化成一份项目级设计输入；正式功能状态与待实现登记仍以根目录 `FUNCTION_TREE.md` 为准。
 
 输入依据主要来自：
 
@@ -390,7 +396,7 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 - audit bundles：`audit-diagnostics` / `audit-pingan-review` / `audit-rejection-diagnostics` / `audit-pingan-rejection-diagnostics` / `audit-confirmed-review` / `audit-pingan-confirmed-review` / `audit-replay-review` / `audit-pingan-replay-review` / `audit-failure-diagnostics` / `audit-pingan-failure-diagnostics` / `audit-exception-diagnostics` / `audit-pingan-exception-diagnostics` / `audit-confirm-exception-diagnostics` / `audit-confirm-rejection-diagnostics` / `audit-confirm-failure-diagnostics` / `audit-pingan-confirm-exception-diagnostics` / `audit-pingan-confirm-rejection-diagnostics` / `audit-pingan-confirm-failure-diagnostics` / `audit-submit-once-exception-diagnostics` / `audit-submit-once-rejection-diagnostics` / `audit-submit-once-failure-diagnostics` / `audit-pingan-submit-once-exception-diagnostics` / `audit-pingan-submit-once-rejection-diagnostics` / `audit-pingan-submit-once-failure-diagnostics` / `audit-buy-exception-diagnostics` / `audit-buy-rejection-diagnostics` / `audit-buy-failure-diagnostics` / `audit-pingan-buy-exception-diagnostics` / `audit-pingan-buy-rejection-diagnostics` / `audit-pingan-buy-failure-diagnostics` / `audit-sell-exception-diagnostics` / `audit-pingan-sell-exception-diagnostics` / `audit-submit-path-exception-diagnostics` / `audit-submit-path-rejection-diagnostics` / `audit-submit-path-failure-diagnostics` / `audit-pingan-submit-path-exception-diagnostics` / `audit-pingan-submit-path-rejection-diagnostics` / `audit-pingan-submit-path-failure-diagnostics` / `audit-order-exception-diagnostics` / `audit-order-rejection-diagnostics` / `audit-order-failure-diagnostics` / `audit-pingan-order-exception-diagnostics` / `audit-pingan-order-rejection-diagnostics` / `audit-pingan-order-failure-diagnostics`
 - task presets：`submit-ready-default` / `confirm-current-default`
 - split-step catalog entries：`task-submit-ready` / `task-confirm-current`
-- split-step bundles：`submit-ready-audit-review` / `submit-ready-exception-review` / `submit-ready-pingan-audit-review` / `submit-ready-pingan-exception-review` / `submit-ready-order-exception-review` / `submit-ready-pingan-order-exception-review` / `submit-ready-order-rejection-review` / `submit-ready-order-failure-review` / `submit-ready-pingan-order-rejection-review` / `submit-ready-pingan-order-failure-review` / `submit-ready-submit-path-exception-review` / `submit-ready-pingan-submit-path-exception-review` / `submit-ready-submit-path-rejection-review` / `submit-ready-submit-path-failure-review` / `submit-ready-pingan-submit-path-rejection-review` / `submit-ready-pingan-submit-path-failure-review` / `confirm-audit-review` / `confirm-pingan-audit-review` / `confirm-complete-review` / `confirm-pingan-complete-review` / `confirm-exception-review` / `confirm-pingan-exception-review` / `confirm-rejection-review` / `confirm-failure-review` / `confirm-pingan-rejection-review` / `confirm-pingan-failure-review` / `confirm-order-exception-review` / `confirm-pingan-order-exception-review` / `confirm-order-rejection-review` / `confirm-order-failure-review` / `confirm-pingan-order-rejection-review` / `confirm-pingan-order-failure-review` / `submit-once-audit-review` / `submit-once-pingan-audit-review` / `submit-once-complete-review` / `submit-once-pingan-complete-review` / `submit-once-exception-review` / `submit-once-pingan-exception-review` / `submit-once-rejection-review` / `submit-once-failure-review` / `submit-once-pingan-rejection-review` / `submit-once-pingan-failure-review` / `submit-once-submit-path-exception-review` / `submit-once-pingan-submit-path-exception-review` / `submit-once-submit-path-rejection-review` / `submit-once-submit-path-failure-review` / `submit-once-pingan-submit-path-rejection-review` / `submit-once-pingan-submit-path-failure-review` / `submit-once-order-exception-review` / `submit-once-pingan-order-exception-review` / `submit-once-order-rejection-review` / `submit-once-order-failure-review` / `submit-once-pingan-order-rejection-review` / `submit-once-pingan-order-failure-review` / `guarded-buy-audit-review` / `guarded-pingan-buy-audit-review` / `guarded-buy-complete-review` / `guarded-pingan-buy-complete-review` / `guarded-buy-exception-review` / `guarded-buy-rejection-review` / `guarded-buy-failure-review` / `guarded-pingan-buy-exception-review` / `guarded-pingan-buy-rejection-review` / `guarded-pingan-buy-failure-review` / `guarded-buy-order-exception-review` / `guarded-pingan-buy-order-exception-review` / `guarded-buy-order-rejection-review` / `guarded-buy-order-failure-review` / `guarded-pingan-buy-order-rejection-review` / `guarded-pingan-buy-order-failure-review` / `confirm-submit-path-exception-review` / `confirm-pingan-submit-path-exception-review` / `confirm-submit-path-rejection-review` / `confirm-submit-path-failure-review` / `confirm-pingan-submit-path-rejection-review` / `confirm-pingan-submit-path-failure-review`
+- split-step bundles：`submit-ready-audit-review` / `submit-ready-exception-review` / `submit-ready-pingan-audit-review` / `submit-ready-pingan-exception-review` / `submit-ready-rejection-review` / `submit-ready-failure-review` / `submit-ready-pingan-rejection-review` / `submit-ready-pingan-failure-review` / `submit-ready-order-exception-review` / `submit-ready-pingan-order-exception-review` / `submit-ready-order-rejection-review` / `submit-ready-order-failure-review` / `submit-ready-pingan-order-rejection-review` / `submit-ready-pingan-order-failure-review` / `submit-ready-submit-path-exception-review` / `submit-ready-pingan-submit-path-exception-review` / `submit-ready-submit-path-rejection-review` / `submit-ready-submit-path-failure-review` / `submit-ready-pingan-submit-path-rejection-review` / `submit-ready-pingan-submit-path-failure-review` / `confirm-audit-review` / `confirm-pingan-audit-review` / `confirm-complete-review` / `confirm-pingan-complete-review` / `confirm-exception-review` / `confirm-pingan-exception-review` / `confirm-rejection-review` / `confirm-failure-review` / `confirm-pingan-rejection-review` / `confirm-pingan-failure-review` / `confirm-order-exception-review` / `confirm-pingan-order-exception-review` / `confirm-order-rejection-review` / `confirm-order-failure-review` / `confirm-pingan-order-rejection-review` / `confirm-pingan-order-failure-review` / `submit-once-audit-review` / `submit-once-pingan-audit-review` / `submit-once-complete-review` / `submit-once-pingan-complete-review` / `submit-once-exception-review` / `submit-once-pingan-exception-review` / `submit-once-rejection-review` / `submit-once-failure-review` / `submit-once-pingan-rejection-review` / `submit-once-pingan-failure-review` / `submit-once-submit-path-exception-review` / `submit-once-pingan-submit-path-exception-review` / `submit-once-submit-path-rejection-review` / `submit-once-submit-path-failure-review` / `submit-once-pingan-submit-path-rejection-review` / `submit-once-pingan-submit-path-failure-review` / `submit-once-order-exception-review` / `submit-once-pingan-order-exception-review` / `submit-once-order-rejection-review` / `submit-once-order-failure-review` / `submit-once-pingan-order-rejection-review` / `submit-once-pingan-order-failure-review` / `guarded-buy-audit-review` / `guarded-pingan-buy-audit-review` / `guarded-buy-complete-review` / `guarded-pingan-buy-complete-review` / `guarded-buy-exception-review` / `guarded-buy-rejection-review` / `guarded-buy-failure-review` / `guarded-pingan-buy-exception-review` / `guarded-pingan-buy-rejection-review` / `guarded-pingan-buy-failure-review` / `guarded-buy-order-exception-review` / `guarded-pingan-buy-order-exception-review` / `guarded-buy-order-rejection-review` / `guarded-buy-order-failure-review` / `guarded-pingan-buy-order-rejection-review` / `guarded-pingan-buy-order-failure-review` / `confirm-submit-path-exception-review` / `confirm-pingan-submit-path-exception-review` / `confirm-submit-path-rejection-review` / `confirm-submit-path-failure-review` / `confirm-pingan-submit-path-rejection-review` / `confirm-pingan-submit-path-failure-review`
 - 基于 `audit_id` / `contract_no` / `submission_key` / `code` 的稳定审计查询
 - 基于本地日期的稳定单日审计聚合
 - 基于闭区间的稳定审计聚合
@@ -570,7 +576,9 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
 
 为了便于真正推进，建议下一步按小包拆开，而不是混成一个大 change。
 
-建议候选方向：
+截至 `2026-05-13`，第一批基础治理包已经完成，当前后续候选包应围绕 [TdxQuant_Project_Function_Map.md](/opt/iflow/TdxQuant/docs/TdxQuant_Project_Function_Map.md) 中的 `[未实现/延期]` 节点继续拆。
+
+已完成基础包：
 
 1. `block-mutation-safety`
    - 已完成：block 写入审计、`applied / noop / rejected / failed` governance schema、失败反馈、可选 `mutation_key`、本地 replay / conflict 治理
@@ -590,6 +598,44 @@ TdxQuant 已经有较多查询和公式能力，但还没有形成对上层项�
    - 已完成：稳定 `trade submit-ready`、pre-confirm boundary、`local_state_mutating` 安全分级
 9. `trade-confirm-current-workflow`
    - 已完成：稳定 `trade confirm-current`、current-confirm boundary、可选 result closeout
+
+当前建议候选包：
+
+1. `subscription-transport-event-stream`
+   - 优先级：P0
+   - 对应缺口：`HTTP / SSE` 推送语义、`reconnect metadata` 细化
+   - 最低验收：transport contract 文档、状态摘要字段、reconnect 字段、代表性 fixture、focused transport tests
+   - 非范围：不重写 `subscription-watch` artifact contract；不改变 worker registry / auth 语义
+2. `provider-transport-replay-fixtures`
+   - 优先级：P0
+   - 对应缺口：HTTP replay service、daemon fake provider、live delayed playback
+   - 最低验收：HTTP replay service 最小入口、daemon fake provider、delayed playback sample、transport regression tests
+   - 非范围：不新增业务 capability；不改变现有 CLI subprocess replay 语义
+3. `block-watchlist-file-import`
+   - 优先级：P1
+   - 对应缺口：文件导入式 watchlist 适配
+   - 最低验收：输入文件 schema、parser / validator、dry-run 输出、与 `block.sync_watchlist` 的接线测试
+   - 非范围：不做双向同步；不直接写回上层系统
+4. `block-sync-write-policy-hardening`
+   - 优先级：P1
+   - 对应缺口：覆盖写 / 增量写高阶任务入口、重复写保护
+   - 最低验收：显式 policy enum、冲突反馈、`mutation_key` replay / conflict 测试、audit artifact 字段补齐
+   - 非范围：不重做 `block.read_watchlist_snapshot`；不把 task 层扩成新 provider schema
+5. `trade-audit-index-and-cross-ledger-query`
+   - 优先级：P1
+   - 对应缺口：审计目录索引缓存、跨 ledger 组合查询
+   - 最低验收：index cache schema、只读查询入口、跨 ledger join 规则、损坏文件容错测试
+   - 非范围：不改写历史 audit；不做成交金额 / 数量 / 价格聚合
+6. `catalog-discovery-preview-hardening`
+   - 优先级：P2
+   - 对应缺口：更丰富的 catalog 预览 / 发现能力
+   - 最低验收：list / plan / preview 输出约束、label / bundle 发现测试、文档同步
+   - 非范围：不改变 catalog schema；不让 catalog 反向定义业务 contract
+7. `desktop-trade-extended-broker-capabilities`
+   - 优先级：P2
+   - 对应缺口：资金、持仓、撤单、broker-native push API
+   - 最低验收：资金 / 持仓只读探测、撤单副作用分级、broker-native push 可行性边界、独立风险文档
+   - 非范围：不并入 query API；不作为上层项目默认交易主线
 
 ## 9. 结论
 
