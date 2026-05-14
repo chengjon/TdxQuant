@@ -2,7 +2,6 @@
 
 ## Purpose
 Stable in-process provider replay mode for offline contract validation through the same public entrypoints used by live execution.
-
 ## Requirements
 ### Requirement: Provider replay mode SHALL serve supported capabilities through deterministic fixture-backed execution
 The system SHALL provide an in-process replay provider mode for selected provider-facing capabilities so callers can consume stable offline responses through the same public entrypoints used by live mode.
@@ -34,3 +33,15 @@ The system SHALL treat replay mode as a strict offline execution path and MUST n
 - **WHEN** a caller invokes replay mode and no default, named, or path-based fixture can be resolved for the requested capability
 - **THEN** the system MUST return a stable failure result describing the unresolved replay fixture
 - **AND** the system MUST NOT attempt a live provider call
+
+### Requirement: Provider replay mode SHALL keep transport replay strict and fixture-backed
+The system SHALL treat transport replay execution as a replay-only path backed by explicit fixture data.
+
+#### Scenario: Transport replay never falls back to live runtime
+- **WHEN** a transport replay request cannot resolve a required fixture
+- **THEN** the system MUST return a stable replay error
+- **AND** it MUST NOT invoke live TongDaXin runtime code
+
+#### Scenario: Transport replay identifies replay source metadata
+- **WHEN** a replay HTTP response or replay SSE frame is emitted
+- **THEN** the payload MUST include replay source metadata sufficient to distinguish built-in fixtures from caller-supplied fixture paths

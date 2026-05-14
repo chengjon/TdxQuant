@@ -19,7 +19,7 @@
 
 | 功能节点 | 状态 | 证据 | 边界 |
 | --- | --- | --- | --- |
-| 项目基线 | `[已实现]` | `main@c5ef52a`；`tdxquant_py=63`、`tests=22`、`provider_fixtures=38` | 本文件描述当前工作区主线，不保证外部分支或历史 PR 一致。 |
+| 项目基线 | `[已实现]` | 当前工作区；`tdxquant_py=64`、`tests=23`、`provider_fixtures=40` | 本文件描述当前工作区主线，不保证外部分支或历史 PR 一致。 |
 | 单一功能注册表 | `[已实现]` | 本文件；`docs/TdxQuant_Project_Function_Map.md` 已作为输入资料归并 | `docs/TdxQuant_Project_Function_Map.md` 可作历史/背景参考，但本文件才是功能状态入口。 |
 | 运行环境定位 | `[已实现]` | `README.md`：当前分支以 `WSL <-> Windows TDX bridge` 为主目标 | WSL 侧消费结构化 JSON；不直接承诺在 WSL 内操作 Win32/UIA/HID。 |
 
@@ -95,7 +95,7 @@ TdxQuant
 | B-16 | reconnect/backoff 与长期运行治理 | `[部分实现]` | `docs/TdxQuant_Next_Steps.md` 记录 `reconnecting/degraded` 状态、heartbeat、summary 输出；fixture `subscription-watch-status-*.json` | 已有状态摘要和部分契约；更强 backoff、watermark、heartbeat 和长期治理仍未完全收口。 |
 | B-17 | provider result contract | `[已实现]` | `tdxquant/result_contract.py`、`tdxquant/query_contract.py`；provider fixture `provider-result-*.json`；`tests/test_provider_result_contract.py` | 约束 provider 返回结构；不保证外部 provider 永不返回业务异常。 |
 | B-18 | provider capability discovery / health / doctor | `[已实现]` | `tdxquant/provider_discovery.py`；`tdxquant/api/bridge.py`：`run_tdx_provider_capabilities`、`run_tdx_provider_health`、`run_tdx_provider_doctor`；fixture `runtime-capabilities-success.json`、`runtime-health-degraded.json`、`runtime-doctor-degraded.json` | 发现和诊断是可观测能力；不自动修复本机 TDX、COM、窗口或行情源问题。 |
-| B-19 | provider fixtures / in-process replay | `[已实现]` | `tdxquant/fixtures/provider/*` 共 `38` 个 fixture；`tdxquant/replay_fixtures.py`、`tdxquant/replay_provider.py`；`tests/test_replay_fixtures.py`、`tests/test_replay_provider.py` | fixture/replay 用于契约测试和离线验证；不能替代真实行情、公式或交易联调。 |
+| B-19 | provider fixtures / in-process replay | `[已实现]` | `tdxquant/fixtures/provider/*` 共 `40` 个 fixture；`tdxquant/replay_fixtures.py`、`tdxquant/replay_provider.py`；`tests/test_replay_fixtures.py`、`tests/test_replay_provider.py` | fixture/replay 用于契约测试和离线验证；不能替代真实行情、公式或交易联调。 |
 
 ### C. 任务、报告、目录主线
 
@@ -134,9 +134,9 @@ TdxQuant
 | E-02 | subscription HTTP/SSE 推送语义 | `[部分实现]` | `tdxquant/bridge_http.py` 已新增 `GET /bridge/v1/watch/events/stream` SSE 投影；`tdxquant/bridge_registry.py` 已新增 master-side stream helper；`tdxquant/fixtures/provider/subscription-watch-event-stream-frames.jsonl` 与 `tests/test_bridge_http.py` / `tests/test_bridge_registry.py` / `tests/test_replay_fixtures.py` 已覆盖代表性帧 | 当前是 read-only bridge event-stream v1，投影现有 run artifacts 与 controller state；不重写 `subscription-watch` artifact contract，不改变 worker registry/auth 语义，也不代表多 worker 调度或更高层协调协议已完成。 |
 | E-03 | block 文件导入式 watchlist 适配 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `文件导入式 watchlist 适配 [未实现/延期]` | 不代表当前可用；当前 watchlist 能力以 block 读取、同步、导出和 bundle 编排为主。 |
 | E-04 | block 覆盖写/增量写高阶任务入口 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `覆盖写 / 增量写高阶任务入口 [未实现/延期]` | 不代表当前可用；现有写入必须通过已实现的 mutation/sync 安全边界。 |
-| E-05 | provider HTTP replay service | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `HTTP replay service [未实现/延期]` | 不代表当前可用；当前 replay 是 fixture/in-process/subprocess 契约验证，不提供稳定 HTTP replay 服务。 |
-| E-06 | daemon fake provider | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `daemon fake provider [未实现/延期]` | 不代表当前可用；不能按 daemon 服务方式依赖 fake provider。 |
-| E-07 | wider capability replay coverage | `[部分实现]` | 已有 `38` 个 provider fixture；`docs/TdxQuant_Project_Function_Map.md` 标记 `wider capability replay coverage [部分覆盖]` | 部分能力有代表性 fixture；新增/边缘 capability 仍需补样例、契约和测试。 |
+| E-05 | provider HTTP replay service | `[部分实现]` | `tdxquant/provider_transport_replay.py` 提供 `GET /provider/v1/replay/health`、`fixtures`、`result`、`watch/status`、`watch/events`、`watch/events/stream`；`tests/test_provider_transport_replay.py` | 当前是 fixture-backed、read-only、标准库 HTTP replay service；不新增业务 capability，不改变 CLI subprocess replay 语义，也不等同于 live Windows provider/bridge。 |
+| E-06 | daemon fake provider | `[部分实现]` | `ProviderTransportReplayHTTPServer` 支持 bearer token、allowlist、watch status/events/SSE fake provider 投影；`subscription-watch-event-stream-delayed-playback.jsonl` | 当前 fake provider 只覆盖离线只读 replay transport；没有 start/stop 生命周期控制、真实调度、真实行情会话或长期守护进程管理。 |
+| E-07 | wider capability replay coverage | `[部分实现]` | 已有 `40` 个 provider fixture；`docs/TdxQuant_Project_Function_Map.md` 标记 `wider capability replay coverage [部分覆盖]` | 部分能力有代表性 fixture；新增/边缘 capability 仍需补样例、契约和测试。 |
 | E-08 | 更完整 formula capability-specific contract | `[部分实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `更多公式类 capability-specific contract [部分覆盖]` | 不能把 `formula.screen` 的稳定性推广到所有公式能力。 |
 | E-09 | 更厚 subscription 长跑包装 | `[已设计/待实现]` | `docs/TdxQuant_Next_Steps.md` 记录剩余重点：reconnect/backoff、长期运行治理、health/watermark/heartbeat 摘要、integration regression | 不代表当前可用；现有能力是 foreground run、background controller 和 bridge v1。 |
 | E-10 | 更多 catalog 预览/发现能力 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 与 `docs/TdxQuant_Next_Steps.md` 记录“更多 catalog 预览 / 发现能力仍在继续” | 不代表当前可用；当前以既有 catalog/bundle/list/plan/run 为准。 |
@@ -148,7 +148,7 @@ TdxQuant
 | ID | 功能节点 | 状态 | 证据 | 边界 |
 | --- | --- | --- | --- | --- |
 | X-01 | WSL 内直接操作 Win32/UIA/HID | `[非目标/边界]` | `README.md` 明确 WSL 侧消费结构化 JSON，交易/数据能力优先走 Windows 原生接口或 bridge | 不在 WSL 内直接驱动桌面控件；相关操作必须在 Windows/bridge 一侧完成。 |
-| X-02 | 将 fixture/replay 等同于真实外部可用性 | `[非目标/边界]` | `tdxquant/fixtures/provider/*`、`tdxquant/replay_provider.py`、`tests/test_replay_provider.py` | fixture 是契约和回归资产；不能作为真实行情、公式、交易或客户端环境已就绪的证明。 |
+| X-02 | 将 fixture/replay 等同于真实外部可用性 | `[非目标/边界]` | `tdxquant/fixtures/provider/*`、`tdxquant/replay_provider.py`、`tdxquant/provider_transport_replay.py`、`tests/test_replay_provider.py`、`tests/test_provider_transport_replay.py` | fixture/replay/HTTP fake provider 是契约和回归资产；不能作为真实行情、公式、交易、Windows 客户端环境或 live bridge 已就绪的证明。 |
 | X-03 | 用独立 ROADMAP 覆盖本文件 | `[非目标/边界]` | 本文件注册规则 | 不再建立与 `FUNCTION_TREE.md` 并列抢真相的 `ROADMAP.md`；待实现项只在本文件分状态登记。 |
 | X-04 | 将交易主线包装成全券商生产交易平台 | `[非目标/边界]` | 当前源码主要证据集中在 `PingAnDesktopTraderGateway`、`TdxTradeManager.pingan.*`、平安相关测试与 artifact | 当前是桌面自动化交易辅助和治理层，不承诺多券商、全品种、全异常弹窗覆盖。 |
 
