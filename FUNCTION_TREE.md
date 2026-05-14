@@ -19,7 +19,7 @@
 
 | 功能节点 | 状态 | 证据 | 边界 |
 | --- | --- | --- | --- |
-| 项目基线 | `[已实现]` | 当前工作区；`tdxquant_py=64`、`tests=23`、`provider_fixtures=40` | 本文件描述当前工作区主线，不保证外部分支或历史 PR 一致。 |
+| 项目基线 | `[已实现]` | 当前工作区；`tdxquant_py=65`、`tests=24`、`provider_fixtures=40` | 本文件描述当前工作区主线，不保证外部分支或历史 PR 一致。 |
 | 单一功能注册表 | `[已实现]` | 本文件；`docs/TdxQuant_Project_Function_Map.md` 已作为输入资料归并 | `docs/TdxQuant_Project_Function_Map.md` 可作历史/背景参考，但本文件才是功能状态入口。 |
 | 运行环境定位 | `[已实现]` | `README.md`：当前分支以 `WSL <-> Windows TDX bridge` 为主目标 | WSL 侧消费结构化 JSON；不直接承诺在 WSL 内操作 Win32/UIA/HID。 |
 
@@ -132,7 +132,7 @@ TdxQuant
 | --- | --- | --- | --- | --- |
 | E-01 | subscription query-style one-shot CLI | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `query-style one-shot CLI [未实现/延期]` | 不代表当前可用；当前可用入口是 session、foreground `subscription-watch` 和 worker bridge control plane。 |
 | E-02 | subscription HTTP/SSE 推送语义 | `[部分实现]` | `tdxquant/bridge_http.py` 已新增 `GET /bridge/v1/watch/events/stream` SSE 投影；`tdxquant/bridge_registry.py` 已新增 master-side stream helper；`tdxquant/fixtures/provider/subscription-watch-event-stream-frames.jsonl` 与 `tests/test_bridge_http.py` / `tests/test_bridge_registry.py` / `tests/test_replay_fixtures.py` 已覆盖代表性帧 | 当前是 read-only bridge event-stream v1，投影现有 run artifacts 与 controller state；不重写 `subscription-watch` artifact contract，不改变 worker registry/auth 语义，也不代表多 worker 调度或更高层协调协议已完成。 |
-| E-03 | block 文件导入式 watchlist 适配 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `文件导入式 watchlist 适配 [未实现/延期]` | 不代表当前可用；当前 watchlist 能力以 block 读取、同步、导出和 bundle 编排为主。 |
+| E-03 | block 文件导入式 watchlist 适配 | `[部分实现]` | `tdxquant/block_watchlist_import.py` 支持 JSON import schema、parser/validator、dry-run plan、`sync_watchlist_import_file(...)` 接线；`tests/test_block_watchlist_import.py` | 当前是 JSON-only core adapter；不含 CSV/TXT、CLI/catalog/task wrapper、双向同步或源文件回写，也不绕过现有 `block.sync_watchlist` 安全边界。 |
 | E-04 | block 覆盖写/增量写高阶任务入口 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `覆盖写 / 增量写高阶任务入口 [未实现/延期]` | 不代表当前可用；现有写入必须通过已实现的 mutation/sync 安全边界。 |
 | E-05 | provider HTTP replay service | `[部分实现]` | `tdxquant/provider_transport_replay.py` 提供 `GET /provider/v1/replay/health`、`fixtures`、`result`、`watch/status`、`watch/events`、`watch/events/stream`；`tests/test_provider_transport_replay.py` | 当前是 fixture-backed、read-only、标准库 HTTP replay service；不新增业务 capability，不改变 CLI subprocess replay 语义，也不等同于 live Windows provider/bridge。 |
 | E-06 | daemon fake provider | `[部分实现]` | `ProviderTransportReplayHTTPServer` 支持 bearer token、allowlist、watch status/events/SSE fake provider 投影；`subscription-watch-event-stream-delayed-playback.jsonl` | 当前 fake provider 只覆盖离线只读 replay transport；没有 start/stop 生命周期控制、真实调度、真实行情会话或长期守护进程管理。 |
