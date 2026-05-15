@@ -614,6 +614,12 @@ def _build_catalog_parser(subparsers: argparse._SubParsersAction[argparse.Argume
     catalog_plan_filter_group.add_argument("--bundle")
     _add_catalog_run_arguments(catalog_plan_parser)
 
+    catalog_preview_parser = catalog_subparsers.add_parser("preview")
+    catalog_preview_filter_group = catalog_preview_parser.add_mutually_exclusive_group(required=True)
+    catalog_preview_filter_group.add_argument("--entry")
+    catalog_preview_filter_group.add_argument("--bundle")
+    _add_catalog_run_arguments(catalog_preview_parser)
+
     return catalog_parser
 
 
@@ -2407,6 +2413,18 @@ def _count_catalog_labels(row: dict[str, object]) -> int:
     return 0
 
 
+def _collect_catalog_labels(rows: list[dict[str, object]]) -> list[str]:
+    labels: set[str] = set()
+    for row in rows:
+        raw_labels = row.get("labels")
+        if not isinstance(raw_labels, list):
+            continue
+        for label in raw_labels:
+            if isinstance(label, str) and label:
+                labels.add(label)
+    return sorted(labels)
+
+
 def _sort_catalog_named_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     return sorted(rows, key=lambda row: (-_count_catalog_labels(row), str(row.get("name", ""))))
 
@@ -2462,11 +2480,15 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "selected_label": summary_payload.get("selected_label"),
             "entry_count": summary_payload.get("entry_count"),
             "bundle_count": summary_payload.get("bundle_count"),
+            "matched_entry_count": summary_payload.get("matched_entry_count"),
+            "matched_bundle_count": summary_payload.get("matched_bundle_count"),
+            "available_entry_labels": copy.deepcopy(summary_payload.get("available_entry_labels")),
+            "available_bundle_labels": copy.deepcopy(summary_payload.get("available_bundle_labels")),
             "entries": entry_summaries,
             "bundles": bundle_summaries,
         }
 
-    if args.catalog_command not in {"run", "plan"}:
+    if args.catalog_command not in {"run", "plan", "preview"}:
         return None
 
     mode = args.catalog_command
@@ -2486,7 +2508,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
         }
         if "dispatch" in result.data:
             summary["dispatch"] = copy.deepcopy(result.data["dispatch"])
-        if mode == "plan":
+        if mode in {"plan", "preview"}:
             resolved_args = result.data.get("resolved_args", {})
             if isinstance(resolved_args, dict):
                 summary["resolved_args"] = _extract_catalog_key_fields(resolved_args)
@@ -2516,7 +2538,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "selected_to_step": bundle_meta.get("selected_to_step"),
             "selected_step_count": bundle_meta.get("selected_step_count"),
         }
-        if mode == "plan":
+        if mode in {"plan", "preview"}:
             plan_steps: list[dict[str, object]] = []
             steps = result.data.get("steps", [])
             if isinstance(steps, list):
@@ -2781,6 +2803,7 @@ def _plan_catalog_resolved_entry(
         code=ErrorCode.OK,
         message="planned command catalog entry",
         data={
+            "mode": args.catalog_command,
             "catalog_entry": {
                 "name": entry_name,
                 "source": source,
@@ -2835,6 +2858,7 @@ def _plan_catalog_bundle(args: argparse.Namespace) -> Result:
         code=ErrorCode.OK,
         message="planned command catalog bundle",
         data={
+            "mode": args.catalog_command,
             "catalog_bundle": {
                 "name": args.bundle,
                 "description": resolved_bundle["description"],
@@ -2868,8 +2892,23 @@ def _list_catalog_entries(args: argparse.Namespace) -> Result:
     else:
         filtered_items = []
 
+    available_entry_rows: list[dict[str, object]] = []
+    for name, _value in sorted(entries.items(), key=lambda item: item[0]):
+        resolved = resolve_command_catalog_entry(name, entries=entries)
+        mapped = _resolve_catalog_preset_metadata(resolved["source"], resolved["preset"])
+        available_entry_rows.append(
+            {
+                "name": name,
+                "source": resolved["source"],
+                "preset": resolved["preset"],
+                "labels": resolved["labels"],
+                "command": mapped.get("command"),
+                "description": resolved["description"] or mapped.get("description"),
+            }
+        )
+
     entry_rows = []
-    for name, value in filtered_items:
+    for name, _value in filtered_items:
         resolved = resolve_command_catalog_entry(name, entries=entries)
         if selected_label and selected_label not in resolved["labels"]:
             continue
@@ -2893,8 +2932,19 @@ def _list_catalog_entries(args: argparse.Namespace) -> Result:
     entry_rows = _sort_catalog_named_rows(entry_rows)
 
     bundle_rows = []
+    available_bundle_rows: list[dict[str, object]] = []
     if effective_kind in {"bundle", "all"}:
         bundles = load_command_bundles()
+        for name, _value in sorted(bundles.items(), key=lambda item: item[0]):
+            resolved_bundle = resolve_command_bundle(name, bundles=bundles, entries=entries)
+            available_bundle_rows.append(
+                {
+                    "name": name,
+                    "description": resolved_bundle["description"],
+                    "labels": resolved_bundle["labels"],
+                    "step_count": len(resolved_bundle["steps"]),
+                }
+            )
         if selected_bundle:
             filtered_bundle_items = [(name, value) for name, value in bundles.items() if name == selected_bundle]
         else:
@@ -2933,6 +2983,15 @@ def _list_catalog_entries(args: argparse.Namespace) -> Result:
                 }
             )
     bundle_rows = _sort_catalog_named_rows(bundle_rows)
+    available_entry_labels = _collect_catalog_labels(available_entry_rows)
+    available_bundle_labels = _collect_catalog_labels(available_bundle_rows)
+    discovery = {
+        "selected_label": selected_label,
+        "available_entry_labels": available_entry_labels,
+        "available_bundle_labels": available_bundle_labels,
+        "matched_entry_count": len(entry_rows),
+        "matched_bundle_count": len(bundle_rows),
+    }
 
     result = Result(
         ok=True,
@@ -2942,11 +3001,16 @@ def _list_catalog_entries(args: argparse.Namespace) -> Result:
             "summary": {
                 "kind": effective_kind,
                 "entry_count": len(entry_rows),
+                "matched_entry_count": len(entry_rows),
                 "selected_entry": selected_entry,
                 "bundle_count": len(bundle_rows),
+                "matched_bundle_count": len(bundle_rows),
                 "selected_bundle": selected_bundle,
                 "selected_label": selected_label,
+                "available_entry_labels": available_entry_labels,
+                "available_bundle_labels": available_bundle_labels,
             },
+            "discovery": discovery,
             "entries": entry_rows,
             "bundles": bundle_rows,
         },
@@ -3947,7 +4011,7 @@ def _handle_catalog_subcommand(args: argparse.Namespace) -> Result:
     try:
         if args.catalog_command == "list":
             return _list_catalog_entries(args)
-        if args.catalog_command == "plan":
+        if args.catalog_command in {"plan", "preview"}:
             if getattr(args, "bundle", None):
                 return _plan_catalog_bundle(args)
             resolved = resolve_command_catalog_entry(args.entry)

@@ -13,6 +13,7 @@ from tdxquant.cli import (
     _handle_bridge_subcommand,
     _handle_catalog_subcommand,
     _handle_report_subcommand,
+    _select_catalog_output_payload,
     _run_flat_replay_provider_command,
     _handle_task_subcommand,
     _handle_trade_subcommand,
@@ -2587,6 +2588,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertGreater(len(result.data["entries"]), 0)
         self.assertTrue(all("report" in row["labels"] for row in result.data["entries"]))
 
+    def test_handle_catalog_list_returns_entry_label_discovery_metadata(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "report", "--view", "summary"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        discovery = result.data["discovery"]
+        summary_view = result.data["summary_view"]
+        self.assertEqual(discovery["selected_label"], "report")
+        self.assertEqual(discovery["matched_entry_count"], result.data["summary"]["entry_count"])
+        self.assertIn("report", discovery["available_entry_labels"])
+        self.assertEqual(summary_view["available_entry_labels"], discovery["available_entry_labels"])
+
     def test_handle_catalog_list_filters_bundles_by_label(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--label", "diagnostics"])
@@ -2594,6 +2607,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertGreater(len(result.data["bundles"]), 0)
         self.assertTrue(all("diagnostics" in row["labels"] for row in result.data["bundles"]))
+
+    def test_handle_catalog_list_returns_bundle_label_discovery_metadata(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--label", "diagnostics", "--view", "summary"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        discovery = result.data["discovery"]
+        summary_view = result.data["summary_view"]
+        self.assertEqual(discovery["selected_label"], "diagnostics")
+        self.assertEqual(discovery["matched_bundle_count"], result.data["summary"]["bundle_count"])
+        self.assertIn("diagnostics", discovery["available_bundle_labels"])
+        self.assertEqual(summary_view["available_bundle_labels"], discovery["available_bundle_labels"])
 
     def test_handle_catalog_bundle_list_includes_read_zxg_review(self) -> None:
         parser = build_parser()
@@ -2857,6 +2882,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["mode"], "plan")
         mocked_report_handler.assert_not_called()
 
+    def test_handle_catalog_preview_entry_returns_preview_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "preview", "--entry", "daily-review", "--timezone", "UTC"])
+        with patch("tdxquant.cli._handle_report_subcommand") as mocked_report_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["mode"], "preview")
+        self.assertEqual(result.data["summary_view"]["mode"], "preview")
+        self.assertEqual(result.data["summary_view"]["target"]["name"], "daily-review")
+        self.assertEqual(result.data["summary_view"]["resolved_args"]["timezone"], "UTC")
+        mocked_report_handler.assert_not_called()
+
     def test_handle_catalog_plan_watchlist_entry_returns_resolved_dispatch_without_execution(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "plan", "--entry", "export-zxg-watchlist"])
@@ -2918,6 +2955,22 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][0]["dispatch"]["command_group"], "report")
         self.assertEqual(result.data["steps"][0]["resolved_args"]["limit"], 5)
         self.assertEqual(result.data["summary_view"]["selected_step_count"], 1)
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_preview_bundle_summary_view_is_reduced(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "preview", "--bundle", "guarded-review-buy", "--only-step", "review", "--view", "summary"]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        self.assertEqual(output_payload["mode"], "preview")
+        self.assertEqual(output_payload["target"]["type"], "bundle")
+        self.assertEqual(output_payload["selected_step_count"], 1)
+        self.assertEqual(output_payload["steps"][0]["name"], "review")
+        self.assertNotIn("catalog_bundle", output_payload)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_read_zxg_review_bundle_returns_resolved_steps(self) -> None:
