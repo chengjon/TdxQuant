@@ -25,7 +25,8 @@ from ..subscription_watch_run import (
     build_subscription_watch_status_payload,
     build_subscription_watch_summary_payload,
 )
-from ..trade import TdxTradeManager
+from ..trade import TdxTradeManager, get_pingan_submission_ledger_path
+from ..trade_audit_index import query_trade_audit_cross_ledger
 from .manager import TdxApiManager
 
 
@@ -931,6 +932,30 @@ def _aggregate_trade_audit_entries_by_day(entries: list[dict[str, Any]], *, tzin
             }
         )
     return rows
+
+
+def _build_trade_audit_cross_ledger_csv_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    csv_rows: list[dict[str, Any]] = []
+    for row in rows:
+        audit = row.get("audit", {})
+        submission_matches = row.get("submission_matches", [])
+        task_matches = row.get("task_matches", [])
+        csv_rows.append(
+            {
+                "audit_id": audit.get("audit_id"),
+                "recorded_at": audit.get("recorded_at"),
+                "status": audit.get("status"),
+                "broker": audit.get("broker"),
+                "method": audit.get("method"),
+                "code": audit.get("code"),
+                "contract_no": audit.get("contract_no"),
+                "submission_key": audit.get("submission_key"),
+                "submission_matches_count": len(submission_matches) if isinstance(submission_matches, list) else 0,
+                "task_matches_count": len(task_matches) if isinstance(task_matches, list) else 0,
+                "audit_path": audit.get("audit_path"),
+            }
+        )
+    return csv_rows
 
 
 class TdxTaskManager:
@@ -2793,6 +2818,119 @@ class TdxTaskManager:
 
         result, timing = _capture_task_timing("task.trade_audit_period_report", run)
         return self._attach_task_metadata(result, task_name="trade_audit_period_report", timing=timing)
+
+    def trade_audit_cross_ledger_query(
+        self,
+        *,
+        audit_dir: str | None = None,
+        submission_ledger_path: str | None = None,
+        task_ledger_jsonl_path: str | None = None,
+        task_ledger_csv_path: str | None = None,
+        cache_output_path: str | None = None,
+        audit_id: str | None = None,
+        contract_no: str | None = None,
+        submission_key: str | None = None,
+        code: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+        json_output_path: str | None = None,
+        csv_output_path: str | None = None,
+    ) -> Result:
+        def run() -> Result:
+            resolved_audit_dir = _resolve_trade_audit_dir(self.profile_options, audit_dir=audit_dir)
+            resolved_submission_ledger_path = (
+                Path(submission_ledger_path)
+                if submission_ledger_path is not None
+                else Path(
+                    str(
+                        self.profile_options.get(
+                            "submission_ledger_path",
+                            get_pingan_submission_ledger_path(),
+                        )
+                    )
+                )
+            )
+            default_task_ledger_jsonl_path, default_task_ledger_csv_path = _resolve_task_ledger_paths(self.profile_options)
+            if task_ledger_jsonl_path is None and task_ledger_csv_path is None:
+                resolved_task_ledger_jsonl_path: Path | None = default_task_ledger_jsonl_path
+                resolved_task_ledger_csv_path: Path | None = default_task_ledger_csv_path
+            else:
+                resolved_task_ledger_jsonl_path = (
+                    Path(task_ledger_jsonl_path) if task_ledger_jsonl_path is not None else None
+                )
+                resolved_task_ledger_csv_path = Path(task_ledger_csv_path) if task_ledger_csv_path is not None else None
+            resolved_cache_output_path = (
+                Path(cache_output_path)
+                if cache_output_path is not None
+                else None
+            )
+
+            try:
+                payload = query_trade_audit_cross_ledger(
+                    audit_dir=resolved_audit_dir,
+                    submission_ledger_path=resolved_submission_ledger_path,
+                    task_ledger_jsonl_path=resolved_task_ledger_jsonl_path,
+                    task_ledger_csv_path=resolved_task_ledger_csv_path,
+                    cache_output_path=resolved_cache_output_path,
+                    audit_id=audit_id,
+                    contract_no=contract_no,
+                    submission_key=submission_key,
+                    code=code,
+                    status=status,
+                    limit=limit,
+                )
+            except FileNotFoundError:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.PATH_NOT_FOUND,
+                    message="trade audit cross-ledger query task could not find an audit directory",
+                    data={
+                        "input": {
+                            "audit_dir": str(resolved_audit_dir),
+                            "submission_ledger_path": str(resolved_submission_ledger_path),
+                            "task_ledger_jsonl_path": (
+                                None if resolved_task_ledger_jsonl_path is None else str(resolved_task_ledger_jsonl_path)
+                            ),
+                            "task_ledger_csv_path": (
+                                None if resolved_task_ledger_csv_path is None else str(resolved_task_ledger_csv_path)
+                            ),
+                        }
+                    },
+                    next_action="Run trade audit workflows first or provide explicit ledger paths.",
+                )
+
+            result_payload: dict[str, Any] = copy.deepcopy(payload)
+            warnings = list(result_payload.pop("warnings", []))
+            rows = list(result_payload.get("rows", []))
+            artifacts: dict[str, Any] = {}
+            if cache_output_path is not None:
+                artifacts["cache_output_path"] = str(resolved_cache_output_path)
+            if json_output_path is not None or csv_output_path is not None:
+                export_dir = _resolve_export_dir(self.profile_options)
+                export_stem = _resolve_export_stem(self.profile_options, "trade-audit-cross-ledger-query")
+                summary_json_path = Path(json_output_path) if json_output_path else export_dir / f"{export_stem}.json"
+                summary_csv_path = Path(csv_output_path) if csv_output_path else export_dir / f"{export_stem}.csv"
+                _write_json_file(summary_json_path, result_payload)
+                _write_csv_file(summary_csv_path, _build_trade_audit_cross_ledger_csv_rows(rows))
+                artifacts.update(
+                    {
+                        "json_output_path": str(summary_json_path),
+                        "csv_output_path": str(summary_csv_path),
+                    }
+                )
+            if artifacts:
+                result_payload["artifacts"] = artifacts
+
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="completed trade audit cross-ledger query task",
+                data=result_payload,
+                warnings=warnings,
+            )
+
+        result, timing = _capture_task_timing("task.trade_audit_cross_ledger_query", run)
+        return self._attach_task_metadata(result, task_name="trade_audit_cross_ledger_query", timing=timing)
 
     def trade_period_report(
         self,

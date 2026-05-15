@@ -153,6 +153,16 @@
     "default_recent_limit": 20,
     "default_timezone": "Asia/Shanghai"
   },
+  "trade_audit_cross_ledger_query": {
+    "api_profile": "safe_read",
+    "output_format": "json",
+    "export_dir": "runtime/exports",
+    "export_stem": "trade-audit-cross-ledger-query",
+    "audit_dir": "runtime/trade-audits",
+    "submission_ledger_path": "runtime/pingan-submission-ledger.jsonl",
+    "ledger_stem": "guarded-trade-buy-ledger",
+    "default_limit": 20
+  },
   "trade_period_report": {
     "api_profile": "safe_read",
     "output_format": "json",

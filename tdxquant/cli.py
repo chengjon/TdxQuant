@@ -497,6 +497,22 @@ def _add_trade_audit_period_report_arguments(subparser: argparse.ArgumentParser)
     subparser.add_argument("--csv-output-path")
 
 
+def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--audit-id")
+    subparser.add_argument("--contract-no")
+    subparser.add_argument("--submission-key")
+    subparser.add_argument("--code")
+    subparser.add_argument("--status")
+    subparser.add_argument("--limit", type=int)
+    subparser.add_argument("--audit-dir")
+    subparser.add_argument("--submission-ledger-path")
+    subparser.add_argument("--task-ledger-jsonl-path")
+    subparser.add_argument("--task-ledger-csv-path")
+    subparser.add_argument("--cache-output-path")
+    subparser.add_argument("--json-output-path")
+    subparser.add_argument("--csv-output-path")
+
+
 def _add_trade_period_report_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--start-date")
     subparser.add_argument("--end-date")
@@ -1051,6 +1067,10 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_trade_audit_period_report_parser = task_subparsers.add_parser("trade-audit-period-report")
     _add_trade_audit_period_report_arguments(task_trade_audit_period_report_parser)
     _add_task_common_arguments(task_trade_audit_period_report_parser)
+
+    task_trade_audit_cross_ledger_query_parser = task_subparsers.add_parser("trade-audit-cross-ledger-query")
+    _add_trade_audit_cross_ledger_query_arguments(task_trade_audit_cross_ledger_query_parser)
+    _add_task_common_arguments(task_trade_audit_cross_ledger_query_parser)
 
     task_trade_period_report_parser = task_subparsers.add_parser("trade-period-report")
     _add_trade_period_report_arguments(task_trade_period_report_parser)
@@ -3489,6 +3509,22 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
         if methods is not None:
             period_kwargs["methods"] = methods
         return manager.trade_audit_period_report(**period_kwargs)
+    if command_name == "trade-audit-cross-ledger-query":
+        return manager.trade_audit_cross_ledger_query(
+            audit_dir=args.audit_dir,
+            submission_ledger_path=args.submission_ledger_path,
+            task_ledger_jsonl_path=args.task_ledger_jsonl_path,
+            task_ledger_csv_path=args.task_ledger_csv_path,
+            cache_output_path=args.cache_output_path,
+            audit_id=args.audit_id,
+            contract_no=args.contract_no,
+            submission_key=args.submission_key,
+            code=args.code,
+            status=status,
+            limit=args.limit,
+            json_output_path=args.json_output_path,
+            csv_output_path=args.csv_output_path,
+        )
     if command_name in {"trade-period-report", "period"}:
         return manager.trade_period_report(
             start_date=args.start_date,

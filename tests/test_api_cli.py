@@ -1105,6 +1105,38 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.start_date, "2026-04-28")
         self.assertEqual(args.end_date, "2026-04-29")
 
+    def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-audit-cross-ledger-query",
+                "--audit-dir",
+                "runtime/trade-audits",
+                "--submission-ledger-path",
+                "runtime/pingan-submission-ledger.jsonl",
+                "--task-ledger-jsonl-path",
+                "runtime/exports/guarded-trade-buy-ledger.jsonl",
+                "--cache-output-path",
+                "runtime/exports/trade-audit-index-cache.json",
+                "--code",
+                "000001",
+                "--status",
+                "confirmed",
+                "--limit",
+                "5",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-audit-cross-ledger-query")
+        self.assertEqual(args.audit_dir, "runtime/trade-audits")
+        self.assertEqual(args.submission_ledger_path, "runtime/pingan-submission-ledger.jsonl")
+        self.assertEqual(args.task_ledger_jsonl_path, "runtime/exports/guarded-trade-buy-ledger.jsonl")
+        self.assertEqual(args.cache_output_path, "runtime/exports/trade-audit-index-cache.json")
+        self.assertEqual(args.code, "000001")
+        self.assertEqual(args.status, "confirmed")
+        self.assertEqual(args.limit, 5)
+
     def test_task_trade_period_report_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "trade-period-report", "--start-date", "2026-04-25", "--end-date", "2026-04-26"])

@@ -141,7 +141,7 @@ TdxQuant
 | E-09 | 更厚 subscription 长跑包装 | `[已设计/待实现]` | `docs/TdxQuant_Next_Steps.md` 记录剩余重点：reconnect/backoff、长期运行治理、health/watermark/heartbeat 摘要、integration regression | 不代表当前可用；现有能力是 foreground run、background controller 和 bridge v1。 |
 | E-10 | 更多 catalog 预览/发现能力 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 与 `docs/TdxQuant_Next_Steps.md` 记录“更多 catalog 预览 / 发现能力仍在继续” | 不代表当前可用；当前以既有 catalog/bundle/list/plan/run 为准。 |
 | E-11 | 更多 task/report 组合入口 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 记录“更多任务 / 报表组合入口仍属于下一阶段” | 不代表当前可用；新增组合必须落到 runtime JSON、CLI、测试或契约后才能改状态。 |
-| E-12 | trade_audit 高阶聚合 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 记录 broker/method/status diagnostics、审计目录索引缓存、跨 `trade_audit` / task ledger / submission ledger 组合查询未实现 | 不代表当前可用；当前可用的是已登记的 daily/period/lookup/report preset 和已有 audit artifact。 |
+| E-12 | trade_audit 高阶聚合 | `[部分实现]` | `tdxquant/trade_audit_index.py` 提供 audit index cache 与跨 `trade_audit` / submission ledger / task ledger 只读查询；`TdxTaskManager.trade_audit_cross_ledger_query` 与 `task trade-audit-cross-ledger-query` 提供入口；`tests/test_trade_audit_index.py` 和 `tests/test_api_cli.py` 覆盖缓存、join、损坏文件容错和 CLI parse | 当前是只读 exact-key 诊断查询，cache 是可重建派生 artifact；不改写历史 audit/ledger，不做成交金额/数量/价格/PnL 聚合，也不代表 live broker/provider 新能力。 |
 
 ## 4. 非目标与边界
 
