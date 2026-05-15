@@ -55,7 +55,8 @@ TdxQuant
     ├── block 文件导入式 watchlist 与写策略硬化/高阶入口
     ├── 更完整的 formula capability-specific contract
     ├── 更厚的日常 task/report/catalog 组合入口
-    └── 更高阶 trade_audit 聚合与跨 ledger 查询
+    ├── 更高阶 trade_audit 聚合与跨 ledger 查询
+    └── 桌面交易扩展 broker capability 边界
 ```
 
 ## 3. 状态注册表
@@ -142,6 +143,7 @@ TdxQuant
 | E-10 | 更多 catalog 预览/发现能力 | `[部分实现]` | `tdxquant/cli.py` 支持 `catalog preview` 非执行预览、list discovery metadata、summary-view 输出约束；`tests/test_api_cli.py` 覆盖 label/bundle discovery、entry preview、bundle preview 和 reduced summary payload；OpenSpec `catalog-discovery-preview-hardening` | 当前是 catalog CLI discovery/preview 输出硬化；不改变 `runtime/command-catalog.json` / `runtime/command-bundles.json` schema，不新增业务 contract，也不改变 `catalog run` 执行语义。 |
 | E-11 | 更多 task/report 组合入口 | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 记录“更多任务 / 报表组合入口仍属于下一阶段” | 不代表当前可用；新增组合必须落到 runtime JSON、CLI、测试或契约后才能改状态。 |
 | E-12 | trade_audit 高阶聚合 | `[部分实现]` | `tdxquant/trade_audit_index.py` 提供 audit index cache 与跨 `trade_audit` / submission ledger / task ledger 只读查询；`TdxTaskManager.trade_audit_cross_ledger_query` 与 `task trade-audit-cross-ledger-query` 提供入口；`tests/test_trade_audit_index.py` 和 `tests/test_api_cli.py` 覆盖缓存、join、损坏文件容错和 CLI parse | 当前是只读 exact-key 诊断查询，cache 是可重建派生 artifact；不改写历史 audit/ledger，不做成交金额/数量/价格/PnL 聚合，也不代表 live broker/provider 新能力。 |
+| E-13 | 桌面交易扩展 broker capability 边界 | `[部分实现]` | `tdxquant/trade/extended_capabilities.py` 提供 PingAn desktop funds/positions/cancel/native-push capability probe；`trade broker-capabilities` 提供非执行 CLI 入口；`docs/trading/desktop_trade_extended_broker_capabilities_risk.md` 记录独立风险边界；`tests/test_trade_extended_capabilities.py` 与 `tests/test_api_cli.py` 覆盖 payload、manager 与 CLI | 当前是只读/非执行诊断边界：资金和持仓仅报告 capability metadata，撤单仅做 broker-state-mutating 分级，broker-native push 仅报告 feasibility boundary；不执行资金/持仓查询、不提交撤单、不打开 broker-native push，也不并入 query API 或默认交易主线。 |
 
 ## 4. 非目标与边界
 

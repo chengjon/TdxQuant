@@ -40,6 +40,7 @@ from .context import (
     write_pingan_trade_audit,
     resolve_trade_profile,
 )
+from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
 
 
 def _build_trade_health_check(
@@ -163,6 +164,34 @@ class _PingAnTradeProxy:
 
     def __init__(self, manager: "TdxTradeManager") -> None:
         self._manager = manager
+
+    def extended_broker_capabilities(self, *, generated_at: str | None = None) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+
+        def run() -> Result:
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="completed PingAn desktop extended broker capability probe",
+                data={
+                    "broker_capabilities": build_pingan_desktop_extended_broker_capability_probe(
+                        generated_at=generated_at
+                    )
+                },
+            )
+
+        result, timing = capture_trade_timing("pingan.extended_broker_capabilities", run)
+        attach_trade_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            broker="pingan",
+            method="extended_broker_capabilities",
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            timing=timing,
+        )
+        return result
 
     def buy(
         self,

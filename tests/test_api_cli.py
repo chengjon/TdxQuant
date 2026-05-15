@@ -18,6 +18,7 @@ from tdxquant.cli import (
     _handle_task_subcommand,
     _handle_trade_subcommand,
     _run_trade_buy,
+    _run_trade_broker_capabilities,
     _run_trade_confirm_current,
     _run_trade_submit_ready,
     _run_trade_dialog_readiness,
@@ -4816,6 +4817,15 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)
 
+    def test_handle_trade_broker_capabilities_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "broker-capabilities", "--broker", "pingan_desktop"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"broker_capabilities": {"overall_status": "ok"}})
+        with patch("tdxquant.cli._run_trade_broker_capabilities", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
     def test_handle_trade_confirm_current_uses_trade_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["trade", "confirm-current"])
@@ -5043,6 +5053,29 @@ class TradeCliDispatchTests(unittest.TestCase):
             dialog_lookup_mode="win32_experimental",
             confirm_timeout=1.2,
         )
+
+    def test_run_trade_broker_capabilities_forwards_to_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "broker-capabilities", "--broker", "pingan_desktop"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"broker_capabilities": {"overall_status": "ok"}})
+        manager = MagicMock()
+        manager.pingan.extended_broker_capabilities.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager) as trade_manager:
+            result = _run_trade_broker_capabilities(args)
+        self.assertIs(result, expected)
+        trade_manager.assert_called_once_with(profile="balanced", title_keyword="平安证券", exe_path=None)
+        manager.pingan.extended_broker_capabilities.assert_called_once_with()
+
+    def test_run_trade_broker_capabilities_rejects_unsupported_broker(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "broker-capabilities", "--broker", "other"])
+
+        result = _run_trade_broker_capabilities(args)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertIn("unsupported broker", result.message)
+        self.assertEqual(result.data["supported_brokers"], ["pingan_desktop"])
 
     def test_run_trade_confirm_current_forwards_boundary_arguments(self) -> None:
         parser = build_parser()
