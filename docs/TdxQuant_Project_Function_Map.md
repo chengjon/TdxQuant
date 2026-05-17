@@ -761,11 +761,11 @@ TdxQuant
 
 #### 3.5.6 更厚的日常入口收口
 
-更厚的 task / report / catalog 组合入口还在继续沉淀：
+更厚的 task / report / catalog 组合入口已开始按 `FUNCTION_TREE.md` 的单一功能注册表分状态登记：
 
 - 更强的 `subscription-watch` 长跑包装仍在继续
-- 更多 catalog 预览 / 发现能力仍在继续
-- 更多任务 / 报表组合入口仍属于下一阶段
+- 更多 catalog 预览 / 发现能力已部分闭合，后续状态以 `FUNCTION_TREE.md` 为准
+- 更多任务 / 报表组合入口已部分落到 runtime bundle、CLI plan/list 测试和 OpenSpec 契约；未覆盖组合继续按具体节点登记
 
 #### 3.5.7 建议拆成的后续 OpenSpec 包
 

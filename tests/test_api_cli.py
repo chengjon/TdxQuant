@@ -2687,6 +2687,21 @@ class ApiCliDispatchTests(unittest.TestCase):
         bundle_names = [row["name"] for row in result.data["bundles"]]
         self.assertIn("read-zxg-review-and-export", bundle_names)
 
+    def test_handle_catalog_list_exposes_task_report_combo_bundle(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--label", "followup"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        combo = next(
+            row for row in result.data["bundles"] if row["name"] == "confirm-complete-review"
+        )
+        self.assertEqual(combo["step_count"], 3)
+        self.assertEqual([step["source"] for step in combo["steps"]], ["task", "report", "report"])
+        self.assertEqual(
+            [step["entry"] for step in combo["steps"]],
+            ["task-confirm-current", "daily-success", "audit-daily-confirmed"],
+        )
+
     def test_handle_catalog_bundle_list_returns_read_zxg_review_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "read-zxg-review"])
@@ -3006,6 +3021,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][0]["dispatch"]["command_group"], "report")
         self.assertEqual(result.data["steps"][0]["resolved_args"]["limit"], 5)
         self.assertEqual(result.data["summary_view"]["selected_step_count"], 1)
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_task_report_combo_bundle_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--bundle", "confirm-complete-review"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "confirm-complete-review")
+        self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 3)
+        self.assertEqual([step["name"] for step in result.data["steps"]], ["confirm", "success", "audit"])
+        self.assertEqual(
+            [step["dispatch"]["command_group"] for step in result.data["steps"]],
+            ["task", "report", "report"],
+        )
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-confirm-current")
+        self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "daily")
+        self.assertEqual(result.data["steps"][2]["dispatch"]["command_name"], "audit-daily")
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_preview_bundle_summary_view_is_reduced(self) -> None:
