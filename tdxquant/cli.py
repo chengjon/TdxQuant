@@ -691,6 +691,17 @@ def _build_api_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     api_doctor_parser.add_argument("--hid-port")
     _add_api_common_arguments(api_doctor_parser)
 
+    api_subscription_subscribe_parser = api_subparsers.add_parser("subscription-subscribe")
+    api_subscription_subscribe_parser.add_argument("--code", action="append", required=True)
+    _add_api_common_arguments(api_subscription_subscribe_parser)
+
+    api_subscription_unsubscribe_parser = api_subparsers.add_parser("subscription-unsubscribe")
+    api_subscription_unsubscribe_parser.add_argument("--code", action="append", required=True)
+    _add_api_common_arguments(api_subscription_unsubscribe_parser)
+
+    api_subscription_list_parser = api_subparsers.add_parser("subscription-list")
+    _add_api_common_arguments(api_subscription_list_parser)
+
     api_snapshot_parser = api_subparsers.add_parser("snapshot")
     api_snapshot_parser.add_argument("--code", required=True)
     api_snapshot_parser.add_argument("--field", action="append", default=None)
@@ -2711,6 +2722,9 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
 
 _API_REPLAY_CAPABILITIES = {
     "snapshot": "market.snapshot",
+    "subscription-subscribe": "subscription.subscribe_hq",
+    "subscription-unsubscribe": "subscription.unsubscribe_hq",
+    "subscription-list": "subscription.get_subscribe_hq_stock_list",
     "send-user-block": "block.send_user_block",
     "block-read-watchlist": "block.read_watchlist_snapshot",
     "formula-screen": "formula.screen",
@@ -3177,6 +3191,12 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
         return manager.runtime.health(window_key=args.window_key, hid_port=args.hid_port)
     if args.api_command == "doctor":
         return manager.runtime.doctor(window_key=args.window_key, hid_port=args.hid_port)
+    if args.api_command == "subscription-subscribe":
+        return manager.runtime.subscription_subscribe(stock_list=args.code)
+    if args.api_command == "subscription-unsubscribe":
+        return manager.runtime.subscription_unsubscribe(stock_list=args.code)
+    if args.api_command == "subscription-list":
+        return manager.runtime.subscription_list()
     if args.api_command == "snapshot":
         return manager.market.snapshot(args.code, fields=args.field)
     if args.api_command == "market-snapshot":

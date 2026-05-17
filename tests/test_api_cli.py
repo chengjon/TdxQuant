@@ -141,6 +141,18 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.window_key, "平安证券")
         self.assertEqual(args.hid_port, "COM3")
 
+    def test_api_subscription_one_shot_commands_parse(self) -> None:
+        parser = build_parser()
+        subscribe = parser.parse_args(["api", "subscription-subscribe", "--code", "688318.SH", "--code", "600519.SH"])
+        unsubscribe = parser.parse_args(["api", "subscription-unsubscribe", "--code", "688318.SH"])
+        listing = parser.parse_args(["api", "subscription-list"])
+
+        self.assertEqual(subscribe.api_command, "subscription-subscribe")
+        self.assertEqual(subscribe.code, ["688318.SH", "600519.SH"])
+        self.assertEqual(unsubscribe.api_command, "subscription-unsubscribe")
+        self.assertEqual(unsubscribe.code, ["688318.SH"])
+        self.assertEqual(listing.api_command, "subscription-list")
+
     def test_api_doctor_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "doctor", "--window-key", "通达信金融终端"])
@@ -1839,6 +1851,20 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["replay_source"]["capability"], "market.snapshot")
         mocked_manager.assert_not_called()
 
+    def test_handle_api_subscription_one_shot_replay_rejects_before_manager_construction(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["api", "subscription-subscribe", "--code", "688318.SH", "--provider-mode", "replay"]
+        )
+        with patch("tdxquant.cli.TdxApiManager") as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "unsupported replay api command: subscription-subscribe")
+        self.assertEqual(result.data["replay_source"]["mode"], "replay")
+        self.assertEqual(result.data["replay_source"]["capability"], "subscription.subscribe_hq")
+        mocked_manager.assert_not_called()
+
     def test_handle_api_kline_uses_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "kline", "--code", "688260.SH", "--period", "1d"])
@@ -1880,6 +1906,30 @@ class ApiCliDispatchTests(unittest.TestCase):
             result = _handle_api_subcommand(args)
         self.assertIs(result, expected)
         manager.runtime.capabilities.assert_called_once_with()
+
+    def test_handle_api_subscription_one_shot_uses_manager(self) -> None:
+        parser = build_parser()
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.runtime.subscription_subscribe.return_value = expected
+        manager.runtime.subscription_unsubscribe.return_value = expected
+        manager.runtime.subscription_list.return_value = expected
+
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            subscribe_result = _handle_api_subcommand(
+                parser.parse_args(["api", "subscription-subscribe", "--code", "688318.SH"])
+            )
+            unsubscribe_result = _handle_api_subcommand(
+                parser.parse_args(["api", "subscription-unsubscribe", "--code", "688318.SH"])
+            )
+            list_result = _handle_api_subcommand(parser.parse_args(["api", "subscription-list"]))
+
+        self.assertIs(subscribe_result, expected)
+        self.assertIs(unsubscribe_result, expected)
+        self.assertIs(list_result, expected)
+        manager.runtime.subscription_subscribe.assert_called_once_with(stock_list=["688318.SH"])
+        manager.runtime.subscription_unsubscribe.assert_called_once_with(stock_list=["688318.SH"])
+        manager.runtime.subscription_list.assert_called_once_with()
 
     def test_handle_api_trading_dates_uses_manager(self) -> None:
         parser = build_parser()

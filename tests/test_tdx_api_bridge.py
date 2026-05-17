@@ -21,7 +21,11 @@ from tdxquant.api.bridge import (
     run_tdx_rename_sector,
     run_tdx_send_user_block,
     run_tdx_stock_list,
+    run_tdx_subscription_list,
+    run_tdx_subscription_subscribe,
+    run_tdx_subscription_unsubscribe,
 )
+from tdxquant.api.runtime import RuntimeApi
 from tdxquant.models import ErrorCode, Result
 from tdxquant.tdx_api_bridge import run_tdx_data_sector_list, run_tdx_bridge_health, serialize_value
 
@@ -521,6 +525,49 @@ class RuntimeSubscriptionSessionTests(unittest.TestCase):
         self.assertEqual(list_result.code, ErrorCode.INVALID_REQUEST)
         self.assertEqual(unsubscribe_result.code, ErrorCode.INVALID_REQUEST)
         self.assertEqual(_FakeTqSubscriptionRuntime.close_calls, 1)
+
+    def test_subscription_one_shot_wrappers_invoke_runtime_once_and_close(self) -> None:
+        _FakeTqSubscriptionRuntime.reset()
+        with patch(
+            "tdxquant.api.bridge._load_tqcenter",
+            return_value=(
+                _FakeTqSubscriptionRuntime,
+                {"available": True, "module": "tqcenter"},
+            ),
+        ), patch("tdxquant.api.bridge.IS_WINDOWS", True):
+            subscribe_result = run_tdx_subscription_subscribe(["688318.SH"], strategy_path="strategy.py")
+            list_result = run_tdx_subscription_list(strategy_path="strategy.py")
+            unsubscribe_result = run_tdx_subscription_unsubscribe(["688318.SH"], strategy_path="strategy.py")
+
+        self.assertTrue(subscribe_result.ok)
+        self.assertTrue(list_result.ok)
+        self.assertTrue(unsubscribe_result.ok)
+        self.assertEqual(_FakeTqSubscriptionRuntime.initialize_calls, ["strategy.py", "strategy.py", "strategy.py"])
+        self.assertEqual(_FakeTqSubscriptionRuntime.close_calls, 3)
+        self.assertEqual(_FakeTqSubscriptionRuntime.subscribe_calls[0][0], ["688318.SH"])
+        self.assertTrue(callable(_FakeTqSubscriptionRuntime.subscribe_calls[0][1]))
+        self.assertEqual(_FakeTqSubscriptionRuntime.list_calls, 1)
+        self.assertEqual(_FakeTqSubscriptionRuntime.unsubscribe_calls, [["688318.SH"]])
+        self.assertEqual(subscribe_result.data["subscription_query"]["mode"], "one_shot")
+        self.assertEqual(subscribe_result.data["subscription_query"]["action"], "subscribe_hq")
+        self.assertFalse(subscribe_result.data["subscription_query"]["foreground_watch_started"])
+        self.assertFalse(subscribe_result.data["subscription_query"]["background_worker_started"])
+        self.assertFalse(subscribe_result.data["subscription_query"]["event_stream_started"])
+
+    def test_runtime_api_exposes_subscription_one_shot_wrappers(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        runtime = RuntimeApi(strategy_path="strategy.py")
+
+        with patch("tdxquant.api.runtime.run_tdx_subscription_subscribe", return_value=expected) as subscribe:
+            self.assertIs(runtime.subscription_subscribe(["688318.SH"]), expected)
+        with patch("tdxquant.api.runtime.run_tdx_subscription_unsubscribe", return_value=expected) as unsubscribe:
+            self.assertIs(runtime.subscription_unsubscribe(["688318.SH"]), expected)
+        with patch("tdxquant.api.runtime.run_tdx_subscription_list", return_value=expected) as list_subscriptions:
+            self.assertIs(runtime.subscription_list(), expected)
+
+        subscribe.assert_called_once_with(stock_list=["688318.SH"], strategy_path="strategy.py")
+        unsubscribe.assert_called_once_with(stock_list=["688318.SH"], strategy_path="strategy.py")
+        list_subscriptions.assert_called_once_with(strategy_path="strategy.py")
 
 
 if __name__ == "__main__":

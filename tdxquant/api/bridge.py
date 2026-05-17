@@ -525,6 +525,45 @@ def run_tdx_open_subscription_session(strategy_path: str | None = None) -> TdxRu
     return TdxRuntimeSubscriptionSession(strategy_path=strategy_path)
 
 
+def run_tdx_subscription_subscribe(stock_list: list[str], strategy_path: str | None = None) -> Result:
+    with run_tdx_open_subscription_session(strategy_path=strategy_path) as session:
+        result = session.subscribe_hq(stock_list=stock_list, callback=_subscription_one_shot_callback)
+    return _attach_subscription_query_metadata(result, action="subscribe_hq", stock_list=stock_list)
+
+
+def run_tdx_subscription_unsubscribe(stock_list: list[str], strategy_path: str | None = None) -> Result:
+    with run_tdx_open_subscription_session(strategy_path=strategy_path) as session:
+        result = session.unsubscribe_hq(stock_list=stock_list)
+    return _attach_subscription_query_metadata(result, action="unsubscribe_hq", stock_list=stock_list)
+
+
+def run_tdx_subscription_list(strategy_path: str | None = None) -> Result:
+    with run_tdx_open_subscription_session(strategy_path=strategy_path) as session:
+        result = session.get_subscribe_hq_stock_list()
+    return _attach_subscription_query_metadata(result, action="get_subscribe_hq_stock_list", stock_list=None)
+
+
+def _subscription_one_shot_callback(*args: Any, **kwargs: Any) -> None:
+    return None
+
+
+def _attach_subscription_query_metadata(
+    result: Result,
+    *,
+    action: str,
+    stock_list: list[str] | None,
+) -> Result:
+    result.data["subscription_query"] = {
+        "mode": "one_shot",
+        "action": action,
+        "stock_list": None if stock_list is None else list(stock_list),
+        "foreground_watch_started": False,
+        "background_worker_started": False,
+        "event_stream_started": False,
+    }
+    return result
+
+
 def run_tdx_provider_capabilities() -> Result:
     payload = build_capability_discovery_payload()
     return Result(

@@ -50,6 +50,7 @@ TdxQuant
 │   ├── PingAn buy / sell / submit_once / confirm [部分实现]
 │   └── trade audit / ledger / safety governance [部分实现]
 └── E. 待闭合与下一阶段能力 [分状态登记]
+    ├── subscription query-style one-shot CLI
     ├── subscription HTTP/SSE 推送语义
     ├── provider HTTP replay service / daemon fake provider
     ├── block 文件导入式 watchlist 与写策略硬化/高阶入口
@@ -131,7 +132,7 @@ TdxQuant
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
 | --- | --- | --- | --- | --- |
-| E-01 | subscription query-style one-shot CLI | `[已设计/待实现]` | `docs/TdxQuant_Project_Function_Map.md` 标记 `query-style one-shot CLI [未实现/延期]` | 不代表当前可用；当前可用入口是 session、foreground `subscription-watch` 和 worker bridge control plane。 |
+| E-01 | subscription query-style one-shot CLI | `[部分实现]` | `tdxquant/api/bridge.py` 提供 `run_tdx_subscription_subscribe/unsubscribe/list` one-shot wrappers；`RuntimeApi.subscription_subscribe/unsubscribe/list` 接出 runtime API；`tdxquant/cli.py` 提供 `api subscription-subscribe`、`api subscription-unsubscribe`、`api subscription-list`；`tests/test_tdx_api_bridge.py` 与 `tests/test_api_cli.py` 覆盖 runtime wrapper、CLI parse/dispatch 与 replay rejection | 当前是 query-style one-shot 方法调用：会打开 runtime subscription session、调用一次 `subscribe_hq`/`unsubscribe_hq`/`get_subscribe_hq_stock_list` 并关闭；不启动 foreground `subscription-watch`、background worker、SSE/event-stream transport，也不补 replay fixture 或 reconnect/backoff 长跑治理。 |
 | E-02 | subscription HTTP/SSE 推送语义 | `[部分实现]` | `tdxquant/bridge_http.py` 已新增 `GET /bridge/v1/watch/events/stream` SSE 投影；`tdxquant/bridge_registry.py` 已新增 master-side stream helper；`tdxquant/fixtures/provider/subscription-watch-event-stream-frames.jsonl` 与 `tests/test_bridge_http.py` / `tests/test_bridge_registry.py` / `tests/test_replay_fixtures.py` 已覆盖代表性帧 | 当前是 read-only bridge event-stream v1，投影现有 run artifacts 与 controller state；不重写 `subscription-watch` artifact contract，不改变 worker registry/auth 语义，也不代表多 worker 调度或更高层协调协议已完成。 |
 | E-03 | block 文件导入式 watchlist 适配 | `[部分实现]` | `tdxquant/block_watchlist_import.py` 支持 JSON import schema、parser/validator、dry-run plan、`sync_watchlist_import_file(...)` 接线；`tests/test_block_watchlist_import.py` | 当前是 JSON-only core adapter；不含 CSV/TXT、CLI/catalog/task wrapper、双向同步或源文件回写，也不绕过现有 `block.sync_watchlist` 安全边界。 |
 | E-04 | block 覆盖写/增量写高阶任务入口 | `[部分实现]` | `tdxquant/block_sync.py` 支持显式 `write_policy`、`mode`/`dry_run` 兼容解析、mutation_key replay/conflict 元数据和 audit policy 字段；`tests/test_block_sync.py` 覆盖策略映射、冲突反馈与审计字段；OpenSpec `block-sync-write-policy-hardening` | 当前完成底层 `block.sync_watchlist` 写策略 contract 和重复写保护反馈；仍不包含 CLI/catalog/task 高阶入口，也不新增 provider schema 或绕过既有 mutation/sync 安全边界。 |

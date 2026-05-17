@@ -10,6 +10,9 @@ from .bridge import (
     run_tdx_provider_health,
     run_tdx_refresh_kline,
     run_tdx_send_warn,
+    run_tdx_subscription_list,
+    run_tdx_subscription_subscribe,
+    run_tdx_subscription_unsubscribe,
 )
 
 
@@ -79,6 +82,15 @@ class RuntimeApi:
 
     def open_subscription_session(self):
         return run_tdx_open_subscription_session(strategy_path=self.strategy_path)
+
+    def subscription_subscribe(self, stock_list: list[str]) -> Result:
+        return run_tdx_subscription_subscribe(stock_list=stock_list, strategy_path=self.strategy_path)
+
+    def subscription_unsubscribe(self, stock_list: list[str]) -> Result:
+        return run_tdx_subscription_unsubscribe(stock_list=stock_list, strategy_path=self.strategy_path)
+
+    def subscription_list(self) -> Result:
+        return run_tdx_subscription_list(strategy_path=self.strategy_path)
 
     def health(self, window_key: str = "通达信金融终端", hid_port: str | None = None) -> Result:
         return run_tdx_provider_health(
