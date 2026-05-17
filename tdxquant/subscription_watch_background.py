@@ -18,6 +18,86 @@ DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
 DEFAULT_START_TIMEOUT_SECONDS = 10
 DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
 ACTIVE_PROCESS_STATES = {"starting", "running", "reconnecting", "degraded", "stopping"}
+SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION = "tdx.subscription_watch.status_summary.v1"
+
+
+def build_subscription_watch_status_summary(
+    *,
+    control: dict[str, Any] | None,
+    watch_status: dict[str, Any] | None,
+) -> dict[str, Any]:
+    resolved_control = control if isinstance(control, dict) else {}
+    resolved_status = watch_status if isinstance(watch_status, dict) else {}
+    state = _optional_str(resolved_status.get("state")) or _optional_str(resolved_control.get("state")) or "unknown"
+    run_id = _optional_str(resolved_status.get("run_id")) or _optional_str(resolved_control.get("run_id"))
+    active = bool(resolved_control.get("active"))
+    return {
+        "schema_version": SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION,
+        "overall_status": _subscription_watch_overall_status(state=state, active=active),
+        "state": state,
+        "active": active,
+        "run_id": run_id,
+        "heartbeat": {
+            "status": "present" if _optional_str(resolved_status.get("heartbeat_at")) else "missing",
+            "heartbeat_at": _optional_str(resolved_status.get("heartbeat_at")),
+            "staleness": "not_evaluated",
+        },
+        "watermark": {
+            "event_count": _optional_int(resolved_status.get("event_count"), default=0),
+            "unique_symbol_count": _optional_int(resolved_status.get("unique_symbol_count"), default=0),
+            "last_sequence": _optional_int_or_none(resolved_status.get("last_sequence")),
+            "last_event_ts": _optional_str(resolved_status.get("last_event_ts"))
+            or _optional_str(resolved_status.get("last_event_at")),
+            "last_symbol": _optional_str(resolved_status.get("last_symbol")),
+            "last_source_ts": _optional_str(resolved_status.get("last_source_ts")),
+        },
+        "reconnect": {
+            "reconnect_count": _optional_int(resolved_status.get("reconnect_count"), default=0),
+            "last_disconnect_at": _optional_str(resolved_status.get("last_disconnect_at")),
+            "last_reconnect_at": _optional_str(resolved_status.get("last_reconnect_at")),
+            "next_reconnect_at": _optional_str(resolved_status.get("next_reconnect_at")),
+            "degraded_since": _optional_str(resolved_status.get("degraded_since")),
+            "consecutive_reconnect_failures": _optional_int(
+                resolved_status.get("consecutive_reconnect_failures"),
+                default=0,
+            ),
+            "last_error": resolved_status.get("last_error") if isinstance(resolved_status.get("last_error"), dict) else None,
+        },
+        "boundary": "summary_projection_only; does not evaluate wall-clock heartbeat staleness or change reconnect/backoff behavior",
+    }
+
+
+def _subscription_watch_overall_status(*, state: str, active: bool) -> str:
+    if state in {"reconnecting", "degraded", "failed", "completed", "stopped"}:
+        return state
+    if active and state in ACTIVE_PROCESS_STATES:
+        return "active"
+    if state in {"starting", "running", "stopping"}:
+        return "active"
+    return "unknown"
+
+
+def _optional_str(value: Any) -> str | None:
+    text = str(value).strip() if value is not None else ""
+    return text or None
+
+
+def _optional_int(value: Any, *, default: int) -> int:
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _optional_int_or_none(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass(frozen=True)
@@ -748,6 +828,7 @@ class SubscriptionWatchBackgroundController:
         return {
             "control": control,
             "watch_status": watch_status,
+            "status_summary": build_subscription_watch_status_summary(control=control, watch_status=watch_status),
         }
 
     def list_runs(self) -> dict[str, Any]:

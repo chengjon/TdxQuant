@@ -543,6 +543,12 @@ def test_status_view_returns_explicit_empty_watch_status_when_no_run_is_active(t
     assert status_view["control"]["state"] == "stopped"
     assert status_view["control"]["active"] is False
     assert status_view["watch_status"] is None
+    assert status_view["status_summary"]["schema_version"] == "tdx.subscription_watch.status_summary.v1"
+    assert status_view["status_summary"]["state"] == "stopped"
+    assert status_view["status_summary"]["overall_status"] == "stopped"
+    assert status_view["status_summary"]["heartbeat"]["status"] == "missing"
+    assert status_view["status_summary"]["watermark"]["event_count"] == 0
+    assert status_view["status_summary"]["reconnect"]["reconnect_count"] == 0
 
 
 def test_status_view_returns_active_control_and_current_run_status(tmp_path: Path) -> None:
@@ -562,7 +568,18 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
     (run_dir / "status.json").write_text(
-        json.dumps({"run_id": "run-001", "state": "running", "event_count": 3}),
+        json.dumps(
+            {
+                "run_id": "run-001",
+                "state": "running",
+                "event_count": 3,
+                "unique_symbol_count": 2,
+                "heartbeat_at": "2026-05-17T09:30:00+00:00",
+                "last_sequence": 12,
+                "last_event_ts": "2026-05-17T09:30:01+00:00",
+                "last_symbol": "688318.SH",
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -570,6 +587,69 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
 
     assert status_view["control"]["run_id"] == "run-001"
     assert status_view["watch_status"]["event_count"] == 3
+    assert status_view["status_summary"]["state"] == "running"
+    assert status_view["status_summary"]["overall_status"] == "active"
+    assert status_view["status_summary"]["run_id"] == "run-001"
+    assert status_view["status_summary"]["heartbeat"]["status"] == "present"
+    assert status_view["status_summary"]["heartbeat"]["heartbeat_at"] == "2026-05-17T09:30:00+00:00"
+    assert status_view["status_summary"]["watermark"] == {
+        "event_count": 3,
+        "unique_symbol_count": 2,
+        "last_sequence": 12,
+        "last_event_ts": "2026-05-17T09:30:01+00:00",
+        "last_symbol": "688318.SH",
+        "last_source_ts": None,
+    }
+
+
+@pytest.mark.parametrize("state", ["reconnecting", "degraded"])
+def test_status_view_summarizes_resilience_runtime_fields(tmp_path: Path, state: str) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    run_dir = tmp_path / "run-001"
+    run_dir.mkdir(parents=True)
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": state,
+            "run_id": "run-001",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
+    controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    (run_dir / "status.json").write_text(
+        json.dumps(
+            {
+                "run_id": "run-001",
+                "state": state,
+                "event_count": 7,
+                "heartbeat_at": "2026-05-17T09:30:00+00:00",
+                "reconnect_count": 2,
+                "last_disconnect_at": "2026-05-17T09:29:00+00:00",
+                "last_reconnect_at": "2026-05-17T09:29:10+00:00",
+                "next_reconnect_at": "2026-05-17T09:30:10+00:00",
+                "degraded_since": "2026-05-17T09:29:30+00:00",
+                "consecutive_reconnect_failures": 1,
+                "last_error": {"code": "SESSION_LOST"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status_view = controller.status()
+
+    assert status_view["status_summary"]["overall_status"] == state
+    assert status_view["status_summary"]["reconnect"] == {
+        "reconnect_count": 2,
+        "last_disconnect_at": "2026-05-17T09:29:00+00:00",
+        "last_reconnect_at": "2026-05-17T09:29:10+00:00",
+        "next_reconnect_at": "2026-05-17T09:30:10+00:00",
+        "degraded_since": "2026-05-17T09:29:30+00:00",
+        "consecutive_reconnect_failures": 1,
+        "last_error": {"code": "SESSION_LOST"},
+    }
 
 
 def test_list_view_returns_active_last_completed_and_last_failed(tmp_path: Path) -> None:
