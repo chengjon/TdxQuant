@@ -276,7 +276,10 @@ class _MetaManagerProxy:
         effective_profile = self._manager._build_effective_profile({})
         result, timing = capture_api_timing(
             "meta.gb_info",
-            lambda: self._manager._meta_api.gb_info(stock_code=stock_code, date_list=date_list, count=count),
+            lambda: self._manager._dispatch_sync_capability(
+                "meta.gb_info",
+                lambda: self._manager._meta_api.gb_info(stock_code=stock_code, date_list=date_list, count=count),
+            ),
         )
         return attach_manager_metadata(
             result,

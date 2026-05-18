@@ -2065,6 +2065,48 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         manager.market.cb_info.assert_called_once_with("113015.SZ", fields=["symbol", "name"])
 
+    def test_handle_api_gb_info_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "gb-info",
+                "--code",
+                "000001.SZ",
+                "--date",
+                "20250101",
+                "--date",
+                "20241231",
+                "--count",
+                "2",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.gb_info"}},
+        )
+        manager = MagicMock()
+        manager.meta.gb_info.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.gb_info.assert_called_once_with(
+            stock_code="000001.SZ",
+            date_list=["20250101", "20241231"],
+            count=2,
+        )
+
     def test_handle_api_kline_uses_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "kline", "--code", "688260.SH", "--period", "1d"])
@@ -6904,6 +6946,50 @@ class ReportCliDispatchTests(unittest.TestCase):
             replay_fixture_path=None,
         )
         manager.market.cb_info.assert_called_once_with("113015.SZ", fields=["symbol", "name"])
+
+    def test_flat_tdx_data_gb_info_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-gb-info",
+                "--code",
+                "000001.SZ",
+                "--date",
+                "20250101",
+                "--date",
+                "20241231",
+                "--count",
+                "2",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.gb_info"}},
+        )
+        manager = MagicMock()
+        manager.meta.gb_info.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch("tdxquant.cli.run_tdx_gb_info", side_effect=AssertionError("live bridge called")),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.gb_info.assert_called_once_with(
+            stock_code="000001.SZ",
+            date_list=["20250101", "20241231"],
+            count=2,
+        )
 
     def test_main_tdx_create_sector_uses_bridge(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})

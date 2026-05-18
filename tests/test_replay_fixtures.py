@@ -22,6 +22,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("market-stock-info-success", names)
         self.assertIn("market-more-info-success", names)
         self.assertIn("market-cb-info-success", names)
+        self.assertIn("meta-gb-info-success", names)
         self.assertIn("market-kline-success", names)
         self.assertIn("meta-stock-list-success", names)
         self.assertIn("meta-sector-stocks-success", names)
@@ -107,6 +108,15 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["symbol"], "113015.SZ")
         self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["symbol", "name", "issue_date"])
 
+    def test_load_meta_gb_info_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("meta-gb-info-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "meta.gb_info")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "000001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "meta.gb_info")
+        self.assertEqual(payload["data"]["query_meta"]["symbol"], "000001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["date_list"], ["20250101", "20241231"])
+
     def test_load_formula_failure_fixture_returns_hardened_provider_envelope(self) -> None:
         payload = load_provider_replay_fixture("formula-screen-failure")
         self.assertFalse(payload["success"])
@@ -157,6 +167,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                     }
                 ],
                 "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["meta.gb_info"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "meta.gb_info",
+                        "selectors": ["symbol"],
+                        "query_params": ["date_list", "count"],
+                    }
+                ],
+                "supports_requested_fields": False,
                 "supports_empty_results": True,
                 "supports_replay": True,
             },

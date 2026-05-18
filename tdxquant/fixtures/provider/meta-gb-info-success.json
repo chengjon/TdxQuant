@@ -1,0 +1,66 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "provider fixture replay result",
+  "capability": "meta.gb_info",
+  "capability_version": "v1",
+  "schema_version": "tdx.provider.result.v1",
+  "request_id": "fixture-meta-gb-info-success",
+  "started_at": "2026-05-18T00:00:00Z",
+  "finished_at": "2026-05-18T00:00:00Z",
+  "elapsed_ms": 0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "000001.SZ",
+        "date": "20250101",
+        "category": "dividend",
+        "cash_dividend": 1.2,
+        "bonus_share": 0.0,
+        "rights_issue": 0.0
+      },
+      {
+        "symbol": "000001.SZ",
+        "date": "20241231",
+        "category": "bonus_share",
+        "cash_dividend": 0.0,
+        "bonus_share": 0.3,
+        "rights_issue": 0.0
+      }
+    ],
+    "query_meta": {
+      "query_kind": "meta.gb_info",
+      "row_count": 2,
+      "requested_fields": [],
+      "returned_fields": [
+        "symbol",
+        "date",
+        "category",
+        "cash_dividend",
+        "bonus_share",
+        "rights_issue"
+      ],
+      "symbol": "000001.SZ",
+      "date_list": [
+        "20250101",
+        "20241231"
+      ],
+      "count": 2,
+      "query_params": {
+        "date_list": [
+          "20250101",
+          "20241231"
+        ],
+        "count": 2
+      }
+    }
+  },
+  "artifacts": []
+}

@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 17,
+      "total": 18,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
-        "meta": 2,
+        "meta": 3,
         "financial": 2,
         "transaction": 2,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 12
+        "stable": 13
       },
       "by_side_effect_level": {
-        "read_only": 15,
+        "read_only": 16,
         "local_state_mutating": 2
       }
     },
@@ -291,11 +291,11 @@
           "supports_replay": true
         }
       },
-      {
-        "name": "meta.sector_stocks",
-        "capability_version": "v1",
-        "domain": "meta",
-        "description": "List securities inside a TongDaXin sector.",
+    {
+      "name": "meta.sector_stocks",
+      "capability_version": "v1",
+      "domain": "meta",
+      "description": "List securities inside a TongDaXin sector.",
         "stability": "stable",
         "side_effect_level": "read_only",
         "entrypoints": {
@@ -307,11 +307,11 @@
           "native_windows_python",
           "tqcenter"
         ],
-        "query_metadata": {
-          "query_shapes": [
-            {
-              "query_kind": "meta.sector_stocks",
-              "selectors": [
+      "query_metadata": {
+        "query_shapes": [
+          {
+            "query_kind": "meta.sector_stocks",
+            "selectors": [
                 "block_code"
               ],
               "query_params": [
@@ -320,16 +320,50 @@
               ]
             }
           ],
-          "supports_requested_fields": false,
-          "supports_empty_results": true,
-          "supports_replay": true
-        }
+        "supports_requested_fields": false,
+        "supports_empty_results": true,
+        "supports_replay": true
+      }
+    },
+    {
+      "name": "meta.gb_info",
+      "capability_version": "v1",
+      "domain": "meta",
+      "description": "Fetch bonus-share and dividend history.",
+      "stability": "stable",
+      "side_effect_level": "read_only",
+      "entrypoints": {
+        "manager_method": "meta.gb_info",
+        "api_command": "gb-info",
+        "flat_command": "tdx-data-gb-info"
       },
-      {
-        "name": "financial.financial_data",
-        "capability_version": "v1",
-        "domain": "financial",
-        "description": "Fetch professional financial data by range.",
+      "requires": [
+        "native_windows_python",
+        "tqcenter"
+      ],
+      "query_metadata": {
+        "query_shapes": [
+          {
+            "query_kind": "meta.gb_info",
+            "selectors": [
+              "symbol"
+            ],
+            "query_params": [
+              "date_list",
+              "count"
+            ]
+          }
+        ],
+        "supports_requested_fields": false,
+        "supports_empty_results": true,
+        "supports_replay": true
+      }
+    },
+    {
+      "name": "financial.financial_data",
+      "capability_version": "v1",
+      "domain": "financial",
+      "description": "Fetch professional financial data by range.",
         "stability": "stable",
         "side_effect_level": "read_only",
         "entrypoints": {

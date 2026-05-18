@@ -135,6 +135,29 @@ def test_manager_market_cb_info_replay_uses_fixture_without_live_call() -> None:
     assert result.data["replay_source"]["fixture"] == "market-cb-info-success"
 
 
+def test_execute_sync_replay_uses_default_meta_gb_info_fixture() -> None:
+    result = execute_sync_replay("meta.gb_info")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.gb_info"
+    assert result.data["query_meta"]["date_list"] == ["20250101", "20241231"]
+    assert result.data["query_meta"]["count"] == 2
+    assert result.data["rows"][0]["symbol"] == "000001.SZ"
+    assert result.data["replay_source"]["fixture"] == "meta-gb-info-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_meta_gb_info_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MetaApi.gb_info", side_effect=AssertionError("live gb-info called")):
+        result = manager.meta.gb_info("000001.SZ", date_list=["20250101", "20241231"], count=2)
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.gb_info"
+    assert result.data["replay_source"]["fixture"] == "meta-gb-info-success"
+
+
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
     fixture_path = tmp_path / "bad-runtime-capabilities.json"
     fixture_path.write_text(json.dumps(["bad"]), encoding="utf-8")
