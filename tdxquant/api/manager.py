@@ -158,7 +158,10 @@ class _MarketManagerProxy:
         effective_profile = self._manager._build_effective_profile({"field_list": field_list})
         result, timing = capture_api_timing(
             "market.cb_info",
-            lambda: self._manager._market_api.cb_info(stock_code=stock_code, field_list=field_list),
+            lambda: self._manager._dispatch_sync_capability(
+                "market.cb_info",
+                lambda: self._manager._market_api.cb_info(stock_code=stock_code, field_list=field_list),
+            ),
         )
         return attach_manager_metadata(
             result,

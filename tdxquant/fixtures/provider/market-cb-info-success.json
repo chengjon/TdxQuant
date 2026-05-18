@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched convertible bond info",
+  "capability": "market.cb_info",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-market-cb-info-success",
+  "started_at": "2026-05-18T12:02:00Z",
+  "finished_at": "2026-05-18T12:02:00Z",
+  "elapsed_ms": 10,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "113015.SZ",
+        "name": "Longi CB",
+        "issue_date": "2017-11-02"
+      }
+    ],
+    "query_meta": {
+      "query_kind": "market.cb_info",
+      "row_count": 1,
+      "requested_fields": [
+        "symbol",
+        "name",
+        "issue_date"
+      ],
+      "returned_fields": [
+        "symbol",
+        "name",
+        "issue_date"
+      ],
+      "symbol": "113015.SZ",
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

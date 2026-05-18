@@ -18,11 +18,11 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 16,
+      "total": 17,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
-        "market": 4,
+        "market": 5,
         "meta": 2,
         "financial": 2,
         "transaction": 2,
@@ -30,10 +30,10 @@
       },
       "by_stability": {
         "beta": 5,
-        "stable": 11
+        "stable": 12
       },
       "by_side_effect_level": {
-        "read_only": 14,
+        "read_only": 15,
         "local_state_mutating": 2
       }
     },
@@ -179,6 +179,37 @@
           "query_shapes": [
             {
               "query_kind": "market.more_info",
+              "selectors": [
+                "symbol"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "market.cb_info",
+        "capability_version": "v1",
+        "domain": "market",
+        "description": "Fetch convertible bond metadata.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "market.cb_info",
+          "api_command": "cb-info",
+          "flat_command": "tdx-data-cb-info"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "market.cb_info",
               "selectors": [
                 "symbol"
               ],

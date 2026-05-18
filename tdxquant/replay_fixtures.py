@@ -82,6 +82,13 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "market-more-info-success.json",
     },
     {
+        "name": "market-cb-info-success",
+        "capability": "market.cb_info",
+        "format": "json",
+        "description": "Representative successful market.cb_info provider response sample.",
+        "relative_path": "market-cb-info-success.json",
+    },
+    {
         "name": "market-kline-success",
         "capability": "market.kline",
         "format": "json",

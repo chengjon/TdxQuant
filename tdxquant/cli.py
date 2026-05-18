@@ -1591,6 +1591,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_cb_info_parser.add_argument("--code", required=True)
     tdx_data_cb_info_parser.add_argument("--field", action="append", default=[])
     tdx_data_cb_info_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_cb_info_parser)
     tdx_data_gb_info_parser = subparsers.add_parser("tdx-data-gb-info")
     tdx_data_gb_info_parser.add_argument("--code", required=True)
     tdx_data_gb_info_parser.add_argument("--date", action="append", required=True)
@@ -2672,6 +2673,8 @@ _FLAT_PROVIDER_RESULT_COMMANDS = {
     "tdx-doctor",
     "tdx-data-snapshot",
     "tdx-data-stock-info",
+    "tdx-data-more-info",
+    "tdx-data-cb-info",
     "tdx-data-kline",
     "tdx-data-sector-list",
     "tdx-data-sector-stocks",
@@ -2760,6 +2763,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "formula-screen",
     "stock-info",
     "more-info",
+    "cb-info",
     "send-user-block",
     "block-read-watchlist",
 }
@@ -2768,6 +2772,7 @@ _API_REPLAY_CAPABILITIES = {
     "snapshot": "market.snapshot",
     "stock-info": "market.stock_info",
     "more-info": "market.more_info",
+    "cb-info": "market.cb_info",
     "subscription-subscribe": "subscription.subscribe_hq",
     "subscription-unsubscribe": "subscription.unsubscribe_hq",
     "subscription-list": "subscription.get_subscribe_hq_stock_list",
@@ -2853,6 +2858,8 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
         return manager.market.stock_info(args.code, fields=args.field)
     if args.command == "tdx-data-more-info":
         return manager.market.more_info(args.code, fields=args.field)
+    if args.command == "tdx-data-cb-info":
+        return manager.market.cb_info(args.code, fields=args.field)
     return _build_cli_replay_failure_result(
         capability=str(args.command),
         message=f"unsupported replay flat command: {args.command}",
