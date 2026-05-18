@@ -19,6 +19,7 @@ TASK_COMMAND_DEFAULT_PROFILES: dict[str, str] = {
     "block-read-watchlist": "default",
     "block-read-watchlist-export": "default",
     "block-read-full": "default",
+    "block-watchlist-import": "default",
 }
 
 

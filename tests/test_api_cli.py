@@ -971,6 +971,27 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.mutation_key, "sync-001")
         self.assertEqual(args.audit_dir, "runtime/block-sync")
 
+    def test_task_block_watchlist_import_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "block-watchlist-import",
+                "--input",
+                "runtime/watchlist-imports/zxg-watchlist-import.example.json",
+                "--no-dry-run",
+                "--no-show",
+                "--audit-dir",
+                "runtime/block-sync",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "block-watchlist-import")
+        self.assertEqual(args.input_path, "runtime/watchlist-imports/zxg-watchlist-import.example.json")
+        self.assertFalse(args.dry_run)
+        self.assertFalse(args.show)
+        self.assertEqual(args.audit_dir, "runtime/block-sync")
+
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "block-read-watchlist", "--block-code", "ZXG"])
@@ -2639,6 +2660,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertGreater(len(result.data["entries"]), 0)
         self.assertTrue(all("report" in row["labels"] for row in result.data["entries"]))
 
+    def test_handle_catalog_list_includes_block_watchlist_import_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "import"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entry_names = [row["name"] for row in result.data["entries"]]
+        self.assertIn("plan-zxg-watchlist-import", entry_names)
+
     def test_handle_catalog_list_returns_entry_label_discovery_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "report", "--view", "summary"])
@@ -2973,6 +3002,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["resolved_args"]["block_code"], "ZXG")
         self.assertEqual(result.data["resolved_args"]["export_output"], "runtime/exports/zxg.json")
         self.assertFalse(result.data["resolved_args"]["overwrite"])
+        mocked_task_handler.assert_not_called()
+
+    def test_handle_catalog_plan_block_watchlist_import_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "plan-zxg-watchlist-import"])
+        with patch("tdxquant.cli._handle_task_subcommand") as mocked_task_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "plan-zxg-watchlist-import")
+        self.assertEqual(result.data["dispatch"]["source"], "task")
+        self.assertEqual(result.data["dispatch"]["command_group"], "task")
+        self.assertEqual(result.data["dispatch"]["command_name"], "block-watchlist-import")
+        self.assertEqual(
+            result.data["resolved_args"]["input_path"],
+            "runtime/watchlist-imports/zxg-watchlist-import.example.json",
+        )
+        self.assertTrue(result.data["resolved_args"]["dry_run"])
+        self.assertTrue(result.data["resolved_args"]["show"])
         mocked_task_handler.assert_not_called()
 
     def test_handle_catalog_plan_read_zxg_full_returns_resolved_dispatch_without_execution(self) -> None:
@@ -3781,6 +3828,23 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(args.preset, "read-zxg-full")
         self.assertEqual(args.block_code, "ZXG")
 
+    def test_task_run_parser_accepts_watchlist_import_input_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "run",
+                "--preset",
+                "plan-zxg-watchlist-import",
+                "--input",
+                "runtime/watchlist-imports/custom.json",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "run")
+        self.assertEqual(args.preset, "plan-zxg-watchlist-import")
+        self.assertEqual(args.input_path, "runtime/watchlist-imports/custom.json")
+
     def test_handle_task_run_uses_block_read_full_preset_defaults(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "run", "--preset", "read-zxg-full"])
@@ -3932,6 +3996,39 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertIs(result, expected)
         manager.block_read_watchlist.assert_called_once_with(block_code="ZXG")
+
+    def test_handle_task_run_uses_block_watchlist_import_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "plan-zxg-watchlist-import"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_watchlist_import.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-watchlist-import",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "input_path": "runtime/watchlist-imports/zxg-watchlist-import.example.json",
+                        "dry_run": True,
+                        "show": True,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_watchlist_import.assert_called_once_with(
+            input_path="runtime/watchlist-imports/zxg-watchlist-import.example.json",
+            dry_run=True,
+            show=True,
+            audit_dir=None,
+        )
 
     def test_handle_task_run_prefers_block_read_watchlist_cli_overrides(self) -> None:
         parser = build_parser()
@@ -4099,6 +4196,33 @@ class TaskCliDispatchTests(unittest.TestCase):
             dry_run=True,
             show=True,
             mutation_key="sync-001",
+            audit_dir="runtime/block-sync",
+        )
+
+    def test_handle_task_block_watchlist_import_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "block-watchlist-import",
+                "--input",
+                "runtime/watchlist-imports/zxg-watchlist-import.example.json",
+                "--dry-run",
+                "--show",
+                "--audit-dir",
+                "runtime/block-sync",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_watchlist_import.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_watchlist_import.assert_called_once_with(
+            input_path="runtime/watchlist-imports/zxg-watchlist-import.example.json",
+            dry_run=True,
+            show=True,
             audit_dir="runtime/block-sync",
         )
 

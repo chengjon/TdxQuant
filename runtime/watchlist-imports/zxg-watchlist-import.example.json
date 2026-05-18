@@ -1,0 +1,16 @@
+{
+  "schema_version": "tdx.block.watchlist.import.v1",
+  "block_code": "ZXG",
+  "block_name": "ZXG",
+  "mode": "merge",
+  "create_if_missing": false,
+  "mutation_key": "example-zxg-watchlist-import",
+  "symbols": [
+    "000001.SZ",
+    "600519.SH"
+  ],
+  "source": {
+    "kind": "example",
+    "note": "Dry-run catalog preset sample; override --input for operator-owned imports."
+  }
+}

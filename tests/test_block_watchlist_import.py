@@ -11,6 +11,7 @@ from tdxquant.block_watchlist_import import (
     plan_watchlist_import,
     sync_watchlist_import_file,
 )
+from tdxquant.api.task import TdxTaskManager
 from tdxquant.models import ErrorCode, Result
 
 
@@ -137,3 +138,55 @@ def test_sync_watchlist_import_file_delegates_to_block_sync(tmp_path: Path) -> N
     assert calls["show"] is False
     assert calls["mutation_key"] == "import-001"
     assert calls["audit_dir"] == str(tmp_path / "audit")
+
+
+def test_task_manager_block_watchlist_import_dry_run_returns_plan(tmp_path: Path) -> None:
+    path = _write_import_file(
+        tmp_path,
+        {
+            "schema_version": "tdx.block.watchlist.import.v1",
+            "block_code": "ZXG",
+            "symbols": ["000001.SZ"],
+        },
+    )
+    with (
+        patch("tdxquant.api.task.TdxApiManager"),
+        patch("tdxquant.api.task.TdxTradeManager"),
+    ):
+        manager = TdxTaskManager()
+        result = manager.block_watchlist_import(input_path=str(path), dry_run=True)
+    assert result.ok
+    assert result.data["watchlist_import"]["source_path"] == str(path)
+    assert result.data["watchlist_import"]["dry_run"] is True
+    assert result.data["task"]["name"] == "block_watchlist_import"
+
+
+def test_task_manager_block_watchlist_import_apply_delegates_to_import_adapter(tmp_path: Path) -> None:
+    path = _write_import_file(
+        tmp_path,
+        {
+            "schema_version": "tdx.block.watchlist.import.v1",
+            "block_code": "ZXG",
+            "block_name": "自选股",
+            "symbols": ["000001.SZ"],
+        },
+    )
+    expected = Result(ok=True, code=ErrorCode.OK, message="applied", data={})
+    with (
+        patch("tdxquant.api.task.TdxApiManager"),
+        patch("tdxquant.api.task.TdxTradeManager"),
+        patch("tdxquant.api.task.sync_watchlist_import_request", return_value=expected) as mocked_import,
+    ):
+        manager = TdxTaskManager()
+        result = manager.block_watchlist_import(
+            input_path=str(path),
+            dry_run=False,
+            show=False,
+            audit_dir=str(tmp_path / "audit"),
+        )
+    assert result is expected
+    assert mocked_import.call_count == 1
+    _, kwargs = mocked_import.call_args
+    assert kwargs["dry_run"] is False
+    assert kwargs["show"] is False
+    assert kwargs["audit_dir"] == str(tmp_path / "audit")

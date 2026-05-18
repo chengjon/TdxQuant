@@ -85,6 +85,17 @@
       "overwrite": false
     }
   },
+  "plan-zxg-watchlist-import": {
+    "command": "block-watchlist-import",
+    "description": "从固定 JSON 文件生成 ZXG 自选板块导入 dry-run 计划。",
+    "profile": "default",
+    "api_profile": "safe_read",
+    "options": {
+      "input_path": "runtime/watchlist-imports/zxg-watchlist-import.example.json",
+      "dry_run": true,
+      "show": true
+    }
+  },
   "read-zxg-watchlist": {
     "command": "block-read-watchlist",
     "description": "读取 ZXG 板块标准化快照。",

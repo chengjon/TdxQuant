@@ -168,6 +168,13 @@ def _add_block_sync_arguments(subparser: argparse.ArgumentParser) -> None:
     _add_block_mutation_arguments(subparser)
 
 
+def _add_block_watchlist_import_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--input", dest="input_path", required=True)
+    subparser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=True)
+    subparser.add_argument("--show", action=argparse.BooleanOptionalAction, default=True)
+    subparser.add_argument("--audit-dir")
+
+
 def _add_task_common_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--profile", default="default")
     subparser.add_argument("--api-profile")
@@ -410,6 +417,10 @@ def _add_task_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--csv-output-path")
     subparser.add_argument("--export-output")
     subparser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=None)
+    subparser.add_argument("--input", dest="input_path")
+    subparser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=None)
+    subparser.add_argument("--show", action=argparse.BooleanOptionalAction, default=None)
+    subparser.add_argument("--audit-dir")
     subparser.add_argument("--output", help="Optional path to write the JSON result")
 
 
@@ -1025,6 +1036,10 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_block_sync_parser = task_subparsers.add_parser("block-sync")
     _add_block_sync_arguments(task_block_sync_parser)
     _add_task_common_arguments(task_block_sync_parser)
+
+    task_block_watchlist_import_parser = task_subparsers.add_parser("block-watchlist-import")
+    _add_block_watchlist_import_arguments(task_block_watchlist_import_parser)
+    _add_task_common_arguments(task_block_watchlist_import_parser)
 
     task_block_read_watchlist_parser = task_subparsers.add_parser("block-read-watchlist")
     task_block_read_watchlist_parser.add_argument("--block-code", required=True)
@@ -3756,6 +3771,13 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
         if missing_required:
             raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
 
+    if command_name == "block-watchlist-import":
+        missing_required = [name for name in ("input_path",) if merged.get(name) in (None, "")]
+        if missing_required:
+            raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
+        merged["dry_run"] = True if merged.get("dry_run") is None else merged["dry_run"]
+        merged["show"] = True if merged.get("show") is None else merged["show"]
+
     if command_name == "block-read-full":
         missing_required = [name for name in ("block_code",) if merged.get(name) in (None, "")]
         if missing_required:
@@ -3853,6 +3875,13 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             dry_run=args.dry_run,
             show=args.show,
             mutation_key=args.mutation_key,
+            audit_dir=args.audit_dir,
+        )
+    if args.task_command == "block-watchlist-import":
+        return manager.block_watchlist_import(
+            input_path=args.input_path,
+            dry_run=args.dry_run,
+            show=args.show,
             audit_dir=args.audit_dir,
         )
     if args.task_command == "block-read-watchlist":

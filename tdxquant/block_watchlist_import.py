@@ -64,6 +64,27 @@ def sync_watchlist_import_file(
     audit_dir: str | None = None,
 ) -> Result:
     request = load_watchlist_import_file(path)
+    return sync_watchlist_import_request(
+        request,
+        observed_state=observed_state,
+        create_block=create_block,
+        sync_members=sync_members,
+        dry_run=dry_run,
+        show=show,
+        audit_dir=audit_dir,
+    )
+
+
+def sync_watchlist_import_request(
+    request: WatchlistImportRequest,
+    *,
+    observed_state: dict[str, Any] | Result | Callable[[], dict[str, Any] | Result],
+    create_block: Callable[[], Result] | None,
+    sync_members: Callable[[list[str], bool], Result],
+    dry_run: bool = False,
+    show: bool = True,
+    audit_dir: str | None = None,
+) -> Result:
     return sync_watchlist_to_block(
         block_code=request.block_code,
         symbols=list(request.symbols),

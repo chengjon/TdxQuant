@@ -12,6 +12,7 @@ from typing import Any
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from ..block_watchlist_import import load_watchlist_import_file, plan_watchlist_import, sync_watchlist_import_request
 from ..models import ErrorCode, Result
 from ..replay_provider import materialize_subscription_watch_replay
 from ..subscription_event import (
@@ -1147,6 +1148,57 @@ class TdxTaskManager:
             ),
         )
         return self._attach_task_metadata(result, task_name="block_sync", timing=timing)
+
+    def block_watchlist_import(
+        self,
+        *,
+        input_path: str,
+        dry_run: bool = True,
+        show: bool = True,
+        audit_dir: str | None = None,
+    ) -> Result:
+        def run() -> Result:
+            try:
+                request = load_watchlist_import_file(input_path)
+            except ValueError as exc:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=str(exc),
+                    data={"input_path": input_path},
+                    next_action="Fix the JSON watchlist import file and retry.",
+                )
+
+            if dry_run:
+                return Result(
+                    ok=True,
+                    code=ErrorCode.OK,
+                    message="planned watchlist import",
+                    data={"watchlist_import": plan_watchlist_import(input_path, dry_run=True)},
+                )
+
+            block_name = request.block_name or request.block_code
+            return sync_watchlist_import_request(
+                request,
+                observed_state=lambda: self.api_manager.block.read_watchlist_snapshot(block_code=request.block_code),
+                create_block=lambda: self.api_manager.block.create_sector(
+                    block_code=request.block_code,
+                    block_name=block_name,
+                    audit_dir=audit_dir,
+                ),
+                sync_members=lambda symbols, requested_show: self.api_manager.block.send_user_block(
+                    block_code=request.block_code,
+                    stocks=symbols,
+                    show=requested_show,
+                    audit_dir=audit_dir,
+                ),
+                dry_run=False,
+                show=show,
+                audit_dir=audit_dir,
+            )
+
+        result, timing = _capture_task_timing("task.block_watchlist_import", run)
+        return self._attach_task_metadata(result, task_name="block_watchlist_import", timing=timing)
 
     def block_read_watchlist(
         self,
