@@ -91,6 +91,28 @@ def test_manager_market_stock_info_replay_uses_fixture_without_live_call() -> No
     assert result.data["replay_source"]["fixture"] == "market-stock-info-success"
 
 
+def test_execute_sync_replay_uses_default_market_more_info_fixture() -> None:
+    result = execute_sync_replay("market.more_info")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.more_info"
+    assert result.data["query_meta"]["requested_fields"] == ["symbol", "industry", "area"]
+    assert result.data["rows"][0]["symbol"] == "688260.SH"
+    assert result.data["replay_source"]["fixture"] == "market-more-info-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_market_more_info_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MarketApi.more_info", side_effect=AssertionError("live more-info called")):
+        result = manager.market.more_info("688260.SH", fields=["symbol", "industry", "area"])
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.more_info"
+    assert result.data["replay_source"]["fixture"] == "market-more-info-success"
+
+
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
     fixture_path = tmp_path / "bad-runtime-capabilities.json"
     fixture_path.write_text(json.dumps(["bad"]), encoding="utf-8")

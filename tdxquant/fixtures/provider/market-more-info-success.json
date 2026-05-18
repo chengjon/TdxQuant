@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched extended stock info",
+  "capability": "market.more_info",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-market-more-info-success",
+  "started_at": "2026-05-18T12:01:00Z",
+  "finished_at": "2026-05-18T12:01:00Z",
+  "elapsed_ms": 11,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "688260.SH",
+        "industry": "Electronic Components",
+        "area": "Jiangsu"
+      }
+    ],
+    "query_meta": {
+      "query_kind": "market.more_info",
+      "row_count": 1,
+      "requested_fields": [
+        "symbol",
+        "industry",
+        "area"
+      ],
+      "returned_fields": [
+        "symbol",
+        "industry",
+        "area"
+      ],
+      "symbol": "688260.SH",
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

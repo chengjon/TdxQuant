@@ -1993,6 +1993,42 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         manager.market.stock_info.assert_called_once_with("688260.SH", fields=["symbol", "name"])
 
+    def test_handle_api_more_info_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "more-info",
+                "--code",
+                "688260.SH",
+                "--field",
+                "symbol",
+                "--field",
+                "industry",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "market.more_info"}},
+        )
+        manager = MagicMock()
+        manager.market.more_info.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.market.more_info.assert_called_once_with("688260.SH", fields=["symbol", "industry"])
+
     def test_handle_api_kline_uses_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "kline", "--code", "688260.SH", "--period", "1d"])
@@ -6756,6 +6792,44 @@ class ReportCliDispatchTests(unittest.TestCase):
             replay_fixture_path=None,
         )
         manager.market.stock_info.assert_called_once_with("688260.SH", fields=["symbol", "name"])
+
+    def test_flat_tdx_data_more_info_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-more-info",
+                "--code",
+                "688260.SH",
+                "--field",
+                "symbol",
+                "--field",
+                "industry",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "market.more_info"}},
+        )
+        manager = MagicMock()
+        manager.market.more_info.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch("tdxquant.cli.run_tdx_more_info", side_effect=AssertionError("live bridge called")),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.market.more_info.assert_called_once_with("688260.SH", fields=["symbol", "industry"])
 
     def test_main_tdx_create_sector_uses_bridge(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})

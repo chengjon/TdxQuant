@@ -20,6 +20,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("runtime-doctor-degraded", names)
         self.assertIn("market-snapshot-success", names)
         self.assertIn("market-stock-info-success", names)
+        self.assertIn("market-more-info-success", names)
         self.assertIn("market-kline-success", names)
         self.assertIn("meta-stock-list-success", names)
         self.assertIn("meta-sector-stocks-success", names)
@@ -86,6 +87,15 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["query_kind"], "market.stock_info")
         self.assertEqual(payload["data"]["query_meta"]["symbol"], "688260.SH")
         self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["symbol", "name", "market"])
+
+    def test_load_market_more_info_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("market-more-info-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "market.more_info")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "688260.SH")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "market.more_info")
+        self.assertEqual(payload["data"]["query_meta"]["symbol"], "688260.SH")
+        self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["symbol", "industry", "area"])
 
     def test_load_formula_failure_fixture_returns_hardened_provider_envelope(self) -> None:
         payload = load_provider_replay_fixture("formula-screen-failure")

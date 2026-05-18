@@ -128,6 +128,7 @@ _QUERY_CONTRACT_REGISTRY: dict[str, dict[str, Any]] = {
 _QUERY_REPLAY_SUPPORTED_CAPABILITIES = {
     "market.snapshot",
     "market.stock_info",
+    "market.more_info",
     "market.kline",
     "meta.stock_list",
     "meta.sector_stocks",
