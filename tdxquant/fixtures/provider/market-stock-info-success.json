@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched stock info",
+  "capability": "market.stock_info",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-market-stock-info-success",
+  "started_at": "2026-05-18T12:00:00Z",
+  "finished_at": "2026-05-18T12:00:00Z",
+  "elapsed_ms": 9,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "688260.SH",
+        "name": "Yunzhong Tech",
+        "market": "SH"
+      }
+    ],
+    "query_meta": {
+      "query_kind": "market.stock_info",
+      "row_count": 1,
+      "requested_fields": [
+        "symbol",
+        "name",
+        "market"
+      ],
+      "returned_fields": [
+        "symbol",
+        "name",
+        "market"
+      ],
+      "symbol": "688260.SH",
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

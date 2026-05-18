@@ -21,6 +21,7 @@ _SYNC_REPLAY_DEFAULT_FIXTURES: dict[str, str] = {
     "runtime.health": "runtime-health-degraded",
     "runtime.doctor": "runtime-doctor-degraded",
     "market.snapshot": "market-snapshot-success",
+    "market.stock_info": "market-stock-info-success",
     "market.kline": "market-kline-success",
     "meta.stock_list": "meta-stock-list-success",
     "meta.sector_stocks": "meta-sector-stocks-success",

@@ -18,11 +18,11 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 14,
+      "total": 15,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
-        "market": 2,
+        "market": 3,
         "meta": 2,
         "financial": 2,
         "transaction": 2,
@@ -30,10 +30,10 @@
       },
       "by_stability": {
         "beta": 5,
-        "stable": 9
+        "stable": 10
       },
       "by_side_effect_level": {
-        "read_only": 12,
+        "read_only": 13,
         "local_state_mutating": 2
       }
     },
@@ -117,6 +117,37 @@
           "query_shapes": [
             {
               "query_kind": "market.snapshot",
+              "selectors": [
+                "symbol"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "market.stock_info",
+        "capability_version": "v1",
+        "domain": "market",
+        "description": "Fetch static stock info fields.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "market.stock_info",
+          "api_command": "stock-info",
+          "flat_command": "tdx-data-stock-info"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "market.stock_info",
               "selectors": [
                 "symbol"
               ],

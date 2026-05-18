@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
+from tdxquant.api.manager import TdxApiManager
 from tdxquant.provider_discovery import list_provider_capabilities
 from tdxquant.replay_fixtures import load_provider_replay_fixture
 from tdxquant.replay_provider import execute_sync_replay, materialize_subscription_watch_replay
@@ -65,6 +67,28 @@ def test_execute_sync_replay_uses_default_market_snapshot_fixture() -> None:
     assert result.data["query_meta"]["query_kind"] == "market.snapshot"
     assert result.data["replay_source"]["fixture"] == "market-snapshot-success"
     assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_execute_sync_replay_uses_default_market_stock_info_fixture() -> None:
+    result = execute_sync_replay("market.stock_info")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.stock_info"
+    assert result.data["query_meta"]["requested_fields"] == ["symbol", "name", "market"]
+    assert result.data["rows"][0]["symbol"] == "688260.SH"
+    assert result.data["replay_source"]["fixture"] == "market-stock-info-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_market_stock_info_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MarketApi.stock_info", side_effect=AssertionError("live stock-info called")):
+        result = manager.market.stock_info("688260.SH", fields=["symbol", "name", "market"])
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.stock_info"
+    assert result.data["replay_source"]["fixture"] == "market-stock-info-success"
 
 
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
