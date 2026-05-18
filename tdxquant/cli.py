@@ -162,6 +162,7 @@ def _add_block_sync_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--block-code", required=True)
     subparser.add_argument("--stock", action="append", default=[])
     subparser.add_argument("--mode", choices=("replace", "merge"), default="replace")
+    subparser.add_argument("--write-policy", choices=("replace", "merge", "replace_dry_run", "merge_dry_run"))
     subparser.add_argument("--create-if-missing", action=argparse.BooleanOptionalAction, default=False)
     subparser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=False)
     subparser.add_argument("--show", action=argparse.BooleanOptionalAction, default=True)
@@ -382,6 +383,11 @@ def _add_task_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--trade-profile")
     subparser.add_argument("--strategy-path")
     subparser.add_argument("--block-code")
+    subparser.add_argument("--stock", action="append")
+    subparser.add_argument("--mode", choices=("replace", "merge"))
+    subparser.add_argument("--write-policy", choices=("replace", "merge", "replace_dry_run", "merge_dry_run"))
+    subparser.add_argument("--create-if-missing", action=argparse.BooleanOptionalAction, default=None)
+    subparser.add_argument("--mutation-key")
     subparser.add_argument("--port")
     subparser.add_argument("--baudrate", type=int)
     subparser.add_argument("--timeout", type=float)
@@ -3401,6 +3407,7 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
             block_code=args.block_code,
             symbols=args.stock,
             mode=args.mode,
+            write_policy=args.write_policy,
             create_if_missing=args.create_if_missing,
             dry_run=args.dry_run,
             show=args.show,
@@ -3766,6 +3773,15 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
         if missing_required:
             raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
 
+    if command_name == "block-sync":
+        missing_required = [name for name in ("block_code", "stock") if merged.get(name) in (None, "", [])]
+        if missing_required:
+            raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
+        merged["mode"] = "replace" if merged.get("mode") is None else merged["mode"]
+        merged["create_if_missing"] = False if merged.get("create_if_missing") is None else merged["create_if_missing"]
+        merged["dry_run"] = False if merged.get("dry_run") is None else merged["dry_run"]
+        merged["show"] = True if merged.get("show") is None else merged["show"]
+
     if command_name == "block-read-watchlist-export":
         missing_required = [name for name in ("block_code", "export_output") if merged.get(name) in (None, "")]
         if missing_required:
@@ -3871,6 +3887,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             block_code=args.block_code,
             symbols=args.stock,
             mode=args.mode,
+            write_policy=args.write_policy,
             create_if_missing=args.create_if_missing,
             dry_run=args.dry_run,
             show=args.show,

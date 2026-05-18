@@ -1355,6 +1355,7 @@ class _BlockManagerProxy:
         create_if_missing: bool = False,
         dry_run: bool = False,
         show: bool = True,
+        write_policy: str | None = None,
         mutation_key: str | None = None,
         audit_dir: str | None = None,
     ) -> Result:
@@ -1366,6 +1367,7 @@ class _BlockManagerProxy:
                 "create_if_missing": create_if_missing,
                 "dry_run": dry_run,
                 "show": show,
+                "write_policy": write_policy,
                 "mutation_key": mutation_key,
                 "audit_dir": audit_dir,
             }
@@ -1386,6 +1388,7 @@ class _BlockManagerProxy:
                     create_if_missing=create_if_missing,
                     dry_run=dry_run,
                     show=show,
+                    write_policy=write_policy,
                     **options,
                 ),
             ),

@@ -1347,6 +1347,7 @@ def run_tdx_block_sync(
     create_if_missing: bool = False,
     dry_run: bool = False,
     show: bool = True,
+    write_policy: str | None = None,
     mutation_key: str | None = None,
     audit_dir: str | None = None,
     strategy_path: str | None = None,
@@ -1358,6 +1359,7 @@ def run_tdx_block_sync(
         create_if_missing=create_if_missing,
         dry_run=dry_run,
         show=show,
+        write_policy=write_policy,
         mutation_key=mutation_key,
         observed_state=lambda: _probe_custom_sector_state(block_code, strategy_path=strategy_path, include_stocks=True),
         create_block=lambda: run_tdx_create_sector(

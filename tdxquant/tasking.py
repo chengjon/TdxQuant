@@ -16,6 +16,7 @@ TASK_COMMAND_DEFAULT_PROFILES: dict[str, str] = {
     "trade-submit-ready": "trade_submit_ready",
     "trade-confirm-current": "trade_confirm_current",
     "guarded-trade-buy": "guarded_trade_buy",
+    "block-sync": "default",
     "block-read-watchlist": "default",
     "block-read-watchlist-export": "default",
     "block-read-full": "default",

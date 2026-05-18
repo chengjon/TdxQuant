@@ -85,6 +85,22 @@
       "overwrite": false
     }
   },
+  "plan-zxg-block-sync-merge": {
+    "command": "block-sync",
+    "description": "使用显式 merge_dry_run 写策略生成 ZXG 自选板块同步计划。",
+    "profile": "default",
+    "api_profile": "safe_read",
+    "options": {
+      "block_code": "ZXG",
+      "stock": [
+        "000001.SZ",
+        "600519.SH"
+      ],
+      "write_policy": "merge_dry_run",
+      "dry_run": true,
+      "show": true
+    }
+  },
   "plan-zxg-watchlist-import": {
     "command": "block-watchlist-import",
     "description": "从固定 JSON 文件生成 ZXG 自选板块导入 dry-run 计划。",

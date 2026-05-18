@@ -416,6 +416,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
                 create_if_missing=True,
                 dry_run=True,
                 show=False,
+                write_policy="merge_dry_run",
                 mutation_key="sync-001",
                 audit_dir="runtime/block-sync",
                 strategy_path="strategy.py",
@@ -427,6 +428,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
         self.assertEqual(kwargs["block_code"], "ZXG")
         self.assertEqual(kwargs["symbols"], ["000001.SZ", "600519.SH"])
         self.assertEqual(kwargs["mode"], "merge")
+        self.assertEqual(kwargs["write_policy"], "merge_dry_run")
         self.assertTrue(kwargs["create_if_missing"])
         self.assertTrue(kwargs["dry_run"])
         self.assertFalse(kwargs["show"])

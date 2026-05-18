@@ -665,6 +665,12 @@
     "description": "统一入口下的 ZXG 自选板块快照导出模板。",
     "labels": ["task", "block", "watchlist", "export"]
   },
+  "plan-zxg-block-sync-merge": {
+    "source": "task",
+    "preset": "plan-zxg-block-sync-merge",
+    "description": "统一入口下的 ZXG 自选板块 merge_dry_run 同步计划模板。",
+    "labels": ["task", "block", "watchlist", "sync", "dry-run"]
+  },
   "plan-zxg-watchlist-import": {
     "source": "task",
     "preset": "plan-zxg-watchlist-import",

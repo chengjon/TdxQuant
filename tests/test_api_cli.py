@@ -903,6 +903,8 @@ class ApiCliParserTests(unittest.TestCase):
                 "000001.SZ",
                 "--mode",
                 "merge",
+                "--write-policy",
+                "merge_dry_run",
                 "--create-if-missing",
                 "--dry-run",
                 "--show",
@@ -917,6 +919,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.block_code, "ZXG")
         self.assertEqual(args.stock, ["000001.SZ"])
         self.assertEqual(args.mode, "merge")
+        self.assertEqual(args.write_policy, "merge_dry_run")
         self.assertTrue(args.create_if_missing)
         self.assertTrue(args.dry_run)
         self.assertTrue(args.show)
@@ -951,6 +954,8 @@ class ApiCliParserTests(unittest.TestCase):
                 "600519.SH",
                 "--mode",
                 "merge",
+                "--write-policy",
+                "merge_dry_run",
                 "--create-if-missing",
                 "--dry-run",
                 "--show",
@@ -965,6 +970,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.block_code, "ZXG")
         self.assertEqual(args.stock, ["000001.SZ", "600519.SH"])
         self.assertEqual(args.mode, "merge")
+        self.assertEqual(args.write_policy, "merge_dry_run")
         self.assertTrue(args.create_if_missing)
         self.assertTrue(args.dry_run)
         self.assertTrue(args.show)
@@ -2492,6 +2498,8 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "600519.SH",
                 "--mode",
                 "merge",
+                "--write-policy",
+                "merge_dry_run",
                 "--create-if-missing",
                 "--dry-run",
                 "--show",
@@ -2511,6 +2519,7 @@ class ApiCliDispatchTests(unittest.TestCase):
             block_code="ZXG",
             symbols=["000001.SZ", "600519.SH"],
             mode="merge",
+            write_policy="merge_dry_run",
             create_if_missing=True,
             dry_run=True,
             show=True,
@@ -2667,6 +2676,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertTrue(result.ok)
         entry_names = [row["name"] for row in result.data["entries"]]
         self.assertIn("plan-zxg-watchlist-import", entry_names)
+
+    def test_handle_catalog_list_includes_block_sync_write_policy_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "sync"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entry_names = [row["name"] for row in result.data["entries"]]
+        self.assertIn("plan-zxg-block-sync-merge", entry_names)
 
     def test_handle_catalog_list_returns_entry_label_discovery_metadata(self) -> None:
         parser = build_parser()
@@ -3019,6 +3036,22 @@ class ApiCliDispatchTests(unittest.TestCase):
             "runtime/watchlist-imports/zxg-watchlist-import.example.json",
         )
         self.assertTrue(result.data["resolved_args"]["dry_run"])
+        self.assertTrue(result.data["resolved_args"]["show"])
+        mocked_task_handler.assert_not_called()
+
+    def test_handle_catalog_plan_block_sync_write_policy_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "plan-zxg-block-sync-merge"])
+        with patch("tdxquant.cli._handle_task_subcommand") as mocked_task_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "plan-zxg-block-sync-merge")
+        self.assertEqual(result.data["dispatch"]["source"], "task")
+        self.assertEqual(result.data["dispatch"]["command_group"], "task")
+        self.assertEqual(result.data["dispatch"]["command_name"], "block-sync")
+        self.assertEqual(result.data["resolved_args"]["block_code"], "ZXG")
+        self.assertEqual(result.data["resolved_args"]["stock"], ["000001.SZ", "600519.SH"])
+        self.assertEqual(result.data["resolved_args"]["write_policy"], "merge_dry_run")
         self.assertTrue(result.data["resolved_args"]["show"])
         mocked_task_handler.assert_not_called()
 
@@ -4030,6 +4063,46 @@ class TaskCliDispatchTests(unittest.TestCase):
             audit_dir=None,
         )
 
+    def test_handle_task_run_uses_block_sync_write_policy_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "plan-zxg-block-sync-merge"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.block_sync.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "block-sync",
+                    "profile": "default",
+                    "api_profile": "safe_read",
+                    "trade_profile": None,
+                    "strategy_path": None,
+                    "options": {
+                        "block_code": "ZXG",
+                        "stock": ["000001.SZ", "600519.SH"],
+                        "write_policy": "merge_dry_run",
+                        "dry_run": True,
+                        "show": True,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.block_sync.assert_called_once_with(
+            block_code="ZXG",
+            symbols=["000001.SZ", "600519.SH"],
+            mode="replace",
+            write_policy="merge_dry_run",
+            create_if_missing=False,
+            dry_run=True,
+            show=True,
+            mutation_key=None,
+            audit_dir=None,
+        )
+
     def test_handle_task_run_prefers_block_read_watchlist_cli_overrides(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "run", "--preset", "read-zxg-watchlist", "--block-code", "MYZXG"])
@@ -4173,6 +4246,8 @@ class TaskCliDispatchTests(unittest.TestCase):
                 "600519.SH",
                 "--mode",
                 "merge",
+                "--write-policy",
+                "merge_dry_run",
                 "--create-if-missing",
                 "--dry-run",
                 "--show",
@@ -4192,6 +4267,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             block_code="ZXG",
             symbols=["000001.SZ", "600519.SH"],
             mode="merge",
+            write_policy="merge_dry_run",
             create_if_missing=True,
             dry_run=True,
             show=True,
