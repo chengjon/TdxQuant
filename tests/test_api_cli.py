@@ -12,6 +12,7 @@ from tdxquant.cli import (
     _handle_api_subcommand,
     _handle_bridge_subcommand,
     _handle_catalog_subcommand,
+    _handle_provider_replay_subcommand,
     _handle_report_subcommand,
     _select_catalog_output_payload,
     _run_flat_replay_provider_command,
@@ -998,6 +999,24 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertFalse(args.show)
         self.assertEqual(args.audit_dir, "runtime/block-sync")
 
+    def test_provider_replay_serve_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["provider-replay", "serve", "--config", "runtime/provider-transport-replay.example.json"]
+        )
+        self.assertEqual(args.command, "provider-replay")
+        self.assertEqual(args.provider_replay_command, "serve")
+        self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
+
+    def test_provider_replay_config_check_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["provider-replay", "config-check", "--config", "runtime/provider-transport-replay.example.json"]
+        )
+        self.assertEqual(args.command, "provider-replay")
+        self.assertEqual(args.provider_replay_command, "config-check")
+        self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
+
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "block-read-watchlist", "--block-code", "ZXG"])
@@ -1809,6 +1828,52 @@ class ApiCliParserTests(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["catalog", "plan", "--entry", "daily-review", "--view", "summary"])
         self.assertEqual(args.view, "summary")
+
+
+class ProviderReplayCliDispatchTests(unittest.TestCase):
+    def test_handle_provider_replay_config_check_returns_summary_without_serving(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(["provider-replay", "config-check", "--config", str(config_path)])
+            with patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve:
+                result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["config"]["provider_id"], "provider-replay-a")
+        self.assertEqual(result.data["config"]["bind_host"], "127.0.0.1")
+        self.assertEqual(result.data["config"]["port"], 0)
+        self.assertEqual(result.data["config"]["master_allowlist_count"], 1)
+        self.assertEqual(result.data["config"]["replay_fixture"], "market-snapshot-default")
+        mocked_serve.assert_not_called()
+
+    def test_handle_provider_replay_serve_delegates_to_foreground_server(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["provider-replay", "serve", "--config", "runtime/provider-transport-replay.example.json"])
+        loaded_config = MagicMock(provider_id="provider-replay-a", bind_host="127.0.0.1", port=0)
+        with (
+            patch("tdxquant.cli.load_provider_transport_replay_config", return_value=loaded_config) as mocked_load,
+            patch("tdxquant.cli.serve_provider_transport_replay", return_value=0) as mocked_serve,
+        ):
+            result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["exit_code"], 0)
+        mocked_load.assert_called_once_with("runtime/provider-transport-replay.example.json")
+        mocked_serve.assert_called_once_with(loaded_config)
 
 
 class ApiCliDispatchTests(unittest.TestCase):

@@ -1,0 +1,10 @@
+{
+  "provider_id": "provider-replay-local",
+  "bind_host": "127.0.0.1",
+  "port": 8765,
+  "token": "local-replay-token",
+  "master_allowlist": [
+    "127.0.0.1"
+  ],
+  "replay_fixture": "market-snapshot-success"
+}

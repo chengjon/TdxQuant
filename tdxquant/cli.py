@@ -40,6 +40,7 @@ from .desktop.hid import build_type_command, normalize_hid_key, run_hid_ping, ru
 from .desktop.inspect import enumerate_controls, find_main_window
 from .bridge_registry import run_bridge_watch_start, run_bridge_watch_status, run_bridge_watch_stop
 from .bridge_http import serve_bridge_from_config
+from .provider_transport_replay import load_provider_transport_replay_config, serve_provider_transport_replay
 from .models import ErrorCode, OrderRequest, Result
 from .result_contract import DEFAULT_CAPABILITY_VERSION, DEFAULT_SCHEMA_VERSION, build_runtime_metadata, format_rfc3339, utc_now
 from .api.bridge import (
@@ -665,6 +666,23 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_stop_parser.add_argument("--worker", required=True)
 
     return bridge_parser
+
+
+def _build_provider_replay_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> argparse.ArgumentParser:
+    provider_replay_parser = subparsers.add_parser("provider-replay")
+    provider_replay_subparsers = provider_replay_parser.add_subparsers(dest="provider_replay_command", required=True)
+
+    provider_replay_serve_parser = provider_replay_subparsers.add_parser("serve")
+    provider_replay_serve_parser.add_argument("--config", required=True)
+    provider_replay_serve_parser.add_argument("--output", help="Optional path to write the JSON result after exit")
+
+    provider_replay_config_check_parser = provider_replay_subparsers.add_parser("config-check")
+    provider_replay_config_check_parser.add_argument("--config", required=True)
+    provider_replay_config_check_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    return provider_replay_parser
 
 
 def _add_report_run_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -1317,6 +1335,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_trade_parser(subparsers)
     _build_catalog_parser(subparsers)
     _build_bridge_parser(subparsers)
+    _build_provider_replay_parser(subparsers)
     health_parser = subparsers.add_parser("health-check")
     inspect_parser = subparsers.add_parser("inspect")
     uia_windows_parser = subparsers.add_parser("uia-windows")
@@ -4153,6 +4172,43 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
         return _emit_bridge_payload(_build_bridge_local_failure(exc))
 
 
+def _provider_replay_config_summary(config: object) -> dict[str, object]:
+    master_allowlist = getattr(config, "master_allowlist", []) or []
+    return {
+        "provider_id": getattr(config, "provider_id", ""),
+        "bind_host": getattr(config, "bind_host", ""),
+        "port": getattr(config, "port", None),
+        "master_allowlist_count": len(master_allowlist),
+        "replay_fixture": getattr(config, "replay_fixture", None),
+        "replay_fixture_path": getattr(config, "replay_fixture_path", None),
+    }
+
+
+def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
+    try:
+        config = load_provider_transport_replay_config(args.config)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
+
+    config_summary = _provider_replay_config_summary(config)
+    if args.provider_replay_command == "config-check":
+        return Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="validated provider replay config",
+            data={"config": config_summary},
+        )
+    if args.provider_replay_command == "serve":
+        exit_code = serve_provider_transport_replay(config)
+        return Result(
+            ok=exit_code == 0,
+            code=ErrorCode.OK if exit_code == 0 else ErrorCode.EXECUTION_FAILED,
+            message="provider replay service exited",
+            data={"exit_code": exit_code, "config": config_summary},
+        )
+    return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported provider replay command: {args.provider_replay_command}")
+
+
 def _emit_bridge_payload(payload: dict[str, object]) -> int:
     sys.stdout.write(json.dumps(payload, ensure_ascii=False))
     sys.stdout.write("\n")
@@ -4183,6 +4239,15 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "bridge":
         return _handle_bridge_subcommand(args)
+    if args.command == "provider-replay":
+        result = _handle_provider_replay_subcommand(args)
+        serialized = json.dumps(result.to_dict(), ensure_ascii=False, indent=2)
+        if getattr(args, "output", None):
+            output_path = Path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(serialized + "\n", encoding="utf-8")
+        print(serialized)
+        return 0 if result.ok else 1
     adapter = PingAnBrokerAdapter(title_keyword=args.title_key, exe_path=args.exe_path)
     command_started_wall = utc_now()
     command_started_at = time.perf_counter()
