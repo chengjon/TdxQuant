@@ -1611,6 +1611,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_ipo_info_parser.add_argument("--ipo-type", default=0, type=int, choices=[0, 1, 2])
     tdx_data_ipo_info_parser.add_argument("--ipo-date", default=0, type=int, choices=[0, 1])
     tdx_data_ipo_info_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_ipo_info_parser)
     tdx_data_financial_parser = subparsers.add_parser("tdx-data-financial")
     tdx_data_financial_parser.add_argument("--code", action="append", required=True)
     tdx_data_financial_parser.add_argument("--field", action="append", required=True)
@@ -2767,6 +2768,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "more-info",
     "cb-info",
     "gb-info",
+    "ipo-info",
     "send-user-block",
     "block-read-watchlist",
 }
@@ -2777,6 +2779,7 @@ _API_REPLAY_CAPABILITIES = {
     "more-info": "market.more_info",
     "cb-info": "market.cb_info",
     "gb-info": "meta.gb_info",
+    "ipo-info": "meta.ipo_info",
     "subscription-subscribe": "subscription.subscribe_hq",
     "subscription-unsubscribe": "subscription.unsubscribe_hq",
     "subscription-list": "subscription.get_subscribe_hq_stock_list",
@@ -2866,6 +2869,8 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
         return manager.market.cb_info(args.code, fields=args.field)
     if args.command == "tdx-data-gb-info":
         return manager.meta.gb_info(stock_code=args.code, date_list=args.date, count=args.count)
+    if args.command == "tdx-data-ipo-info":
+        return manager.meta.ipo_info(ipo_type=args.ipo_type, ipo_date=args.ipo_date)
     return _build_cli_replay_failure_result(
         capability=str(args.command),
         message=f"unsupported replay flat command: {args.command}",

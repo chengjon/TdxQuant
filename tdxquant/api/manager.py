@@ -261,7 +261,10 @@ class _MetaManagerProxy:
         )
         result, timing = capture_api_timing(
             "meta.ipo_info",
-            lambda: self._manager._meta_api.ipo_info(ipo_type=ipo_type, ipo_date=ipo_date),
+            lambda: self._manager._dispatch_sync_capability(
+                "meta.ipo_info",
+                lambda: self._manager._meta_api.ipo_info(ipo_type=ipo_type, ipo_date=ipo_date),
+            ),
         )
         return attach_manager_metadata(
             result,

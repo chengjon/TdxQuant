@@ -158,6 +158,29 @@ def test_manager_meta_gb_info_replay_uses_fixture_without_live_call() -> None:
     assert result.data["replay_source"]["fixture"] == "meta-gb-info-success"
 
 
+def test_execute_sync_replay_uses_default_meta_ipo_info_fixture() -> None:
+    result = execute_sync_replay("meta.ipo_info")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.ipo_info"
+    assert result.data["query_meta"]["ipo_type"] == 2
+    assert result.data["query_meta"]["ipo_date"] == 1
+    assert result.data["rows"][0]["code"] == "301001.SZ"
+    assert result.data["replay_source"]["fixture"] == "meta-ipo-info-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_meta_ipo_info_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MetaApi.ipo_info", side_effect=AssertionError("live ipo-info called")):
+        result = manager.meta.ipo_info(ipo_type=2, ipo_date=1)
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.ipo_info"
+    assert result.data["replay_source"]["fixture"] == "meta-ipo-info-success"
+
+
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
     fixture_path = tmp_path / "bad-runtime-capabilities.json"
     fixture_path.write_text(json.dumps(["bad"]), encoding="utf-8")

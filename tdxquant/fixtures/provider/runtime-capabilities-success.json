@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 18,
+      "total": 19,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
-        "meta": 3,
+        "meta": 4,
         "financial": 2,
         "transaction": 2,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 13
+        "stable": 14
       },
       "by_side_effect_level": {
-        "read_only": 16,
+        "read_only": 17,
         "local_state_mutating": 2
       }
     },
@@ -351,6 +351,38 @@
             "query_params": [
               "date_list",
               "count"
+            ]
+          }
+        ],
+        "supports_requested_fields": false,
+        "supports_empty_results": true,
+        "supports_replay": true
+      }
+    },
+    {
+      "name": "meta.ipo_info",
+      "capability_version": "v1",
+      "domain": "meta",
+      "description": "Fetch IPO metadata.",
+      "stability": "stable",
+      "side_effect_level": "read_only",
+      "entrypoints": {
+        "manager_method": "meta.ipo_info",
+        "api_command": "ipo-info",
+        "flat_command": "tdx-data-ipo-info"
+      },
+      "requires": [
+        "native_windows_python",
+        "tqcenter"
+      ],
+      "query_metadata": {
+        "query_shapes": [
+          {
+            "query_kind": "meta.ipo_info",
+            "selectors": [],
+            "query_params": [
+              "ipo_type",
+              "ipo_date"
             ]
           }
         ],

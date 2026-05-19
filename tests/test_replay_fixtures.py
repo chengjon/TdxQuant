@@ -23,6 +23,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("market-more-info-success", names)
         self.assertIn("market-cb-info-success", names)
         self.assertIn("meta-gb-info-success", names)
+        self.assertIn("meta-ipo-info-success", names)
         self.assertIn("market-kline-success", names)
         self.assertIn("meta-stock-list-success", names)
         self.assertIn("meta-sector-stocks-success", names)
@@ -117,6 +118,15 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["symbol"], "000001.SZ")
         self.assertEqual(payload["data"]["query_meta"]["date_list"], ["20250101", "20241231"])
 
+    def test_load_meta_ipo_info_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("meta-ipo-info-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "meta.ipo_info")
+        self.assertEqual(payload["data"]["rows"][0]["code"], "301001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "meta.ipo_info")
+        self.assertEqual(payload["data"]["query_meta"]["ipo_type"], 2)
+        self.assertEqual(payload["data"]["query_meta"]["ipo_date"], 1)
+
     def test_load_formula_failure_fixture_returns_hardened_provider_envelope(self) -> None:
         payload = load_provider_replay_fixture("formula-screen-failure")
         self.assertFalse(payload["success"])
@@ -179,6 +189,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                         "query_kind": "meta.gb_info",
                         "selectors": ["symbol"],
                         "query_params": ["date_list", "count"],
+                    }
+                ],
+                "supports_requested_fields": False,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["meta.ipo_info"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "meta.ipo_info",
+                        "selectors": [],
+                        "query_params": ["ipo_type", "ipo_date"],
                     }
                 ],
                 "supports_requested_fields": False,

@@ -25,6 +25,7 @@ _SYNC_REPLAY_DEFAULT_FIXTURES: dict[str, str] = {
     "market.more_info": "market-more-info-success",
     "market.cb_info": "market-cb-info-success",
     "meta.gb_info": "meta-gb-info-success",
+    "meta.ipo_info": "meta-ipo-info-success",
     "market.kline": "market-kline-success",
     "meta.stock_list": "meta-stock-list-success",
     "meta.sector_stocks": "meta-sector-stocks-success",

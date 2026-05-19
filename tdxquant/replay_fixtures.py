@@ -96,6 +96,13 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "meta-gb-info-success.json",
     },
     {
+        "name": "meta-ipo-info-success",
+        "capability": "meta.ipo_info",
+        "format": "json",
+        "description": "Representative successful meta.ipo_info provider response sample.",
+        "relative_path": "meta-ipo-info-success.json",
+    },
+    {
         "name": "market-kline-success",
         "capability": "market.kline",
         "format": "json",

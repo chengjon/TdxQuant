@@ -1,0 +1,59 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "provider fixture replay result",
+  "capability": "meta.ipo_info",
+  "capability_version": "v1",
+  "schema_version": "tdx.provider.result.v1",
+  "request_id": "fixture-meta-ipo-info-success",
+  "started_at": "2026-05-18T00:00:00Z",
+  "finished_at": "2026-05-18T00:00:00Z",
+  "elapsed_ms": 0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "code": "301001.SZ",
+        "name": "IPO Sample A",
+        "market": "SZ",
+        "ipo_date": "20250115",
+        "issue_price": 12.34,
+        "shares": 42000000
+      },
+      {
+        "code": "688001.SH",
+        "name": "IPO Sample B",
+        "market": "SH",
+        "ipo_date": "20250120",
+        "issue_price": 28.5,
+        "shares": 26000000
+      }
+    ],
+    "query_meta": {
+      "query_kind": "meta.ipo_info",
+      "row_count": 2,
+      "requested_fields": [],
+      "returned_fields": [
+        "code",
+        "name",
+        "market",
+        "ipo_date",
+        "issue_price",
+        "shares"
+      ],
+      "ipo_type": 2,
+      "ipo_date": 1,
+      "query_params": {
+        "ipo_type": 2,
+        "ipo_date": 1
+      }
+    }
+  },
+  "artifacts": []
+}
