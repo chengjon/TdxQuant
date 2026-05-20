@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 19,
+      "total": 20,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
-        "meta": 4,
+        "meta": 5,
         "financial": 2,
         "transaction": 2,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 14
+        "stable": 15
       },
       "by_side_effect_level": {
-        "read_only": 17,
+        "read_only": 18,
         "local_state_mutating": 2
       }
     },
@@ -387,6 +387,37 @@
           }
         ],
         "supports_requested_fields": false,
+        "supports_empty_results": true,
+        "supports_replay": true
+      }
+    },
+    {
+      "name": "meta.gp_one_data",
+      "capability_version": "v1",
+      "domain": "meta",
+      "description": "Fetch one-shot per-security metadata fields.",
+      "stability": "stable",
+      "side_effect_level": "read_only",
+      "entrypoints": {
+        "manager_method": "meta.gp_one_data",
+        "api_command": "gp-one",
+        "flat_command": "tdx-data-gp-one"
+      },
+      "requires": [
+        "native_windows_python",
+        "tqcenter"
+      ],
+      "query_metadata": {
+        "query_shapes": [
+          {
+            "query_kind": "meta.gp_one_data",
+            "selectors": [
+              "symbols"
+            ],
+            "query_params": []
+          }
+        ],
+        "supports_requested_fields": true,
         "supports_empty_results": true,
         "supports_replay": true
       }

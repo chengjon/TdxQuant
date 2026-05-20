@@ -24,6 +24,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("market-cb-info-success", names)
         self.assertIn("meta-gb-info-success", names)
         self.assertIn("meta-ipo-info-success", names)
+        self.assertIn("meta-gp-one-success", names)
         self.assertIn("market-kline-success", names)
         self.assertIn("meta-stock-list-success", names)
         self.assertIn("meta-sector-stocks-success", names)
@@ -127,6 +128,15 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["ipo_type"], 2)
         self.assertEqual(payload["data"]["query_meta"]["ipo_date"], 1)
 
+    def test_load_meta_gp_one_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("meta-gp-one-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "meta.gp_one_data")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "000001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "meta.gp_one_data")
+        self.assertEqual(payload["data"]["query_meta"]["symbols"], ["000001.SZ", "600519.SH"])
+        self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["Now", "Volume"])
+
     def test_load_formula_failure_fixture_returns_hardened_provider_envelope(self) -> None:
         payload = load_provider_replay_fixture("formula-screen-failure")
         self.assertFalse(payload["success"])
@@ -207,6 +217,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                     }
                 ],
                 "supports_requested_fields": False,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["meta.gp_one_data"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "meta.gp_one_data",
+                        "selectors": ["symbols"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": True,
                 "supports_empty_results": True,
                 "supports_replay": True,
             },

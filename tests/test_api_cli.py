@@ -2141,6 +2141,47 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         manager.meta.ipo_info.assert_called_once_with(ipo_type=2, ipo_date=1)
 
+    def test_handle_api_gp_one_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "gp-one",
+                "--code",
+                "000001.SZ",
+                "--code",
+                "600519.SH",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.gp_one_data"}},
+        )
+        manager = MagicMock()
+        manager.meta.gp_one_data.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.gp_one_data.assert_called_once_with(
+            stock_list=["000001.SZ", "600519.SH"],
+            fields=["Now", "Volume"],
+        )
+
     def test_handle_api_kline_uses_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "kline", "--code", "688260.SH", "--period", "1d"])
@@ -7060,6 +7101,49 @@ class ReportCliDispatchTests(unittest.TestCase):
             replay_fixture_path=None,
         )
         manager.meta.ipo_info.assert_called_once_with(ipo_type=2, ipo_date=1)
+
+    def test_flat_tdx_data_gp_one_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-gp-one",
+                "--code",
+                "000001.SZ",
+                "--code",
+                "600519.SH",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.gp_one_data"}},
+        )
+        manager = MagicMock()
+        manager.meta.gp_one_data.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch("tdxquant.cli.run_tdx_gp_one_data", side_effect=AssertionError("live bridge called")),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.gp_one_data.assert_called_once_with(
+            stock_list=["000001.SZ", "600519.SH"],
+            fields=["Now", "Volume"],
+        )
 
     def test_main_tdx_create_sector_uses_bridge(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})

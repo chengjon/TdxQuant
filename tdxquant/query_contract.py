@@ -133,6 +133,7 @@ _QUERY_REPLAY_SUPPORTED_CAPABILITIES = {
     "market.kline",
     "meta.gb_info",
     "meta.ipo_info",
+    "meta.gp_one_data",
     "meta.stock_list",
     "meta.sector_stocks",
     "financial.financial_data",

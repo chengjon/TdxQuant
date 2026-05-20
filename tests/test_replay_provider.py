@@ -181,6 +181,29 @@ def test_manager_meta_ipo_info_replay_uses_fixture_without_live_call() -> None:
     assert result.data["replay_source"]["fixture"] == "meta-ipo-info-success"
 
 
+def test_execute_sync_replay_uses_default_meta_gp_one_fixture() -> None:
+    result = execute_sync_replay("meta.gp_one_data")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.gp_one_data"
+    assert result.data["query_meta"]["symbols"] == ["000001.SZ", "600519.SH"]
+    assert result.data["query_meta"]["requested_fields"] == ["Now", "Volume"]
+    assert result.data["rows"][0]["symbol"] == "000001.SZ"
+    assert result.data["replay_source"]["fixture"] == "meta-gp-one-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_meta_gp_one_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MetaApi.gp_one_data", side_effect=AssertionError("live gp-one called")):
+        result = manager.meta.gp_one_data(stock_list=["000001.SZ", "600519.SH"], fields=["Now", "Volume"])
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.gp_one_data"
+    assert result.data["replay_source"]["fixture"] == "meta-gp-one-success"
+
+
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
     fixture_path = tmp_path / "bad-runtime-capabilities.json"
     fixture_path.write_text(json.dumps(["bad"]), encoding="utf-8")

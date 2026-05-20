@@ -297,7 +297,10 @@ class _MetaManagerProxy:
         effective_profile = self._manager._build_effective_profile({"field_list": list(fields)})
         result, timing = capture_api_timing(
             "meta.gp_one_data",
-            lambda: self._manager._meta_api.gp_one_data(stock_list=stock_list, field_list=list(fields)),
+            lambda: self._manager._dispatch_sync_capability(
+                "meta.gp_one_data",
+                lambda: self._manager._meta_api.gp_one_data(stock_list=stock_list, field_list=list(fields)),
+            ),
         )
         return attach_manager_metadata(
             result,

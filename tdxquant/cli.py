@@ -1602,6 +1602,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_gp_one_parser.add_argument("--code", action="append", required=True)
     tdx_data_gp_one_parser.add_argument("--field", action="append", required=True)
     tdx_data_gp_one_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_gp_one_parser)
     tdx_data_divid_factors_parser = subparsers.add_parser("tdx-data-divid-factors")
     tdx_data_divid_factors_parser.add_argument("--code", required=True)
     tdx_data_divid_factors_parser.add_argument("--start-time", default="")
@@ -2678,6 +2679,7 @@ _FLAT_PROVIDER_RESULT_COMMANDS = {
     "tdx-data-more-info",
     "tdx-data-cb-info",
     "tdx-data-gb-info",
+    "tdx-data-gp-one",
     "tdx-data-kline",
     "tdx-data-sector-list",
     "tdx-data-sector-stocks",
@@ -2769,6 +2771,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "cb-info",
     "gb-info",
     "ipo-info",
+    "gp-one",
     "send-user-block",
     "block-read-watchlist",
 }
@@ -2780,6 +2783,7 @@ _API_REPLAY_CAPABILITIES = {
     "cb-info": "market.cb_info",
     "gb-info": "meta.gb_info",
     "ipo-info": "meta.ipo_info",
+    "gp-one": "meta.gp_one_data",
     "subscription-subscribe": "subscription.subscribe_hq",
     "subscription-unsubscribe": "subscription.unsubscribe_hq",
     "subscription-list": "subscription.get_subscribe_hq_stock_list",
@@ -2871,6 +2875,8 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
         return manager.meta.gb_info(stock_code=args.code, date_list=args.date, count=args.count)
     if args.command == "tdx-data-ipo-info":
         return manager.meta.ipo_info(ipo_type=args.ipo_type, ipo_date=args.ipo_date)
+    if args.command == "tdx-data-gp-one":
+        return manager.meta.gp_one_data(stock_list=args.code, fields=args.field)
     return _build_cli_replay_failure_result(
         capability=str(args.command),
         message=f"unsupported replay flat command: {args.command}",
