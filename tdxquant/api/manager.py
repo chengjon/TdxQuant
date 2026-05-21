@@ -792,11 +792,14 @@ class _TransactionManagerProxy:
         )
         result, timing = capture_api_timing(
             "transaction.sector_transaction_data_by_date",
-            lambda: self._manager._transaction_api.sector_transaction_data_by_date(
-                stock_list=stock_list,
-                field_list=field_list,
-                year=year,
-                mmdd=mmdd,
+            lambda: self._manager._dispatch_sync_capability(
+                "transaction.sector_transaction_data_by_date",
+                lambda: self._manager._transaction_api.sector_transaction_data_by_date(
+                    stock_list=stock_list,
+                    field_list=field_list,
+                    year=year,
+                    mmdd=mmdd,
+                ),
             ),
         )
         return attach_manager_metadata(

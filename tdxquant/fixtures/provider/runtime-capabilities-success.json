@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 23,
+      "total": 24,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
         "meta": 6,
         "financial": 2,
-        "transaction": 4,
+        "transaction": 5,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 18
+        "stable": 19
       },
       "by_side_effect_level": {
-        "read_only": 21,
+        "read_only": 22,
         "local_state_mutating": 2
       }
     },
@@ -572,6 +572,38 @@
           "query_shapes": [
             {
               "query_kind": "transaction.stock_transaction_data_by_date",
+              "selectors": [
+                "symbols",
+                "date"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "transaction.sector_transaction_data_by_date",
+        "capability_version": "v1",
+        "domain": "transaction",
+        "description": "Fetch sector transaction statistics by date.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "transaction.sector_transaction_data_by_date",
+          "api_command": "sector-transaction-data-by-date",
+          "flat_command": "tdx-data-sector-transaction-by-date"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "transaction.sector_transaction_data_by_date",
               "selectors": [
                 "symbols",
                 "date"

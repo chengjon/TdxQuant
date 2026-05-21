@@ -1652,6 +1652,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_sector_transaction_by_date_parser.add_argument("--year", required=True, type=int)
     tdx_data_sector_transaction_by_date_parser.add_argument("--mmdd", required=True, type=int)
     tdx_data_sector_transaction_by_date_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_sector_transaction_by_date_parser)
     tdx_data_market_transaction_parser = subparsers.add_parser("tdx-data-market-transaction")
     tdx_data_market_transaction_parser.add_argument("--field", action="append", required=True)
     tdx_data_market_transaction_parser.add_argument("--start-time", default="")
@@ -2777,6 +2778,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "gp-one",
     "divid-factors",
     "stock-transaction-data-by-date",
+    "sector-transaction-data-by-date",
     "market-transaction-data-by-date",
     "send-user-block",
     "block-read-watchlist",
@@ -2792,6 +2794,7 @@ _API_REPLAY_CAPABILITIES = {
     "gp-one": "meta.gp_one_data",
     "divid-factors": "meta.divid_factors",
     "stock-transaction-data-by-date": "transaction.stock_transaction_data_by_date",
+    "sector-transaction-data-by-date": "transaction.sector_transaction_data_by_date",
     "market-transaction-data-by-date": "transaction.market_transaction_data_by_date",
     "subscription-subscribe": "subscription.subscribe_hq",
     "subscription-unsubscribe": "subscription.unsubscribe_hq",
@@ -2894,6 +2897,13 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
         )
     if args.command == "tdx-data-stock-transaction-by-date":
         return manager.transaction.stock_transaction_data_by_date(
+            stock_list=args.code,
+            fields=args.field,
+            year=args.year,
+            mmdd=args.mmdd,
+        )
+    if args.command == "tdx-data-sector-transaction-by-date":
+        return manager.transaction.sector_transaction_data_by_date(
             stock_list=args.code,
             fields=args.field,
             year=args.year,
