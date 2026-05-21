@@ -260,6 +260,36 @@ def test_manager_transaction_stock_transaction_by_date_replay_uses_fixture_witho
     assert result.data["replay_source"]["fixture"] == "transaction-stock-transaction-data-by-date-success"
 
 
+def test_execute_sync_replay_uses_default_transaction_market_transaction_by_date_fixture() -> None:
+    result = execute_sync_replay("transaction.market_transaction_data_by_date")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "transaction.market_transaction_data_by_date"
+    assert result.data["query_meta"]["requested_fields"] == ["field_a", "field_b"]
+    assert result.data["query_meta"]["date"] == "20250101"
+    assert result.data["rows"][0]["field_a"] == 3
+    assert result.data["replay_source"]["fixture"] == "transaction-market-transaction-data-by-date-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_transaction_market_transaction_by_date_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch(
+        "tdxquant.api.manager.TransactionApi.market_transaction_data_by_date",
+        side_effect=AssertionError("live market transaction by-date called"),
+    ):
+        result = manager.transaction.market_transaction_data_by_date(
+            fields=["field_a", "field_b"],
+            year=2025,
+            mmdd=101,
+        )
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "transaction.market_transaction_data_by_date"
+    assert result.data["replay_source"]["fixture"] == "transaction-market-transaction-data-by-date-success"
+
+
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
     fixture_path = tmp_path / "bad-runtime-capabilities.json"
     fixture_path.write_text(json.dumps(["bad"]), encoding="utf-8")

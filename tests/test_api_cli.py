@@ -797,6 +797,29 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.year, 0)
         self.assertEqual(args.mmdd, 0)
 
+    def test_tdx_data_market_transaction_by_date_command_parses_replay_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-market-transaction-by-date",
+                "--field",
+                "field_a",
+                "--field",
+                "field_b",
+                "--year",
+                "2025",
+                "--mmdd",
+                "101",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-market-transaction-by-date")
+        self.assertEqual(args.provider_mode, "replay")
+        self.assertEqual(args.field, ["field_a", "field_b"])
+        self.assertEqual(args.year, 2025)
+        self.assertEqual(args.mmdd, 101)
+
     def test_tdx_data_financial_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -2738,6 +2761,48 @@ class ApiCliDispatchTests(unittest.TestCase):
             fields=["SC06"],
             year=0,
             mmdd=0,
+        )
+
+    def test_handle_api_market_transaction_data_by_date_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "market-transaction-data-by-date",
+                "--field",
+                "field_a",
+                "--field",
+                "field_b",
+                "--year",
+                "2025",
+                "--mmdd",
+                "101",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "transaction.market_transaction_data_by_date"}},
+        )
+        manager = MagicMock()
+        manager.transaction.market_transaction_data_by_date.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.transaction.market_transaction_data_by_date.assert_called_once_with(
+            fields=["field_a", "field_b"],
+            year=2025,
+            mmdd=101,
         )
 
     def test_handle_api_invalid_profile_returns_invalid_request(self) -> None:
@@ -7346,6 +7411,53 @@ class ReportCliDispatchTests(unittest.TestCase):
         manager.transaction.stock_transaction_data_by_date.assert_called_once_with(
             stock_list=["000001.SZ", "000002.SZ"],
             fields=["price", "volume"],
+            year=2025,
+            mmdd=101,
+        )
+
+    def test_flat_tdx_data_market_transaction_by_date_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-market-transaction-by-date",
+                "--field",
+                "field_a",
+                "--field",
+                "field_b",
+                "--year",
+                "2025",
+                "--mmdd",
+                "101",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "transaction.market_transaction_data_by_date"}},
+        )
+        manager = MagicMock()
+        manager.transaction.market_transaction_data_by_date.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch(
+                "tdxquant.cli.run_tdx_market_transaction_data_by_date",
+                side_effect=AssertionError("live bridge called"),
+            ),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.transaction.market_transaction_data_by_date.assert_called_once_with(
+            fields=["field_a", "field_b"],
             year=2025,
             mmdd=101,
         )

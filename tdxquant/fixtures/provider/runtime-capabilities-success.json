@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 22,
+      "total": 23,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
         "meta": 6,
         "financial": 2,
-        "transaction": 3,
+        "transaction": 4,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 17
+        "stable": 18
       },
       "by_side_effect_level": {
-        "read_only": 20,
+        "read_only": 21,
         "local_state_mutating": 2
       }
     },
@@ -606,6 +606,37 @@
               "query_kind": "transaction.market_transaction_data",
               "selectors": [
                 "date_range"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "transaction.market_transaction_data_by_date",
+        "capability_version": "v1",
+        "domain": "transaction",
+        "description": "Fetch market transaction statistics by date.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "transaction.market_transaction_data_by_date",
+          "api_command": "market-transaction-data-by-date",
+          "flat_command": "tdx-data-market-transaction-by-date"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "transaction.market_transaction_data_by_date",
+              "selectors": [
+                "date"
               ],
               "query_params": []
             }

@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched market transaction data by date",
+  "capability": "transaction.market_transaction_data_by_date",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-transaction-market-transaction-data-by-date-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 10.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "field_a": 3,
+        "field_b": 4
+      }
+    ],
+    "query_meta": {
+      "query_kind": "transaction.market_transaction_data_by_date",
+      "row_count": 1,
+      "requested_fields": [
+        "field_a",
+        "field_b"
+      ],
+      "returned_fields": [
+        "field_a",
+        "field_b"
+      ],
+      "date": "20250101",
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

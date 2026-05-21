@@ -142,6 +142,7 @@ _QUERY_REPLAY_SUPPORTED_CAPABILITIES = {
     "transaction.stock_transaction_data",
     "transaction.stock_transaction_data_by_date",
     "transaction.market_transaction_data",
+    "transaction.market_transaction_data_by_date",
     "block.read_watchlist_snapshot",
 }
 
