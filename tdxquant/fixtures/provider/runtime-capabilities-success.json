@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 21,
+      "total": 22,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
         "meta": 6,
         "financial": 2,
-        "transaction": 2,
+        "transaction": 3,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 16
+        "stable": 17
       },
       "by_side_effect_level": {
-        "read_only": 19,
+        "read_only": 20,
         "local_state_mutating": 2
       }
     },
@@ -543,6 +543,38 @@
               "selectors": [
                 "symbols",
                 "date_range"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "transaction.stock_transaction_data_by_date",
+        "capability_version": "v1",
+        "domain": "transaction",
+        "description": "Fetch stock transaction statistics by date.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "transaction.stock_transaction_data_by_date",
+          "api_command": "stock-transaction-data-by-date",
+          "flat_command": "tdx-data-stock-transaction-by-date"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "transaction.stock_transaction_data_by_date",
+              "selectors": [
+                "symbols",
+                "date"
               ],
               "query_params": []
             }

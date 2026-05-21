@@ -34,6 +34,7 @@ _SYNC_REPLAY_DEFAULT_FIXTURES: dict[str, str] = {
     "financial.financial_data": "financial-financial-data-success",
     "financial.financial_data_by_date": "financial-financial-data-by-date-success",
     "transaction.stock_transaction_data": "transaction-stock-transaction-data-success",
+    "transaction.stock_transaction_data_by_date": "transaction-stock-transaction-data-by-date-success",
     "transaction.market_transaction_data": "transaction-market-transaction-data-success",
     "block.send_user_block": "block-send-user-block-applied",
     "block.read_watchlist_snapshot": "block-read-watchlist-success",

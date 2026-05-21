@@ -228,6 +228,38 @@ def test_manager_meta_divid_factors_replay_uses_fixture_without_live_call() -> N
     assert result.data["replay_source"]["fixture"] == "meta-divid-factors-success"
 
 
+def test_execute_sync_replay_uses_default_transaction_stock_transaction_by_date_fixture() -> None:
+    result = execute_sync_replay("transaction.stock_transaction_data_by_date")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "transaction.stock_transaction_data_by_date"
+    assert result.data["query_meta"]["symbols"] == ["000001.SZ", "000002.SZ"]
+    assert result.data["query_meta"]["requested_fields"] == ["price", "volume"]
+    assert result.data["query_meta"]["date"] == "20250101"
+    assert result.data["rows"][0]["symbol"] == "000001.SZ"
+    assert result.data["replay_source"]["fixture"] == "transaction-stock-transaction-data-by-date-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_transaction_stock_transaction_by_date_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch(
+        "tdxquant.api.manager.TransactionApi.stock_transaction_data_by_date",
+        side_effect=AssertionError("live stock transaction by-date called"),
+    ):
+        result = manager.transaction.stock_transaction_data_by_date(
+            stock_list=["000001.SZ", "000002.SZ"],
+            fields=["price", "volume"],
+            year=2025,
+            mmdd=101,
+        )
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "transaction.stock_transaction_data_by_date"
+    assert result.data["replay_source"]["fixture"] == "transaction-stock-transaction-data-by-date-success"
+
+
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
     fixture_path = tmp_path / "bad-runtime-capabilities.json"
     fixture_path.write_text(json.dumps(["bad"]), encoding="utf-8")

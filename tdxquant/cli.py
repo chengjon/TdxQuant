@@ -1639,6 +1639,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_stock_transaction_by_date_parser.add_argument("--year", required=True, type=int)
     tdx_data_stock_transaction_by_date_parser.add_argument("--mmdd", required=True, type=int)
     tdx_data_stock_transaction_by_date_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_stock_transaction_by_date_parser)
     tdx_data_sector_transaction_parser = subparsers.add_parser("tdx-data-sector-transaction")
     tdx_data_sector_transaction_parser.add_argument("--code", action="append", required=True)
     tdx_data_sector_transaction_parser.add_argument("--field", action="append", required=True)
@@ -2774,6 +2775,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "ipo-info",
     "gp-one",
     "divid-factors",
+    "stock-transaction-data-by-date",
     "send-user-block",
     "block-read-watchlist",
 }
@@ -2787,6 +2789,7 @@ _API_REPLAY_CAPABILITIES = {
     "ipo-info": "meta.ipo_info",
     "gp-one": "meta.gp_one_data",
     "divid-factors": "meta.divid_factors",
+    "stock-transaction-data-by-date": "transaction.stock_transaction_data_by_date",
     "subscription-subscribe": "subscription.subscribe_hq",
     "subscription-unsubscribe": "subscription.unsubscribe_hq",
     "subscription-list": "subscription.get_subscribe_hq_stock_list",
@@ -2885,6 +2888,13 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
             stock_code=args.code,
             start_time=args.start_time,
             end_time=args.end_time,
+        )
+    if args.command == "tdx-data-stock-transaction-by-date":
+        return manager.transaction.stock_transaction_data_by_date(
+            stock_list=args.code,
+            fields=args.field,
+            year=args.year,
+            mmdd=args.mmdd,
         )
     return _build_cli_replay_failure_result(
         capability=str(args.command),

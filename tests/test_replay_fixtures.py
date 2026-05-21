@@ -32,6 +32,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("financial-financial-data-success", names)
         self.assertIn("financial-financial-data-by-date-success", names)
         self.assertIn("transaction-stock-transaction-data-success", names)
+        self.assertIn("transaction-stock-transaction-data-by-date-success", names)
         self.assertIn("transaction-market-transaction-data-success", names)
         self.assertIn("market-kline-empty", names)
         self.assertIn("meta-sector-stocks-empty", names)
@@ -148,6 +149,16 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["start_time"], "20200101")
         self.assertEqual(payload["data"]["query_meta"]["end_time"], "20241231")
 
+    def test_load_transaction_stock_transaction_data_by_date_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("transaction-stock-transaction-data-by-date-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "transaction.stock_transaction_data_by_date")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "000001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "transaction.stock_transaction_data_by_date")
+        self.assertEqual(payload["data"]["query_meta"]["symbols"], ["000001.SZ", "000002.SZ"])
+        self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["price", "volume"])
+        self.assertEqual(payload["data"]["query_meta"]["date"], "20250101")
+
     def test_load_formula_failure_fixture_returns_hardened_provider_envelope(self) -> None:
         payload = load_provider_replay_fixture("formula-screen-failure")
         self.assertFalse(payload["success"])
@@ -258,6 +269,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                     }
                 ],
                 "supports_requested_fields": False,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["transaction.stock_transaction_data_by_date"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "transaction.stock_transaction_data_by_date",
+                        "selectors": ["symbols", "date"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": True,
                 "supports_empty_results": True,
                 "supports_replay": True,
             },
