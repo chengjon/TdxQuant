@@ -204,6 +204,30 @@ def test_manager_meta_gp_one_replay_uses_fixture_without_live_call() -> None:
     assert result.data["replay_source"]["fixture"] == "meta-gp-one-success"
 
 
+def test_execute_sync_replay_uses_default_meta_divid_factors_fixture() -> None:
+    result = execute_sync_replay("meta.divid_factors")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.divid_factors"
+    assert result.data["query_meta"]["symbol"] == "688318.SH"
+    assert result.data["query_meta"]["start_time"] == "20200101"
+    assert result.data["query_meta"]["end_time"] == "20241231"
+    assert result.data["rows"][0]["symbol"] == "688318.SH"
+    assert result.data["replay_source"]["fixture"] == "meta-divid-factors-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_meta_divid_factors_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MetaApi.divid_factors", side_effect=AssertionError("live divid-factors called")):
+        result = manager.meta.divid_factors(stock_code="688318.SH", start_time="20200101", end_time="20241231")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.divid_factors"
+    assert result.data["replay_source"]["fixture"] == "meta-divid-factors-success"
+
+
 def test_execute_sync_replay_rejects_malformed_custom_fixture_path(tmp_path: Path) -> None:
     fixture_path = tmp_path / "bad-runtime-capabilities.json"
     fixture_path.write_text(json.dumps(["bad"]), encoding="utf-8")

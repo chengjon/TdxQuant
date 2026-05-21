@@ -241,7 +241,14 @@ class _MetaManagerProxy:
         )
         result, timing = capture_api_timing(
             "meta.divid_factors",
-            lambda: self._manager._meta_api.divid_factors(stock_code=stock_code, start_time=start_time, end_time=end_time),
+            lambda: self._manager._dispatch_sync_capability(
+                "meta.divid_factors",
+                lambda: self._manager._meta_api.divid_factors(
+                    stock_code=stock_code,
+                    start_time=start_time,
+                    end_time=end_time,
+                ),
+            ),
         )
         return attach_manager_metadata(
             result,

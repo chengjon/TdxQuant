@@ -25,6 +25,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("meta-gb-info-success", names)
         self.assertIn("meta-ipo-info-success", names)
         self.assertIn("meta-gp-one-success", names)
+        self.assertIn("meta-divid-factors-success", names)
         self.assertIn("market-kline-success", names)
         self.assertIn("meta-stock-list-success", names)
         self.assertIn("meta-sector-stocks-success", names)
@@ -137,6 +138,16 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["symbols"], ["000001.SZ", "600519.SH"])
         self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["Now", "Volume"])
 
+    def test_load_meta_divid_factors_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("meta-divid-factors-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "meta.divid_factors")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "688318.SH")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "meta.divid_factors")
+        self.assertEqual(payload["data"]["query_meta"]["symbol"], "688318.SH")
+        self.assertEqual(payload["data"]["query_meta"]["start_time"], "20200101")
+        self.assertEqual(payload["data"]["query_meta"]["end_time"], "20241231")
+
     def test_load_formula_failure_fixture_returns_hardened_provider_envelope(self) -> None:
         payload = load_provider_replay_fixture("formula-screen-failure")
         self.assertFalse(payload["success"])
@@ -232,6 +243,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                     }
                 ],
                 "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["meta.divid_factors"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "meta.divid_factors",
+                        "selectors": ["symbol", "date_range"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": False,
                 "supports_empty_results": True,
                 "supports_replay": True,
             },

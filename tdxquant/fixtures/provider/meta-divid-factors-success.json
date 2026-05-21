@@ -1,0 +1,48 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "provider fixture replay result",
+  "capability": "meta.divid_factors",
+  "capability_version": "v1",
+  "schema_version": "tdx.provider.result.v1",
+  "request_id": "fixture-meta-divid-factors-success",
+  "started_at": "2026-05-19T00:00:00Z",
+  "finished_at": "2026-05-19T00:00:00Z",
+  "elapsed_ms": 0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "688318.SH",
+        "date": "20220630",
+        "factor": 1.0325
+      },
+      {
+        "symbol": "688318.SH",
+        "date": "20230630",
+        "factor": 1.0471
+      }
+    ],
+    "query_meta": {
+      "query_kind": "meta.divid_factors",
+      "row_count": 2,
+      "requested_fields": [],
+      "returned_fields": [
+        "symbol",
+        "date",
+        "factor"
+      ],
+      "symbol": "688318.SH",
+      "start_time": "20200101",
+      "end_time": "20241231",
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

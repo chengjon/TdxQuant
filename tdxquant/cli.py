@@ -1608,6 +1608,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_divid_factors_parser.add_argument("--start-time", default="")
     tdx_data_divid_factors_parser.add_argument("--end-time", default="")
     tdx_data_divid_factors_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_divid_factors_parser)
     tdx_data_ipo_info_parser = subparsers.add_parser("tdx-data-ipo-info")
     tdx_data_ipo_info_parser.add_argument("--ipo-type", default=0, type=int, choices=[0, 1, 2])
     tdx_data_ipo_info_parser.add_argument("--ipo-date", default=0, type=int, choices=[0, 1])
@@ -2772,6 +2773,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "gb-info",
     "ipo-info",
     "gp-one",
+    "divid-factors",
     "send-user-block",
     "block-read-watchlist",
 }
@@ -2784,6 +2786,7 @@ _API_REPLAY_CAPABILITIES = {
     "gb-info": "meta.gb_info",
     "ipo-info": "meta.ipo_info",
     "gp-one": "meta.gp_one_data",
+    "divid-factors": "meta.divid_factors",
     "subscription-subscribe": "subscription.subscribe_hq",
     "subscription-unsubscribe": "subscription.unsubscribe_hq",
     "subscription-list": "subscription.get_subscribe_hq_stock_list",
@@ -2877,6 +2880,12 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
         return manager.meta.ipo_info(ipo_type=args.ipo_type, ipo_date=args.ipo_date)
     if args.command == "tdx-data-gp-one":
         return manager.meta.gp_one_data(stock_list=args.code, fields=args.field)
+    if args.command == "tdx-data-divid-factors":
+        return manager.meta.divid_factors(
+            stock_code=args.code,
+            start_time=args.start_time,
+            end_time=args.end_time,
+        )
     return _build_cli_replay_failure_result(
         capability=str(args.command),
         message=f"unsupported replay flat command: {args.command}",

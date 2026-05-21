@@ -110,6 +110,13 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "meta-gp-one-success.json",
     },
     {
+        "name": "meta-divid-factors-success",
+        "capability": "meta.divid_factors",
+        "format": "json",
+        "description": "Representative successful meta.divid_factors provider response sample.",
+        "relative_path": "meta-divid-factors-success.json",
+    },
+    {
         "name": "market-kline-success",
         "capability": "market.kline",
         "format": "json",

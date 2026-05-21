@@ -99,3 +99,12 @@ Replay mode SHALL treat `meta.gp_one_data` as a supported synchronous provider-f
 - **THEN** the system MUST resolve `meta-gp-one-success`
 - **AND** the returned result MUST include replay source metadata identifying that fixture
 - **AND** the system MUST NOT invoke live Windows runtime gp-one code
+
+### Requirement: Provider replay mode SHALL serve divid-factors through default fixture-backed execution
+Replay mode SHALL treat `meta.divid_factors` as a supported synchronous provider-facing capability backed by a stable built-in fixture.
+
+#### Scenario: Replay mode resolves default divid-factors fixture
+- **WHEN** a caller invokes `meta.divid_factors` in replay mode without an explicit fixture override
+- **THEN** the system MUST resolve `meta-divid-factors-success`
+- **AND** the returned result MUST include replay source metadata identifying that fixture
+- **AND** the system MUST NOT invoke live Windows runtime divid-factors code

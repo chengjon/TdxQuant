@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 20,
+      "total": 21,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
-        "meta": 5,
+        "meta": 6,
         "financial": 2,
         "transaction": 2,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 15
+        "stable": 16
       },
       "by_side_effect_level": {
-        "read_only": 18,
+        "read_only": 19,
         "local_state_mutating": 2
       }
     },
@@ -418,6 +418,38 @@
           }
         ],
         "supports_requested_fields": true,
+        "supports_empty_results": true,
+        "supports_replay": true
+      }
+    },
+    {
+      "name": "meta.divid_factors",
+      "capability_version": "v1",
+      "domain": "meta",
+      "description": "Fetch dividend-factor metadata.",
+      "stability": "stable",
+      "side_effect_level": "read_only",
+      "entrypoints": {
+        "manager_method": "meta.divid_factors",
+        "api_command": "divid-factors",
+        "flat_command": "tdx-data-divid-factors"
+      },
+      "requires": [
+        "native_windows_python",
+        "tqcenter"
+      ],
+      "query_metadata": {
+        "query_shapes": [
+          {
+            "query_kind": "meta.divid_factors",
+            "selectors": [
+              "symbol",
+              "date_range"
+            ],
+            "query_params": []
+          }
+        ],
+        "supports_requested_fields": false,
         "supports_empty_results": true,
         "supports_replay": true
       }

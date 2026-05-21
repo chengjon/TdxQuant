@@ -2182,6 +2182,46 @@ class ApiCliDispatchTests(unittest.TestCase):
             fields=["Now", "Volume"],
         )
 
+    def test_handle_api_divid_factors_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "divid-factors",
+                "--code",
+                "688318.SH",
+                "--start-time",
+                "20200101",
+                "--end-time",
+                "20241231",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.divid_factors"}},
+        )
+        manager = MagicMock()
+        manager.meta.divid_factors.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.divid_factors.assert_called_once_with(
+            stock_code="688318.SH",
+            start_time="20200101",
+            end_time="20241231",
+        )
+
     def test_handle_api_kline_uses_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "kline", "--code", "688260.SH", "--period", "1d"])
@@ -7143,6 +7183,48 @@ class ReportCliDispatchTests(unittest.TestCase):
         manager.meta.gp_one_data.assert_called_once_with(
             stock_list=["000001.SZ", "600519.SH"],
             fields=["Now", "Volume"],
+        )
+
+    def test_flat_tdx_data_divid_factors_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-divid-factors",
+                "--code",
+                "688318.SH",
+                "--start-time",
+                "20200101",
+                "--end-time",
+                "20241231",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.divid_factors"}},
+        )
+        manager = MagicMock()
+        manager.meta.divid_factors.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch("tdxquant.cli.run_tdx_divid_factors", side_effect=AssertionError("live bridge called")),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.divid_factors.assert_called_once_with(
+            stock_code="688318.SH",
+            start_time="20200101",
+            end_time="20241231",
         )
 
     def test_main_tdx_create_sector_uses_bridge(self) -> None:
