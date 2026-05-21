@@ -201,6 +201,13 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "transaction-market-transaction-data-by-date-success.json",
     },
     {
+        "name": "transaction-sector-transaction-data-success",
+        "capability": "transaction.sector_transaction_data",
+        "format": "json",
+        "description": "Representative successful transaction.sector_transaction_data provider response sample.",
+        "relative_path": "transaction-sector-transaction-data-success.json",
+    },
+    {
         "name": "transaction-sector-transaction-data-by-date-success",
         "capability": "transaction.sector_transaction_data_by_date",
         "format": "json",

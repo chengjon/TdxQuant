@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched sector transaction data",
+  "capability": "transaction.sector_transaction_data",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-transaction-sector-transaction-data-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 10.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "880660.SH",
+        "BK5": 5,
+        "BK6": 6
+      }
+    ],
+    "query_meta": {
+      "query_kind": "transaction.sector_transaction_data",
+      "row_count": 1,
+      "requested_fields": [
+        "BK5",
+        "BK6"
+      ],
+      "returned_fields": [
+        "symbol",
+        "BK5",
+        "BK6"
+      ],
+      "symbols": [
+        "880660.SH",
+        "880001.SH"
+      ],
+      "date_range": {
+        "start": "20240101",
+        "end": "20241231"
+      },
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

@@ -33,6 +33,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("financial-financial-data-by-date-success", names)
         self.assertIn("transaction-stock-transaction-data-success", names)
         self.assertIn("transaction-stock-transaction-data-by-date-success", names)
+        self.assertIn("transaction-sector-transaction-data-success", names)
         self.assertIn("transaction-market-transaction-data-success", names)
         self.assertIn("transaction-market-transaction-data-by-date-success", names)
         self.assertIn("transaction-sector-transaction-data-by-date-success", names)
@@ -160,6 +161,19 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["symbols"], ["000001.SZ", "000002.SZ"])
         self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["price", "volume"])
         self.assertEqual(payload["data"]["query_meta"]["date"], "20250101")
+
+    def test_load_transaction_sector_transaction_data_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("transaction-sector-transaction-data-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "transaction.sector_transaction_data")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "880660.SH")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "transaction.sector_transaction_data")
+        self.assertEqual(payload["data"]["query_meta"]["symbols"], ["880660.SH", "880001.SH"])
+        self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["BK5", "BK6"])
+        self.assertEqual(
+            payload["data"]["query_meta"]["date_range"],
+            {"start": "20240101", "end": "20241231"},
+        )
 
     def test_load_transaction_market_transaction_data_by_date_fixture_returns_query_meta(self) -> None:
         payload = load_provider_replay_fixture("transaction-market-transaction-data-by-date-success")
@@ -301,6 +315,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                     {
                         "query_kind": "transaction.stock_transaction_data_by_date",
                         "selectors": ["symbols", "date"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["transaction.sector_transaction_data"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "transaction.sector_transaction_data",
+                        "selectors": ["symbols", "date_range"],
                         "query_params": [],
                     }
                 ],

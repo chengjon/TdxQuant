@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 24,
+      "total": 25,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
         "meta": 6,
         "financial": 2,
-        "transaction": 5,
+        "transaction": 6,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 19
+        "stable": 20
       },
       "by_side_effect_level": {
-        "read_only": 22,
+        "read_only": 23,
         "local_state_mutating": 2
       }
     },
@@ -575,6 +575,38 @@
               "selectors": [
                 "symbols",
                 "date"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "transaction.sector_transaction_data",
+        "capability_version": "v1",
+        "domain": "transaction",
+        "description": "Fetch sector transaction statistics by range.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "transaction.sector_transaction_data",
+          "api_command": "sector-transaction-data",
+          "flat_command": "tdx-data-sector-transaction"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "transaction.sector_transaction_data",
+              "selectors": [
+                "symbols",
+                "date_range"
               ],
               "query_params": []
             }

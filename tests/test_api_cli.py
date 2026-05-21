@@ -687,6 +687,34 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.start_time, "20240101")
         self.assertEqual(args.end_time, "20241231")
 
+    def test_tdx_data_sector_transaction_command_parses_replay_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-sector-transaction",
+                "--code",
+                "880660.SH",
+                "--code",
+                "880001.SH",
+                "--field",
+                "BK5",
+                "--field",
+                "BK6",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-sector-transaction")
+        self.assertEqual(args.provider_mode, "replay")
+        self.assertEqual(args.code, ["880660.SH", "880001.SH"])
+        self.assertEqual(args.field, ["BK5", "BK6"])
+        self.assertEqual(args.start_time, "20240101")
+        self.assertEqual(args.end_time, "20241231")
+
     def test_tdx_data_sector_transaction_by_date_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -2701,6 +2729,53 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         manager.transaction.sector_transaction_data.assert_called_once_with(
             stock_list=["880660.SH"],
+            fields=["BK5", "BK6"],
+            start_time="20240101",
+            end_time="20241231",
+        )
+
+    def test_handle_api_sector_transaction_data_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "sector-transaction-data",
+                "--code",
+                "880660.SH",
+                "--code",
+                "880001.SH",
+                "--field",
+                "BK5",
+                "--field",
+                "BK6",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "transaction.sector_transaction_data"}},
+        )
+        manager = MagicMock()
+        manager.transaction.sector_transaction_data.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.transaction.sector_transaction_data.assert_called_once_with(
+            stock_list=["880660.SH", "880001.SH"],
             fields=["BK5", "BK6"],
             start_time="20240101",
             end_time="20241231",
@@ -7585,6 +7660,58 @@ class ReportCliDispatchTests(unittest.TestCase):
             fields=["BK9", "BK10"],
             year=2025,
             mmdd=101,
+        )
+
+    def test_flat_tdx_data_sector_transaction_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-sector-transaction",
+                "--code",
+                "880660.SH",
+                "--code",
+                "880001.SH",
+                "--field",
+                "BK5",
+                "--field",
+                "BK6",
+                "--start-time",
+                "20240101",
+                "--end-time",
+                "20241231",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "transaction.sector_transaction_data"}},
+        )
+        manager = MagicMock()
+        manager.transaction.sector_transaction_data.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch(
+                "tdxquant.cli.run_tdx_sector_transaction_data",
+                side_effect=AssertionError("live bridge called"),
+            ),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.transaction.sector_transaction_data.assert_called_once_with(
+            stock_list=["880660.SH", "880001.SH"],
+            fields=["BK5", "BK6"],
+            start_time="20240101",
+            end_time="20241231",
         )
 
     def test_main_tdx_create_sector_uses_bridge(self) -> None:

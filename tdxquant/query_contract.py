@@ -141,6 +141,7 @@ _QUERY_REPLAY_SUPPORTED_CAPABILITIES = {
     "financial.financial_data_by_date",
     "transaction.stock_transaction_data",
     "transaction.stock_transaction_data_by_date",
+    "transaction.sector_transaction_data",
     "transaction.sector_transaction_data_by_date",
     "transaction.market_transaction_data",
     "transaction.market_transaction_data_by_date",

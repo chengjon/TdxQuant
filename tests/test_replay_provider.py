@@ -260,6 +260,38 @@ def test_manager_transaction_stock_transaction_by_date_replay_uses_fixture_witho
     assert result.data["replay_source"]["fixture"] == "transaction-stock-transaction-data-by-date-success"
 
 
+def test_execute_sync_replay_uses_default_transaction_sector_transaction_fixture() -> None:
+    result = execute_sync_replay("transaction.sector_transaction_data")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "transaction.sector_transaction_data"
+    assert result.data["query_meta"]["symbols"] == ["880660.SH", "880001.SH"]
+    assert result.data["query_meta"]["requested_fields"] == ["BK5", "BK6"]
+    assert result.data["query_meta"]["date_range"] == {"start": "20240101", "end": "20241231"}
+    assert result.data["rows"][0]["symbol"] == "880660.SH"
+    assert result.data["replay_source"]["fixture"] == "transaction-sector-transaction-data-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_transaction_sector_transaction_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch(
+        "tdxquant.api.manager.TransactionApi.sector_transaction_data",
+        side_effect=AssertionError("live sector transaction range called"),
+    ):
+        result = manager.transaction.sector_transaction_data(
+            stock_list=["880660.SH", "880001.SH"],
+            fields=["BK5", "BK6"],
+            start_time="20240101",
+            end_time="20241231",
+        )
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "transaction.sector_transaction_data"
+    assert result.data["replay_source"]["fixture"] == "transaction-sector-transaction-data-success"
+
+
 def test_execute_sync_replay_uses_default_transaction_market_transaction_by_date_fixture() -> None:
     result = execute_sync_replay("transaction.market_transaction_data_by_date")
 
