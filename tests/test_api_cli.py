@@ -3950,6 +3950,43 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertNotIn("catalog_bundle", output_payload)
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_entry_summary_includes_provenance_and_constraints(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "daily-review", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["provenance"]["mode"], "plan")
+        self.assertEqual(result.data["provenance"]["target_type"], "entry")
+        self.assertEqual(result.data["provenance"]["target_name"], "daily-review")
+        self.assertTrue(result.data["provenance"]["catalog_path"].endswith("runtime/command-catalog.json"))
+        self.assertEqual(result.data["constraints"]["execution_mode"], "non_executing")
+        self.assertFalse(result.data["constraints"]["dispatch_executed"])
+        self.assertEqual(output_payload["provenance"]["target_name"], "daily-review")
+        self.assertEqual(output_payload["constraints"]["execution_mode"], "non_executing")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_preview_bundle_summary_includes_provenance_and_constraints(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "preview", "--bundle", "guarded-review-buy", "--only-step", "review", "--view", "summary"]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        self.assertEqual(output_payload["provenance"]["mode"], "preview")
+        self.assertEqual(output_payload["provenance"]["target_type"], "bundle")
+        self.assertEqual(output_payload["provenance"]["target_name"], "guarded-review-buy")
+        self.assertTrue(output_payload["provenance"]["catalog_path"].endswith("runtime/command-catalog.json"))
+        self.assertTrue(output_payload["provenance"]["bundle_path"].endswith("runtime/command-bundles.json"))
+        self.assertEqual(output_payload["constraints"]["execution_mode"], "non_executing")
+        self.assertFalse(output_payload["constraints"]["dispatch_executed"])
+        self.assertFalse(output_payload["constraints"]["schema_mutation"])
+        self.assertFalse(output_payload["constraints"]["run_semantics_changed"])
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_read_zxg_review_bundle_returns_resolved_steps(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "plan", "--bundle", "read-zxg-review"])

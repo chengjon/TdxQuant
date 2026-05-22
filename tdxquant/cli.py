@@ -13,6 +13,8 @@ from uuid import uuid4
 from .brokers import PingAnBrokerAdapter
 from .api import TdxApiManager, TdxTaskManager
 from .catalog import (
+    get_command_bundle_path,
+    get_command_catalog_path,
     load_command_bundles,
     load_command_catalog,
     resolve_command_bundle,
@@ -2515,6 +2517,39 @@ def _sort_catalog_named_rows(rows: list[dict[str, object]]) -> list[dict[str, ob
     return sorted(rows, key=lambda row: (-_count_catalog_labels(row), str(row.get("name", ""))))
 
 
+def _build_catalog_non_execution_provenance(
+    args: argparse.Namespace,
+    *,
+    target_type: str,
+    target_name: str,
+) -> dict[str, object]:
+    provenance: dict[str, object] = {
+        "mode": args.catalog_command,
+        "target_type": target_type,
+        "target_name": target_name,
+        "catalog_path": str(get_command_catalog_path()),
+    }
+    if target_type == "bundle":
+        provenance["bundle_path"] = str(get_command_bundle_path())
+    return provenance
+
+
+def _build_catalog_non_execution_constraints() -> dict[str, object]:
+    return {
+        "execution_mode": "non_executing",
+        "dispatch_executed": False,
+        "schema_mutation": False,
+        "run_semantics_changed": False,
+    }
+
+
+def _copy_catalog_non_execution_metadata(summary: dict[str, object], result: Result) -> None:
+    for key in ("provenance", "constraints"):
+        value = result.data.get(key)
+        if isinstance(value, dict):
+            summary[key] = copy.deepcopy(value)
+
+
 def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dict[str, object] | None:
     if args.catalog_command == "list":
         summary_payload = result.data.get("summary", {})
@@ -2598,6 +2633,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             resolved_args = result.data.get("resolved_args", {})
             if isinstance(resolved_args, dict):
                 summary["resolved_args"] = _extract_catalog_key_fields(resolved_args)
+            _copy_catalog_non_execution_metadata(summary, result)
         else:
             input_payload = result.data.get("input", {})
             if isinstance(input_payload, dict):
@@ -2642,6 +2678,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                         step_view["resolved_args"] = _extract_catalog_key_fields(step["resolved_args"])
                     plan_steps.append(step_view)
             summary["steps"] = plan_steps
+            _copy_catalog_non_execution_metadata(summary, result)
         else:
             run_steps: list[dict[str, object]] = []
             steps = bundle_meta.get("steps", [])
@@ -2989,6 +3026,12 @@ def _plan_catalog_resolved_entry(
                 "command_name": getattr(resolved_args, command_name_key, None),
             },
             "resolved_args": _serialize_catalog_namespace(resolved_args),
+            "provenance": _build_catalog_non_execution_provenance(
+                args,
+                target_type="entry",
+                target_name=entry_name,
+            ),
+            "constraints": _build_catalog_non_execution_constraints(),
         },
     )
     result.data["summary_view"] = _build_catalog_summary_view(args, result)
@@ -3041,6 +3084,12 @@ def _plan_catalog_bundle(args: argparse.Namespace) -> Result:
                 "selected_step_count": len(selected_range["steps"]),
             },
             "steps": step_rows,
+            "provenance": _build_catalog_non_execution_provenance(
+                args,
+                target_type="bundle",
+                target_name=args.bundle,
+            ),
+            "constraints": _build_catalog_non_execution_constraints(),
         },
     )
     result.data["summary_view"] = _build_catalog_summary_view(args, result)
