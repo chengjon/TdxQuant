@@ -2787,6 +2787,9 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "sector-transaction-data",
     "sector-transaction-data-by-date",
     "market-transaction-data-by-date",
+    "subscription-subscribe",
+    "subscription-unsubscribe",
+    "subscription-list",
     "send-user-block",
     "block-read-watchlist",
 }

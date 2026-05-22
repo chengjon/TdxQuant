@@ -320,6 +320,27 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "block-sync-replace-plan.json",
     },
     {
+        "name": "subscription-subscribe-success",
+        "capability": "subscription.subscribe_hq",
+        "format": "json",
+        "description": "Representative one-shot subscription subscribe provider response sample.",
+        "relative_path": "subscription-subscribe-success.json",
+    },
+    {
+        "name": "subscription-unsubscribe-success",
+        "capability": "subscription.unsubscribe_hq",
+        "format": "json",
+        "description": "Representative one-shot subscription unsubscribe provider response sample.",
+        "relative_path": "subscription-unsubscribe-success.json",
+    },
+    {
+        "name": "subscription-list-success",
+        "capability": "subscription.get_subscribe_hq_stock_list",
+        "format": "json",
+        "description": "Representative one-shot subscription list provider response sample.",
+        "relative_path": "subscription-list-success.json",
+    },
+    {
         "name": "subscription-event-batch",
         "capability": "subscription.quote_update",
         "format": "jsonl",

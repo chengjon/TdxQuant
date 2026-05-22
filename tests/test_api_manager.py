@@ -3205,6 +3205,32 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertIn("summary", payload["data"])
         self.assertIn("grading", payload["data"])
 
+    def test_manager_runtime_subscription_one_shot_live_delegates_to_runtime_api(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="subscribed", data={"operation": {"scope": "one_shot"}})
+        with patch("tdxquant.api.manager.RuntimeApi.subscription_subscribe", return_value=expected) as mocked:
+            manager = TdxApiManager(profile="default", strategy_path="strategy.py")
+            result = manager.runtime.subscription_subscribe(stock_list=["688318.SH", "600519.SH"])
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(stock_list=["688318.SH", "600519.SH"])
+        self.assertEqual(result.data["manager"]["domain"], "runtime")
+        self.assertEqual(result.data["manager"]["method"], "subscription_subscribe")
+        self.assertEqual(result.data["api_profile"]["name"], "default")
+        self.assertIn("manager_call", result.data["timing"])
+
+    def test_manager_runtime_subscription_one_shot_replay_uses_fixture(self) -> None:
+        manager = TdxApiManager(provider_mode="replay")
+
+        with patch(
+            "tdxquant.api.manager.RuntimeApi.subscription_subscribe",
+            side_effect=AssertionError("live subscribe called"),
+        ):
+            result = manager.runtime.subscription_subscribe(stock_list=["688318.SH", "600519.SH"])
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["operation"]["scope"], "one_shot")
+        self.assertEqual(result.data["replay_source"]["fixture"], "subscription-subscribe-success")
+        self.assertEqual(result.data["manager"]["method"], "subscription_subscribe")
+
     def test_manager_runtime_health_attaches_metadata_and_forwards_probe_args(self) -> None:
         expected = Result(
             ok=True,

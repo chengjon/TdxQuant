@@ -45,6 +45,9 @@ _SYNC_REPLAY_DEFAULT_FIXTURES: dict[str, str] = {
     "block.send_user_block": "block-send-user-block-applied",
     "block.read_watchlist_snapshot": "block-read-watchlist-success",
     "block.sync_watchlist": "block-sync-replace-applied",
+    "subscription.subscribe_hq": "subscription-subscribe-success",
+    "subscription.unsubscribe_hq": "subscription-unsubscribe-success",
+    "subscription.get_subscribe_hq_stock_list": "subscription-list-success",
 }
 
 _SUBSCRIPTION_WATCH_BUNDLE_DEFAULTS: dict[str, str] = {

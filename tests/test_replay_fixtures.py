@@ -55,6 +55,9 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("block-sync-merge-noop", names)
         self.assertIn("block-sync-replace-rejected", names)
         self.assertIn("block-sync-replace-plan", names)
+        self.assertIn("subscription-subscribe-success", names)
+        self.assertIn("subscription-unsubscribe-success", names)
+        self.assertIn("subscription-list-success", names)
         self.assertIn("subscription-event-batch", names)
         self.assertIn("subscription-watch-events", names)
         self.assertIn("subscription-watch-status-completed", names)
@@ -248,6 +251,24 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         finding = payload["data"]["findings"][0]
         self.assertIn("related_checks", finding)
         self.assertIn("recommended_action_id", finding)
+
+    def test_load_subscription_one_shot_fixtures_return_operation_scope(self) -> None:
+        subscribe = load_provider_replay_fixture("subscription-subscribe-success")
+        unsubscribe = load_provider_replay_fixture("subscription-unsubscribe-success")
+        listing = load_provider_replay_fixture("subscription-list-success")
+
+        self.assertEqual(subscribe["capability"], "subscription.subscribe_hq")
+        self.assertEqual(subscribe["data"]["operation"]["scope"], "one_shot")
+        self.assertEqual(subscribe["data"]["operation"]["action"], "subscribe_hq")
+        self.assertEqual(subscribe["data"]["stock_list"], ["688318.SH", "600519.SH"])
+        self.assertEqual(unsubscribe["capability"], "subscription.unsubscribe_hq")
+        self.assertEqual(unsubscribe["data"]["operation"]["scope"], "one_shot")
+        self.assertEqual(unsubscribe["data"]["operation"]["action"], "unsubscribe_hq")
+        self.assertEqual(listing["capability"], "subscription.get_subscribe_hq_stock_list")
+        self.assertEqual(listing["data"]["operation"]["scope"], "one_shot")
+        self.assertEqual(listing["data"]["subscribed"], ["688318.SH", "600519.SH"])
+        self.assertNotIn("watch_run", subscribe["data"])
+        self.assertNotIn("event_stream", subscribe["data"])
 
     def test_load_runtime_capabilities_fixture_returns_grading_summary(self) -> None:
         payload = load_provider_replay_fixture("runtime-capabilities-success")

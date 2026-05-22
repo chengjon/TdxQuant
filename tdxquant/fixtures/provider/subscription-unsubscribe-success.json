@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "unsubscribed one-shot symbols",
+  "capability": "subscription.unsubscribe_hq",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-subscription-unsubscribe-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 5.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "operation": {
+      "scope": "one_shot",
+      "action": "unsubscribe_hq",
+      "status": "applied"
+    },
+    "stock_list": [
+      "688318.SH"
+    ]
+  },
+  "artifacts": []
+}

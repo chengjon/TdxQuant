@@ -22,6 +22,52 @@ def test_execute_sync_replay_uses_default_runtime_capabilities_fixture() -> None
     assert result._provider_contract["runtime"]["mode"] == "replay"
 
 
+def test_execute_sync_replay_uses_default_subscription_one_shot_fixtures() -> None:
+    subscribe = execute_sync_replay("subscription.subscribe_hq")
+    unsubscribe = execute_sync_replay("subscription.unsubscribe_hq")
+    listing = execute_sync_replay("subscription.get_subscribe_hq_stock_list")
+
+    assert subscribe.ok is True
+    assert subscribe.data["operation"]["scope"] == "one_shot"
+    assert subscribe.data["operation"]["action"] == "subscribe_hq"
+    assert subscribe.data["replay_source"]["fixture"] == "subscription-subscribe-success"
+    assert unsubscribe.ok is True
+    assert unsubscribe.data["operation"]["action"] == "unsubscribe_hq"
+    assert unsubscribe.data["replay_source"]["fixture"] == "subscription-unsubscribe-success"
+    assert listing.ok is True
+    assert listing.data["operation"]["action"] == "get_subscribe_hq_stock_list"
+    assert listing.data["replay_source"]["fixture"] == "subscription-list-success"
+
+
+def test_subscription_one_shot_discovery_metadata_is_exposed() -> None:
+    capabilities = {item["name"]: item for item in list_provider_capabilities()}
+
+    assert capabilities["subscription.subscribe_hq"]["side_effect_level"] == "read_only"
+    assert capabilities["subscription.subscribe_hq"]["entrypoints"]["api_command"] == "subscription-subscribe"
+    assert capabilities["subscription.unsubscribe_hq"]["entrypoints"]["api_command"] == "subscription-unsubscribe"
+    assert capabilities["subscription.get_subscribe_hq_stock_list"]["entrypoints"]["api_command"] == "subscription-list"
+
+
+def test_manager_subscription_one_shot_replay_uses_fixtures_without_live_session() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with (
+        patch("tdxquant.api.manager.RuntimeApi.subscription_subscribe", side_effect=AssertionError("live subscribe called")),
+        patch("tdxquant.api.manager.RuntimeApi.subscription_unsubscribe", side_effect=AssertionError("live unsubscribe called")),
+        patch("tdxquant.api.manager.RuntimeApi.subscription_list", side_effect=AssertionError("live list called")),
+    ):
+        subscribe = manager.runtime.subscription_subscribe(stock_list=["688318.SH", "600519.SH"])
+        unsubscribe = manager.runtime.subscription_unsubscribe(stock_list=["688318.SH"])
+        listing = manager.runtime.subscription_list()
+
+    assert subscribe.ok is True
+    assert subscribe.data["replay_source"]["fixture"] == "subscription-subscribe-success"
+    assert unsubscribe.ok is True
+    assert unsubscribe.data["replay_source"]["fixture"] == "subscription-unsubscribe-success"
+    assert listing.ok is True
+    assert listing.data["replay_source"]["fixture"] == "subscription-list-success"
+
+
 def test_execute_sync_replay_uses_default_block_read_watchlist_fixture() -> None:
     result = execute_sync_replay("block.read_watchlist_snapshot")
 

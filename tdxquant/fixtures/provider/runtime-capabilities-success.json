@@ -18,7 +18,7 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 28,
+      "total": 31,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
@@ -26,14 +26,15 @@
         "meta": 7,
         "financial": 2,
         "transaction": 6,
+        "subscription": 3,
         "block": 3
       },
       "by_stability": {
-        "beta": 5,
+        "beta": 8,
         "stable": 23
       },
       "by_side_effect_level": {
-        "read_only": 26,
+        "read_only": 29,
         "local_state_mutating": 2
       }
     },
@@ -802,6 +803,54 @@
           "supports_empty_results": true,
           "supports_replay": true
         }
+      },
+      {
+        "name": "subscription.subscribe_hq",
+        "capability_version": "v1",
+        "domain": "subscription",
+        "description": "Run one-shot symbol subscription through a temporary runtime session.",
+        "stability": "beta",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "runtime.subscription_subscribe",
+          "api_command": "subscription-subscribe"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ]
+      },
+      {
+        "name": "subscription.unsubscribe_hq",
+        "capability_version": "v1",
+        "domain": "subscription",
+        "description": "Run one-shot symbol unsubscription through a temporary runtime session.",
+        "stability": "beta",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "runtime.subscription_unsubscribe",
+          "api_command": "subscription-unsubscribe"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ]
+      },
+      {
+        "name": "subscription.get_subscribe_hq_stock_list",
+        "capability_version": "v1",
+        "domain": "subscription",
+        "description": "List symbols from a one-shot temporary runtime subscription session.",
+        "stability": "beta",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "runtime.subscription_list",
+          "api_command": "subscription-list"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ]
       },
       {
         "name": "block.send_user_block",

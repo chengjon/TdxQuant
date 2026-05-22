@@ -1042,6 +1042,62 @@ class _RuntimeManagerProxy:
             timing=timing,
         )
 
+    def subscription_subscribe(self, stock_list: list[str]) -> Result:
+        resolved_stock_list = list(stock_list)
+        effective_profile = self._manager._build_effective_profile({"stock_list": resolved_stock_list})
+        result, timing = capture_api_timing(
+            "subscription.subscribe_hq",
+            lambda: self._manager._dispatch_sync_capability(
+                "subscription.subscribe_hq",
+                lambda: self._manager._runtime_api.subscription_subscribe(stock_list=resolved_stock_list),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="subscription_subscribe",
+            timing=timing,
+        )
+
+    def subscription_unsubscribe(self, stock_list: list[str]) -> Result:
+        resolved_stock_list = list(stock_list)
+        effective_profile = self._manager._build_effective_profile({"stock_list": resolved_stock_list})
+        result, timing = capture_api_timing(
+            "subscription.unsubscribe_hq",
+            lambda: self._manager._dispatch_sync_capability(
+                "subscription.unsubscribe_hq",
+                lambda: self._manager._runtime_api.subscription_unsubscribe(stock_list=resolved_stock_list),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="subscription_unsubscribe",
+            timing=timing,
+        )
+
+    def subscription_list(self) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+        result, timing = capture_api_timing(
+            "subscription.get_subscribe_hq_stock_list",
+            lambda: self._manager._dispatch_sync_capability(
+                "subscription.get_subscribe_hq_stock_list",
+                lambda: self._manager._runtime_api.subscription_list(),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="subscription_list",
+            timing=timing,
+        )
+
     def open_subscription_session(self):
         raw_session = self._manager._runtime_api.open_subscription_session()
         return _RuntimeManagerSubscriptionSession(manager=self._manager, raw_session=raw_session)
