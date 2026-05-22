@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,11 +28,18 @@ class WatchlistImportRequest:
 def load_watchlist_import_file(path: str | Path) -> WatchlistImportRequest:
     source_path = Path(path)
     try:
-        payload = json.loads(source_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"watchlist import file is not valid JSON: {source_path}") from exc
+        content = source_path.read_text(encoding="utf-8")
     except OSError as exc:
         raise ValueError(f"unable to read watchlist import file: {source_path}") from exc
+    suffix = source_path.suffix.lower()
+    if suffix == ".csv":
+        return _parse_watchlist_import_csv(content, source_path=source_path)
+    if suffix == ".txt":
+        return _parse_watchlist_import_txt(content, source_path=source_path)
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"watchlist import file is not valid JSON: {source_path}") from exc
     if not isinstance(payload, Mapping):
         raise ValueError("watchlist import file must contain a JSON object")
     return _parse_watchlist_import_payload(payload, source_path=source_path)
@@ -129,6 +137,104 @@ def _parse_watchlist_import_payload(payload: Mapping[str, Any], *, source_path: 
     )
 
 
+def _parse_watchlist_import_csv(content: str, *, source_path: Path) -> WatchlistImportRequest:
+    reader = csv.DictReader(content.splitlines())
+    fieldnames = _normalize_csv_fieldnames(reader.fieldnames)
+    for required in ("block_code", "symbol"):
+        if required not in fieldnames:
+            raise ValueError(f"watchlist CSV import requires {required} column")
+    rows = list(reader)
+    block_codes = _unique_non_empty_csv_values(rows, fieldnames, "block_code")
+    if not block_codes:
+        raise ValueError("watchlist CSV import requires at least one non-empty block_code")
+    if len(block_codes) > 1:
+        raise ValueError("watchlist CSV import contains multiple block_code values")
+
+    payload: dict[str, Any] = {
+        "schema_version": WATCHLIST_IMPORT_SCHEMA_VERSION,
+        "block_code": block_codes[0],
+        "symbols": [_csv_cell(row, fieldnames, "symbol") for row in rows],
+    }
+    for key in ("block_name", "mode", "mutation_key"):
+        value = _first_non_empty_csv_value(rows, fieldnames, key)
+        if value is not None:
+            payload[key] = value
+    create_if_missing = _first_non_empty_csv_value(rows, fieldnames, "create_if_missing")
+    if create_if_missing is not None:
+        payload["create_if_missing"] = _parse_bool(create_if_missing, field_name="create_if_missing")
+    return _parse_watchlist_import_payload(payload, source_path=source_path)
+
+
+def _parse_watchlist_import_txt(content: str, *, source_path: Path) -> WatchlistImportRequest:
+    directives: dict[str, str] = {}
+    symbols: list[str] = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            directive = line[1:].strip()
+            if "=" not in directive:
+                continue
+            key, value = directive.split("=", 1)
+            normalized_key = key.strip().lower()
+            normalized_value = value.strip()
+            if normalized_key and normalized_value:
+                directives[normalized_key] = normalized_value
+            continue
+        symbols.append(line)
+
+    payload: dict[str, Any] = {
+        "schema_version": WATCHLIST_IMPORT_SCHEMA_VERSION,
+        "block_code": directives.get("block_code"),
+        "symbols": symbols,
+    }
+    for key in ("block_name", "mode", "mutation_key"):
+        if key in directives:
+            payload[key] = directives[key]
+    if "create_if_missing" in directives:
+        payload["create_if_missing"] = _parse_bool(directives["create_if_missing"], field_name="create_if_missing")
+    return _parse_watchlist_import_payload(payload, source_path=source_path)
+
+
+def _normalize_csv_fieldnames(raw_fieldnames: list[str] | None) -> dict[str, str]:
+    fieldnames: dict[str, str] = {}
+    for raw_name in raw_fieldnames or []:
+        normalized = str(raw_name).strip().lstrip("\ufeff").lower()
+        if normalized:
+            fieldnames[normalized] = raw_name
+    return fieldnames
+
+
+def _csv_cell(row: Mapping[str, Any], fieldnames: Mapping[str, str], key: str) -> str | None:
+    fieldname = fieldnames.get(key)
+    if fieldname is None:
+        return None
+    return _optional_str(row.get(fieldname))
+
+
+def _unique_non_empty_csv_values(rows: list[Mapping[str, Any]], fieldnames: Mapping[str, str], key: str) -> list[str]:
+    values: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        value = _csv_cell(row, fieldnames, key)
+        if value is None:
+            continue
+        normalized = value.upper() if key == "block_code" else value
+        if normalized not in seen:
+            values.append(normalized)
+            seen.add(normalized)
+    return values
+
+
+def _first_non_empty_csv_value(rows: list[Mapping[str, Any]], fieldnames: Mapping[str, str], key: str) -> str | None:
+    for row in rows:
+        value = _csv_cell(row, fieldnames, key)
+        if value is not None:
+            return value
+    return None
+
+
 def _normalize_import_symbols(raw_symbols: Any) -> list[str]:
     if not isinstance(raw_symbols, list) or not raw_symbols:
         raise ValueError("watchlist import symbols must be a non-empty array")
@@ -172,3 +278,12 @@ def _optional_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _parse_bool(value: str, *, field_name: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "y"}:
+        return True
+    if normalized in {"0", "false", "no", "n"}:
+        return False
+    raise ValueError(f"watchlist import {field_name} must be a boolean")

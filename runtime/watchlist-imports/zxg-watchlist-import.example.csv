@@ -1,0 +1,3 @@
+block_code,block_name,mode,create_if_missing,mutation_key,symbol
+ZXG,Self Selected,merge,false,example-zxg-watchlist-import-csv,000001.SZ
+ZXG,,,,,600519.SH

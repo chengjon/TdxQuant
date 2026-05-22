@@ -1,0 +1,7 @@
+# block_code=ZXG
+# block_name=Self Selected
+# mode=merge
+# create_if_missing=false
+# mutation_key=example-zxg-watchlist-import-txt
+000001.SZ
+600519.SH
