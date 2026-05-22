@@ -12,25 +12,30 @@ def _write_audit(
     *,
     audit_id: str,
     recorded_at: str,
-    status: str = "confirmed",
+    status: str | None = "confirmed",
+    broker: str | None = "pingan",
     code: str = "000001",
     contract_no: str = "B202605140001",
     submission_key: str = "submit-001",
-    method: str = "buy_submit_once",
+    method: str | None = "buy_submit_once",
 ) -> None:
+    trade_audit = {
+        "audit_id": audit_id,
+        "recorded_at": recorded_at,
+        "contract_no": contract_no,
+        "submission_key": submission_key,
+    }
+    if status is not None:
+        trade_audit["status"] = status
+    if broker is not None:
+        trade_audit["broker"] = broker
+    if method is not None:
+        trade_audit["method"] = method
     path.write_text(
         json.dumps(
             {
                 "schema_version": "2026-04-29",
-                "trade_audit": {
-                    "audit_id": audit_id,
-                    "recorded_at": recorded_at,
-                    "status": status,
-                    "broker": "pingan",
-                    "method": method,
-                    "contract_no": contract_no,
-                    "submission_key": submission_key,
-                },
+                "trade_audit": trade_audit,
                 "result": {"data": {"code": code}},
             },
             ensure_ascii=False,
@@ -120,6 +125,83 @@ class TradeAuditIndexTests(unittest.TestCase):
         self.assertEqual(len(result["rows"][0]["submission_matches"]), 1)
         self.assertEqual(len(result["rows"][0]["task_matches"]), 1)
         self.assertIn("submission-ledger.jsonl:2", "\n".join(result["warnings"]))
+
+    def test_cross_ledger_query_returns_broker_method_status_aggregation(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "trade-audits"
+            audit_dir.mkdir()
+            _write_audit(
+                audit_dir / "audit-1.json",
+                audit_id="audit-agg-001",
+                recorded_at="2026-05-14T04:00:00+00:00",
+                status="confirmed",
+                broker="pingan",
+                method="buy_submit_once",
+            )
+            _write_audit(
+                audit_dir / "audit-2.json",
+                audit_id="audit-agg-002",
+                recorded_at="2026-05-14T04:01:00+00:00",
+                status="rejected",
+                broker="pingan",
+                method="buy_submit_once",
+            )
+            _write_audit(
+                audit_dir / "audit-3.json",
+                audit_id="audit-agg-003",
+                recorded_at="2026-05-14T04:02:00+00:00",
+                status="confirmed",
+                broker="sim",
+                method="confirm_current",
+            )
+
+            result = query_trade_audit_cross_ledger(audit_dir=audit_dir)
+
+        self.assertEqual(result["aggregation"]["by_status"], {"confirmed": 2, "rejected": 1})
+        self.assertEqual(result["aggregation"]["by_method"], {"buy_submit_once": 2, "confirm_current": 1})
+        self.assertEqual(result["aggregation"]["by_broker"], {"pingan": 2, "sim": 1})
+        self.assertIn(
+            {"broker": "pingan", "method": "buy_submit_once", "status": "confirmed", "count": 1},
+            result["aggregation"]["by_broker_method_status"],
+        )
+
+    def test_cross_ledger_query_aggregation_uses_filtered_entries_before_limit(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "trade-audits"
+            audit_dir.mkdir()
+            for index, status in enumerate(["confirmed", "confirmed", "rejected"], start=1):
+                _write_audit(
+                    audit_dir / f"audit-{index}.json",
+                    audit_id=f"audit-limit-{index}",
+                    recorded_at=f"2026-05-14T05:0{index}:00+00:00",
+                    status=status,
+                )
+
+            result = query_trade_audit_cross_ledger(audit_dir=audit_dir, limit=1)
+
+        self.assertEqual(result["summary"]["returned_rows"], 1)
+        self.assertEqual(result["summary"]["filtered_entries"], 3)
+        self.assertEqual(result["aggregation"]["by_status"], {"confirmed": 2, "rejected": 1})
+
+    def test_cross_ledger_query_aggregation_counts_missing_dimensions_as_unknown(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "trade-audits"
+            audit_dir.mkdir()
+            _write_audit(
+                audit_dir / "audit-unknown.json",
+                audit_id="audit-unknown-001",
+                recorded_at="2026-05-14T06:00:00+00:00",
+                status=None,
+                broker=None,
+                method=None,
+            )
+
+            result = query_trade_audit_cross_ledger(audit_dir=audit_dir)
+
+        self.assertEqual(result["summary"]["returned_rows"], 1)
+        self.assertEqual(result["aggregation"]["by_status"], {"unknown": 1})
+        self.assertEqual(result["aggregation"]["by_method"], {"unknown": 1})
+        self.assertEqual(result["aggregation"]["by_broker"], {"unknown": 1})
 
     def test_task_manager_cross_ledger_query_returns_task_metadata_and_artifacts(self) -> None:
         with TemporaryDirectory() as temp_dir:

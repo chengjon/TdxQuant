@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import csv
 import json
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -235,6 +236,43 @@ def _task_matches(entry: dict[str, Any], rows: list[dict[str, Any]]) -> list[dic
     return matches
 
 
+def _aggregation_dimension(entry: dict[str, Any], key: str) -> str:
+    value = entry.get(key)
+    if value is None:
+        return "unknown"
+    text = str(value).strip()
+    return text or "unknown"
+
+
+def _counter_to_sorted_dict(counter: Counter[str]) -> dict[str, int]:
+    return {key: counter[key] for key in sorted(counter)}
+
+
+def _build_trade_audit_aggregation(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    by_status: Counter[str] = Counter()
+    by_method: Counter[str] = Counter()
+    by_broker: Counter[str] = Counter()
+    by_broker_method_status: Counter[tuple[str, str, str]] = Counter()
+    for entry in entries:
+        status = _aggregation_dimension(entry, "status")
+        method = _aggregation_dimension(entry, "method")
+        broker = _aggregation_dimension(entry, "broker")
+        by_status[status] += 1
+        by_method[method] += 1
+        by_broker[broker] += 1
+        by_broker_method_status[(broker, method, status)] += 1
+    return {
+        "by_status": _counter_to_sorted_dict(by_status),
+        "by_method": _counter_to_sorted_dict(by_method),
+        "by_broker": _counter_to_sorted_dict(by_broker),
+        "by_broker_method_status": [
+            {"broker": broker, "method": method, "status": status, "count": by_broker_method_status[key]}
+            for key in sorted(by_broker_method_status)
+            for broker, method, status in [key]
+        ],
+    }
+
+
 def query_trade_audit_cross_ledger(
     *,
     audit_dir: str | Path,
@@ -318,6 +356,7 @@ def query_trade_audit_cross_ledger(
             "task_ledger_rows": len(task_rows),
             "warning_count": len(warnings),
         },
+        "aggregation": _build_trade_audit_aggregation(filtered_entries),
         "rows": rows,
         "warnings": warnings,
     }
