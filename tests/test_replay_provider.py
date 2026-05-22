@@ -92,6 +92,29 @@ def test_manager_market_market_snapshot_replay_uses_fixture_without_live_call() 
     assert result.data["replay_source"]["fixture"] == "market-market-snapshot-success"
 
 
+def test_execute_sync_replay_uses_default_market_full_tick_fixture() -> None:
+    result = execute_sync_replay("market.full_tick")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.full_tick"
+    assert result.data["query_meta"]["symbol"] == "688260.SH"
+    assert result.data["query_meta"]["requested_fields"] == ["Now", "Volume"]
+    assert result.data["rows"][0]["symbol"] == "688260.SH"
+    assert result.data["replay_source"]["fixture"] == "market-full-tick-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_market_full_tick_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MarketApi.full_tick", side_effect=AssertionError("live full-tick called")):
+        result = manager.market.full_tick("688260.SH", fields=["Now", "Volume"])
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.full_tick"
+    assert result.data["replay_source"]["fixture"] == "market-full-tick-success"
+
+
 def test_execute_sync_replay_uses_default_market_stock_info_fixture() -> None:
     result = execute_sync_replay("market.stock_info")
 

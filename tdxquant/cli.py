@@ -2774,6 +2774,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "doctor",
     "formula-screen",
     "market-snapshot",
+    "full-tick",
     "stock-info",
     "more-info",
     "cb-info",
@@ -2793,6 +2794,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
 _API_REPLAY_CAPABILITIES = {
     "snapshot": "market.snapshot",
     "market-snapshot": "market.market_snapshot",
+    "full-tick": "market.full_tick",
     "stock-info": "market.stock_info",
     "more-info": "market.more_info",
     "cb-info": "market.cb_info",

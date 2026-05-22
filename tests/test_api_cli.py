@@ -299,6 +299,28 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.api_command, "full-tick")
         self.assertEqual(args.code, "688260.SH")
 
+    def test_api_full_tick_command_parses_replay_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "full-tick",
+                "--code",
+                "688260.SH",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "full-tick")
+        self.assertEqual(args.code, "688260.SH")
+        self.assertEqual(args.field, ["Now", "Volume"])
+        self.assertEqual(args.provider_mode, "replay")
+
     def test_api_trading_dates_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "trading-dates", "--market", "SH", "--count", "10"])
@@ -2446,6 +2468,42 @@ class ApiCliDispatchTests(unittest.TestCase):
             result = _handle_api_subcommand(args)
         self.assertIs(result, expected)
         manager.market.full_tick.assert_called_once_with("688260.SH", fields=None)
+
+    def test_handle_api_full_tick_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "full-tick",
+                "--code",
+                "688260.SH",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "market.full_tick"}},
+        )
+        manager = MagicMock()
+        manager.market.full_tick.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.market.full_tick.assert_called_once_with("688260.SH", fields=["Now", "Volume"])
 
     def test_handle_api_capabilities_uses_manager(self) -> None:
         parser = build_parser()

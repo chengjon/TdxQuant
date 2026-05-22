@@ -20,6 +20,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("runtime-doctor-degraded", names)
         self.assertIn("market-snapshot-success", names)
         self.assertIn("market-market-snapshot-success", names)
+        self.assertIn("market-full-tick-success", names)
         self.assertIn("market-stock-info-success", names)
         self.assertIn("market-more-info-success", names)
         self.assertIn("market-cb-info-success", names)
@@ -97,6 +98,15 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["rows"][0]["symbol"], "000001.SZ")
         self.assertEqual(payload["data"]["query_meta"]["query_kind"], "market.market_snapshot")
         self.assertEqual(payload["data"]["query_meta"]["symbol"], "000001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["Now", "Volume"])
+
+    def test_load_market_full_tick_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("market-full-tick-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "market.full_tick")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "688260.SH")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "market.full_tick")
+        self.assertEqual(payload["data"]["query_meta"]["symbol"], "688260.SH")
         self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["Now", "Volume"])
 
     def test_load_market_stock_info_query_fixture_returns_query_meta(self) -> None:
@@ -273,6 +283,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                 "query_shapes": [
                     {
                         "query_kind": "market.market_snapshot",
+                        "selectors": ["symbol"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["market.full_tick"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "market.full_tick",
                         "selectors": ["symbol"],
                         "query_params": [],
                     }

@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "fetched full tick",
+  "capability": "market.full_tick",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-market-full-tick-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 10.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "symbol": "688260.SH",
+        "Now": 37.42,
+        "Volume": 123456
+      }
+    ],
+    "query_meta": {
+      "query_kind": "market.full_tick",
+      "row_count": 1,
+      "requested_fields": [
+        "Now",
+        "Volume"
+      ],
+      "returned_fields": [
+        "symbol",
+        "Now",
+        "Volume"
+      ],
+      "symbol": "688260.SH",
+      "query_params": {}
+    }
+  },
+  "artifacts": []
+}

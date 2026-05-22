@@ -18,11 +18,11 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 27,
+      "total": 28,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
-        "market": 6,
+        "market": 7,
         "meta": 7,
         "financial": 2,
         "transaction": 6,
@@ -30,10 +30,10 @@
       },
       "by_stability": {
         "beta": 5,
-        "stable": 22
+        "stable": 23
       },
       "by_side_effect_level": {
-        "read_only": 25,
+        "read_only": 26,
         "local_state_mutating": 2
       }
     },
@@ -148,6 +148,37 @@
           "query_shapes": [
             {
               "query_kind": "market.market_snapshot",
+              "selectors": [
+                "symbol"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "market.full_tick",
+        "capability_version": "v1",
+        "domain": "market",
+        "description": "Fetch full tick data.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "market.full_tick",
+          "api_command": "full-tick",
+          "flat_command": null
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "market.full_tick",
               "selectors": [
                 "symbol"
               ],
