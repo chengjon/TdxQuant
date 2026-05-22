@@ -18,11 +18,11 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 26,
+      "total": 27,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
-        "market": 5,
+        "market": 6,
         "meta": 7,
         "financial": 2,
         "transaction": 6,
@@ -30,10 +30,10 @@
       },
       "by_stability": {
         "beta": 5,
-        "stable": 21
+        "stable": 22
       },
       "by_side_effect_level": {
-        "read_only": 24,
+        "read_only": 25,
         "local_state_mutating": 2
       }
     },
@@ -117,6 +117,37 @@
           "query_shapes": [
             {
               "query_kind": "market.snapshot",
+              "selectors": [
+                "symbol"
+              ],
+              "query_params": []
+            }
+          ],
+          "supports_requested_fields": true,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
+        "name": "market.market_snapshot",
+        "capability_version": "v1",
+        "domain": "market",
+        "description": "Fetch market snapshot fields via get_market_snapshot.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "market.market_snapshot",
+          "api_command": "market-snapshot",
+          "flat_command": "tdx-data-market-snapshot"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "market.market_snapshot",
               "selectors": [
                 "symbol"
               ],

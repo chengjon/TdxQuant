@@ -68,6 +68,13 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "market-snapshot-success.json",
     },
     {
+        "name": "market-market-snapshot-success",
+        "capability": "market.market_snapshot",
+        "format": "json",
+        "description": "Representative successful market.market_snapshot provider response sample.",
+        "relative_path": "market-market-snapshot-success.json",
+    },
+    {
         "name": "market-stock-info-success",
         "capability": "market.stock_info",
         "format": "json",

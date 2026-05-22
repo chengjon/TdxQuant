@@ -19,6 +19,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("runtime-health-degraded", names)
         self.assertIn("runtime-doctor-degraded", names)
         self.assertIn("market-snapshot-success", names)
+        self.assertIn("market-market-snapshot-success", names)
         self.assertIn("market-stock-info-success", names)
         self.assertIn("market-more-info-success", names)
         self.assertIn("market-cb-info-success", names)
@@ -88,6 +89,15 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["capability"], "market.snapshot")
         self.assertEqual(payload["data"]["query_meta"]["query_kind"], "market.snapshot")
         self.assertEqual(payload["data"]["query_meta"]["symbol"], "000001.SZ")
+
+    def test_load_market_market_snapshot_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("market-market-snapshot-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "market.market_snapshot")
+        self.assertEqual(payload["data"]["rows"][0]["symbol"], "000001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "market.market_snapshot")
+        self.assertEqual(payload["data"]["query_meta"]["symbol"], "000001.SZ")
+        self.assertEqual(payload["data"]["query_meta"]["requested_fields"], ["Now", "Volume"])
 
     def test_load_market_stock_info_query_fixture_returns_query_meta(self) -> None:
         payload = load_provider_replay_fixture("market-stock-info-success")
@@ -248,6 +258,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                 "query_shapes": [
                     {
                         "query_kind": "market.snapshot",
+                        "selectors": ["symbol"],
+                        "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": True,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["market.market_snapshot"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "market.market_snapshot",
                         "selectors": ["symbol"],
                         "query_params": [],
                     }

@@ -1563,6 +1563,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_market_snapshot_parser.add_argument("--code", required=True)
     tdx_data_market_snapshot_parser.add_argument("--field", action="append", default=[])
     tdx_data_market_snapshot_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_market_snapshot_parser)
     tdx_data_kline_parser = subparsers.add_parser("tdx-data-kline")
     tdx_data_kline_parser.add_argument("--code", action="append", required=True)
     tdx_data_kline_parser.add_argument("--period", required=True)
@@ -2772,6 +2773,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "health",
     "doctor",
     "formula-screen",
+    "market-snapshot",
     "stock-info",
     "more-info",
     "cb-info",
@@ -2790,6 +2792,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
 
 _API_REPLAY_CAPABILITIES = {
     "snapshot": "market.snapshot",
+    "market-snapshot": "market.market_snapshot",
     "stock-info": "market.stock_info",
     "more-info": "market.more_info",
     "cb-info": "market.cb_info",
@@ -2885,6 +2888,8 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
         )
     if args.command == "tdx-data-stock-info":
         return manager.market.stock_info(args.code, fields=args.field)
+    if args.command == "tdx-data-market-snapshot":
+        return manager.market.market_snapshot(args.code, fields=args.field)
     if args.command == "tdx-data-more-info":
         return manager.market.more_info(args.code, fields=args.field)
     if args.command == "tdx-data-cb-info":

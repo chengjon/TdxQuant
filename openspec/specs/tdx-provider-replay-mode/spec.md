@@ -153,3 +153,12 @@ Replay mode SHALL serve `meta.sector_list` through deterministic fixture-backed 
 - **THEN** the system MUST resolve `meta-sector-list-success`
 - **AND** the returned result MUST include replay source metadata identifying that fixture
 - **AND** the system MUST NOT invoke live Windows runtime sector-list code
+
+### Requirement: Provider replay mode SHALL serve market-snapshot through default fixture-backed execution
+Replay mode SHALL serve `market.market_snapshot` through deterministic fixture-backed execution while preserving live behavior in live mode.
+
+#### Scenario: Replay mode resolves default market-snapshot fixture
+- **WHEN** a caller invokes `market.market_snapshot` in replay mode without an explicit fixture override
+- **THEN** the system MUST resolve `market-market-snapshot-success`
+- **AND** the returned result MUST include replay source metadata identifying that fixture
+- **AND** the system MUST NOT invoke live Windows runtime market-snapshot code

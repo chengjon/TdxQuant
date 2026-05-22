@@ -69,6 +69,29 @@ def test_execute_sync_replay_uses_default_market_snapshot_fixture() -> None:
     assert result._provider_contract["runtime"]["mode"] == "replay"
 
 
+def test_execute_sync_replay_uses_default_market_market_snapshot_fixture() -> None:
+    result = execute_sync_replay("market.market_snapshot")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.market_snapshot"
+    assert result.data["query_meta"]["symbol"] == "000001.SZ"
+    assert result.data["query_meta"]["requested_fields"] == ["Now", "Volume"]
+    assert result.data["rows"][0]["symbol"] == "000001.SZ"
+    assert result.data["replay_source"]["fixture"] == "market-market-snapshot-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_market_market_snapshot_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MarketApi.market_snapshot", side_effect=AssertionError("live market-snapshot called")):
+        result = manager.market.market_snapshot("000001.SZ", fields=["Now", "Volume"])
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "market.market_snapshot"
+    assert result.data["replay_source"]["fixture"] == "market-market-snapshot-success"
+
+
 def test_execute_sync_replay_uses_default_market_stock_info_fixture() -> None:
     result = execute_sync_replay("market.stock_info")
 

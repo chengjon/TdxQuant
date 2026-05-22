@@ -169,6 +169,28 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.code, "688260.SH")
         self.assertEqual(args.profile, "default")
 
+    def test_api_market_snapshot_command_parses_replay_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "market-snapshot",
+                "--code",
+                "000001.SZ",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "market-snapshot")
+        self.assertEqual(args.code, "000001.SZ")
+        self.assertEqual(args.field, ["Now", "Volume"])
+        self.assertEqual(args.provider_mode, "replay")
+
     def test_api_sector_list_command_parses_replay_arguments(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "sector-list", "--list-type", "0", "--provider-mode", "replay"])
@@ -573,6 +595,26 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.field, ["GP01", "GP02"])
         self.assertEqual(args.start_time, "20240101")
         self.assertEqual(args.end_time, "20241231")
+
+    def test_tdx_data_market_snapshot_command_parses_replay_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-market-snapshot",
+                "--code",
+                "000001.SZ",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        self.assertEqual(args.command, "tdx-data-market-snapshot")
+        self.assertEqual(args.code, "000001.SZ")
+        self.assertEqual(args.field, ["Now", "Volume"])
+        self.assertEqual(args.provider_mode, "replay")
 
     def test_tdx_data_stock_transaction_by_date_command_parses(self) -> None:
         parser = build_parser()
@@ -2058,6 +2100,42 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["replay_source"]["mode"], "replay")
         self.assertEqual(result.data["replay_source"]["capability"], "market.snapshot")
         mocked_manager.assert_not_called()
+
+    def test_handle_api_market_snapshot_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "api",
+                "market-snapshot",
+                "--code",
+                "000001.SZ",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "market.market_snapshot"}},
+        )
+        manager = MagicMock()
+        manager.market.market_snapshot.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.market.market_snapshot.assert_called_once_with("000001.SZ", fields=["Now", "Volume"])
 
     def test_handle_api_subscription_one_shot_replay_rejects_before_manager_construction(self) -> None:
         parser = build_parser()
@@ -7307,6 +7385,44 @@ class ReportCliDispatchTests(unittest.TestCase):
             replay_fixture_path=None,
         )
         manager.market.stock_info.assert_called_once_with("688260.SH", fields=["symbol", "name"])
+
+    def test_flat_tdx_data_market_snapshot_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "tdx-data-market-snapshot",
+                "--code",
+                "000001.SZ",
+                "--field",
+                "Now",
+                "--field",
+                "Volume",
+                "--provider-mode",
+                "replay",
+            ]
+        )
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "market.market_snapshot"}},
+        )
+        manager = MagicMock()
+        manager.market.market_snapshot.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch("tdxquant.cli.run_tdx_market_snapshot", side_effect=AssertionError("live bridge called")),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.market.market_snapshot.assert_called_once_with("000001.SZ", fields=["Now", "Volume"])
 
     def test_flat_tdx_data_more_info_replay_uses_manager_instead_of_live_bridge(self) -> None:
         parser = build_parser()
