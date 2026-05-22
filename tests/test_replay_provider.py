@@ -228,6 +228,28 @@ def test_manager_meta_divid_factors_replay_uses_fixture_without_live_call() -> N
     assert result.data["replay_source"]["fixture"] == "meta-divid-factors-success"
 
 
+def test_execute_sync_replay_uses_default_meta_sector_list_fixture() -> None:
+    result = execute_sync_replay("meta.sector_list")
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.sector_list"
+    assert result.data["query_meta"]["query_params"] == {"list_type": 0}
+    assert result.data["rows"][0]["block_code"] == "880660.SH"
+    assert result.data["replay_source"]["fixture"] == "meta-sector-list-success"
+    assert result._provider_contract["runtime"]["mode"] == "replay"
+
+
+def test_manager_meta_sector_list_replay_uses_fixture_without_live_call() -> None:
+    manager = TdxApiManager(provider_mode="replay")
+
+    with patch("tdxquant.api.manager.MetaApi.sector_list", side_effect=AssertionError("live sector-list called")):
+        result = manager.meta.sector_list(list_type=0)
+
+    assert result.ok is True
+    assert result.data["query_meta"]["query_kind"] == "meta.sector_list"
+    assert result.data["replay_source"]["fixture"] == "meta-sector-list-success"
+
+
 def test_execute_sync_replay_uses_default_transaction_stock_transaction_by_date_fixture() -> None:
     result = execute_sync_replay("transaction.stock_transaction_data_by_date")
 

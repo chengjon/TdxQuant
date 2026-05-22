@@ -169,6 +169,14 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.code, "688260.SH")
         self.assertEqual(args.profile, "default")
 
+    def test_api_sector_list_command_parses_replay_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "sector-list", "--list-type", "0", "--provider-mode", "replay"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "sector-list")
+        self.assertEqual(args.list_type, 0)
+        self.assertEqual(args.provider_mode, "replay")
+
     def test_api_sector_stocks_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "sector-stocks", "--sector", "钛金属", "--list-type", "1"])
@@ -610,6 +618,13 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.field, ["price"])
         self.assertEqual(args.year, 2025)
         self.assertEqual(args.mmdd, 101)
+
+    def test_tdx_data_sector_list_command_parses_replay_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["tdx-data-sector-list", "--list-type", "0", "--provider-mode", "replay"])
+        self.assertEqual(args.command, "tdx-data-sector-list")
+        self.assertEqual(args.list_type, 0)
+        self.assertEqual(args.provider_mode, "replay")
 
     def test_api_sector_transaction_data_command_parses(self) -> None:
         parser = build_parser()
@@ -2702,6 +2717,29 @@ class ApiCliDispatchTests(unittest.TestCase):
             year=2025,
             mmdd=101,
         )
+
+    def test_handle_api_sector_list_replay_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "sector-list", "--list-type", "0", "--provider-mode", "replay"])
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.sector_list"}},
+        )
+        manager = MagicMock()
+        manager.meta.sector_list.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager:
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.sector_list.assert_called_once_with(list_type=0)
 
     def test_handle_api_sector_transaction_data_uses_manager(self) -> None:
         parser = build_parser()
@@ -7510,6 +7548,32 @@ class ReportCliDispatchTests(unittest.TestCase):
             start_time="20200101",
             end_time="20241231",
         )
+
+    def test_flat_tdx_data_sector_list_replay_uses_manager_instead_of_live_bridge(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["tdx-data-sector-list", "--list-type", "0", "--provider-mode", "replay"])
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="fixture",
+            data={"query_meta": {"query_kind": "meta.sector_list"}},
+        )
+        manager = MagicMock()
+        manager.meta.sector_list.return_value = expected
+        with (
+            patch("tdxquant.cli.TdxApiManager", return_value=manager) as mocked_manager,
+            patch("tdxquant.cli.run_tdx_data_sector_list", side_effect=AssertionError("live bridge called")),
+        ):
+            result = _run_flat_replay_provider_command(args)
+        self.assertIs(result, expected)
+        mocked_manager.assert_called_once_with(
+            profile="default",
+            strategy_path=None,
+            provider_mode="replay",
+            replay_fixture=None,
+            replay_fixture_path=None,
+        )
+        manager.meta.sector_list.assert_called_once_with(list_type=0)
 
     def test_flat_tdx_data_stock_transaction_by_date_replay_uses_manager_instead_of_live_bridge(self) -> None:
         parser = build_parser()

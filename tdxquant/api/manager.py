@@ -200,7 +200,10 @@ class _MetaManagerProxy:
         effective_profile = self._manager._build_effective_profile({"list_type": resolved_list_type})
         result, timing = capture_api_timing(
             "meta.sector_list",
-            lambda: self._manager._meta_api.sector_list(list_type=resolved_list_type),
+            lambda: self._manager._dispatch_sync_capability(
+                "meta.sector_list",
+                lambda: self._manager._meta_api.sector_list(list_type=resolved_list_type),
+            ),
         )
         return attach_manager_metadata(
             result,

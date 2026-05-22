@@ -136,6 +136,7 @@ _QUERY_REPLAY_SUPPORTED_CAPABILITIES = {
     "meta.gp_one_data",
     "meta.divid_factors",
     "meta.stock_list",
+    "meta.sector_list",
     "meta.sector_stocks",
     "financial.financial_data",
     "financial.financial_data_by_date",

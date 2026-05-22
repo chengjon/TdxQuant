@@ -18,22 +18,22 @@
   "warnings": [],
   "data": {
     "summary": {
-      "total": 25,
+      "total": 26,
       "by_domain": {
         "runtime": 2,
         "formula": 1,
         "market": 5,
-        "meta": 6,
+        "meta": 7,
         "financial": 2,
         "transaction": 6,
         "block": 3
       },
       "by_stability": {
         "beta": 5,
-        "stable": 20
+        "stable": 21
       },
       "by_side_effect_level": {
-        "read_only": 23,
+        "read_only": 24,
         "local_state_mutating": 2
       }
     },
@@ -291,7 +291,38 @@
           "supports_replay": true
         }
       },
-    {
+      {
+        "name": "meta.sector_list",
+        "capability_version": "v1",
+        "domain": "meta",
+        "description": "List TongDaXin sectors.",
+        "stability": "stable",
+        "side_effect_level": "read_only",
+        "entrypoints": {
+          "manager_method": "meta.sector_list",
+          "api_command": "sector-list",
+          "flat_command": "tdx-data-sector-list"
+        },
+        "requires": [
+          "native_windows_python",
+          "tqcenter"
+        ],
+        "query_metadata": {
+          "query_shapes": [
+            {
+              "query_kind": "meta.sector_list",
+              "selectors": [],
+              "query_params": [
+                "list_type"
+              ]
+            }
+          ],
+          "supports_requested_fields": false,
+          "supports_empty_results": true,
+          "supports_replay": true
+        }
+      },
+      {
       "name": "meta.sector_stocks",
       "capability_version": "v1",
       "domain": "meta",

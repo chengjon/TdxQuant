@@ -30,6 +30,7 @@ _SYNC_REPLAY_DEFAULT_FIXTURES: dict[str, str] = {
     "meta.divid_factors": "meta-divid-factors-success",
     "market.kline": "market-kline-success",
     "meta.stock_list": "meta-stock-list-success",
+    "meta.sector_list": "meta-sector-list-success",
     "meta.sector_stocks": "meta-sector-stocks-success",
     "financial.financial_data": "financial-financial-data-success",
     "financial.financial_data_by_date": "financial-financial-data-by-date-success",

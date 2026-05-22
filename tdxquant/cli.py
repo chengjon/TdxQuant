@@ -1668,6 +1668,7 @@ def build_parser() -> argparse.ArgumentParser:
     tdx_data_sector_list_parser = subparsers.add_parser("tdx-data-sector-list")
     tdx_data_sector_list_parser.add_argument("--list-type", type=int, default=0, choices=[0, 1])
     tdx_data_sector_list_parser.add_argument("--strategy-path")
+    _add_replay_provider_arguments(tdx_data_sector_list_parser)
     tdx_data_sector_stocks_parser = subparsers.add_parser("tdx-data-sector-stocks")
     tdx_data_sector_stocks_parser.add_argument("--sector", required=True)
     tdx_data_sector_stocks_parser.add_argument("--block-type", type=int, default=0, choices=[0, 1])
@@ -2778,6 +2779,7 @@ _SUPPORTED_API_REPLAY_COMMANDS = {
     "ipo-info",
     "gp-one",
     "divid-factors",
+    "sector-list",
     "stock-transaction-data-by-date",
     "sector-transaction-data",
     "sector-transaction-data-by-date",
@@ -2795,6 +2797,7 @@ _API_REPLAY_CAPABILITIES = {
     "ipo-info": "meta.ipo_info",
     "gp-one": "meta.gp_one_data",
     "divid-factors": "meta.divid_factors",
+    "sector-list": "meta.sector_list",
     "stock-transaction-data-by-date": "transaction.stock_transaction_data_by_date",
     "sector-transaction-data": "transaction.sector_transaction_data",
     "sector-transaction-data-by-date": "transaction.sector_transaction_data_by_date",
@@ -2898,6 +2901,8 @@ def _run_flat_replay_provider_command(args: argparse.Namespace) -> Result | None
             start_time=args.start_time,
             end_time=args.end_time,
         )
+    if args.command == "tdx-data-sector-list":
+        return manager.meta.sector_list(list_type=args.list_type)
     if args.command == "tdx-data-stock-transaction-by-date":
         return manager.transaction.stock_transaction_data_by_date(
             stock_list=args.code,

@@ -28,6 +28,7 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertIn("meta-divid-factors-success", names)
         self.assertIn("market-kline-success", names)
         self.assertIn("meta-stock-list-success", names)
+        self.assertIn("meta-sector-list-success", names)
         self.assertIn("meta-sector-stocks-success", names)
         self.assertIn("financial-financial-data-success", names)
         self.assertIn("financial-financial-data-by-date-success", names)
@@ -151,6 +152,14 @@ class ProviderReplayFixtureTests(unittest.TestCase):
         self.assertEqual(payload["data"]["query_meta"]["symbol"], "688318.SH")
         self.assertEqual(payload["data"]["query_meta"]["start_time"], "20200101")
         self.assertEqual(payload["data"]["query_meta"]["end_time"], "20241231")
+
+    def test_load_meta_sector_list_query_fixture_returns_query_meta(self) -> None:
+        payload = load_provider_replay_fixture("meta-sector-list-success")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["capability"], "meta.sector_list")
+        self.assertEqual(payload["data"]["rows"][0]["block_code"], "880660.SH")
+        self.assertEqual(payload["data"]["query_meta"]["query_kind"], "meta.sector_list")
+        self.assertEqual(payload["data"]["query_meta"]["query_params"], {"list_type": 0})
 
     def test_load_transaction_stock_transaction_data_by_date_fixture_returns_query_meta(self) -> None:
         payload = load_provider_replay_fixture("transaction-stock-transaction-data-by-date-success")
@@ -301,6 +310,21 @@ class ProviderReplayFixtureTests(unittest.TestCase):
                         "query_kind": "meta.divid_factors",
                         "selectors": ["symbol", "date_range"],
                         "query_params": [],
+                    }
+                ],
+                "supports_requested_fields": False,
+                "supports_empty_results": True,
+                "supports_replay": True,
+            },
+        )
+        self.assertEqual(
+            capabilities["meta.sector_list"]["query_metadata"],
+            {
+                "query_shapes": [
+                    {
+                        "query_kind": "meta.sector_list",
+                        "selectors": [],
+                        "query_params": ["list_type"],
                     }
                 ],
                 "supports_requested_fields": False,

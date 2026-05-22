@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "ok": true,
+  "code": "ok",
+  "message": "listed sectors",
+  "capability": "meta.sector_list",
+  "capability_version": "v1",
+  "schema_version": "2026-05-03",
+  "request_id": "fixture-meta-sector-list-success",
+  "started_at": "2026-05-03T12:00:00Z",
+  "finished_at": "2026-05-03T12:00:00Z",
+  "elapsed_ms": 7.0,
+  "runtime": {
+    "provider": "tdxquant",
+    "provider_version": "dev",
+    "mode": "replay"
+  },
+  "warnings": [],
+  "data": {
+    "rows": [
+      {
+        "block_code": "880660.SH",
+        "name": "Lithium Battery"
+      },
+      {
+        "block_code": "880001.SH",
+        "name": "All A Shares"
+      }
+    ],
+    "query_meta": {
+      "query_kind": "meta.sector_list",
+      "row_count": 2,
+      "requested_fields": [],
+      "returned_fields": [
+        "block_code",
+        "name"
+      ],
+      "query_params": {
+        "list_type": 0
+      }
+    }
+  },
+  "artifacts": []
+}

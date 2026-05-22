@@ -138,6 +138,13 @@ _PROVIDER_REPLAY_FIXTURE_REGISTRY: list[dict[str, str]] = [
         "relative_path": "meta-stock-list-success.json",
     },
     {
+        "name": "meta-sector-list-success",
+        "capability": "meta.sector_list",
+        "format": "json",
+        "description": "Representative successful meta.sector_list provider response sample.",
+        "relative_path": "meta-sector-list-success.json",
+    },
+    {
         "name": "meta-sector-stocks-success",
         "capability": "meta.sector_stocks",
         "format": "json",
