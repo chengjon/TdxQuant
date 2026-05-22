@@ -623,6 +623,12 @@
     "description": "统一入口下的完整提交流程模板。",
     "labels": ["trade", "submit", "full-flow"]
   },
+  "broker-capabilities": {
+    "source": "trade",
+    "preset": "broker-capabilities-default",
+    "description": "统一入口下的平安桌面扩展 broker capability 只读边界探针。",
+    "labels": ["trade", "broker", "capability", "desktop", "diagnostics"]
+  },
   "guarded-buy": {
     "source": "task",
     "preset": "guarded-default",

@@ -2350,7 +2350,12 @@ def _build_trade_preset_namespace(args: argparse.Namespace) -> argparse.Namespac
     merged["close_result_dialog"] = True if merged.get("close_result_dialog") is None else merged["close_result_dialog"]
     merged["trade_command"] = command_name
 
-    missing_required = [name for name in ("port", "code", "price", "quantity") if merged.get(name) is None]
+    required_fields_by_command = {
+        "broker-capabilities": (),
+        "buy": ("port", "code", "price", "quantity"),
+        "submit-once": ("port", "code", "price", "quantity"),
+    }
+    missing_required = [name for name in required_fields_by_command.get(command_name, ()) if merged.get(name) is None]
     if missing_required:
         joined = ", ".join(missing_required)
         raise ValueError(f"trade preset execution requires: {joined}")
@@ -2471,6 +2476,7 @@ def _serialize_catalog_namespace(args: argparse.Namespace) -> dict[str, object]:
 def _extract_catalog_key_fields(payload: dict[str, object]) -> dict[str, object]:
     keys = (
         "block_code",
+        "broker",
         "code",
         "price",
         "quantity",

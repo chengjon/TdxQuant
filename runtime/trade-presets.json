@@ -37,5 +37,14 @@
       "max_depth": 12,
       "close_result_dialog": true
     }
+  },
+  "broker-capabilities-default": {
+    "command": "broker-capabilities",
+    "description": "平安证券桌面扩展 broker capability 只读边界探针。",
+    "profile": "balanced",
+    "title_key": "平安证券",
+    "options": {
+      "broker": "pingan_desktop"
+    }
   }
 }

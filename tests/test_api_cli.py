@@ -4001,6 +4001,22 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][1]["resolved_args"]["block_code"], "ZXG")
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_broker_capabilities_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "broker-capabilities", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["source"], "trade")
+        self.assertEqual(result.data["catalog_entry"]["preset"], "broker-capabilities-default")
+        self.assertEqual(result.data["dispatch"]["command_name"], "broker-capabilities")
+        self.assertEqual(result.data["resolved_args"]["broker"], "pingan_desktop")
+        self.assertEqual(output_payload["target"]["name"], "broker-capabilities")
+        self.assertEqual(output_payload["resolved_args"]["broker"], "pingan_desktop")
+        self.assertFalse(output_payload["constraints"]["dispatch_executed"])
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_read_zxg_review_and_export_bundle_returns_resolved_steps(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "plan", "--bundle", "read-zxg-review-and-export"])
@@ -5882,6 +5898,26 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertEqual(called_args.profile, "submit_once")
         self.assertEqual(called_args.port, "COM3")
         self.assertEqual(called_args.confirm_timeout, 3.0)
+
+    def test_handle_trade_run_broker_capabilities_preset_without_order_fields(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "run", "--preset", "broker-capabilities-default"])
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"broker_capabilities": {"overall_status": "boundary_only"}},
+        )
+        with patch("tdxquant.cli._run_trade_broker_capabilities", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        called_args = mocked.call_args.args[0]
+        self.assertEqual(called_args.trade_command, "broker-capabilities")
+        self.assertEqual(called_args.profile, "balanced")
+        self.assertEqual(called_args.broker, "pingan_desktop")
+        self.assertIsNone(called_args.code)
+        self.assertIsNone(called_args.price)
+        self.assertIsNone(called_args.quantity)
 
     def test_handle_trade_run_rejects_unsupported_preset_command(self) -> None:
         parser = build_parser()
