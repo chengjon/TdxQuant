@@ -126,7 +126,7 @@ TdxQuant
 | D-08 | PingAn submit_once | `[部分实现]` | `TdxTradeManager.pingan.buy_submit_once`；`docs/TdxQuant_Project_Function_Map.md` 记录 `side=sell + execution_mode=submit_once` 兼容路由；CLI parser 包含 `trade-submit-once`、`submit-once` | 支持当前适配过的 submit-once 路径；不代表所有交易品种、券商、异常弹窗都已覆盖。 |
 | D-09 | trade safety / idempotency governance | `[已实现]` | `tdxquant/trader/store.py`；runtime artifact `runtime/pingan-submission-ledger.jsonl`、`runtime/pingan-order-events.jsonl`；`docs/TdxQuant_Project_Function_Map.md` 记录 `submission_key` ledger、`max_price` 风险门、`trade_safety` 摘要 | governance 用于降低重复提交和危险价格风险；不替代真实交易前的人为风控。 |
 | D-10 | immutable trade audit artifacts | `[已实现]` | `runtime/trade-audits/` 当前存在约 `300` 个审计 JSON；`runtime/report-presets.json` 包含大量 audit preset | artifact 可用于回看和诊断；目录数量是当前工作区样例，不保证生产保留策略。 |
-| D-11 | trade_audit daily/period diagnostics | `[部分实现]` | CLI parser 包含 `trade-audit-daily-report`、`trade-audit-period-report`；`runtime/report-presets.json` 包含 pingan/rejected/failed/exceptions 等 preset | 大量常用视角已落地；跨 ledger/count aggregation 以 E-12 的只读边界为准，更深金额/成交质量/PnL 诊断仍未声明完成。 |
+| D-11 | trade_audit daily/period diagnostics | `[已实现]` | CLI parser 包含 `trade-audit-daily-report`、`trade-audit-period-report`；`runtime/report-presets.json` 包含 pingan/rejected/failed/exceptions 等 preset；`TdxTaskManager.trade_audit_daily_report` / `trade_audit_period_report` 输出 by_code、by_status、by_day 与 `value_diagnostics` requested-order-value 诊断；`tests/test_api_manager.py` 覆盖 daily/period 过滤、导出与 requested value 聚合；OpenSpec `trade-audit-report-value-diagnostics` | 当前是本地 audit JSON 的只读诊断：金额仅按 audit result data 中已有 `price * quantity` 计算 requested order value 覆盖率；不查询券商、不改 audit/ledger、不推断成交质量、fees、账户余额或 PnL；跨 ledger/count aggregation 仍以 E-12 的只读边界为准。 |
 
 ### E. 已设计/待实现能力
 

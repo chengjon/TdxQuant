@@ -7,6 +7,7 @@ import os
 import threading
 import time
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -753,6 +754,110 @@ def _build_trade_audit_entry_view(entry: dict[str, Any]) -> dict[str, Any]:
         "submission_key": trade_audit.get("submission_key"),
         "side_effect_level": trade_audit.get("side_effect_level"),
         "audit_path": entry.get("audit_path"),
+    }
+
+
+def _extract_trade_audit_result_data(entry: dict[str, Any]) -> dict[str, Any]:
+    payload = entry.get("payload")
+    if not isinstance(payload, dict):
+        return {}
+    result_payload = payload.get("result")
+    if not isinstance(result_payload, dict):
+        return {}
+    data_payload = result_payload.get("data", result_payload)
+    if not isinstance(data_payload, dict):
+        return {}
+    return data_payload
+
+
+def _first_present_value(payload: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in payload:
+            return payload[key]
+    return None
+
+
+def _coerce_trade_audit_decimal(value: Any) -> Decimal | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    if not parsed.is_finite():
+        return None
+    return parsed
+
+
+def _extract_trade_audit_requested_order_value(entry: dict[str, Any]) -> Decimal | None:
+    result_data = _extract_trade_audit_result_data(entry)
+    price = _coerce_trade_audit_decimal(_first_present_value(result_data, ("price", "requested_price")))
+    quantity = _coerce_trade_audit_decimal(_first_present_value(result_data, ("quantity", "requested_quantity")))
+    if price is None or quantity is None:
+        return None
+    return price * quantity
+
+
+def _format_trade_audit_decimal(value: Decimal) -> str:
+    return format(value, "f")
+
+
+def _new_trade_audit_value_bucket(label_key: str, label_value: str) -> dict[str, Any]:
+    return {
+        label_key: label_value,
+        "entries_count": 0,
+        "priced_entries": 0,
+        "unpriced_entries": 0,
+        "requested_order_value": Decimal("0"),
+    }
+
+
+def _record_trade_audit_value(bucket: dict[str, Any], requested_value: Decimal | None) -> None:
+    bucket["entries_count"] += 1
+    if requested_value is None:
+        bucket["unpriced_entries"] += 1
+        return
+    bucket["priced_entries"] += 1
+    bucket["requested_order_value"] += requested_value
+
+
+def _finalize_trade_audit_value_bucket(bucket: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: (_format_trade_audit_decimal(value) if isinstance(value, Decimal) else value)
+        for key, value in bucket.items()
+    }
+
+
+def _build_trade_audit_value_diagnostics(entries: list[dict[str, Any]], *, scope: str) -> dict[str, Any]:
+    total_bucket = _new_trade_audit_value_bucket("scope", scope)
+    by_status: dict[str, dict[str, Any]] = {}
+    by_method: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        trade_audit = entry.get("trade_audit", {})
+        requested_value = _extract_trade_audit_requested_order_value(entry)
+        _record_trade_audit_value(total_bucket, requested_value)
+
+        status = str(trade_audit.get("status", "")).strip() or "<unknown>"
+        status_bucket = by_status.setdefault(status, _new_trade_audit_value_bucket("status", status))
+        _record_trade_audit_value(status_bucket, requested_value)
+
+        method = str(trade_audit.get("method", "")).strip() or "<unknown>"
+        method_bucket = by_method.setdefault(method, _new_trade_audit_value_bucket("method", method))
+        _record_trade_audit_value(method_bucket, requested_value)
+
+    total_view = _finalize_trade_audit_value_bucket(total_bucket)
+    return {
+        "schema_version": "tdx.trade_audit.requested_value_diagnostics.v1",
+        "scope": scope,
+        "calculation": "requested_order_value = price * quantity from audit result data; excludes fills, fees, execution quality, account balances, and PnL.",
+        "entries_count": total_view["entries_count"],
+        "priced_entries": total_view["priced_entries"],
+        "unpriced_entries": total_view["unpriced_entries"],
+        "requested_order_value": total_view["requested_order_value"],
+        "by_status": [_finalize_trade_audit_value_bucket(by_status[status]) for status in sorted(by_status)],
+        "by_method": [_finalize_trade_audit_value_bucket(by_method[method]) for method in sorted(by_method)],
     }
 
 
@@ -2635,6 +2740,7 @@ class TdxTaskManager:
                 },
                 "by_code": by_code_rows,
                 "by_status": by_status_rows,
+                "value_diagnostics": _build_trade_audit_value_diagnostics(report_entries, scope="daily"),
                 "entries": recent_entries,
             }
 
@@ -2833,6 +2939,7 @@ class TdxTaskManager:
                 "by_day": by_day_rows,
                 "by_code": by_code_rows,
                 "by_status": by_status_rows,
+                "value_diagnostics": _build_trade_audit_value_diagnostics(report_entries, scope="period"),
                 "entries": recent_entries,
             }
 

@@ -4967,7 +4967,7 @@ class TdxTaskManagerTests(unittest.TestCase):
                             "contract_no": "B202604290201",
                             "submission_key": "submit-201",
                         },
-                        "result": {"data": {"code": "000001"}},
+                        "result": {"data": {"code": "000001", "price": "10.00", "quantity": 100}},
                     },
                     ensure_ascii=False,
                 ),
@@ -5003,6 +5003,11 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["summary"]["report_entries"], 1)
         self.assertEqual(result.data["summary"]["unique_codes"], ["000001"])
         self.assertEqual(result.data["by_status"][0]["status"], "confirmed")
+        self.assertEqual(result.data["value_diagnostics"]["priced_entries"], 1)
+        self.assertEqual(result.data["value_diagnostics"]["unpriced_entries"], 0)
+        self.assertEqual(result.data["value_diagnostics"]["requested_order_value"], "1000.00")
+        self.assertEqual(result.data["value_diagnostics"]["by_status"][0]["requested_order_value"], "1000.00")
+        self.assertIn("price * quantity", result.data["value_diagnostics"]["calculation"])
         self.assertEqual(result.data["task"]["name"], "trade_audit_daily_report")
 
     def test_task_trade_audit_daily_report_supports_multi_status_filter(self) -> None:
@@ -5111,10 +5116,10 @@ class TdxTaskManagerTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             audit_dir = Path(temp_dir) / "trade-audits"
             audit_dir.mkdir(parents=True, exist_ok=True)
-            for name, recorded_at, status, method, code in [
-                ("a1.json", "2026-04-28T01:00:00+00:00", "confirmed", "buy", "000001"),
-                ("a2.json", "2026-04-28T02:00:00+00:00", "replayed", "buy_submit_once", "000001"),
-                ("a3.json", "2026-04-29T03:00:00+00:00", "rejected", "confirm_current", "000002"),
+            for name, recorded_at, status, method, code, order_fields in [
+                ("a1.json", "2026-04-28T01:00:00+00:00", "confirmed", "buy", "000001", {"price": "10.00", "quantity": 100}),
+                ("a2.json", "2026-04-28T02:00:00+00:00", "replayed", "buy_submit_once", "000001", {"price": "11.50", "quantity": 100}),
+                ("a3.json", "2026-04-29T03:00:00+00:00", "rejected", "confirm_current", "000002", {}),
             ]:
                 (audit_dir / name).write_text(
                     json.dumps(
@@ -5128,7 +5133,7 @@ class TdxTaskManagerTests(unittest.TestCase):
                                 "contract_no": f"B{name[:2]}",
                                 "submission_key": f"S{name[:2]}",
                             },
-                            "result": {"data": {"code": code}},
+                            "result": {"data": {"code": code, **order_fields}},
                         },
                         ensure_ascii=False,
                     ),
@@ -5160,6 +5165,14 @@ class TdxTaskManagerTests(unittest.TestCase):
             self.assertEqual(by_status_rows["replayed"]["entries_count"], 1)
             self.assertEqual(by_status_rows["rejected"]["entries_count"], 1)
             self.assertEqual(by_day_rows["2026-04-28"]["entries_count"], 2)
+            value_diagnostics = result.data["value_diagnostics"]
+            self.assertEqual(value_diagnostics["priced_entries"], 2)
+            self.assertEqual(value_diagnostics["unpriced_entries"], 1)
+            self.assertEqual(value_diagnostics["requested_order_value"], "2150.00")
+            value_by_method = {row["method"]: row for row in value_diagnostics["by_method"]}
+            self.assertEqual(value_by_method["buy"]["requested_order_value"], "1000.00")
+            self.assertEqual(value_by_method["buy_submit_once"]["requested_order_value"], "1150.00")
+            self.assertEqual(value_by_method["confirm_current"]["unpriced_entries"], 1)
             self.assertIn("trade_days", json_path.read_text(encoding="utf-8"))
             self.assertIn("report_date", csv_path.read_text(encoding="utf-8"))
 
