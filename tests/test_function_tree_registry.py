@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import textwrap
@@ -12,9 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = REPO_ROOT / "scripts" / "validate_function_tree_registry.py"
 
 
-def _run_validator(root: Path) -> subprocess.CompletedProcess[str]:
+def _run_validator(root: Path, *extra_args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(VALIDATOR), "--root", str(root)],
+        [sys.executable, str(VALIDATOR), "--root", str(root), *extra_args],
         check=False,
         capture_output=True,
         text=True,
@@ -41,6 +42,40 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("rows=", result.stdout)
         self.assertIn("[已实现]", result.stdout)
+        self.assertEqual(result.stderr, "")
+
+    def test_validator_json_report_summarizes_current_function_tree(self) -> None:
+        result = _run_validator(REPO_ROOT, "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["valid"], True)
+        self.assertGreater(payload["row_count"], 0)
+        self.assertEqual(payload["problem_count"], 0)
+        self.assertEqual(payload["errors"], [])
+        self.assertIn("[已实现]", payload["status_counts"])
+        self.assertEqual(result.stderr, "")
+
+    def test_validator_json_report_returns_errors_without_stderr(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_function_tree(
+                root,
+                """
+                | ID | 功能 | 状态 | 证据 | 边界 |
+                | --- | --- | --- | --- | --- |
+                | A-01 | sample | `[已实现]` |  | implemented boundary |
+                """,
+            )
+
+            result = _run_validator(root, "--json")
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["valid"], False)
+        self.assertEqual(payload["row_count"], 1)
+        self.assertEqual(payload["problem_count"], 1)
+        self.assertIn("A-01", payload["errors"][0])
         self.assertEqual(result.stderr, "")
 
     def test_validator_rejects_missing_evidence_or_boundary(self) -> None:

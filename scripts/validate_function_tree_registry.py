@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -185,21 +186,41 @@ def validate_registry(root: Path) -> tuple[list[FeatureRow], list[str]]:
     return rows, errors
 
 
-def _summary(rows: list[FeatureRow]) -> str:
-    counts = {status: 0 for status in STATUS_ORDER}
+def _status_counts(rows: list[FeatureRow]) -> dict[str, int]:
+    counts = {status.strip("`"): 0 for status in STATUS_ORDER}
     for row in rows:
-        if row.status in counts:
-            counts[row.status] += 1
-    status_summary = "; ".join(f"{status.strip('`')}={counts[status]}" for status in STATUS_ORDER)
+        status = row.status.strip("`")
+        if status in counts:
+            counts[status] += 1
+    return counts
+
+
+def _summary(rows: list[FeatureRow]) -> str:
+    counts = _status_counts(rows)
+    status_summary = "; ".join(f"{status.strip('`')}={counts[status.strip('`')]}" for status in STATUS_ORDER)
     return f"rows={len(rows)}; {status_summary}; problems=0"
+
+
+def _json_report(rows: list[FeatureRow], errors: list[str]) -> dict[str, object]:
+    return {
+        "valid": not errors,
+        "row_count": len(rows),
+        "status_counts": _status_counts(rows),
+        "problem_count": len(errors),
+        "errors": errors,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate FUNCTION_TREE.md as the single feature registry.")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root containing FUNCTION_TREE.md")
+    parser.add_argument("--json", action="store_true", dest="json_output", help="Print a machine-readable JSON report")
     args = parser.parse_args(argv)
 
     rows, errors = validate_registry(args.root.resolve())
+    if args.json_output:
+        print(json.dumps(_json_report(rows, errors), ensure_ascii=False, sort_keys=True))
+        return 1 if errors else 0
     if errors:
         for error in errors:
             print(error, file=sys.stderr)
