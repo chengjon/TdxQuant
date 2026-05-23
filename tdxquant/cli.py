@@ -4688,6 +4688,7 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
     runtime = status.get("runtime") if isinstance(status.get("runtime"), dict) else {}
     lifecycle = status.get("lifecycle") if isinstance(status.get("lifecycle"), dict) else {}
     capabilities = status.get("capabilities") if isinstance(status.get("capabilities"), dict) else {}
+    replay_source = status.get("replay_source") if isinstance(status.get("replay_source"), dict) else {}
     probe_summary = runtime.get("probe_summary") if isinstance(runtime.get("probe_summary"), dict) else {}
     boundaries = status.get("boundaries") if isinstance(status.get("boundaries"), list) else []
     endpoints = capabilities.get("endpoints") if isinstance(capabilities.get("endpoints"), list) else []
@@ -4695,6 +4696,11 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
         "mode": "summary",
         "provider_id": status.get("provider_id"),
         "transport_mode": status.get("transport_mode"),
+        "replay_source": {
+            "source_kind": replay_source.get("source_kind"),
+            "fixture": replay_source.get("fixture"),
+            "fixture_path_provided": bool(replay_source.get("fixture_path")),
+        },
         "capabilities": {
             "read_only": capabilities.get("read_only"),
             "writes_supported": capabilities.get("writes_supported"),
