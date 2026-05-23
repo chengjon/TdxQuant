@@ -3372,6 +3372,105 @@ class TdxTaskManager:
         result, timing = _capture_task_timing("task.trade_buy", run)
         return self._attach_task_metadata(result, task_name="trade_buy", timing=timing)
 
+    def trade_sell(
+        self,
+        *,
+        port: str,
+        code: str,
+        price: str,
+        quantity: int,
+        baudrate: int = 115200,
+        timeout: float = 2.0,
+        max_depth: int = 12,
+        close_result_dialog: bool = True,
+        submission_key: str | None = None,
+        max_price: float | None = None,
+        refresh_before_trade: bool | None = None,
+        refresh_market: str | None = None,
+        refresh_force: bool | None = None,
+    ) -> Result:
+        def run() -> Result:
+            resolved_refresh_first = bool(
+                self.profile_options.get("refresh_before_trade", False)
+                if refresh_before_trade is None
+                else refresh_before_trade
+            )
+            resolved_refresh_market = refresh_market if refresh_market is not None else self.profile_options.get("refresh_market")
+            resolved_refresh_force = refresh_force if refresh_force is not None else self.profile_options.get("refresh_force")
+            refresh_result: Result | None = None
+            if resolved_refresh_first:
+                refresh_result = self.api_manager.refresh_cache(
+                    market=None if resolved_refresh_market is None else str(resolved_refresh_market),
+                    force=None if resolved_refresh_force is None else bool(resolved_refresh_force),
+                )
+                if not refresh_result.ok:
+                    return Result(
+                        ok=False,
+                        code=refresh_result.code,
+                        message="trade sell task aborted during environment refresh",
+                        data={
+                            "input": {
+                                "port": port,
+                                "code": code,
+                                "price": price,
+                                "quantity": quantity,
+                                "submission_key": submission_key,
+                                "max_price": max_price,
+                                "refresh_before_trade": resolved_refresh_first,
+                                "refresh_market": resolved_refresh_market,
+                                "refresh_force": resolved_refresh_force,
+                            },
+                            "refresh_result": refresh_result.to_dict(),
+                        },
+                        warnings=refresh_result.warnings,
+                        next_action=refresh_result.next_action,
+                    )
+            trade_result = self.trade_manager.pingan.sell(
+                port=port,
+                baudrate=baudrate,
+                timeout=timeout,
+                code=code,
+                price=price,
+                quantity=quantity,
+                max_depth=max_depth,
+                close_result_dialog=close_result_dialog,
+                submission_key=submission_key,
+                max_price=max_price,
+            )
+            if not trade_result.ok:
+                return trade_result
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="completed trade sell task",
+                data={
+                    "input": {
+                        "port": port,
+                        "code": code,
+                        "price": price,
+                        "quantity": quantity,
+                        "baudrate": baudrate,
+                        "timeout": timeout,
+                        "max_depth": max_depth,
+                        "close_result_dialog": close_result_dialog,
+                        "submission_key": submission_key,
+                        "max_price": max_price,
+                        "refresh_before_trade": resolved_refresh_first,
+                        "refresh_market": resolved_refresh_market,
+                        "refresh_force": resolved_refresh_force,
+                    },
+                    "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
+                    "trade_result": trade_result.to_dict(),
+                    "artifacts": copy.deepcopy(trade_result.data.get("artifacts", {})),
+                    "result_dialog": copy.deepcopy(trade_result.data.get("result_dialog", {})),
+                },
+                warnings=list(trade_result.warnings),
+                next_action=trade_result.next_action,
+            )
+
+        result, timing = _capture_task_timing("task.trade_sell", run)
+        return self._attach_task_metadata(result, task_name="trade_sell", timing=timing)
+
     def trade_submit_once(
         self,
         *,

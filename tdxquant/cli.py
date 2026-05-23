@@ -1203,6 +1203,13 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_trade_buy_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
     _add_task_common_arguments(task_trade_buy_parser)
 
+    task_trade_sell_parser = task_subparsers.add_parser("trade-sell")
+    _add_trade_common_arguments(task_trade_sell_parser)
+    task_trade_sell_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
+    task_trade_sell_parser.add_argument("--refresh-market")
+    task_trade_sell_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
+    _add_task_common_arguments(task_trade_sell_parser)
+
     task_trade_submit_once_parser = task_subparsers.add_parser("trade-submit-once")
     _add_trade_common_arguments(task_trade_submit_once_parser)
     task_trade_submit_once_parser.add_argument("--side", choices=["buy", "sell"], default="buy")
@@ -1341,6 +1348,11 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     _add_trade_common_arguments(trade_buy_parser)
     _add_trade_buy_profile_arguments(trade_buy_parser)
     trade_buy_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    trade_sell_parser = trade_subparsers.add_parser("sell")
+    _add_trade_common_arguments(trade_sell_parser)
+    _add_trade_buy_profile_arguments(trade_sell_parser)
+    trade_sell_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_submit_once_parser = trade_subparsers.add_parser("submit-once")
     _add_trade_common_arguments(trade_submit_once_parser)
@@ -2137,6 +2149,29 @@ def _run_trade_buy(args: argparse.Namespace) -> Result:
         )
         snapshot = service.place_order(request)
         return _build_trade_command_compat_result(snapshot, profile_name=str(args.profile), message="completed trade buy command")
+    except ValueError as exc:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
+    except NotImplementedError as exc:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
+    except RuntimeError as exc:
+        return Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message=str(exc))
+
+
+def _run_trade_sell(args: argparse.Namespace) -> Result:
+    try:
+        service = _build_trader_service(args, execution_mode="sell")
+        request = SecurityOrderRequest(
+            broker="pingan_desktop",
+            client_order_id=str(getattr(args, "client_order_id", None) or f"trade-sell-{uuid4().hex[:12]}"),
+            submission_key=args.submission_key,
+            symbol=str(args.code),
+            market="SZ",
+            side=OrderSide.SELL,
+            quantity=int(args.quantity),
+            limit_price=Decimal(str(args.price)),
+        )
+        snapshot = service.place_order(request)
+        return _build_trade_command_compat_result(snapshot, profile_name=str(args.profile), message="completed trade sell command")
     except ValueError as exc:
         return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=str(exc))
     except NotImplementedError as exc:
@@ -3955,14 +3990,14 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
     if merged.get("title_key") == "平安证券" and resolved_preset.get("title_key"):
         merged["title_key"] = resolved_preset.get("title_key")
 
-    if command_name in {"trade-buy", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
+    if command_name in {"trade-buy", "trade-sell", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
         merged["baudrate"] = 115200 if merged.get("baudrate") is None else merged["baudrate"]
         merged["timeout"] = 2.0 if merged.get("timeout") is None else merged["timeout"]
         merged["max_depth"] = 12 if merged.get("max_depth") is None else merged["max_depth"]
     if command_name == "trade-submit-once":
         merged["side"] = "buy" if merged.get("side") is None else merged["side"]
 
-    if command_name in {"trade-buy", "trade-submit-once", "guarded-trade-buy", "trade-confirm-current"}:
+    if command_name in {"trade-buy", "trade-sell", "trade-submit-once", "guarded-trade-buy", "trade-confirm-current"}:
         merged["close_result_dialog"] = True if merged.get("close_result_dialog") is None else merged["close_result_dialog"]
 
     if command_name == "guarded-trade-buy":
@@ -4011,7 +4046,7 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
         if missing_required:
             raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
 
-    if command_name in {"trade-buy", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
+    if command_name in {"trade-buy", "trade-sell", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
         missing_required = [name for name in ("port", "code", "price", "quantity") if merged.get(name) is None]
         if missing_required:
             raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
@@ -4182,6 +4217,22 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
         )
+    if args.task_command == "trade-sell":
+        return manager.trade_sell(
+            port=args.port,
+            baudrate=args.baudrate,
+            timeout=args.timeout,
+            code=args.code,
+            price=args.price,
+            quantity=args.quantity,
+            max_depth=args.max_depth,
+            close_result_dialog=args.close_result_dialog,
+            submission_key=args.submission_key,
+            max_price=args.max_price,
+            refresh_before_trade=args.refresh_before_trade,
+            refresh_market=args.refresh_market,
+            refresh_force=args.refresh_force,
+        )
     if args.task_command == "trade-submit-once":
         return manager.trade_submit_once(
             port=args.port,
@@ -4293,6 +4344,8 @@ def _handle_trade_subcommand(args: argparse.Namespace) -> Result:
         return _run_trade_trade_query(args)
     if args.trade_command == "buy":
         return _run_trade_buy(args)
+    if args.trade_command == "sell":
+        return _run_trade_sell(args)
     if args.trade_command == "submit-once":
         return _run_trade_submit_once(args)
     if args.trade_command == "health":

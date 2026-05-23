@@ -12,6 +12,7 @@ TASK_COMMAND_DEFAULT_PROFILES: dict[str, str] = {
     "trade-audit-period-report": "trade_audit_period_report",
     "trade-audit-cross-ledger-query": "trade_audit_cross_ledger_query",
     "trade-buy": "trade_buy",
+    "trade-sell": "trade_sell",
     "trade-submit-once": "trade_submit_once",
     "trade-submit-ready": "trade_submit_ready",
     "trade-confirm-current": "trade_confirm_current",
