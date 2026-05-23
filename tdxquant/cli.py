@@ -52,6 +52,7 @@ from .provider_transport_replay import (
     build_provider_transport_replay_status,
     load_provider_transport_replay_config,
     probe_provider_transport_replay_health,
+    probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_status,
     serve_provider_transport_replay,
 )
@@ -717,6 +718,7 @@ def _build_provider_replay_parser(
     provider_replay_status_parser.add_argument("--config", required=True)
     provider_replay_status_parser.add_argument("--probe-health", action="store_true")
     provider_replay_status_parser.add_argument("--probe-watch-status", action="store_true")
+    provider_replay_status_parser.add_argument("--probe-watch-events", action="store_true")
     provider_replay_status_parser.add_argument("--probe-timeout", type=float, default=1.0)
     provider_replay_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -4483,10 +4485,13 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
     if args.provider_replay_command == "status":
         health_probe = None
         watch_status_probe = None
+        watch_events_probe = None
         if args.probe_health:
             health_probe = probe_provider_transport_replay_health(config, timeout_seconds=args.probe_timeout)
         if args.probe_watch_status:
             watch_status_probe = probe_provider_transport_replay_watch_status(config, timeout_seconds=args.probe_timeout)
+        if args.probe_watch_events:
+            watch_events_probe = probe_provider_transport_replay_watch_events(config, timeout_seconds=args.probe_timeout)
         return Result(
             ok=True,
             code=ErrorCode.OK,
@@ -4496,6 +4501,7 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
                     config,
                     health_probe=health_probe,
                     watch_status_probe=watch_status_probe,
+                    watch_events_probe=watch_events_probe,
                 ),
                 "config": config_summary,
             },
