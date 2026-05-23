@@ -1502,9 +1502,32 @@ class ApiCliParserTests(unittest.TestCase):
         )
         self.assertEqual(args.command, "task")
         self.assertEqual(args.task_command, "trade-submit-once")
+        self.assertEqual(args.side, "buy")
         self.assertIsNone(args.refresh_before_trade)
         self.assertEqual(args.submission_key, "task-submit-001")
         self.assertEqual(args.max_price, 10.50)
+
+    def test_task_trade_submit_once_sell_side_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-submit-once",
+                "--side",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "trade-submit-once")
+        self.assertEqual(args.side, "sell")
 
     def test_task_trade_submit_ready_command_parses(self) -> None:
         parser = build_parser()
@@ -1746,9 +1769,32 @@ class ApiCliParserTests(unittest.TestCase):
         )
         self.assertEqual(args.command, "trade")
         self.assertEqual(args.trade_command, "submit-once")
+        self.assertEqual(args.side, "buy")
         self.assertTrue(args.close_result_dialog)
         self.assertEqual(args.submission_key, "trade-submit-20260428-001")
         self.assertEqual(args.max_price, 10.50)
+
+    def test_trade_submit_once_sell_side_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "submit-once",
+                "--side",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "submit-once")
+        self.assertEqual(args.side, "sell")
 
     def test_trade_health_command_parses(self) -> None:
         parser = build_parser()
@@ -5745,6 +5791,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             port="COM3",
             baudrate=115200,
             timeout=2.0,
+            side="buy",
             code="000001",
             price="10.00",
             quantity=100,
@@ -5756,6 +5803,32 @@ class TaskCliDispatchTests(unittest.TestCase):
             refresh_market=None,
             refresh_force=None,
         )
+
+    def test_handle_task_trade_submit_once_forwards_sell_side_to_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-submit-once",
+                "--side",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_submit_once.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        self.assertEqual(manager.trade_submit_once.call_args.kwargs["side"], "sell")
 
     def test_handle_task_trade_submit_ready_uses_task_manager(self) -> None:
         parser = build_parser()
@@ -6182,6 +6255,34 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.data["order"]["gateway_order_id"], "gw-002")
         self.assertEqual(result.data["execution_profile"]["name"], "submit_once")
+
+    def test_run_trade_submit_once_forwards_explicit_sell_side(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "submit-once",
+                "--side",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        snapshot = _snapshot(gateway_order_id="gw-sell-001")
+        service = MagicMock()
+        service.place_order.return_value = snapshot
+        with patch("tdxquant.cli._build_trader_service", return_value=service):
+            result = _run_trade_submit_once(args)
+        request = service.place_order.call_args.args[0]
+        self.assertEqual(request.side, OrderSide.SELL)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["order"]["gateway_order_id"], "gw-sell-001")
 
     def test_run_trade_buy_returns_failed_result_when_snapshot_failed(self) -> None:
         parser = build_parser()

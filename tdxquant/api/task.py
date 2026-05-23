@@ -3379,6 +3379,7 @@ class TdxTaskManager:
         code: str,
         price: str,
         quantity: int,
+        side: str = "buy",
         baudrate: int = 115200,
         timeout: float = 2.0,
         max_depth: int = 12,
@@ -3390,6 +3391,27 @@ class TdxTaskManager:
         refresh_force: bool | None = None,
     ) -> Result:
         def run() -> Result:
+            normalized_side = str(side or "buy").strip().lower()
+            common_input = {
+                "port": port,
+                "side": normalized_side,
+                "code": code,
+                "price": price,
+                "quantity": quantity,
+                "baudrate": baudrate,
+                "timeout": timeout,
+                "max_depth": max_depth,
+                "close_result_dialog": close_result_dialog,
+                "submission_key": submission_key,
+                "max_price": max_price,
+            }
+            if normalized_side not in {"buy", "sell"}:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"unsupported trade submit-once side: {side}",
+                    data={"input": common_input, "supported_sides": ["buy", "sell"]},
+                )
             resolved_refresh_first = bool(
                 self.profile_options.get("refresh_before_trade", False)
                 if refresh_before_trade is None
@@ -3410,12 +3432,7 @@ class TdxTaskManager:
                         message="trade submit-once task aborted during environment refresh",
                         data={
                             "input": {
-                                "port": port,
-                                "code": code,
-                                "price": price,
-                                "quantity": quantity,
-                                "submission_key": submission_key,
-                                "max_price": max_price,
+                                **common_input,
                                 "refresh_before_trade": resolved_refresh_first,
                                 "refresh_market": resolved_refresh_market,
                                 "refresh_force": resolved_refresh_force,
@@ -3425,18 +3442,22 @@ class TdxTaskManager:
                         warnings=refresh_result.warnings,
                         next_action=refresh_result.next_action,
                     )
-            trade_result = self.trade_manager.pingan.buy_submit_once(
-                port=port,
-                baudrate=baudrate,
-                timeout=timeout,
-                code=code,
-                price=price,
-                quantity=quantity,
-                max_depth=max_depth,
-                close_result_dialog=close_result_dialog,
-                submission_key=submission_key,
-                max_price=max_price,
-            )
+            trade_kwargs = {
+                "port": port,
+                "baudrate": baudrate,
+                "timeout": timeout,
+                "code": code,
+                "price": price,
+                "quantity": quantity,
+                "max_depth": max_depth,
+                "close_result_dialog": close_result_dialog,
+                "submission_key": submission_key,
+                "max_price": max_price,
+            }
+            if normalized_side == "sell":
+                trade_result = self.trade_manager.pingan.sell(**trade_kwargs)
+            else:
+                trade_result = self.trade_manager.pingan.buy_submit_once(**trade_kwargs)
             if not trade_result.ok:
                 return trade_result
             return Result(
@@ -3445,16 +3466,7 @@ class TdxTaskManager:
                 message="completed trade submit-once task",
                 data={
                     "input": {
-                        "port": port,
-                        "code": code,
-                        "price": price,
-                        "quantity": quantity,
-                        "baudrate": baudrate,
-                        "timeout": timeout,
-                        "max_depth": max_depth,
-                        "close_result_dialog": close_result_dialog,
-                        "submission_key": submission_key,
-                        "max_price": max_price,
+                        **common_input,
                         "refresh_before_trade": resolved_refresh_first,
                         "refresh_market": resolved_refresh_market,
                         "refresh_force": resolved_refresh_force,

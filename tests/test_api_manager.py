@@ -5517,8 +5517,52 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.data["task"]["name"], "trade_submit_once")
         self.assertIn("task_call", result.data["timing"])
+        self.assertEqual(result.data["input"]["side"], "buy")
         self.assertEqual(result.data["input"]["submission_key"], "task-submit-001")
         self.assertEqual(result.data["input"]["max_price"], 10.50)
+
+    def test_task_trade_submit_once_sell_side_uses_existing_sell_path(self) -> None:
+        trade_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "artifacts": {},
+                "result_dialog": {"contract_no": "S202604260004"},
+            },
+        )
+        manager = TdxTaskManager(profile="trade_submit_once", strategy_path="strategy.py")
+        with (
+            patch.object(type(manager.trade_manager.pingan), "sell", return_value=trade_result) as mocked_sell,
+            patch.object(type(manager.trade_manager.pingan), "buy_submit_once") as mocked_buy_submit_once,
+        ):
+            result = manager.trade_submit_once(
+                side="sell",
+                port="COM3",
+                code="000001",
+                price="10.00",
+                quantity=100,
+                submission_key="task-sell-submit-001",
+                max_price=10.50,
+            )
+
+        mocked_sell.assert_called_once_with(
+            port="COM3",
+            baudrate=115200,
+            timeout=2.0,
+            code="000001",
+            price="10.00",
+            quantity=100,
+            max_depth=12,
+            close_result_dialog=True,
+            submission_key="task-sell-submit-001",
+            max_price=10.50,
+        )
+        mocked_buy_submit_once.assert_not_called()
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["task"]["name"], "trade_submit_once")
+        self.assertEqual(result.data["input"]["side"], "sell")
+        self.assertEqual(result.data["result_dialog"]["contract_no"], "S202604260004")
 
     def test_task_trade_submit_ready_can_refresh_before_submit_boundary(self) -> None:
         refresh_result = Result(ok=True, code=ErrorCode.OK, message="refreshed", data={})

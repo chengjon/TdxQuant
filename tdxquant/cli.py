@@ -296,6 +296,7 @@ def _add_trade_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--port")
     subparser.add_argument("--baudrate", type=int)
     subparser.add_argument("--timeout", type=float)
+    subparser.add_argument("--side", choices=["buy", "sell"])
     subparser.add_argument("--code")
     subparser.add_argument("--price")
     subparser.add_argument("--quantity", type=int)
@@ -1204,6 +1205,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
     task_trade_submit_once_parser = task_subparsers.add_parser("trade-submit-once")
     _add_trade_common_arguments(task_trade_submit_once_parser)
+    task_trade_submit_once_parser.add_argument("--side", choices=["buy", "sell"], default="buy")
     task_trade_submit_once_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_submit_once_parser.add_argument("--refresh-market")
     task_trade_submit_once_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -1342,6 +1344,7 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
 
     trade_submit_once_parser = trade_subparsers.add_parser("submit-once")
     _add_trade_common_arguments(trade_submit_once_parser)
+    trade_submit_once_parser.add_argument("--side", choices=["buy", "sell"], default="buy")
     _add_trade_submit_once_profile_arguments(trade_submit_once_parser)
     trade_submit_once_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -2145,6 +2148,8 @@ def _run_trade_buy(args: argparse.Namespace) -> Result:
 def _run_trade_submit_once(args: argparse.Namespace) -> Result:
     profile_name = getattr(args, "profile", None) or "submit_once"
     try:
+        raw_side = getattr(args, "side", None) or "buy"
+        side = OrderSide(str(raw_side).lower())
         service = _build_trader_service(args, execution_mode="submit_once")
         request = SecurityOrderRequest(
             broker="pingan_desktop",
@@ -2152,7 +2157,7 @@ def _run_trade_submit_once(args: argparse.Namespace) -> Result:
             submission_key=args.submission_key,
             symbol=str(args.code),
             market="SZ",
-            side=OrderSide.BUY,
+            side=side,
             quantity=int(args.quantity),
             limit_price=Decimal(str(args.price)),
         )
@@ -3954,6 +3959,8 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
         merged["baudrate"] = 115200 if merged.get("baudrate") is None else merged["baudrate"]
         merged["timeout"] = 2.0 if merged.get("timeout") is None else merged["timeout"]
         merged["max_depth"] = 12 if merged.get("max_depth") is None else merged["max_depth"]
+    if command_name == "trade-submit-once":
+        merged["side"] = "buy" if merged.get("side") is None else merged["side"]
 
     if command_name in {"trade-buy", "trade-submit-once", "guarded-trade-buy", "trade-confirm-current"}:
         merged["close_result_dialog"] = True if merged.get("close_result_dialog") is None else merged["close_result_dialog"]
@@ -4180,6 +4187,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             port=args.port,
             baudrate=args.baudrate,
             timeout=args.timeout,
+            side=args.side,
             code=args.code,
             price=args.price,
             quantity=args.quantity,
