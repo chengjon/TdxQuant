@@ -1273,6 +1273,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "--probe-watch-status",
                 "--probe-watch-events",
                 "--probe-watch-stream",
+                "--probe-all",
                 "--probe-timeout",
                 "1.5",
             ]
@@ -1284,6 +1285,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.probe_watch_status, True)
         self.assertEqual(args.probe_watch_events, True)
         self.assertEqual(args.probe_watch_stream, True)
+        self.assertEqual(args.probe_all, True)
         self.assertEqual(args.probe_timeout, 1.5)
 
     def test_task_block_read_watchlist_command_parses(self) -> None:
@@ -2250,10 +2252,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "status",
                     "--config",
                     str(config_path),
-                    "--probe-health",
-                    "--probe-watch-status",
-                    "--probe-watch-events",
-                    "--probe-watch-stream",
+                    "--probe-all",
                     "--probe-timeout",
                     "1.5",
                 ]

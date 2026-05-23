@@ -721,6 +721,7 @@ def _build_provider_replay_parser(
     provider_replay_status_parser.add_argument("--probe-watch-status", action="store_true")
     provider_replay_status_parser.add_argument("--probe-watch-events", action="store_true")
     provider_replay_status_parser.add_argument("--probe-watch-stream", action="store_true")
+    provider_replay_status_parser.add_argument("--probe-all", action="store_true")
     provider_replay_status_parser.add_argument("--probe-timeout", type=float, default=1.0)
     provider_replay_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -4489,13 +4490,13 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
         watch_status_probe = None
         watch_events_probe = None
         watch_stream_probe = None
-        if args.probe_health:
+        if args.probe_health or args.probe_all:
             health_probe = probe_provider_transport_replay_health(config, timeout_seconds=args.probe_timeout)
-        if args.probe_watch_status:
+        if args.probe_watch_status or args.probe_all:
             watch_status_probe = probe_provider_transport_replay_watch_status(config, timeout_seconds=args.probe_timeout)
-        if args.probe_watch_events:
+        if args.probe_watch_events or args.probe_all:
             watch_events_probe = probe_provider_transport_replay_watch_events(config, timeout_seconds=args.probe_timeout)
-        if args.probe_watch_stream:
+        if args.probe_watch_stream or args.probe_all:
             watch_stream_probe = probe_provider_transport_replay_watch_stream(config, timeout_seconds=args.probe_timeout)
         return Result(
             ok=True,
