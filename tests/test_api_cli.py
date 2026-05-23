@@ -8168,11 +8168,11 @@ class ReportCliDispatchTests(unittest.TestCase):
         )
         detailed_payload = {
             "ok": True,
-            "result": {
-                "status": "running",
-                "control": {"state": "running", "active": True},
-                "watch_status": {"state": "running", "run_id": "run-001"},
-                "status_summary": {
+                "result": {
+                    "status": "running",
+                    "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                    "watch_status": {"state": "running", "run_id": "run-001"},
+                    "status_summary": {
                     "overall_status": "manual_review",
                     "heartbeat": {"staleness": "stale"},
                     "watermark": {"staleness": "not_evaluated"},
@@ -8212,6 +8212,13 @@ class ReportCliDispatchTests(unittest.TestCase):
                     "mode": "summary",
                     "worker": "worker-a",
                     "status": "manual_review",
+                    "runtime": {
+                        "control_state": "running",
+                        "active": True,
+                        "watch_state": "running",
+                        "run_id": "run-001",
+                        "pid": 1234,
+                    },
                     "status_summary": {
                         "overall_status": "manual_review",
                         "heartbeat": {"staleness": "stale"},
@@ -8231,6 +8238,9 @@ class ReportCliDispatchTests(unittest.TestCase):
                 },
             },
         )
+        summary_payload = json.loads(stdout.getvalue())["result"]
+        self.assertNotIn("control", summary_payload)
+        self.assertNotIn("watch_status", summary_payload)
 
     def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(

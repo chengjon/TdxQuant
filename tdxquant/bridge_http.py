@@ -89,6 +89,10 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
         "status": status_summary.get("overall_status", result.get("status")),
     }
 
+    runtime_view = build_bridge_watch_status_runtime_view(result)
+    if runtime_view:
+        summary_view["runtime"] = runtime_view
+
     if status_summary:
         status_view: dict[str, Any] = {}
         for key in ("overall_status", "heartbeat", "watermark", "reconnect"):
@@ -104,6 +108,28 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
         summary_view["governance"] = governance_view
 
     return summary_view
+
+
+def build_bridge_watch_status_runtime_view(result: dict[str, Any]) -> dict[str, Any]:
+    control = result.get("control")
+    control = control if isinstance(control, dict) else {}
+    watch_status = result.get("watch_status")
+    watch_status = watch_status if isinstance(watch_status, dict) else {}
+
+    runtime_view: dict[str, Any] = {}
+    if "state" in control:
+        runtime_view["control_state"] = control["state"]
+    if "active" in control:
+        runtime_view["active"] = control["active"]
+    if "state" in watch_status:
+        runtime_view["watch_state"] = watch_status["state"]
+
+    run_id = watch_status.get("run_id", control.get("run_id"))
+    if run_id is not None:
+        runtime_view["run_id"] = run_id
+    if "pid" in control:
+        runtime_view["pid"] = control["pid"]
+    return runtime_view
 
 
 def _now_utc_iso() -> str:

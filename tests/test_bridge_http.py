@@ -430,7 +430,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             controller = _FakeController()
             controller.status_result = {
                 "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
-                "watch_status": {"run_id": "run-001", "event_count": 3},
+                "watch_status": {"state": "running", "run_id": "run-001", "event_count": 3},
                 "status_summary": {
                     "overall_status": "degraded",
                     "heartbeat": {"status": "stale", "age_seconds": 180.0},
@@ -472,6 +472,16 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["mode"], "summary")
         self.assertEqual(payload["result"]["worker"], "worker-a")
         self.assertEqual(payload["result"]["status"], "degraded")
+        self.assertEqual(
+            payload["result"]["runtime"],
+            {
+                "control_state": "running",
+                "active": True,
+                "watch_state": "running",
+                "run_id": "run-001",
+                "pid": 1234,
+            },
+        )
         self.assertEqual(payload["result"]["status_summary"]["heartbeat"]["status"], "stale")
         self.assertEqual(payload["result"]["status_summary"]["watermark"]["status"], "fresh")
         self.assertEqual(payload["result"]["status_summary"]["reconnect"]["reconnect_count"], 2)
