@@ -8110,6 +8110,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                     "governance": {
                         "decision": "manual_review",
                         "requires_manual_review": True,
+                        "staleness_evaluated": True,
                         "action_summary": {
                             "count": 1,
                             "primary_action": "review_subscription_watch_heartbeat",
@@ -8150,6 +8151,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                     "governance": {
                         "decision": "manual_review",
                         "requires_manual_review": True,
+                        "staleness_evaluated": True,
                         "action_summary": {
                             "count": 1,
                             "primary_action": "review_subscription_watch_heartbeat",
