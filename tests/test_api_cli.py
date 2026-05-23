@@ -3800,6 +3800,25 @@ class ApiCliDispatchTests(unittest.TestCase):
             ["task-confirm-current", "daily-success", "audit-daily-confirmed"],
         )
 
+    def test_handle_catalog_list_exposes_confirm_current_pingan_aliases(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--label", "confirm-current"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        bundle_names = [row["name"] for row in result.data["bundles"]]
+        self.assertIn("confirm-current-pingan-exception-review", bundle_names)
+        self.assertIn("confirm-current-pingan-rejection-review", bundle_names)
+        self.assertIn("confirm-current-pingan-failure-review", bundle_names)
+        alias = next(
+            row for row in result.data["bundles"] if row["name"] == "confirm-current-pingan-exception-review"
+        )
+        self.assertEqual(alias["step_count"], 2)
+        self.assertEqual([step["source"] for step in alias["steps"]], ["task", "report"])
+        self.assertEqual(
+            [step["entry"] for step in alias["steps"]],
+            ["task-confirm-current", "audit-daily-pingan-confirm-exceptions"],
+        )
+
     def test_handle_catalog_list_exposes_task_sell_entry(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "sell"])
@@ -4191,6 +4210,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-confirm-current")
         self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "daily")
         self.assertEqual(result.data["steps"][2]["dispatch"]["command_name"], "audit-daily")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_confirm_current_pingan_bundle_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--bundle", "confirm-current-pingan-exception-review"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "confirm-current-pingan-exception-review")
+        self.assertEqual(result.data["catalog_bundle"]["selected_step_count"], 2)
+        self.assertEqual([step["name"] for step in result.data["steps"]], ["confirm", "audit"])
+        self.assertEqual(
+            [step["dispatch"]["command_group"] for step in result.data["steps"]],
+            ["task", "report"],
+        )
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-confirm-current")
+        self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "audit-daily")
+        self.assertEqual(result.data["summary_view"]["selected_step_count"], 2)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_task_sell_entry_without_execution(self) -> None:

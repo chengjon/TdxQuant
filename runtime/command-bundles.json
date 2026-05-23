@@ -1377,6 +1377,48 @@
       }
     ]
   },
+  "confirm-current-pingan-exception-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 confirm_current rejected + failed trade_audit 异常复盘的显式 confirm_current 入口。",
+    "labels": ["trading", "confirm", "confirm-current", "pingan", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-exceptions"
+      }
+    ]
+  },
+  "confirm-current-pingan-rejection-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 confirm_current rejected trade_audit 拒单诊断复盘的显式 confirm_current 入口。",
+    "labels": ["trading", "confirm", "confirm-current", "pingan", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-rejected"
+      }
+    ]
+  },
+  "confirm-current-pingan-failure-review": {
+    "description": "推进当前确认框后继续回看当日平安券商 confirm_current failed trade_audit 失败诊断复盘的显式 confirm_current 入口。",
+    "labels": ["trading", "confirm", "confirm-current", "pingan", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "confirm",
+        "entry": "task-confirm-current"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirm-failed"
+      }
+    ]
+  },
   "confirm-order-exception-review": {
     "description": "推进当前确认框后继续回看当日 buy + sell rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "confirm", "order", "audit", "exceptions", "followup"],
