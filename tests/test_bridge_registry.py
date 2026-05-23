@@ -323,10 +323,14 @@ class BridgeRegistryTests(unittest.TestCase):
                 registry_path="runtime/bridge/master-workers.json",
                 worker_id="worker-a",
                 heartbeat_stale_after_seconds=60,
+                watermark_stale_after_seconds=120,
             )
 
         self.assertEqual(payload, {"ok": True, "result": {"status": "running"}})
-        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/status?heartbeat_stale_after_seconds=60")
+        self.assertEqual(
+            mocked_call.call_args.kwargs["route"],
+            "/bridge/v1/watch/status?heartbeat_stale_after_seconds=60&watermark_stale_after_seconds=120",
+        )
 
     def test_run_bridge_watch_event_stream_uses_stream_route_and_cursor_query(self) -> None:
         worker = BridgeWorker(

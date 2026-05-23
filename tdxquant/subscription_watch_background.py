@@ -27,6 +27,7 @@ def build_subscription_watch_status_summary(
     control: dict[str, Any] | None,
     watch_status: dict[str, Any] | None,
     heartbeat_stale_after_seconds: float | int | None = None,
+    watermark_stale_after_seconds: float | int | None = None,
     now_utc: datetime | str | None = None,
 ) -> dict[str, Any]:
     resolved_control = control if isinstance(control, dict) else {}
@@ -39,6 +40,17 @@ def build_subscription_watch_status_summary(
         heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
         now_utc=now_utc,
     )
+    watermark = _build_watermark_summary(
+        event_count=_optional_int(resolved_status.get("event_count"), default=0),
+        unique_symbol_count=_optional_int(resolved_status.get("unique_symbol_count"), default=0),
+        last_sequence=_optional_int_or_none(resolved_status.get("last_sequence")),
+        last_event_ts=_optional_str(resolved_status.get("last_event_ts"))
+        or _optional_str(resolved_status.get("last_event_at")),
+        last_symbol=_optional_str(resolved_status.get("last_symbol")),
+        last_source_ts=_optional_str(resolved_status.get("last_source_ts")),
+        watermark_stale_after_seconds=watermark_stale_after_seconds,
+        now_utc=now_utc,
+    )
     return {
         "schema_version": SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION,
         "overall_status": _subscription_watch_overall_status(state=state, active=active),
@@ -46,15 +58,7 @@ def build_subscription_watch_status_summary(
         "active": active,
         "run_id": run_id,
         "heartbeat": heartbeat,
-        "watermark": {
-            "event_count": _optional_int(resolved_status.get("event_count"), default=0),
-            "unique_symbol_count": _optional_int(resolved_status.get("unique_symbol_count"), default=0),
-            "last_sequence": _optional_int_or_none(resolved_status.get("last_sequence")),
-            "last_event_ts": _optional_str(resolved_status.get("last_event_ts"))
-            or _optional_str(resolved_status.get("last_event_at")),
-            "last_symbol": _optional_str(resolved_status.get("last_symbol")),
-            "last_source_ts": _optional_str(resolved_status.get("last_source_ts")),
-        },
+        "watermark": watermark,
         "reconnect": {
             "reconnect_count": _optional_int(resolved_status.get("reconnect_count"), default=0),
             "last_disconnect_at": _optional_str(resolved_status.get("last_disconnect_at")),
@@ -67,7 +71,7 @@ def build_subscription_watch_status_summary(
             ),
             "last_error": resolved_status.get("last_error") if isinstance(resolved_status.get("last_error"), dict) else None,
         },
-        "boundary": "summary_projection_only; optional heartbeat staleness evaluation only; does not change reconnect/backoff behavior",
+        "boundary": "summary_projection_only; optional heartbeat/watermark staleness evaluation only; does not change reconnect/backoff behavior",
     }
 
 
@@ -110,6 +114,60 @@ def _build_heartbeat_summary(
         }
     )
     return heartbeat
+
+
+def _build_watermark_summary(
+    *,
+    event_count: int,
+    unique_symbol_count: int,
+    last_sequence: int | None,
+    last_event_ts: str | None,
+    last_symbol: str | None,
+    last_source_ts: str | None,
+    watermark_stale_after_seconds: float | int | None,
+    now_utc: datetime | str | None,
+) -> dict[str, Any]:
+    watermark: dict[str, Any] = {
+        "event_count": event_count,
+        "unique_symbol_count": unique_symbol_count,
+        "last_sequence": last_sequence,
+        "last_event_ts": last_event_ts,
+        "last_symbol": last_symbol,
+        "last_source_ts": last_source_ts,
+        "staleness": "not_evaluated",
+    }
+    if watermark_stale_after_seconds is None:
+        return watermark
+    try:
+        stale_after_seconds = float(watermark_stale_after_seconds)
+    except (TypeError, ValueError):
+        watermark["staleness"] = "invalid_threshold"
+        return watermark
+    if stale_after_seconds <= 0:
+        watermark["staleness"] = "invalid_threshold"
+        watermark["stale_after_seconds"] = stale_after_seconds
+        return watermark
+    if not last_event_ts:
+        watermark["staleness"] = "missing"
+        watermark["stale_after_seconds"] = stale_after_seconds
+        return watermark
+    try:
+        watermark_dt = _parse_rfc3339_datetime(last_event_ts)
+        evaluated_at_dt = _coerce_utc_datetime(now_utc)
+    except ValueError:
+        watermark["staleness"] = "invalid_timestamp"
+        watermark["stale_after_seconds"] = stale_after_seconds
+        return watermark
+    age_seconds = max(0.0, (evaluated_at_dt - watermark_dt).total_seconds())
+    watermark.update(
+        {
+            "staleness": "stale" if age_seconds > stale_after_seconds else "fresh",
+            "age_seconds": age_seconds,
+            "stale_after_seconds": stale_after_seconds,
+            "evaluated_at": evaluated_at_dt.isoformat(),
+        }
+    )
+    return watermark
 
 
 def _coerce_utc_datetime(value: datetime | str | None) -> datetime:
@@ -895,6 +953,7 @@ class SubscriptionWatchBackgroundController:
         *,
         run_id: str | None = None,
         heartbeat_stale_after_seconds: float | int | None = None,
+        watermark_stale_after_seconds: float | int | None = None,
         now_utc: datetime | str | None = None,
     ) -> dict[str, Any]:
         control = self._background_state()
@@ -910,6 +969,7 @@ class SubscriptionWatchBackgroundController:
                 control=control,
                 watch_status=watch_status,
                 heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
+                watermark_stale_after_seconds=watermark_stale_after_seconds,
                 now_utc=now_utc,
             ),
         }

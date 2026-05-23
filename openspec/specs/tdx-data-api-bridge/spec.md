@@ -3,7 +3,6 @@
 ## Purpose
 
 定义 TongDaXin 数据接口桥接能力，使 WSL 侧能够通过稳定 JSON 结果访问行情、K 线与股票/板块元数据。
-
 ## Requirements
 ### Requirement: Data bridge SHALL expose TongDaXin market snapshot access
 The system SHALL expose a bridge command for fetching TongDaXin market snapshot data without relying on GUI scraping.
@@ -41,3 +40,13 @@ The system SHALL expose bridge commands for stock metadata and sector/board enum
 #### Scenario: List stocks in sector
 - **WHEN** a caller requests the constituents of a valid sector
 - **THEN** the bridge returns the sector constituents in structured JSON form
+
+### Requirement: Bridge watch-status SHALL forward watermark stale threshold
+
+Bridge watch-status surfaces SHALL accept and forward an explicit watermark stale threshold to the background controller.
+
+#### Scenario: Caller requests bridge watch-status with watermark threshold
+
+- **WHEN** a caller requests `watch/status` with `watermark_stale_after_seconds`
+- **THEN** bridge HTTP, registry, and CLI watch-status paths MUST forward that threshold to the controller
+- **AND** the response MUST remain a read-only status projection

@@ -404,7 +404,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             server, base_url, thread = self._start_server(config, controller=controller)
             try:
                 payload = self._request(
-                    f"{base_url}/bridge/v1/watch/status?heartbeat_stale_after_seconds=60",
+                    f"{base_url}/bridge/v1/watch/status?heartbeat_stale_after_seconds=60&watermark_stale_after_seconds=120",
                     token="secret-token",
                 )
             finally:
@@ -413,7 +413,10 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 thread.join(timeout=5)
 
         self.assertTrue(payload["ok"])
-        self.assertEqual(controller.status_calls, [{"heartbeat_stale_after_seconds": 60.0}])
+        self.assertEqual(
+            controller.status_calls,
+            [{"heartbeat_stale_after_seconds": 60.0, "watermark_stale_after_seconds": 120.0}],
+        )
 
     def test_watch_event_stream_projects_status_and_event_rows_as_sse(self) -> None:
         with TemporaryDirectory() as temp_dir:

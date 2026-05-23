@@ -665,6 +665,7 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_status_parser.add_argument("--registry", required=True)
     bridge_watch_status_parser.add_argument("--worker", required=True)
     bridge_watch_status_parser.add_argument("--heartbeat-stale-after-seconds", type=float)
+    bridge_watch_status_parser.add_argument("--watermark-stale-after-seconds", type=float)
 
     bridge_watch_events_parser = bridge_subparsers.add_parser("watch-events")
     bridge_watch_events_parser.add_argument("--registry", required=True)
@@ -4405,6 +4406,7 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                     registry_path=args.registry,
                     worker_id=args.worker,
                     heartbeat_stale_after_seconds=args.heartbeat_stale_after_seconds,
+                    watermark_stale_after_seconds=args.watermark_stale_after_seconds,
                 )
             )
         if args.bridge_command == "watch-events":

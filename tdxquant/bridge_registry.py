@@ -136,6 +136,7 @@ def run_bridge_watch_status(
     registry_path: str | Path,
     worker_id: str,
     heartbeat_stale_after_seconds: float | int | None = None,
+    watermark_stale_after_seconds: float | int | None = None,
 ) -> dict[str, Any]:
     worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
     return call_worker(
@@ -144,6 +145,7 @@ def run_bridge_watch_status(
         route=_build_route(
             "/bridge/v1/watch/status",
             heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
+            watermark_stale_after_seconds=watermark_stale_after_seconds,
         ),
         token=resolve_worker_token(worker),
     )

@@ -90,6 +90,8 @@ class ApiCliParserTests(unittest.TestCase):
                 "worker-a",
                 "--heartbeat-stale-after-seconds",
                 "60",
+                "--watermark-stale-after-seconds",
+                "120",
             ]
         )
         self.assertEqual(args.command, "bridge")
@@ -97,6 +99,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
         self.assertEqual(args.worker, "worker-a")
         self.assertEqual(args.heartbeat_stale_after_seconds, 60.0)
+        self.assertEqual(args.watermark_stale_after_seconds, 120.0)
 
     def test_bridge_watch_events_commands_parse(self) -> None:
         parser = build_parser()
@@ -7226,6 +7229,8 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "worker-a",
                 "--heartbeat-stale-after-seconds",
                 "60",
+                "--watermark-stale-after-seconds",
+                "120",
             ]
         )
         with (
@@ -7239,6 +7244,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             registry_path="runtime/bridge/master-workers.json",
             worker_id="worker-a",
             heartbeat_stale_after_seconds=60.0,
+            watermark_stale_after_seconds=120.0,
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "idle"}})
 
