@@ -689,6 +689,12 @@
     "description": "统一入口下的 task 完整提交模板。",
     "labels": ["task", "trade", "submit", "full-flow"]
   },
+  "task-sell-submit-once": {
+    "source": "task",
+    "preset": "sell-submit-once-default",
+    "description": "统一入口下的 task 卖出侧完整提交模板。",
+    "labels": ["task", "trade", "submit", "sell-submit-once", "full-flow"]
+  },
   "task-submit-ready": {
     "source": "task",
     "preset": "submit-ready-default",

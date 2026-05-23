@@ -1551,10 +1551,7 @@
     "steps": [
       {
         "name": "trade",
-        "entry": "task-submit-once",
-        "options": {
-          "side": "sell"
-        }
+        "entry": "task-sell-submit-once"
       },
       {
         "name": "audit",
@@ -1568,10 +1565,7 @@
     "steps": [
       {
         "name": "trade",
-        "entry": "task-submit-once",
-        "options": {
-          "side": "sell"
-        }
+        "entry": "task-sell-submit-once"
       },
       {
         "name": "audit",
@@ -1585,10 +1579,7 @@
     "steps": [
       {
         "name": "trade",
-        "entry": "task-submit-once",
-        "options": {
-          "side": "sell"
-        }
+        "entry": "task-sell-submit-once"
       },
       {
         "name": "audit",
