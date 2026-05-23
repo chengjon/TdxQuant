@@ -1264,11 +1264,21 @@ class ApiCliParserTests(unittest.TestCase):
     def test_provider_replay_status_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
-            ["provider-replay", "status", "--config", "runtime/provider-transport-replay.example.json"]
+            [
+                "provider-replay",
+                "status",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+                "--probe-health",
+                "--probe-timeout",
+                "1.5",
+            ]
         )
         self.assertEqual(args.command, "provider-replay")
         self.assertEqual(args.provider_replay_command, "status")
         self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
+        self.assertEqual(args.probe_health, True)
+        self.assertEqual(args.probe_timeout, 1.5)
 
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
@@ -2228,17 +2238,33 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            args = parser.parse_args(["provider-replay", "status", "--config", str(config_path)])
-            with patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve:
+            args = parser.parse_args(
+                ["provider-replay", "status", "--config", str(config_path), "--probe-health", "--probe-timeout", "1.5"]
+            )
+            probe_result = {
+                "enabled": True,
+                "status": "healthy",
+                "reachable": True,
+                "http_status": 200,
+                "timeout_seconds": 1.5,
+                "service": "provider-transport-replay",
+            }
+            with (
+                patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
+                patch("tdxquant.cli.probe_provider_transport_replay_health", return_value=probe_result) as mocked_probe,
+            ):
                 result = _handle_provider_replay_subcommand(args)
 
         self.assertTrue(result.ok)
         self.assertEqual(result.data["status"]["provider_id"], "provider-replay-a")
         self.assertEqual(result.data["status"]["transport_mode"], "replay_only")
         self.assertEqual(result.data["status"]["lifecycle"]["start_stop_managed"], False)
-        self.assertEqual(result.data["status"]["runtime"]["runtime_observed"], False)
+        self.assertEqual(result.data["status"]["runtime"]["runtime_observed"], True)
+        self.assertEqual(result.data["status"]["runtime"]["health_probe"]["status"], "healthy")
         self.assertEqual(result.data["status"]["capabilities"]["writes_supported"], False)
         mocked_serve.assert_not_called()
+        mocked_probe.assert_called_once()
+        self.assertEqual(mocked_probe.call_args.kwargs["timeout_seconds"], 1.5)
 
     def test_handle_provider_replay_serve_delegates_to_foreground_server(self) -> None:
         parser = build_parser()

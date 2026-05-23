@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from .models import ErrorCode
@@ -48,7 +50,11 @@ class ProviderTransportReplayConfig:
             raise ValueError("token is required")
 
 
-def build_provider_transport_replay_status(config: ProviderTransportReplayConfig) -> dict[str, Any]:
+def build_provider_transport_replay_status(
+    config: ProviderTransportReplayConfig,
+    *,
+    health_probe: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     source_kind = "default_fixture_resolution"
     if config.replay_fixture_path:
         source_kind = "fixture_path"
@@ -56,6 +62,7 @@ def build_provider_transport_replay_status(config: ProviderTransportReplayConfig
         source_kind = "built_in_fixture"
 
     master_allowlist = list(config.master_allowlist or [])
+    resolved_health_probe = _normalize_provider_replay_health_probe(health_probe)
     return {
         "provider_id": config.provider_id,
         "service": "provider-transport-replay",
@@ -83,9 +90,10 @@ def build_provider_transport_replay_status(config: ProviderTransportReplayConfig
             "endpoints": list(REPLAY_READ_ONLY_ENDPOINTS),
         },
         "runtime": {
-            "runtime_observed": False,
+            "runtime_observed": bool(resolved_health_probe.get("enabled")),
             "live_runtime_required": False,
             "live_market_session_supported": False,
+            "health_probe": resolved_health_probe,
         },
         "lifecycle": {
             "mode": "foreground_process",
@@ -102,6 +110,167 @@ def build_provider_transport_replay_status(config: ProviderTransportReplayConfig
             "no live market session",
         ],
     }
+
+
+def probe_provider_transport_replay_health(
+    config: ProviderTransportReplayConfig,
+    *,
+    timeout_seconds: float | int = 1.0,
+) -> dict[str, Any]:
+    try:
+        resolved_timeout = float(timeout_seconds)
+    except (TypeError, ValueError):
+        return _build_probe_result(
+            status="invalid_timeout",
+            reachable=False,
+            timeout_seconds=None,
+            error="timeout_seconds must be numeric",
+            url=_provider_replay_health_probe_url(config),
+        )
+    if resolved_timeout <= 0:
+        return _build_probe_result(
+            status="invalid_timeout",
+            reachable=False,
+            timeout_seconds=resolved_timeout,
+            error="timeout_seconds must be positive",
+            url=_provider_replay_health_probe_url(config),
+        )
+
+    url = _provider_replay_health_probe_url(config)
+    request = Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {config.token}",
+            "X-Request-Id": uuid4().hex,
+        },
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=resolved_timeout) as response:
+            http_status = int(response.getcode())
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        details = _decode_probe_http_error(exc)
+        return _build_probe_result(
+            status="http_error",
+            reachable=True,
+            timeout_seconds=resolved_timeout,
+            http_status=exc.code,
+            error=details.get("message"),
+            error_code=details.get("code"),
+            url=url,
+        )
+    except (URLError, TimeoutError, OSError) as exc:
+        return _build_probe_result(
+            status="unreachable",
+            reachable=False,
+            timeout_seconds=resolved_timeout,
+            error=_probe_error_message(exc),
+            url=url,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return _build_probe_result(
+            status="invalid_response",
+            reachable=True,
+            timeout_seconds=resolved_timeout,
+            http_status=None,
+            error=str(exc),
+            url=url,
+        )
+
+    result = payload.get("result") if isinstance(payload, dict) else None
+    result = result if isinstance(result, dict) else {}
+    healthy = bool(payload.get("ok")) and http_status == 200 and result.get("status") == "ok"
+    return _build_probe_result(
+        status="healthy" if healthy else "unexpected_response",
+        reachable=True,
+        timeout_seconds=resolved_timeout,
+        http_status=http_status,
+        service=str(result.get("service") or "") or None,
+        provider_id=str(result.get("provider_id") or "") or None,
+        provider_mode=str(result.get("provider_mode") or "") or None,
+        url=url,
+    )
+
+
+def _normalize_provider_replay_health_probe(health_probe: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(health_probe, dict):
+        return {
+            "enabled": False,
+            "status": "not_requested",
+            "reachable": None,
+            "http_status": None,
+        }
+    resolved = dict(health_probe)
+    resolved["enabled"] = True
+    resolved.setdefault("status", "unknown")
+    resolved.setdefault("reachable", None)
+    resolved.setdefault("http_status", None)
+    return resolved
+
+
+def _provider_replay_health_probe_url(config: ProviderTransportReplayConfig) -> str:
+    host = config.bind_host.strip()
+    if host in {"0.0.0.0", "::"}:
+        host = "127.0.0.1"
+    elif ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{config.port}/provider/v1/replay/health"
+
+
+def _build_probe_result(
+    *,
+    status: str,
+    reachable: bool,
+    timeout_seconds: float | None,
+    url: str,
+    http_status: int | None = None,
+    error: str | None = None,
+    error_code: str | None = None,
+    service: str | None = None,
+    provider_id: str | None = None,
+    provider_mode: str | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "enabled": True,
+        "status": status,
+        "reachable": reachable,
+        "http_status": http_status,
+        "timeout_seconds": timeout_seconds,
+        "url": url,
+    }
+    if error:
+        result["error"] = error
+    if error_code:
+        result["error_code"] = error_code
+    if service:
+        result["service"] = service
+    if provider_id:
+        result["provider_id"] = provider_id
+    if provider_mode:
+        result["provider_mode"] = provider_mode
+    return result
+
+
+def _decode_probe_http_error(exc: HTTPError) -> dict[str, str | None]:
+    try:
+        payload = json.loads(exc.read().decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {"code": None, "message": str(exc)}
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if isinstance(error, dict):
+        return {
+            "code": str(error.get("code") or "") or None,
+            "message": str(error.get("message") or "") or None,
+        }
+    return {"code": None, "message": str(exc)}
+
+
+def _probe_error_message(exc: BaseException) -> str:
+    reason = getattr(exc, "reason", None)
+    if reason is not None:
+        return str(reason)
+    return str(exc)
 
 
 def build_replay_transport_success(

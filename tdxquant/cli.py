@@ -51,6 +51,7 @@ from .bridge_http import serve_bridge_from_config
 from .provider_transport_replay import (
     build_provider_transport_replay_status,
     load_provider_transport_replay_config,
+    probe_provider_transport_replay_health,
     serve_provider_transport_replay,
 )
 from .models import ErrorCode, OrderRequest, Result
@@ -713,6 +714,8 @@ def _build_provider_replay_parser(
 
     provider_replay_status_parser = provider_replay_subparsers.add_parser("status")
     provider_replay_status_parser.add_argument("--config", required=True)
+    provider_replay_status_parser.add_argument("--probe-health", action="store_true")
+    provider_replay_status_parser.add_argument("--probe-timeout", type=float, default=1.0)
     provider_replay_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     return provider_replay_parser
@@ -4476,11 +4479,14 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             data={"config": config_summary},
         )
     if args.provider_replay_command == "status":
+        health_probe = None
+        if args.probe_health:
+            health_probe = probe_provider_transport_replay_health(config, timeout_seconds=args.probe_timeout)
         return Result(
             ok=True,
             code=ErrorCode.OK,
             message="reported provider replay lifecycle status",
-            data={"status": build_provider_transport_replay_status(config), "config": config_summary},
+            data={"status": build_provider_transport_replay_status(config, health_probe=health_probe), "config": config_summary},
         )
     if args.provider_replay_command == "serve":
         exit_code = serve_provider_transport_replay(config)
