@@ -1665,6 +1665,24 @@
       }
     ]
   },
+  "sell-submit-once-pingan-complete-review": {
+    "description": "完整 sell submit-once 流程后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["trading", "submit", "pingan", "sell-submit-once", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-sell-submit-once"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirmed"
+      }
+    ]
+  },
   "sell-submit-once-pingan-exception-review": {
     "description": "完整 sell submit-once 流程后继续回看当日平安券商 sell_submit_once rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "submit", "pingan", "sell-submit-once", "audit", "exceptions", "followup"],
