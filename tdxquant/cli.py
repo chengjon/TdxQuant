@@ -638,6 +638,7 @@ def _build_catalog_parser(subparsers: argparse._SubParsersAction[argparse.Argume
     catalog_list_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     catalog_validate_parser = catalog_subparsers.add_parser("validate")
+    catalog_validate_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
     catalog_validate_parser.add_argument("--kind", choices=["entry", "bundle", "all"], default="all")
     catalog_validate_filter_group = catalog_validate_parser.add_mutually_exclusive_group()
     catalog_validate_filter_group.add_argument("--entry")
@@ -2710,6 +2711,31 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "bundles": bundle_summaries,
         }
 
+    if args.catalog_command == "validate":
+        validation = result.data.get("validation", {})
+        if not isinstance(validation, dict):
+            return None
+        summary = {
+            "mode": "validate",
+            "kind": validation.get("kind"),
+            "selected_entry": validation.get("selected_entry"),
+            "selected_bundle": validation.get("selected_bundle"),
+            "selected_label": validation.get("selected_label"),
+            "entry_count": validation.get("entry_count"),
+            "bundle_count": validation.get("bundle_count"),
+            "task_report_bundle_count": validation.get("task_report_bundle_count"),
+            "invalid_count": validation.get("invalid_count"),
+            "valid": validation.get("valid"),
+            "non_execution": validation.get("non_execution"),
+            "ok": result.ok,
+            "code": result.code.value,
+            "message": result.message,
+        }
+        errors = validation.get("errors")
+        if errors:
+            summary["errors"] = copy.deepcopy(errors)
+        return summary
+
     if args.catalog_command not in {"run", "plan", "preview"}:
         return None
 
@@ -3404,18 +3430,22 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "non_execution": True,
     }
     if errors:
-        return Result(
+        result = Result(
             ok=False,
             code=ErrorCode.INVALID_REQUEST,
             message="command catalog validation failed",
             data={"validation": validation},
         )
-    return Result(
+        result.data["summary_view"] = _build_catalog_summary_view(args, result)
+        return result
+    result = Result(
         ok=True,
         code=ErrorCode.OK,
         message="validated command catalog registry",
         data={"validation": validation},
     )
+    result.data["summary_view"] = _build_catalog_summary_view(args, result)
+    return result
 
 
 def _run_catalog_bundle(args: argparse.Namespace) -> Result:

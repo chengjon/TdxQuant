@@ -2159,6 +2159,17 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertIsNone(args.bundle)
         self.assertEqual(args.label, "followup")
 
+    def test_catalog_validate_summary_view_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "validate", "--kind", "bundle", "--label", "followup", "--view", "summary"]
+        )
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "validate")
+        self.assertEqual(args.kind, "bundle")
+        self.assertEqual(args.label, "followup")
+        self.assertEqual(args.view, "summary")
+
     def test_catalog_run_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "run", "--entry", "turbo-buy", "--code", "000001", "--price", "10.00", "--quantity", "100"])
@@ -3960,6 +3971,29 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertGreaterEqual(validation["bundle_count"], validation["task_report_bundle_count"])
         self.assertGreater(validation["task_report_bundle_count"], 0)
 
+    def test_handle_catalog_validate_summary_view_projects_counts_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "validate", "--kind", "bundle", "--label", "followup", "--view", "summary"]
+        )
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        summary_view = result.data["summary_view"]
+        self.assertEqual(summary_view["mode"], "validate")
+        self.assertEqual(summary_view["kind"], "bundle")
+        self.assertEqual(summary_view["selected_label"], "followup")
+        self.assertEqual(summary_view["entry_count"], 0)
+        self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
+        self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
+        self.assertEqual(summary_view["invalid_count"], 0)
+        self.assertEqual(summary_view["valid"], True)
+        self.assertEqual(summary_view["non_execution"], True)
+        self.assertNotIn("entries", summary_view)
+        self.assertNotIn("bundles", summary_view)
+
     def test_handle_catalog_validate_missing_bundle_returns_invalid_request(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "validate", "--bundle", "missing-review"])
@@ -3974,6 +4008,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["valid"], False)
         self.assertEqual(validation["errors"][0]["target_type"], "bundle")
         self.assertEqual(validation["errors"][0]["target"], "missing-review")
+
+    def test_handle_catalog_validate_summary_view_keeps_missing_target_error(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "validate", "--bundle", "missing-review", "--view", "summary"])
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        summary_view = result.data["summary_view"]
+        self.assertEqual(summary_view["mode"], "validate")
+        self.assertEqual(summary_view["kind"], "bundle")
+        self.assertEqual(summary_view["selected_bundle"], "missing-review")
+        self.assertEqual(summary_view["invalid_count"], 1)
+        self.assertEqual(summary_view["valid"], False)
+        self.assertEqual(summary_view["non_execution"], True)
+        self.assertEqual(summary_view["errors"][0]["target_type"], "bundle")
+        self.assertEqual(summary_view["errors"][0]["target"], "missing-review")
 
     def test_handle_catalog_list_exposes_confirm_current_pingan_aliases(self) -> None:
         parser = build_parser()
@@ -9602,6 +9654,39 @@ class ReportCliDispatchTests(unittest.TestCase):
         parsed = json.loads(printed_payload)
         self.assertEqual(parsed["mode"], "run")
         self.assertEqual(parsed["target"]["name"], "daily-review")
+
+    def test_main_catalog_validate_summary_view_prints_summary_payload(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="validated command catalog registry",
+            data={
+                "summary_view": {
+                    "mode": "validate",
+                    "kind": "bundle",
+                    "selected_label": "followup",
+                    "bundle_count": 12,
+                    "task_report_bundle_count": 12,
+                    "invalid_count": 0,
+                    "valid": True,
+                    "non_execution": True,
+                }
+            },
+        )
+        with (
+            patch("tdxquant.cli.PingAnBrokerAdapter"),
+            patch("tdxquant.cli._handle_catalog_subcommand", return_value=expected),
+            patch("builtins.print") as mocked_stdout_print,
+            patch("sys.argv", ["tdxquant", "catalog", "validate", "--kind", "bundle", "--label", "followup", "--view", "summary"]),
+        ):
+            exit_code = main()
+        self.assertEqual(exit_code, 0)
+        printed_payload = mocked_stdout_print.call_args.args[0]
+        parsed = json.loads(printed_payload)
+        self.assertEqual(parsed["mode"], "validate")
+        self.assertEqual(parsed["kind"], "bundle")
+        self.assertEqual(parsed["selected_label"], "followup")
+        self.assertEqual(parsed["non_execution"], True)
 
     def test_main_api_snapshot_prints_provider_result_envelope(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"symbol": "688260.SH"}]})
