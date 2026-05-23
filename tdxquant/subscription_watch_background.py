@@ -198,13 +198,25 @@ def _build_subscription_watch_governance_summary(
             reasons.append(f"{name}:stale")
 
     requires_manual_review = bool(reasons)
+    actions = _build_subscription_watch_governance_actions(reasons)
     return {
         "decision": "manual_review" if requires_manual_review else "observe",
         "requires_manual_review": requires_manual_review,
         "reasons": reasons,
-        "actions": _build_subscription_watch_governance_actions(reasons),
+        "actions": actions,
+        "action_summary": _build_subscription_watch_governance_action_summary(actions),
         "staleness_evaluated": staleness_evaluated,
         "boundary": SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY,
+    }
+
+
+def _build_subscription_watch_governance_action_summary(actions: list[dict[str, str]]) -> dict[str, Any]:
+    first_action = actions[0] if actions else None
+    return {
+        "count": len(actions),
+        "primary_action": first_action.get("action") if first_action else None,
+        "primary_reason": first_action.get("reason") if first_action else None,
+        "severity": first_action.get("severity") if first_action else "none",
     }
 
 

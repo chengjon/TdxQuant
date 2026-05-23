@@ -655,6 +655,12 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         "requires_manual_review": False,
         "reasons": [],
         "actions": [],
+        "action_summary": {
+            "count": 0,
+            "primary_action": None,
+            "primary_reason": None,
+            "severity": "none",
+        },
         "staleness_evaluated": False,
         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
     }
@@ -679,6 +685,12 @@ def test_status_summary_governance_requests_manual_review_for_resilience_states(
             "description": f"Inspect subscription-watch long-run process health for {state} status.",
         }
     ]
+    assert summary["governance"]["action_summary"] == {
+        "count": 1,
+        "primary_action": "review_subscription_watch_resilience",
+        "primary_reason": f"overall_status:{state}",
+        "severity": "review",
+    }
 
 
 def test_status_summary_governance_requests_manual_review_for_explicit_stale_inputs() -> None:
@@ -713,6 +725,12 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
             "description": "Inspect event watermark freshness before changing reconnect or restart behavior.",
         },
     ]
+    assert summary["governance"]["action_summary"] == {
+        "count": 2,
+        "primary_action": "review_subscription_watch_heartbeat",
+        "primary_reason": "heartbeat:stale",
+        "severity": "review",
+    }
 
 
 def test_status_view_returns_active_control_and_current_run_status(tmp_path: Path) -> None:
