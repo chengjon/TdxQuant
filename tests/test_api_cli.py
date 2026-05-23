@@ -2143,6 +2143,16 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.bundle, "refresh-review")
         self.assertEqual(args.label, "morning")
 
+    def test_catalog_validate_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "validate", "--kind", "bundle", "--label", "followup"])
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "validate")
+        self.assertEqual(args.kind, "bundle")
+        self.assertIsNone(args.entry)
+        self.assertIsNone(args.bundle)
+        self.assertEqual(args.label, "followup")
+
     def test_catalog_run_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "run", "--entry", "turbo-buy", "--code", "000001", "--price", "10.00", "--quantity", "100"])
@@ -3899,6 +3909,53 @@ class ApiCliDispatchTests(unittest.TestCase):
             [step["entry"] for step in combo["steps"]],
             ["task-confirm-current", "daily-success", "audit-daily-confirmed"],
         )
+
+    def test_handle_catalog_validate_all_resolves_registry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "validate", "--kind", "all"])
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        self.assertEqual(validation["kind"], "all")
+        self.assertEqual(validation["invalid_count"], 0)
+        self.assertEqual(validation["valid"], True)
+        self.assertGreater(validation["entry_count"], 0)
+        self.assertGreater(validation["bundle_count"], 0)
+        self.assertGreater(validation["task_report_bundle_count"], 0)
+        self.assertEqual(validation["errors"], [])
+
+    def test_handle_catalog_validate_followup_bundles_counts_task_report_combos(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "validate", "--kind", "bundle", "--label", "followup"])
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        self.assertEqual(validation["kind"], "bundle")
+        self.assertEqual(validation["selected_label"], "followup")
+        self.assertEqual(validation["entry_count"], 0)
+        self.assertEqual(validation["invalid_count"], 0)
+        self.assertEqual(validation["valid"], True)
+        self.assertGreaterEqual(validation["bundle_count"], validation["task_report_bundle_count"])
+        self.assertGreater(validation["task_report_bundle_count"], 0)
+
+    def test_handle_catalog_validate_missing_bundle_returns_invalid_request(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "validate", "--bundle", "missing-review"])
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        validation = result.data["validation"]
+        self.assertEqual(validation["selected_bundle"], "missing-review")
+        self.assertEqual(validation["invalid_count"], 1)
+        self.assertEqual(validation["valid"], False)
+        self.assertEqual(validation["errors"][0]["target_type"], "bundle")
+        self.assertEqual(validation["errors"][0]["target"], "missing-review")
 
     def test_handle_catalog_list_exposes_confirm_current_pingan_aliases(self) -> None:
         parser = build_parser()

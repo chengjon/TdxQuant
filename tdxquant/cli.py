@@ -637,6 +637,14 @@ def _build_catalog_parser(subparsers: argparse._SubParsersAction[argparse.Argume
     catalog_list_parser.add_argument("--label")
     catalog_list_parser.add_argument("--output", help="Optional path to write the JSON result")
 
+    catalog_validate_parser = catalog_subparsers.add_parser("validate")
+    catalog_validate_parser.add_argument("--kind", choices=["entry", "bundle", "all"], default="all")
+    catalog_validate_filter_group = catalog_validate_parser.add_mutually_exclusive_group()
+    catalog_validate_filter_group.add_argument("--entry")
+    catalog_validate_filter_group.add_argument("--bundle")
+    catalog_validate_parser.add_argument("--label")
+    catalog_validate_parser.add_argument("--output", help="Optional path to write the JSON result")
+
     catalog_run_parser = catalog_subparsers.add_parser("run")
     catalog_run_filter_group = catalog_run_parser.add_mutually_exclusive_group(required=True)
     catalog_run_filter_group.add_argument("--entry")
@@ -3332,6 +3340,82 @@ def _list_catalog_entries(args: argparse.Namespace) -> Result:
     return result
 
 
+def _validate_catalog_registry(args: argparse.Namespace) -> Result:
+    entries = load_command_catalog()
+    selected_entry = getattr(args, "entry", None)
+    selected_bundle = getattr(args, "bundle", None)
+    selected_label = getattr(args, "label", None)
+    effective_kind = args.kind
+    if selected_bundle:
+        effective_kind = "bundle"
+    elif selected_entry:
+        effective_kind = "entry"
+
+    errors: list[dict[str, object]] = []
+    validated_entry_count = 0
+    validated_bundle_count = 0
+    task_report_bundle_count = 0
+
+    if effective_kind in {"entry", "all"}:
+        if selected_entry:
+            entry_names = [selected_entry]
+        else:
+            entry_names = sorted(entries)
+        for entry_name in entry_names:
+            try:
+                resolved = resolve_command_catalog_entry(entry_name, entries=entries)
+                if selected_label and selected_label not in resolved["labels"]:
+                    continue
+                validated_entry_count += 1
+            except ValueError as exc:
+                errors.append({"target_type": "entry", "target": entry_name, "message": str(exc)})
+
+    if effective_kind in {"bundle", "all"}:
+        bundles = load_command_bundles()
+        if selected_bundle:
+            bundle_names = [selected_bundle]
+        else:
+            bundle_names = sorted(bundles)
+        for bundle_name in bundle_names:
+            try:
+                resolved_bundle = resolve_command_bundle(bundle_name, bundles=bundles, entries=entries)
+                if selected_label and selected_label not in resolved_bundle["labels"]:
+                    continue
+                validated_bundle_count += 1
+                step_sources = {step["source"] for step in resolved_bundle["steps"]}
+                if "task" in step_sources and "report" in step_sources:
+                    task_report_bundle_count += 1
+            except ValueError as exc:
+                errors.append({"target_type": "bundle", "target": bundle_name, "message": str(exc)})
+
+    validation = {
+        "kind": effective_kind,
+        "selected_entry": selected_entry,
+        "selected_bundle": selected_bundle,
+        "selected_label": selected_label,
+        "entry_count": validated_entry_count,
+        "bundle_count": validated_bundle_count,
+        "task_report_bundle_count": task_report_bundle_count,
+        "invalid_count": len(errors),
+        "valid": not errors,
+        "errors": errors,
+        "non_execution": True,
+    }
+    if errors:
+        return Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message="command catalog validation failed",
+            data={"validation": validation},
+        )
+    return Result(
+        ok=True,
+        code=ErrorCode.OK,
+        message="validated command catalog registry",
+        data={"validation": validation},
+    )
+
+
 def _run_catalog_bundle(args: argparse.Namespace) -> Result:
     try:
         resolved_bundle = resolve_command_bundle(args.bundle)
@@ -4380,6 +4464,8 @@ def _handle_catalog_subcommand(args: argparse.Namespace) -> Result:
     try:
         if args.catalog_command == "list":
             return _list_catalog_entries(args)
+        if args.catalog_command == "validate":
+            return _validate_catalog_registry(args)
         if args.catalog_command in {"plan", "preview"}:
             if getattr(args, "bundle", None):
                 return _plan_catalog_bundle(args)
