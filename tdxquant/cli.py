@@ -4765,6 +4765,9 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
         ):
             if key in governance:
                 governance_view[key] = copy.deepcopy(governance[key])
+        reasons = governance.get("reasons")
+        if isinstance(reasons, list):
+            governance_view["reason_count"] = len(reasons)
         summary_view["governance"] = governance_view
 
     return {"ok": True, "result": summary_view}
