@@ -4682,12 +4682,19 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
 def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dict[str, object]:
     runtime = status.get("runtime") if isinstance(status.get("runtime"), dict) else {}
     lifecycle = status.get("lifecycle") if isinstance(status.get("lifecycle"), dict) else {}
+    capabilities = status.get("capabilities") if isinstance(status.get("capabilities"), dict) else {}
     probe_summary = runtime.get("probe_summary") if isinstance(runtime.get("probe_summary"), dict) else {}
     boundaries = status.get("boundaries") if isinstance(status.get("boundaries"), list) else []
+    endpoints = capabilities.get("endpoints") if isinstance(capabilities.get("endpoints"), list) else []
     return {
         "mode": "summary",
         "provider_id": status.get("provider_id"),
         "transport_mode": status.get("transport_mode"),
+        "capabilities": {
+            "read_only": capabilities.get("read_only"),
+            "writes_supported": capabilities.get("writes_supported"),
+            "endpoint_count": len(endpoints),
+        },
         "runtime": {
             "runtime_observed": runtime.get("runtime_observed"),
             "probe_requested": bool(probe_summary.get("requested_count")),

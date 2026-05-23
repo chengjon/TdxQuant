@@ -2457,6 +2457,13 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["mode"], "summary")
         self.assertEqual(result.data["summary_view"]["provider_id"], "provider-replay-a")
         self.assertEqual(result.data["summary_view"]["transport_mode"], "replay_only")
+        self.assertEqual(result.data["summary_view"]["capabilities"]["read_only"], True)
+        self.assertEqual(result.data["summary_view"]["capabilities"]["writes_supported"], False)
+        self.assertEqual(
+            result.data["summary_view"]["capabilities"]["endpoint_count"],
+            len(result.data["status"]["capabilities"]["endpoints"]),
+        )
+        self.assertNotIn("endpoints", result.data["summary_view"]["capabilities"])
         self.assertEqual(result.data["summary_view"]["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(result.data["summary_view"]["lifecycle"]["daemon_managed"], False)
         self.assertEqual(result.data["summary_view"]["runtime"]["runtime_observed"], True)
