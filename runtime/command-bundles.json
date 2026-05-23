@@ -1596,6 +1596,48 @@
       }
     ]
   },
+  "sell-pingan-exception-review": {
+    "description": "常规 sell 流程后继续回看当日平安券商 sell rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "sell", "pingan", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-sell"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-sell-exceptions"
+      }
+    ]
+  },
+  "sell-pingan-rejection-review": {
+    "description": "常规 sell 流程后继续回看当日平安券商 sell rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "sell", "pingan", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-sell"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-sell-rejected"
+      }
+    ]
+  },
+  "sell-pingan-failure-review": {
+    "description": "常规 sell 流程后继续回看当日平安券商 sell failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "sell", "pingan", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-sell"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-sell-failed"
+      }
+    ]
+  },
   "submit-once-order-exception-review": {
     "description": "完整提交流程后继续回看当日 buy + sell rejected + failed trade_audit 异常复盘。",
     "labels": ["trading", "submit", "order", "audit", "exceptions", "followup"],

@@ -677,6 +677,12 @@
     "description": "统一入口下的 task 常规买入模板。",
     "labels": ["task", "trade", "buy"]
   },
+  "task-sell": {
+    "source": "task",
+    "preset": "task-sell-default",
+    "description": "统一入口下的 task 常规卖出模板。",
+    "labels": ["task", "trade", "sell"]
+  },
   "task-submit-once": {
     "source": "task",
     "preset": "submit-once-default",

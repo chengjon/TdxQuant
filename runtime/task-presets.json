@@ -37,6 +37,20 @@
       "close_result_dialog": true
     }
   },
+  "task-sell-default": {
+    "command": "trade-sell",
+    "description": "常规 task 卖出模板。",
+    "profile": "trade_sell",
+    "api_profile": "safe_read",
+    "trade_profile": "balanced",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  },
   "submit-once-default": {
     "command": "trade-submit-once",
     "description": "完整提交 task 模板。",

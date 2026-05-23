@@ -3800,6 +3800,16 @@ class ApiCliDispatchTests(unittest.TestCase):
             ["task-confirm-current", "daily-success", "audit-daily-confirmed"],
         )
 
+    def test_handle_catalog_list_exposes_task_sell_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "sell"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entry = next(row for row in result.data["entries"] if row["name"] == "task-sell")
+        self.assertEqual(entry["source"], "task")
+        self.assertEqual(entry["preset"], "task-sell-default")
+        self.assertIn("sell", entry["labels"])
+
     def test_handle_catalog_bundle_list_returns_read_zxg_review_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "read-zxg-review"])
@@ -4171,6 +4181,51 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-confirm-current")
         self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "daily")
         self.assertEqual(result.data["steps"][2]["dispatch"]["command_name"], "audit-daily")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_task_sell_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "plan", "--entry", "task-sell", "--code", "000001.SZ", "--price", "10.00", "--quantity", "100"]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "task-sell")
+        self.assertEqual(result.data["dispatch"]["command_group"], "task")
+        self.assertEqual(result.data["dispatch"]["command_name"], "trade-sell")
+        self.assertEqual(result.data["resolved_args"]["task_command"], "trade-sell")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_sell_followup_bundle_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "sell-pingan-exception-review",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "sell-pingan-exception-review")
+        self.assertEqual([step["name"] for step in result.data["steps"]], ["trade", "audit"])
+        self.assertEqual(
+            [step["dispatch"]["command_group"] for step in result.data["steps"]],
+            ["task", "report"],
+        )
+        self.assertEqual(result.data["steps"][0]["entry"], "task-sell")
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-sell")
+        self.assertEqual(result.data["steps"][1]["entry"], "audit-daily-pingan-sell-exceptions")
+        self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "audit-daily")
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_preview_bundle_summary_view_is_reduced(self) -> None:
