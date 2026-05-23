@@ -48,6 +48,17 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["watch_events_probe"]["status"], "not_requested")
         self.assertEqual(status["runtime"]["watch_stream_probe"]["enabled"], False)
         self.assertEqual(status["runtime"]["watch_stream_probe"]["status"], "not_requested")
+        self.assertEqual(status["runtime"]["probe_summary"]["status"], "not_requested")
+        self.assertEqual(status["runtime"]["probe_summary"]["requested_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["healthy_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["not_requested_count"], 4)
+        self.assertEqual(status["runtime"]["probe_summary"]["requested"], [])
+        self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], [])
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["boundary"],
+            "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",
+        )
         self.assertEqual(status["lifecycle"]["mode"], "foreground_process")
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
@@ -92,6 +103,46 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["runtime_observed"], True)
         self.assertEqual(status["runtime"]["health_probe"]["status"], "healthy")
         self.assertEqual(status["runtime"]["health_probe"]["service"], "provider-transport-replay")
+        self.assertEqual(status["runtime"]["probe_summary"]["status"], "healthy")
+        self.assertEqual(status["runtime"]["probe_summary"]["requested_count"], 1)
+        self.assertEqual(status["runtime"]["probe_summary"]["healthy_count"], 1)
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["not_requested_count"], 3)
+        self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
+        self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], [])
+        self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
+        self.assertEqual(status["lifecycle"]["daemon_managed"], False)
+
+    def test_status_summarizes_degraded_replay_probe(self) -> None:
+        config = ProviderTransportReplayConfig(
+            provider_id="provider-replay-a",
+            bind_host="127.0.0.1",
+            port=0,
+            token="secret-token",
+            master_allowlist=["127.0.0.1"],
+        )
+
+        status = build_provider_transport_replay_status(
+            config,
+            health_probe={
+                "status": "unhealthy",
+                "reachable": False,
+                "http_status": None,
+                "error": {"code": "connection_failed", "message": "connection refused"},
+            },
+        )
+
+        self.assertNotIn("secret-token", json.dumps(status))
+        self.assertEqual(status["runtime"]["runtime_observed"], True)
+        self.assertEqual(status["runtime"]["health_probe"]["enabled"], True)
+        self.assertEqual(status["runtime"]["health_probe"]["status"], "unhealthy")
+        self.assertEqual(status["runtime"]["probe_summary"]["status"], "degraded")
+        self.assertEqual(status["runtime"]["probe_summary"]["requested_count"], 1)
+        self.assertEqual(status["runtime"]["probe_summary"]["healthy_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_count"], 1)
+        self.assertEqual(status["runtime"]["probe_summary"]["not_requested_count"], 3)
+        self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
+        self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], ["health_probe"])
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
 

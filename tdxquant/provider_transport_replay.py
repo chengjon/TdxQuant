@@ -29,6 +29,12 @@ REPLAY_READ_ONLY_ENDPOINTS = [
     "/provider/v1/replay/watch/events",
     "/provider/v1/replay/watch/events/stream",
 ]
+PROVIDER_REPLAY_STATUS_PROBE_KEYS = (
+    "health_probe",
+    "watch_status_probe",
+    "watch_events_probe",
+    "watch_stream_probe",
+)
 
 
 @dataclass(frozen=True)
@@ -69,6 +75,12 @@ def build_provider_transport_replay_status(
     resolved_watch_status_probe = _normalize_provider_replay_watch_status_probe(watch_status_probe)
     resolved_watch_events_probe = _normalize_provider_replay_watch_events_probe(watch_events_probe)
     resolved_watch_stream_probe = _normalize_provider_replay_watch_stream_probe(watch_stream_probe)
+    resolved_probes = {
+        "health_probe": resolved_health_probe,
+        "watch_status_probe": resolved_watch_status_probe,
+        "watch_events_probe": resolved_watch_events_probe,
+        "watch_stream_probe": resolved_watch_stream_probe,
+    }
     return {
         "provider_id": config.provider_id,
         "service": "provider-transport-replay",
@@ -108,6 +120,7 @@ def build_provider_transport_replay_status(
             "watch_status_probe": resolved_watch_status_probe,
             "watch_events_probe": resolved_watch_events_probe,
             "watch_stream_probe": resolved_watch_stream_probe,
+            "probe_summary": _build_provider_replay_probe_summary(resolved_probes),
         },
         "lifecycle": {
             "mode": "foreground_process",
@@ -576,6 +589,43 @@ def _normalize_provider_replay_watch_stream_probe(watch_stream_probe: dict[str, 
     resolved.setdefault("reachable", None)
     resolved.setdefault("http_status", None)
     return resolved
+
+
+def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    requested: list[str] = []
+    unhealthy: list[str] = []
+    healthy_count = 0
+
+    for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
+        probe = probes.get(key) or {}
+        probe_status = probe.get("status")
+        if probe_status == "not_requested":
+            continue
+        requested.append(key)
+        if probe_status == "healthy":
+            healthy_count += 1
+        else:
+            unhealthy.append(key)
+
+    requested_count = len(requested)
+    failed_count = len(unhealthy)
+    if requested_count == 0:
+        summary_status = "not_requested"
+    elif failed_count:
+        summary_status = "degraded"
+    else:
+        summary_status = "healthy"
+
+    return {
+        "status": summary_status,
+        "requested_count": requested_count,
+        "healthy_count": healthy_count,
+        "failed_count": failed_count,
+        "not_requested_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS) - requested_count,
+        "requested": requested,
+        "unhealthy": unhealthy,
+        "boundary": "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",
+    }
 
 
 def _provider_replay_health_probe_url(config: ProviderTransportReplayConfig) -> str:
