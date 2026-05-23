@@ -100,6 +100,25 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.worker, "worker-a")
         self.assertEqual(args.heartbeat_stale_after_seconds, 60.0)
         self.assertEqual(args.watermark_stale_after_seconds, 120.0)
+        self.assertEqual(args.view, "detailed")
+
+    def test_bridge_watch_status_summary_view_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--view",
+                "summary",
+            ]
+        )
+        self.assertEqual(args.command, "bridge")
+        self.assertEqual(args.bridge_command, "watch-status")
+        self.assertEqual(args.view, "summary")
 
     def test_bridge_watch_events_commands_parse(self) -> None:
         parser = build_parser()
@@ -7930,6 +7949,84 @@ class ReportCliDispatchTests(unittest.TestCase):
             watermark_stale_after_seconds=120.0,
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "idle"}})
+
+    def test_handle_bridge_watch_status_summary_view_projects_governance_rollup(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--heartbeat-stale-after-seconds",
+                "60",
+                "--view",
+                "summary",
+            ]
+        )
+        detailed_payload = {
+            "ok": True,
+            "result": {
+                "status": "running",
+                "control": {"state": "running", "active": True},
+                "watch_status": {"state": "running", "run_id": "run-001"},
+                "status_summary": {
+                    "overall_status": "manual_review",
+                    "heartbeat": {"staleness": "stale"},
+                    "watermark": {"staleness": "not_evaluated"},
+                    "governance": {
+                        "decision": "manual_review",
+                        "requires_manual_review": True,
+                        "action_summary": {
+                            "count": 1,
+                            "primary_action": "review_subscription_watch_heartbeat",
+                            "primary_reason": "heartbeat:stale",
+                            "severity": "review",
+                        },
+                    },
+                },
+            },
+        }
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", return_value=detailed_payload) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            heartbeat_stale_after_seconds=60.0,
+            watermark_stale_after_seconds=None,
+        )
+        self.assertEqual(
+            json.loads(stdout.getvalue()),
+            {
+                "ok": True,
+                "result": {
+                    "mode": "summary",
+                    "worker": "worker-a",
+                    "status": "manual_review",
+                    "status_summary": {
+                        "overall_status": "manual_review",
+                        "heartbeat": {"staleness": "stale"},
+                        "watermark": {"staleness": "not_evaluated"},
+                    },
+                    "governance": {
+                        "decision": "manual_review",
+                        "requires_manual_review": True,
+                        "action_summary": {
+                            "count": 1,
+                            "primary_action": "review_subscription_watch_heartbeat",
+                            "primary_reason": "heartbeat:stale",
+                            "severity": "review",
+                        },
+                    },
+                },
+            },
+        )
 
     def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(

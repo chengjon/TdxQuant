@@ -670,6 +670,7 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_status_parser.add_argument("--worker", required=True)
     bridge_watch_status_parser.add_argument("--heartbeat-stale-after-seconds", type=float)
     bridge_watch_status_parser.add_argument("--watermark-stale-after-seconds", type=float)
+    bridge_watch_status_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
 
     bridge_watch_events_parser = bridge_subparsers.add_parser("watch-events")
     bridge_watch_events_parser.add_argument("--registry", required=True)
@@ -4411,14 +4412,15 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
         if args.bridge_command == "serve":
             return serve_bridge_from_config(args.config)
         if args.bridge_command == "watch-status":
-            return _emit_bridge_payload(
-                run_bridge_watch_status(
-                    registry_path=args.registry,
-                    worker_id=args.worker,
-                    heartbeat_stale_after_seconds=args.heartbeat_stale_after_seconds,
-                    watermark_stale_after_seconds=args.watermark_stale_after_seconds,
-                )
+            payload = run_bridge_watch_status(
+                registry_path=args.registry,
+                worker_id=args.worker,
+                heartbeat_stale_after_seconds=args.heartbeat_stale_after_seconds,
+                watermark_stale_after_seconds=args.watermark_stale_after_seconds,
             )
+            if args.view == "summary":
+                payload = _build_bridge_watch_status_summary_payload(payload, worker_id=args.worker)
+            return _emit_bridge_payload(payload)
         if args.bridge_command == "watch-events":
             return _emit_bridge_payload(
                 run_bridge_watch_events(
@@ -4528,6 +4530,41 @@ def _emit_bridge_payload(payload: dict[str, object]) -> int:
     sys.stdout.write(json.dumps(payload, ensure_ascii=False))
     sys.stdout.write("\n")
     return 0 if payload.get("ok") else 1
+
+
+def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, worker_id: str) -> dict[str, object]:
+    if not payload.get("ok"):
+        return payload
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        return payload
+
+    status_summary = result.get("status_summary")
+    status_summary = status_summary if isinstance(status_summary, dict) else {}
+    governance = status_summary.get("governance")
+    governance = governance if isinstance(governance, dict) else {}
+
+    summary_view: dict[str, object] = {
+        "mode": "summary",
+        "worker": worker_id,
+        "status": status_summary.get("overall_status", result.get("status")),
+    }
+
+    if status_summary:
+        status_view: dict[str, object] = {}
+        for key in ("overall_status", "heartbeat", "watermark", "reconnect"):
+            if key in status_summary:
+                status_view[key] = copy.deepcopy(status_summary[key])
+        summary_view["status_summary"] = status_view
+
+    if governance:
+        governance_view: dict[str, object] = {}
+        for key in ("decision", "requires_manual_review", "action_summary"):
+            if key in governance:
+                governance_view[key] = copy.deepcopy(governance[key])
+        summary_view["governance"] = governance_view
+
+    return {"ok": True, "result": summary_view}
 
 
 def _build_bridge_local_failure(exc: Exception) -> dict[str, object]:
