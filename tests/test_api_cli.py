@@ -4313,6 +4313,90 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-buy")
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_buy_pingan_exception_bundle_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "buy-pingan-exception-review",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "buy-pingan-exception-review")
+        self.assertEqual(
+            [step["entry"] for step in result.data["steps"]],
+            ["task-buy", "audit-daily-pingan-buy-exceptions"],
+        )
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-buy")
+        self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "audit-daily")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_buy_pingan_rejection_bundle_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "buy-pingan-rejection-review",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "buy-pingan-rejection-review")
+        self.assertEqual(
+            [step["entry"] for step in result.data["steps"]],
+            ["task-buy", "audit-daily-pingan-buy-rejected"],
+        )
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-buy")
+        self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "audit-daily")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_buy_pingan_failure_bundle_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "buy-pingan-failure-review",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "buy-pingan-failure-review")
+        self.assertEqual(
+            [step["entry"] for step in result.data["steps"]],
+            ["task-buy", "audit-daily-pingan-buy-failed"],
+        )
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-buy")
+        self.assertEqual(result.data["steps"][1]["dispatch"]["command_name"], "audit-daily")
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_guarded_pingan_buy_complete_bundle_stays_available(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -4336,6 +4420,32 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             [step["entry"] for step in result.data["steps"]],
             ["guarded-buy", "daily-success", "audit-daily-pingan-confirmed"],
+        )
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_guarded_pingan_buy_exception_bundle_stays_available(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "guarded-pingan-buy-exception-review",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "guarded-pingan-buy-exception-review")
+        self.assertEqual(
+            [step["entry"] for step in result.data["steps"]],
+            ["guarded-buy", "audit-daily-pingan-buy-exceptions"],
         )
         mocked_dispatch.assert_not_called()
 

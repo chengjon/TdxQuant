@@ -1963,6 +1963,48 @@
       }
     ]
   },
+  "buy-pingan-exception-review": {
+    "description": "常规买入后继续回看当日平安券商 buy rejected + failed trade_audit 异常复盘。",
+    "labels": ["trading", "buy", "pingan", "audit", "exceptions", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-exceptions"
+      }
+    ]
+  },
+  "buy-pingan-rejection-review": {
+    "description": "常规买入后继续回看当日平安券商 buy rejected trade_audit 拒单诊断复盘。",
+    "labels": ["trading", "buy", "pingan", "audit", "rejected", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-rejected"
+      }
+    ]
+  },
+  "buy-pingan-failure-review": {
+    "description": "常规买入后继续回看当日平安券商 buy failed trade_audit 失败诊断复盘。",
+    "labels": ["trading", "buy", "pingan", "audit", "failed", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-buy"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-buy-failed"
+      }
+    ]
+  },
   "guarded-buy-complete-review": {
     "description": "受保护买入后继续查看当日成功成交日报和已确认 trade_audit 复盘。",
     "labels": ["trading", "buy", "audit", "success", "followup"],
