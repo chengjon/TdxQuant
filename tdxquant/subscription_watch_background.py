@@ -200,9 +200,53 @@ def _build_subscription_watch_governance_summary(
     return {
         "decision": "manual_review" if reasons else "observe",
         "reasons": reasons,
+        "actions": _build_subscription_watch_governance_actions(reasons),
         "staleness_evaluated": staleness_evaluated,
         "boundary": SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY,
     }
+
+
+def _build_subscription_watch_governance_actions(reasons: list[str]) -> list[dict[str, str]]:
+    actions: list[dict[str, str]] = []
+    for reason in reasons:
+        if reason.startswith("overall_status:"):
+            status = reason.split(":", maxsplit=1)[1]
+            actions.append(
+                {
+                    "action": "review_subscription_watch_resilience",
+                    "reason": reason,
+                    "severity": "review",
+                    "description": f"Inspect subscription-watch long-run process health for {status} status.",
+                }
+            )
+        elif reason == "heartbeat:stale":
+            actions.append(
+                {
+                    "action": "review_subscription_watch_heartbeat",
+                    "reason": reason,
+                    "severity": "review",
+                    "description": "Inspect heartbeat freshness before changing reconnect or restart behavior.",
+                }
+            )
+        elif reason == "watermark:stale":
+            actions.append(
+                {
+                    "action": "review_subscription_watch_watermark",
+                    "reason": reason,
+                    "severity": "review",
+                    "description": "Inspect event watermark freshness before changing reconnect or restart behavior.",
+                }
+            )
+        else:
+            actions.append(
+                {
+                    "action": "review_subscription_watch_status",
+                    "reason": reason,
+                    "severity": "review",
+                    "description": "Inspect subscription-watch status before changing reconnect or restart behavior.",
+                }
+            )
+    return actions
 
 
 def _coerce_utc_datetime(value: datetime | str | None) -> datetime:

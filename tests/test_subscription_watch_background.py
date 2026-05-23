@@ -653,6 +653,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
     assert summary["governance"] == {
         "decision": "observe",
         "reasons": [],
+        "actions": [],
         "staleness_evaluated": False,
         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
     }
@@ -668,6 +669,14 @@ def test_status_summary_governance_requests_manual_review_for_resilience_states(
     assert summary["governance"]["decision"] == "manual_review"
     assert summary["governance"]["staleness_evaluated"] is False
     assert summary["governance"]["reasons"] == [f"overall_status:{state}"]
+    assert summary["governance"]["actions"] == [
+        {
+            "action": "review_subscription_watch_resilience",
+            "reason": f"overall_status:{state}",
+            "severity": "review",
+            "description": f"Inspect subscription-watch long-run process health for {state} status.",
+        }
+    ]
 
 
 def test_status_summary_governance_requests_manual_review_for_explicit_stale_inputs() -> None:
@@ -687,6 +696,20 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
     assert summary["governance"]["decision"] == "manual_review"
     assert summary["governance"]["staleness_evaluated"] is True
     assert summary["governance"]["reasons"] == ["heartbeat:stale", "watermark:stale"]
+    assert summary["governance"]["actions"] == [
+        {
+            "action": "review_subscription_watch_heartbeat",
+            "reason": "heartbeat:stale",
+            "severity": "review",
+            "description": "Inspect heartbeat freshness before changing reconnect or restart behavior.",
+        },
+        {
+            "action": "review_subscription_watch_watermark",
+            "reason": "watermark:stale",
+            "severity": "review",
+            "description": "Inspect event watermark freshness before changing reconnect or restart behavior.",
+        },
+    ]
 
 
 def test_status_view_returns_active_control_and_current_run_status(tmp_path: Path) -> None:
