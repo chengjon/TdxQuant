@@ -3,7 +3,6 @@
 ## Purpose
 
 定义 broker-neutral 的 A 股证券交易网关能力，包括统一下单入口、canonical 生命周期、订单/成交持久化和本地查询恢复边界。
-
 ## Requirements
 ### Requirement: Securities trader gateway SHALL provide a broker-neutral A-share limit-order entrypoint
 The system SHALL expose a broker-neutral securities trader gateway that accepts ordinary A-share cash limit orders for both `buy` and `sell`.
@@ -73,3 +72,14 @@ The system SHALL expose normalized capability flags so callers can distinguish f
 - **WHEN** a caller inspects the canonical gateway capabilities for the first-phase PingAn desktop implementation
 - **THEN** the returned capability summary MUST distinguish supported behaviors such as buy/sell limit placement and tracked-order query
 - **AND** the summary MUST also distinguish unsupported first-phase behaviors such as account query, position query, and broker-native push events
+
+### Requirement: Ping An desktop gateway SHALL route submit-once sell through sell submit-once identity
+
+The Ping An desktop gateway SHALL route canonical sell orders submitted in submit-once execution mode through the dedicated sell submit-once manager identity.
+
+#### Scenario: Caller places a submit-once sell order through the gateway
+
+- **WHEN** a caller submits a canonical securities order request with `side=sell` and the Ping An desktop gateway is configured with `execution_mode=submit_once`
+- **THEN** the gateway MUST call `TdxTradeManager.pingan.sell_submit_once`
+- **AND** the adapter event step MUST remain `pingan_sell_submit_once`
+- **AND** the request MUST preserve submission safety controls such as `submission_key`

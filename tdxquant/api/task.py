@@ -3554,7 +3554,7 @@ class TdxTaskManager:
                 "max_price": max_price,
             }
             if normalized_side == "sell":
-                trade_result = self.trade_manager.pingan.sell(**trade_kwargs)
+                trade_result = self.trade_manager.pingan.sell_submit_once(**trade_kwargs)
             else:
                 trade_result = self.trade_manager.pingan.buy_submit_once(**trade_kwargs)
             if not trade_result.ok:

@@ -5584,7 +5584,7 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["input"]["submission_key"], "task-submit-001")
         self.assertEqual(result.data["input"]["max_price"], 10.50)
 
-    def test_task_trade_submit_once_sell_side_uses_existing_sell_path(self) -> None:
+    def test_task_trade_submit_once_sell_side_uses_sell_submit_once_identity(self) -> None:
         trade_result = Result(
             ok=True,
             code=ErrorCode.OK,
@@ -5596,7 +5596,8 @@ class TdxTaskManagerTests(unittest.TestCase):
         )
         manager = TdxTaskManager(profile="trade_submit_once", strategy_path="strategy.py")
         with (
-            patch.object(type(manager.trade_manager.pingan), "sell", return_value=trade_result) as mocked_sell,
+            patch.object(type(manager.trade_manager.pingan), "sell_submit_once", return_value=trade_result) as mocked_sell_submit_once,
+            patch.object(type(manager.trade_manager.pingan), "sell") as mocked_sell,
             patch.object(type(manager.trade_manager.pingan), "buy_submit_once") as mocked_buy_submit_once,
         ):
             result = manager.trade_submit_once(
@@ -5609,7 +5610,7 @@ class TdxTaskManagerTests(unittest.TestCase):
                 max_price=10.50,
             )
 
-        mocked_sell.assert_called_once_with(
+        mocked_sell_submit_once.assert_called_once_with(
             port="COM3",
             baudrate=115200,
             timeout=2.0,
@@ -5621,6 +5622,7 @@ class TdxTaskManagerTests(unittest.TestCase):
             submission_key="task-sell-submit-001",
             max_price=10.50,
         )
+        mocked_sell.assert_not_called()
         mocked_buy_submit_once.assert_not_called()
         self.assertTrue(result.ok)
         self.assertEqual(result.data["task"]["name"], "trade_submit_once")

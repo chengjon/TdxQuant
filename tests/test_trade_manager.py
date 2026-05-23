@@ -149,6 +149,38 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(result.data["trade_safety"]["submission_key"], "submit-once-20260428-001")
         self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
 
+    def test_pingan_sell_submit_once_uses_sell_flow_with_submit_once_identity(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "input": {"code": "000001", "price": "10.00", "quantity": 100},
+                "result_dialog": {"contract_no": "S202604260002"},
+            },
+        )
+        with TemporaryDirectory() as temp_dir:
+            with patch("tdxquant.trade.manager.run_pingan_sell_fast", return_value=expected) as mocked:
+                manager = TdxTradeManager(
+                    profile="submit_once",
+                    state_path=str(Path(temp_dir) / "state.json"),
+                    event_log_path=str(Path(temp_dir) / "events.jsonl"),
+                    submission_ledger_path=str(Path(temp_dir) / "submission-ledger.jsonl"),
+                )
+                result = manager.pingan.sell_submit_once(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="sell-submit-once-20260428-001",
+                    max_price=10.50,
+                )
+        mocked.assert_called_once()
+        self.assertEqual(result.data["manager"]["method"], "sell_submit_once")
+        self.assertEqual(result.data["trade_profile"]["name"], "submit_once")
+        self.assertEqual(result.data["trade_safety"]["submission_key"], "sell-submit-once-20260428-001")
+        self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
+
     def test_pingan_sell_attaches_metadata_and_writes_artifacts(self) -> None:
         expected = Result(
             ok=True,
