@@ -40,7 +40,13 @@ from .reporting import REPORT_COMMAND_DEFAULT_PROFILES, load_report_presets, res
 from .tasking import TASK_COMMAND_DEFAULT_PROFILES, load_task_presets, resolve_task_preset
 from .desktop.hid import build_type_command, normalize_hid_key, run_hid_ping, run_hid_send, validate_hid_wire_command
 from .desktop.inspect import enumerate_controls, find_main_window
-from .bridge_registry import run_bridge_watch_start, run_bridge_watch_status, run_bridge_watch_stop
+from .bridge_registry import (
+    run_bridge_watch_event_stream,
+    run_bridge_watch_events,
+    run_bridge_watch_start,
+    run_bridge_watch_status,
+    run_bridge_watch_stop,
+)
 from .bridge_http import serve_bridge_from_config
 from .provider_transport_replay import load_provider_transport_replay_config, serve_provider_transport_replay
 from .models import ErrorCode, OrderRequest, Result
@@ -654,6 +660,20 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_status_parser.add_argument("--registry", required=True)
     bridge_watch_status_parser.add_argument("--worker", required=True)
     bridge_watch_status_parser.add_argument("--heartbeat-stale-after-seconds", type=float)
+
+    bridge_watch_events_parser = bridge_subparsers.add_parser("watch-events")
+    bridge_watch_events_parser.add_argument("--registry", required=True)
+    bridge_watch_events_parser.add_argument("--worker", required=True)
+    bridge_watch_events_parser.add_argument("--run-id")
+    bridge_watch_events_parser.add_argument("--tail", type=int)
+
+    bridge_watch_events_stream_parser = bridge_subparsers.add_parser("watch-events-stream")
+    bridge_watch_events_stream_parser.add_argument("--registry", required=True)
+    bridge_watch_events_stream_parser.add_argument("--worker", required=True)
+    bridge_watch_events_stream_parser.add_argument("--run-id")
+    bridge_watch_events_stream_parser.add_argument("--from", dest="from_cursor")
+    bridge_watch_events_stream_parser.add_argument("--follow", action=argparse.BooleanOptionalAction, default=None)
+    bridge_watch_events_stream_parser.add_argument("--heartbeat-seconds", type=int)
 
     bridge_watch_start_parser = bridge_subparsers.add_parser("watch-start")
     bridge_watch_start_parser.add_argument("--registry", required=True)
@@ -4317,6 +4337,27 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                     heartbeat_stale_after_seconds=args.heartbeat_stale_after_seconds,
                 )
             )
+        if args.bridge_command == "watch-events":
+            return _emit_bridge_payload(
+                run_bridge_watch_events(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    run_id=args.run_id,
+                    tail=args.tail,
+                )
+            )
+        if args.bridge_command == "watch-events-stream":
+            sys.stdout.write(
+                run_bridge_watch_event_stream(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    run_id=args.run_id,
+                    from_cursor=args.from_cursor,
+                    follow=args.follow,
+                    heartbeat_seconds=args.heartbeat_seconds,
+                )
+            )
+            return 0
         if args.bridge_command == "watch-start":
             return _emit_bridge_payload(
                 run_bridge_watch_start(

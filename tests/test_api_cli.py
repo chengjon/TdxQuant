@@ -97,6 +97,48 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.worker, "worker-a")
         self.assertEqual(args.heartbeat_stale_after_seconds, 60.0)
 
+    def test_bridge_watch_events_commands_parse(self) -> None:
+        parser = build_parser()
+        events = parser.parse_args(
+            [
+                "bridge",
+                "watch-events",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--run-id",
+                "run-001",
+                "--tail",
+                "25",
+            ]
+        )
+        stream = parser.parse_args(
+            [
+                "bridge",
+                "watch-events-stream",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--run-id",
+                "run-001",
+                "--from",
+                "run-001:event:7",
+                "--no-follow",
+                "--heartbeat-seconds",
+                "5",
+            ]
+        )
+
+        self.assertEqual(events.bridge_command, "watch-events")
+        self.assertEqual(events.run_id, "run-001")
+        self.assertEqual(events.tail, 25)
+        self.assertEqual(stream.bridge_command, "watch-events-stream")
+        self.assertEqual(stream.from_cursor, "run-001:event:7")
+        self.assertFalse(stream.follow)
+        self.assertEqual(stream.heartbeat_seconds, 5)
+
     def test_bridge_watch_start_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -6912,6 +6954,71 @@ class ReportCliDispatchTests(unittest.TestCase):
             heartbeat_stale_after_seconds=60.0,
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "idle"}})
+
+    def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-events",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--run-id",
+                "run-001",
+                "--tail",
+                "25",
+            ]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_events", return_value={"ok": True, "result": {"events": []}}) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            run_id="run-001",
+            tail=25,
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"events": []}})
+
+    def test_handle_bridge_watch_events_stream_dispatches_registry_client_as_raw_text(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-events-stream",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--run-id",
+                "run-001",
+                "--from",
+                "run-001:event:7",
+                "--no-follow",
+                "--heartbeat-seconds",
+                "5",
+            ]
+        )
+        with (
+            patch("tdxquant.cli.run_bridge_watch_event_stream", return_value="event: heartbeat\n\n") as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            run_id="run-001",
+            from_cursor="run-001:event:7",
+            follow=False,
+            heartbeat_seconds=5,
+        )
+        self.assertEqual(stdout.getvalue(), "event: heartbeat\n\n")
 
     def test_handle_bridge_watch_start_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(
