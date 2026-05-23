@@ -157,6 +157,7 @@ PINGAN_LAST_ORDER_STATE_PATH = get_pingan_last_order_state_path()
 PINGAN_SUBMISSION_LEDGER_PATH = get_pingan_submission_ledger_path()
 TRADER_RUNTIME_DIR = Path(__file__).resolve().parents[1] / "runtime" / "trader"
 PINGAN_BUY_PROFILE_NAMES = ("stable", "balanced", "fast", "turbo")
+TASK_REPORT_BUNDLE_SAMPLE_LIMIT = 5
 PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
     name: dict(resolve_trade_profile(name, profiles=load_trade_profiles()))
     for name in PINGAN_BUY_PROFILE_NAMES
@@ -2726,6 +2727,8 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "bundle_count": validation.get("bundle_count"),
             "task_report_bundle_count": validation.get("task_report_bundle_count"),
             "task_report_bundle_samples": copy.deepcopy(validation.get("task_report_bundle_samples", [])),
+            "task_report_bundle_sample_limit": validation.get("task_report_bundle_sample_limit"),
+            "task_report_bundle_sample_truncated": validation.get("task_report_bundle_sample_truncated"),
             "invalid_count": validation.get("invalid_count"),
             "valid": validation.get("valid"),
             "non_execution": validation.get("non_execution"),
@@ -3416,7 +3419,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                 step_sources = {step["source"] for step in resolved_bundle["steps"]}
                 if "task" in step_sources and "report" in step_sources:
                     task_report_bundle_count += 1
-                    if len(task_report_bundle_samples) < 5:
+                    if len(task_report_bundle_samples) < TASK_REPORT_BUNDLE_SAMPLE_LIMIT:
                         task_report_bundle_samples.append(bundle_name)
             except ValueError as exc:
                 errors.append({"target_type": "bundle", "target": bundle_name, "message": str(exc)})
@@ -3430,6 +3433,8 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "bundle_count": validated_bundle_count,
         "task_report_bundle_count": task_report_bundle_count,
         "task_report_bundle_samples": task_report_bundle_samples,
+        "task_report_bundle_sample_limit": TASK_REPORT_BUNDLE_SAMPLE_LIMIT,
+        "task_report_bundle_sample_truncated": task_report_bundle_count > len(task_report_bundle_samples),
         "invalid_count": len(errors),
         "valid": not errors,
         "errors": errors,

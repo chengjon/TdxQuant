@@ -550,6 +550,8 @@ metadata and reports task/report bundle coverage.
 - **WHEN** a caller runs `catalog validate --kind bundle --label followup`
 - **THEN** the system MUST validate only selected bundles with that label
 - **AND** the task/report bundle count MUST reflect bundles whose resolved steps include both task and report sources
+- **AND** the result MUST include the bounded sample limit used for `task_report_bundle_samples`
+- **AND** the result MUST indicate whether `task_report_bundle_samples` was truncated
 
 #### Scenario: Caller validates an unsupported target
 
@@ -567,6 +569,8 @@ The command catalog validation workflow SHALL expose an opt-in summary view that
 - **THEN** the summary payload MUST include validation mode, selected kind, selected label, bundle count, invalid count, and valid flag
 - **AND** the summary payload MUST include `task_report_bundle_count`
 - **AND** the summary payload MUST include a bounded deterministic `task_report_bundle_samples` list when matching task+report bundles exist
+- **AND** the summary payload MUST include `task_report_bundle_sample_limit`
+- **AND** the summary payload MUST include `task_report_bundle_sample_truncated`
 - **AND** the summary payload MUST declare `non_execution=true`
 - **AND** the summary payload MUST NOT include full entry or bundle detail rows
 

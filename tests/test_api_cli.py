@@ -4047,6 +4047,11 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertGreaterEqual(validation["bundle_count"], validation["task_report_bundle_count"])
         self.assertGreater(validation["task_report_bundle_count"], 0)
         self.assertEqual(len(validation["task_report_bundle_samples"]), 5)
+        self.assertEqual(validation["task_report_bundle_sample_limit"], 5)
+        self.assertEqual(validation["task_report_bundle_sample_truncated"], True)
+        self.assertLessEqual(
+            len(validation["task_report_bundle_samples"]), validation["task_report_bundle_sample_limit"]
+        )
         self.assertEqual(validation["task_report_bundle_samples"][0], "buy-pingan-complete-review")
 
     def test_handle_catalog_validate_summary_view_projects_counts_without_execution(self) -> None:
@@ -4067,6 +4072,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_samples"], validation["task_report_bundle_samples"])
+        self.assertEqual(
+            summary_view["task_report_bundle_sample_limit"], validation["task_report_bundle_sample_limit"]
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_sample_truncated"],
+            validation["task_report_bundle_sample_truncated"],
+        )
+        self.assertEqual(summary_view["task_report_bundle_sample_truncated"], True)
         self.assertEqual(summary_view["task_report_bundle_samples"][0], "buy-pingan-complete-review")
         self.assertEqual(summary_view["invalid_count"], 0)
         self.assertEqual(summary_view["valid"], True)
