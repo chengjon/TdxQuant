@@ -25,6 +25,15 @@ def _write_function_tree(root: Path, body: str) -> None:
     (root / "FUNCTION_TREE.md").write_text(textwrap.dedent(body).strip() + "\n", encoding="utf-8")
 
 
+def _write_openspec_change(root: Path, change_id: str, *, archived: bool) -> None:
+    if archived:
+        change_dir = root / "openspec" / "changes" / "archive" / f"2026-05-23-{change_id}"
+    else:
+        change_dir = root / "openspec" / "changes" / change_id
+    change_dir.mkdir(parents=True)
+    (change_dir / ".openspec.yaml").write_text("id: test\n", encoding="utf-8")
+
+
 class FunctionTreeRegistryValidatorTests(unittest.TestCase):
     def test_current_function_tree_passes_validation(self) -> None:
         result = _run_validator(REPO_ROOT)
@@ -102,6 +111,44 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("ROADMAP.md", result.stderr)
+
+    def test_validator_accepts_archived_and_active_openspec_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_function_tree(
+                root,
+                """
+                | ID | 功能 | 状态 | 证据 | 边界 |
+                | --- | --- | --- | --- | --- |
+                | A-01 | archived | `[已实现]` | source.py；OpenSpec `archived-change` | implemented boundary |
+                | A-02 | active | `[部分实现]` | tests.py；OpenSpec `active-change` | partial boundary |
+                """,
+            )
+            _write_openspec_change(root, "archived-change", archived=True)
+            _write_openspec_change(root, "active-change", archived=False)
+
+            result = _run_validator(root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("rows=2", result.stdout)
+
+    def test_validator_rejects_missing_openspec_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_function_tree(
+                root,
+                """
+                | ID | 功能 | 状态 | 证据 | 边界 |
+                | --- | --- | --- | --- | --- |
+                | A-01 | sample | `[已实现]` | source.py；OpenSpec `missing-change` | implemented boundary |
+                """,
+            )
+
+            result = _run_validator(root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("A-01", result.stderr)
+            self.assertIn("missing-change", result.stderr)
 
 
 if __name__ == "__main__":

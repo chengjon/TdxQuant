@@ -32,6 +32,10 @@ PENDING_BOUNDARY_MARKERS = (
     "不直接",
 )
 FEATURE_ROW_RE = re.compile(r"^\|\s*(?P<node_id>[A-Z]-\d+)\s*\|")
+OPENSPEC_EVIDENCE_RE = re.compile(
+    r"OpenSpec(?:\s+覆盖)?\s+(?P<references>`[^`]+`(?:\s*(?:/|、|,|，|至|和)\s*`[^`]+`)*)"
+)
+BACKTICK_VALUE_RE = re.compile(r"`([^`]+)`")
 
 
 @dataclass(frozen=True)
@@ -73,6 +77,28 @@ def parse_feature_rows(text: str) -> tuple[list[FeatureRow], list[str]]:
     return rows, errors
 
 
+def _extract_openspec_change_ids(evidence: str) -> list[str]:
+    match = OPENSPEC_EVIDENCE_RE.search(evidence)
+    if not match:
+        return []
+    return [value.strip() for value in BACKTICK_VALUE_RE.findall(match.group("references")) if value.strip()]
+
+
+def _openspec_change_exists(root: Path, change_id: str) -> bool:
+    active_marker = root / "openspec" / "changes" / change_id / ".openspec.yaml"
+    if active_marker.exists():
+        return True
+    archive_root = root / "openspec" / "changes" / "archive"
+    if not archive_root.exists():
+        return False
+    for archived_change in archive_root.iterdir():
+        if not archived_change.is_dir():
+            continue
+        if archived_change.name == change_id or archived_change.name.endswith(f"-{change_id}"):
+            return True
+    return False
+
+
 def validate_registry(root: Path) -> tuple[list[FeatureRow], list[str]]:
     errors: list[str] = []
     function_tree_path = root / "FUNCTION_TREE.md"
@@ -104,6 +130,9 @@ def validate_registry(root: Path) -> tuple[list[FeatureRow], list[str]]:
             errors.append(
                 f"line {row.line_number} {row.node_id}: pending rows must explicitly signal pending or unavailable status"
             )
+        for change_id in _extract_openspec_change_ids(row.evidence):
+            if not _openspec_change_exists(root, change_id):
+                errors.append(f"line {row.line_number} {row.node_id}: missing OpenSpec evidence {change_id}")
 
     return rows, errors
 
