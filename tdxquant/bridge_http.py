@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -74,6 +75,35 @@ def build_bridge_failure(
             "request_id": request_id,
         },
     }
+
+
+def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_id: str) -> dict[str, Any]:
+    status_summary = result.get("status_summary")
+    status_summary = status_summary if isinstance(status_summary, dict) else {}
+    governance = status_summary.get("governance")
+    governance = governance if isinstance(governance, dict) else {}
+
+    summary_view: dict[str, Any] = {
+        "mode": "summary",
+        "worker": worker_id,
+        "status": status_summary.get("overall_status", result.get("status")),
+    }
+
+    if status_summary:
+        status_view: dict[str, Any] = {}
+        for key in ("overall_status", "heartbeat", "watermark", "reconnect"):
+            if key in status_summary:
+                status_view[key] = copy.deepcopy(status_summary[key])
+        summary_view["status_summary"] = status_view
+
+    if governance:
+        governance_view: dict[str, Any] = {}
+        for key in ("decision", "requires_manual_review", "action_summary"):
+            if key in governance:
+                governance_view[key] = copy.deepcopy(governance[key])
+        summary_view["governance"] = governance_view
+
+    return summary_view
 
 
 def _now_utc_iso() -> str:
@@ -305,10 +335,18 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         self._write_control_result(result, request_id=request_id)
 
     def _handle_watch_status(self, request_id: str) -> None:
+        view = self._query_optional_str("view") or "detailed"
+        if view not in {"detailed", "summary"}:
+            raise ValueError("query parameter view must be one of: detailed, summary")
         result = self.server.bridge_controller.status(
             heartbeat_stale_after_seconds=self._query_optional_float("heartbeat_stale_after_seconds"),
             watermark_stale_after_seconds=self._query_optional_float("watermark_stale_after_seconds"),
         )
+        if view == "summary":
+            result = build_bridge_watch_status_summary_result(
+                result,
+                worker_id=self.server.bridge_config.worker_id,
+            )
         self._write_json(
             200,
             build_bridge_success(
@@ -576,6 +614,15 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         if value <= 0:
             raise ValueError(f"query parameter {name} must be positive")
         return value
+
+    def _query_optional_str(self, name: str) -> str | None:
+        parsed = urlparse(self.path)
+        query = parse_qs(parsed.query)
+        if name not in query:
+            return None
+        raw_value = query.get(name, [""])[0]
+        value = str(raw_value).strip()
+        return value or None
 
     @staticmethod
     def _optional_int(value: Any) -> int | None:

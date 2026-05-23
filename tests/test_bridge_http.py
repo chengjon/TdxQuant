@@ -334,6 +334,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 self.assertTrue(payload["ok"])
                 self.assertEqual(payload["result"]["control"]["run_id"], "run-001")
                 self.assertEqual(payload["result"]["watch_status"]["event_count"], 3)
+                self.assertNotIn("mode", payload["result"])
             finally:
                 server.shutdown()
                 server.server_close()
@@ -417,6 +418,92 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             controller.status_calls,
             [{"heartbeat_stale_after_seconds": 60.0, "watermark_stale_after_seconds": 120.0}],
         )
+
+    def test_watch_status_summary_view_projects_governance_rollup(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {"run_id": "run-001", "event_count": 3},
+                "status_summary": {
+                    "overall_status": "degraded",
+                    "heartbeat": {"status": "stale", "age_seconds": 180.0},
+                    "watermark": {"status": "fresh", "age_seconds": 15.0},
+                    "reconnect": {"status": "degraded", "reconnect_count": 2},
+                    "governance": {
+                        "decision": "manual_review",
+                        "requires_manual_review": True,
+                        "actions": [{"action": "inspect_worker", "reason": "heartbeat_stale"}],
+                        "action_summary": {
+                            "count": 1,
+                            "primary_action": "inspect_worker",
+                            "actions": ["inspect_worker"],
+                        },
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(
+                    f"{base_url}/bridge/v1/watch/status?view=summary&heartbeat_stale_after_seconds=60",
+                    token="secret-token",
+                )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"]["mode"], "summary")
+        self.assertEqual(payload["result"]["worker"], "worker-a")
+        self.assertEqual(payload["result"]["status"], "degraded")
+        self.assertEqual(payload["result"]["status_summary"]["heartbeat"]["status"], "stale")
+        self.assertEqual(payload["result"]["status_summary"]["watermark"]["status"], "fresh")
+        self.assertEqual(payload["result"]["status_summary"]["reconnect"]["reconnect_count"], 2)
+        self.assertEqual(payload["result"]["governance"]["decision"], "manual_review")
+        self.assertEqual(payload["result"]["governance"]["requires_manual_review"], True)
+        self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_action"], "inspect_worker")
+        self.assertNotIn("actions", payload["result"]["governance"])
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+        self.assertEqual(
+            controller.status_calls,
+            [{"heartbeat_stale_after_seconds": 60.0, "watermark_stale_after_seconds": None}],
+        )
+
+    def test_watch_status_summary_view_rejects_unknown_view(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                with self.assertRaises(HTTPError) as ctx:
+                    self._request(f"{base_url}/bridge/v1/watch/status?view=compact", token="secret-token")
+                payload = json.loads(ctx.exception.read().decode("utf-8"))
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(ctx.exception.code, 400)
+        self.assertEqual(payload["error"]["code"], "INVALID_REQUEST")
+        self.assertEqual(payload["error"]["message"], "query parameter view must be one of: detailed, summary")
+        self.assertEqual(controller.status_calls, [])
 
     def test_watch_event_stream_projects_status_and_event_rows_as_sse(self) -> None:
         with TemporaryDirectory() as temp_dir:
