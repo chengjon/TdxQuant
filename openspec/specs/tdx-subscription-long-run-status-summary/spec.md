@@ -53,25 +53,24 @@ The long-run status summary SHALL support explicit watermark staleness diagnosti
 - **AND** the summary MUST NOT change reconnect/backoff behavior
 
 ### Requirement: Subscription long-run status summary SHALL expose advisory governance posture
+
 The system SHALL include an advisory `governance` object in `status_summary` that summarizes operator-review posture without changing reconnect, backoff, restart, lifecycle, or event-stream behavior.
 
-#### Scenario: Caller inspects active status without explicit stale evaluation
-- **WHEN** the background status is active and no stale threshold is provided
-- **THEN** the governance summary MUST report `decision=observe`
-- **AND** it MUST report that staleness inputs were not evaluated
-- **AND** it MUST include an advisory-only boundary
+#### Scenario: Governance observes healthy or unevaluated state
 
-#### Scenario: Caller inspects reconnecting or degraded status
-- **WHEN** the persisted watch status identifies `reconnecting`, `degraded`, or `failed` state
-- **THEN** the governance summary MUST report `decision=manual_review`
-- **AND** it MUST include a machine-readable reason derived from the overall status
-- **AND** it MUST NOT change reconnect/backoff behavior
+- **WHEN** no stale input or resilience state requires manual review
+- **THEN** `governance.decision` MUST be `observe`
+- **AND** `governance.requires_manual_review` MUST be `false`
+- **AND** `governance.evaluation_summary` MUST identify not-evaluated components without triggering reconnect, backoff, restart, lifecycle, or event-stream changes
 
-#### Scenario: Caller evaluates stale heartbeat or watermark
-- **WHEN** a caller provides an explicit stale threshold and the heartbeat or watermark summary evaluates to `stale`
-- **THEN** the governance summary MUST report `decision=manual_review`
-- **AND** it MUST include a machine-readable stale reason for each stale input
-- **AND** it MUST NOT infer staleness for inputs whose thresholds were omitted
+#### Scenario: Governance requests manual review
+
+- **WHEN** explicit stale inputs or resilience state require manual review
+- **THEN** `governance.decision` MUST be `manual_review`
+- **AND** `governance.requires_manual_review` MUST be `true`
+- **AND** `governance.reasons` MUST describe each review reason
+- **AND** `governance.evaluation_summary` MUST identify evaluated components and stale components
+- **AND** the governance result MUST remain advisory-only
 
 ### Requirement: Subscription long-run status summary SHALL expose advisory governance action hints
 The system SHALL include an advisory `governance.actions` list in `status_summary` that turns existing manual-review reasons into machine-readable action hints without changing reconnect, backoff, restart, lifecycle, or event-stream behavior.
@@ -133,6 +132,7 @@ The bridge watch-status CLI SHALL expose an opt-in summary view that projects th
 - **AND** the CLI MUST print a compact JSON payload
 - **AND** the compact payload MUST include selected runtime identity fields derived from `control` and `watch_status` when present
 - **AND** the compact payload MUST include `status_summary.governance.action_summary` when the detailed payload provides it
+- **AND** the compact payload MUST include `status_summary.governance.evaluation_summary` when the detailed payload provides it
 - **AND** the detailed payload MUST remain the default when no summary view is requested
 
 #### Scenario: Bridge watch-status summary view preserves advisory boundary

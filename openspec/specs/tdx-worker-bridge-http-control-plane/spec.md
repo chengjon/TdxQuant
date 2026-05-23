@@ -125,8 +125,8 @@ The worker bridge HTTP control plane SHALL allow callers to request a compact re
 - **WHEN** a caller requests `GET /bridge/v1/watch/status?view=summary`
 - **THEN** the bridge MUST call the existing controller status path once
 - **AND** the bridge MUST return a compact success envelope with `result.mode=summary`
-- **AND** the result MUST include the worker id, status, selected `status_summary` fields, selected runtime identity fields, and advisory `governance.action_summary` when present
-- **AND** the result MUST NOT include raw `control` or `watch_status` payloads
+- **AND** the result MUST include the worker id, status, selected `status_summary` fields, selected runtime identity fields, advisory `governance.action_summary`, and advisory `governance.evaluation_summary` when present
+- **AND** the result MUST NOT include raw `control`, raw `watch_status`, or full `governance.actions` payloads
 
 #### Scenario: Caller requests unsupported watch-status view
 

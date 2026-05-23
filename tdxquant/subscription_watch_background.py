@@ -276,8 +276,41 @@ def _build_subscription_watch_governance_summary(
         "reasons": reasons,
         "actions": actions,
         "action_summary": _build_subscription_watch_governance_action_summary(actions),
+        "evaluation_summary": _build_subscription_watch_governance_evaluation_summary(
+            heartbeat=heartbeat,
+            watermark=watermark,
+            reconnect=reconnect,
+        ),
         "staleness_evaluated": staleness_evaluated,
         "boundary": SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY,
+    }
+
+
+def _build_subscription_watch_governance_evaluation_summary(
+    *,
+    heartbeat: dict[str, Any],
+    watermark: dict[str, Any],
+    reconnect: dict[str, Any],
+) -> dict[str, Any]:
+    evaluated_components: list[str] = []
+    stale_components: list[str] = []
+    not_evaluated_components: list[str] = []
+    for name, summary in (("heartbeat", heartbeat), ("watermark", watermark), ("reconnect", reconnect)):
+        staleness = summary.get("staleness")
+        if staleness == "not_evaluated":
+            not_evaluated_components.append(name)
+        else:
+            evaluated_components.append(name)
+        if staleness == "stale":
+            stale_components.append(name)
+
+    return {
+        "evaluated_components": evaluated_components,
+        "stale_components": stale_components,
+        "not_evaluated_components": not_evaluated_components,
+        "evaluated_count": len(evaluated_components),
+        "stale_count": len(stale_components),
+        "not_evaluated_count": len(not_evaluated_components),
     }
 
 

@@ -446,6 +446,14 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "primary_action": "inspect_worker",
                             "actions": ["inspect_worker"],
                         },
+                        "evaluation_summary": {
+                            "evaluated_components": ["heartbeat", "watermark"],
+                            "stale_components": ["heartbeat"],
+                            "not_evaluated_components": ["reconnect"],
+                            "evaluated_count": 2,
+                            "stale_count": 1,
+                            "not_evaluated_count": 1,
+                        },
                     },
                 },
             }
@@ -489,6 +497,17 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["governance"]["requires_manual_review"], True)
         self.assertEqual(payload["result"]["governance"]["staleness_evaluated"], True)
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_action"], "inspect_worker")
+        self.assertEqual(
+            payload["result"]["governance"]["evaluation_summary"],
+            {
+                "evaluated_components": ["heartbeat", "watermark"],
+                "stale_components": ["heartbeat"],
+                "not_evaluated_components": ["reconnect"],
+                "evaluated_count": 2,
+                "stale_count": 1,
+                "not_evaluated_count": 1,
+            },
+        )
         self.assertNotIn("actions", payload["result"]["governance"])
         self.assertNotIn("control", payload["result"])
         self.assertNotIn("watch_status", payload["result"])
