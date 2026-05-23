@@ -579,6 +579,20 @@ def test_status_summary_keeps_watermark_staleness_not_evaluated_without_threshol
     assert summary["watermark"]["staleness"] == "not_evaluated"
 
 
+def test_status_summary_keeps_reconnect_staleness_not_evaluated_without_threshold() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "reconnecting", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "reconnecting",
+            "last_disconnect_at": "2026-05-17T09:30:00+00:00",
+        },
+    )
+
+    assert summary["reconnect"]["last_disconnect_at"] == "2026-05-17T09:30:00+00:00"
+    assert summary["reconnect"]["staleness"] == "not_evaluated"
+
+
 @pytest.mark.parametrize(
     ("now_utc", "threshold", "expected_staleness", "expected_age"),
     [
@@ -637,6 +651,53 @@ def test_status_summary_evaluates_watermark_staleness_when_threshold_is_explicit
     assert summary["watermark"]["age_seconds"] == expected_age
     assert summary["watermark"]["stale_after_seconds"] == float(threshold)
     assert summary["watermark"]["evaluated_at"] == now_utc
+
+
+@pytest.mark.parametrize(
+    ("now_utc", "threshold", "expected_staleness", "expected_age"),
+    [
+        ("2026-05-17T09:31:30+00:00", 60, "stale", 90.0),
+        ("2026-05-17T09:30:45+00:00", 60, "fresh", 45.0),
+    ],
+)
+def test_status_summary_evaluates_reconnect_staleness_when_threshold_is_explicit(
+    now_utc: str,
+    threshold: int,
+    expected_staleness: str,
+    expected_age: float,
+) -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "reconnecting", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "reconnecting",
+            "last_disconnect_at": "2026-05-17T09:30:00+00:00",
+        },
+        reconnect_stale_after_seconds=threshold,
+        now_utc=now_utc,
+    )
+
+    assert summary["reconnect"]["staleness"] == expected_staleness
+    assert summary["reconnect"]["age_seconds"] == expected_age
+    assert summary["reconnect"]["age_source"] == "last_disconnect_at"
+    assert summary["reconnect"]["stale_after_seconds"] == float(threshold)
+    assert summary["reconnect"]["evaluated_at"] == now_utc
+
+
+def test_status_summary_reconnect_staleness_is_not_applicable_outside_resilience_state() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "running", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "running",
+            "last_disconnect_at": "2026-05-17T09:30:00+00:00",
+        },
+        reconnect_stale_after_seconds=60,
+        now_utc="2026-05-17T09:31:30+00:00",
+    )
+
+    assert summary["reconnect"]["staleness"] == "not_applicable"
+    assert summary["reconnect"]["stale_after_seconds"] == 60.0
 
 
 def test_status_summary_governance_observes_without_stale_thresholds() -> None:
@@ -729,6 +790,44 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
         "count": 2,
         "primary_action": "review_subscription_watch_heartbeat",
         "primary_reason": "heartbeat:stale",
+        "severity": "review",
+    }
+
+
+def test_status_summary_governance_requests_manual_review_for_stale_reconnect() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "reconnecting", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "reconnecting",
+            "last_disconnect_at": "2026-05-17T09:30:00+00:00",
+        },
+        reconnect_stale_after_seconds=60,
+        now_utc="2026-05-17T09:31:30+00:00",
+    )
+
+    assert summary["governance"]["decision"] == "manual_review"
+    assert summary["governance"]["requires_manual_review"] is True
+    assert summary["governance"]["staleness_evaluated"] is True
+    assert summary["governance"]["reasons"] == ["overall_status:reconnecting", "reconnect:stale"]
+    assert summary["governance"]["actions"] == [
+        {
+            "action": "review_subscription_watch_resilience",
+            "reason": "overall_status:reconnecting",
+            "severity": "review",
+            "description": "Inspect subscription-watch long-run process health for reconnecting status.",
+        },
+        {
+            "action": "review_subscription_watch_reconnect",
+            "reason": "reconnect:stale",
+            "severity": "review",
+            "description": "Inspect reconnect/degraded duration before changing reconnect or restart behavior.",
+        },
+    ]
+    assert summary["governance"]["action_summary"] == {
+        "count": 2,
+        "primary_action": "review_subscription_watch_resilience",
+        "primary_reason": "overall_status:reconnecting",
         "severity": "review",
     }
 
@@ -908,6 +1007,7 @@ def test_status_view_summarizes_resilience_runtime_fields(tmp_path: Path, state:
         "degraded_since": "2026-05-17T09:29:30+00:00",
         "consecutive_reconnect_failures": 1,
         "last_error": {"code": "SESSION_LOST"},
+        "staleness": "not_evaluated",
     }
 
 

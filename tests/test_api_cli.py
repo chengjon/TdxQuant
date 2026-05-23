@@ -92,6 +92,8 @@ class ApiCliParserTests(unittest.TestCase):
                 "60",
                 "--watermark-stale-after-seconds",
                 "120",
+                "--reconnect-stale-after-seconds",
+                "180",
             ]
         )
         self.assertEqual(args.command, "bridge")
@@ -100,6 +102,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.worker, "worker-a")
         self.assertEqual(args.heartbeat_stale_after_seconds, 60.0)
         self.assertEqual(args.watermark_stale_after_seconds, 120.0)
+        self.assertEqual(args.reconnect_stale_after_seconds, 180.0)
         self.assertEqual(args.view, "detailed")
 
     def test_bridge_watch_status_summary_view_command_parses(self) -> None:
@@ -7990,6 +7993,8 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "60",
                 "--watermark-stale-after-seconds",
                 "120",
+                "--reconnect-stale-after-seconds",
+                "180",
             ]
         )
         with (
@@ -8004,6 +8009,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             worker_id="worker-a",
             heartbeat_stale_after_seconds=60.0,
             watermark_stale_after_seconds=120.0,
+            reconnect_stale_after_seconds=180.0,
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "idle"}})
 
@@ -8018,6 +8024,8 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "worker-a",
                 "--heartbeat-stale-after-seconds",
                 "60",
+                "--reconnect-stale-after-seconds",
+                "180",
                 "--view",
                 "summary",
             ]
@@ -8057,6 +8065,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             worker_id="worker-a",
             heartbeat_stale_after_seconds=60.0,
             watermark_stale_after_seconds=None,
+            reconnect_stale_after_seconds=180.0,
         )
         self.assertEqual(
             json.loads(stdout.getvalue()),

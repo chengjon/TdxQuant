@@ -341,6 +341,7 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         result = self.server.bridge_controller.status(
             heartbeat_stale_after_seconds=self._query_optional_float("heartbeat_stale_after_seconds"),
             watermark_stale_after_seconds=self._query_optional_float("watermark_stale_after_seconds"),
+            reconnect_stale_after_seconds=self._query_optional_float("reconnect_stale_after_seconds"),
         )
         if view == "summary":
             result = build_bridge_watch_status_summary_result(

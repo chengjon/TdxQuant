@@ -405,7 +405,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             server, base_url, thread = self._start_server(config, controller=controller)
             try:
                 payload = self._request(
-                    f"{base_url}/bridge/v1/watch/status?heartbeat_stale_after_seconds=60&watermark_stale_after_seconds=120",
+                    f"{base_url}/bridge/v1/watch/status?heartbeat_stale_after_seconds=60&watermark_stale_after_seconds=120&reconnect_stale_after_seconds=180",
                     token="secret-token",
                 )
             finally:
@@ -416,7 +416,13 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(
             controller.status_calls,
-            [{"heartbeat_stale_after_seconds": 60.0, "watermark_stale_after_seconds": 120.0}],
+            [
+                {
+                    "heartbeat_stale_after_seconds": 60.0,
+                    "watermark_stale_after_seconds": 120.0,
+                    "reconnect_stale_after_seconds": 180.0,
+                }
+            ],
         )
 
     def test_watch_status_summary_view_projects_governance_rollup(self) -> None:
@@ -453,7 +459,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             server, base_url, thread = self._start_server(config, controller=controller)
             try:
                 payload = self._request(
-                    f"{base_url}/bridge/v1/watch/status?view=summary&heartbeat_stale_after_seconds=60",
+                    f"{base_url}/bridge/v1/watch/status?view=summary&heartbeat_stale_after_seconds=60&reconnect_stale_after_seconds=180",
                     token="secret-token",
                 )
             finally:
@@ -476,7 +482,13 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertNotIn("watch_status", payload["result"])
         self.assertEqual(
             controller.status_calls,
-            [{"heartbeat_stale_after_seconds": 60.0, "watermark_stale_after_seconds": None}],
+            [
+                {
+                    "heartbeat_stale_after_seconds": 60.0,
+                    "watermark_stale_after_seconds": None,
+                    "reconnect_stale_after_seconds": 180.0,
+                }
+            ],
         )
 
     def test_watch_status_summary_view_rejects_unknown_view(self) -> None:

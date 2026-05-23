@@ -31,6 +31,7 @@ def build_subscription_watch_status_summary(
     watch_status: dict[str, Any] | None,
     heartbeat_stale_after_seconds: float | int | None = None,
     watermark_stale_after_seconds: float | int | None = None,
+    reconnect_stale_after_seconds: float | int | None = None,
     now_utc: datetime | str | None = None,
 ) -> dict[str, Any]:
     resolved_control = control if isinstance(control, dict) else {}
@@ -55,6 +56,21 @@ def build_subscription_watch_status_summary(
         now_utc=now_utc,
     )
     overall_status = _subscription_watch_overall_status(state=state, active=active)
+    reconnect = _build_reconnect_summary(
+        reconnect_count=_optional_int(resolved_status.get("reconnect_count"), default=0),
+        last_disconnect_at=_optional_str(resolved_status.get("last_disconnect_at")),
+        last_reconnect_at=_optional_str(resolved_status.get("last_reconnect_at")),
+        next_reconnect_at=_optional_str(resolved_status.get("next_reconnect_at")),
+        degraded_since=_optional_str(resolved_status.get("degraded_since")),
+        consecutive_reconnect_failures=_optional_int(
+            resolved_status.get("consecutive_reconnect_failures"),
+            default=0,
+        ),
+        last_error=resolved_status.get("last_error") if isinstance(resolved_status.get("last_error"), dict) else None,
+        overall_status=overall_status,
+        reconnect_stale_after_seconds=reconnect_stale_after_seconds,
+        now_utc=now_utc,
+    )
     return {
         "schema_version": SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION,
         "overall_status": overall_status,
@@ -63,24 +79,14 @@ def build_subscription_watch_status_summary(
         "run_id": run_id,
         "heartbeat": heartbeat,
         "watermark": watermark,
-        "reconnect": {
-            "reconnect_count": _optional_int(resolved_status.get("reconnect_count"), default=0),
-            "last_disconnect_at": _optional_str(resolved_status.get("last_disconnect_at")),
-            "last_reconnect_at": _optional_str(resolved_status.get("last_reconnect_at")),
-            "next_reconnect_at": _optional_str(resolved_status.get("next_reconnect_at")),
-            "degraded_since": _optional_str(resolved_status.get("degraded_since")),
-            "consecutive_reconnect_failures": _optional_int(
-                resolved_status.get("consecutive_reconnect_failures"),
-                default=0,
-            ),
-            "last_error": resolved_status.get("last_error") if isinstance(resolved_status.get("last_error"), dict) else None,
-        },
+        "reconnect": reconnect,
         "governance": _build_subscription_watch_governance_summary(
             overall_status=overall_status,
             heartbeat=heartbeat,
             watermark=watermark,
+            reconnect=reconnect,
         ),
-        "boundary": "summary_projection_only; optional heartbeat/watermark staleness evaluation only; does not change reconnect/backoff behavior",
+        "boundary": "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
     }
 
 
@@ -179,18 +185,83 @@ def _build_watermark_summary(
     return watermark
 
 
+def _build_reconnect_summary(
+    *,
+    reconnect_count: int,
+    last_disconnect_at: str | None,
+    last_reconnect_at: str | None,
+    next_reconnect_at: str | None,
+    degraded_since: str | None,
+    consecutive_reconnect_failures: int,
+    last_error: dict[str, Any] | None,
+    overall_status: str,
+    reconnect_stale_after_seconds: float | int | None,
+    now_utc: datetime | str | None,
+) -> dict[str, Any]:
+    reconnect: dict[str, Any] = {
+        "reconnect_count": reconnect_count,
+        "last_disconnect_at": last_disconnect_at,
+        "last_reconnect_at": last_reconnect_at,
+        "next_reconnect_at": next_reconnect_at,
+        "degraded_since": degraded_since,
+        "consecutive_reconnect_failures": consecutive_reconnect_failures,
+        "last_error": last_error,
+        "staleness": "not_evaluated",
+    }
+    if reconnect_stale_after_seconds is None:
+        return reconnect
+    try:
+        stale_after_seconds = float(reconnect_stale_after_seconds)
+    except (TypeError, ValueError):
+        reconnect["staleness"] = "invalid_threshold"
+        return reconnect
+    if stale_after_seconds <= 0:
+        reconnect["staleness"] = "invalid_threshold"
+        reconnect["stale_after_seconds"] = stale_after_seconds
+        return reconnect
+    reconnect["stale_after_seconds"] = stale_after_seconds
+    if overall_status not in {"reconnecting", "degraded"}:
+        reconnect["staleness"] = "not_applicable"
+        return reconnect
+
+    age_source = "last_disconnect_at" if last_disconnect_at else "degraded_since" if degraded_since else None
+    if age_source is None:
+        reconnect["staleness"] = "missing"
+        reconnect["age_source"] = None
+        return reconnect
+    source_ts = last_disconnect_at if age_source == "last_disconnect_at" else degraded_since
+    try:
+        source_dt = _parse_rfc3339_datetime(source_ts or "")
+        evaluated_at_dt = _coerce_utc_datetime(now_utc)
+    except ValueError:
+        reconnect["staleness"] = "invalid_timestamp"
+        reconnect["age_source"] = age_source
+        return reconnect
+    age_seconds = max(0.0, (evaluated_at_dt - source_dt).total_seconds())
+    reconnect.update(
+        {
+            "staleness": "stale" if age_seconds > stale_after_seconds else "fresh",
+            "age_seconds": age_seconds,
+            "age_source": age_source,
+            "evaluated_at": evaluated_at_dt.isoformat(),
+        }
+    )
+    return reconnect
+
+
 def _build_subscription_watch_governance_summary(
     *,
     overall_status: str,
     heartbeat: dict[str, Any],
     watermark: dict[str, Any],
+    reconnect: dict[str, Any],
 ) -> dict[str, Any]:
     reasons: list[str] = []
     if overall_status in {"reconnecting", "degraded", "failed"}:
         reasons.append(f"overall_status:{overall_status}")
 
     staleness_evaluated = False
-    for name, summary in (("heartbeat", heartbeat), ("watermark", watermark)):
+    for name, summary in (("heartbeat", heartbeat), ("watermark", watermark), ("reconnect", reconnect)):
         staleness = summary.get("staleness")
         if staleness != "not_evaluated":
             staleness_evaluated = True
@@ -249,6 +320,15 @@ def _build_subscription_watch_governance_actions(reasons: list[str]) -> list[dic
                     "reason": reason,
                     "severity": "review",
                     "description": "Inspect event watermark freshness before changing reconnect or restart behavior.",
+                }
+            )
+        elif reason == "reconnect:stale":
+            actions.append(
+                {
+                    "action": "review_subscription_watch_reconnect",
+                    "reason": reason,
+                    "severity": "review",
+                    "description": "Inspect reconnect/degraded duration before changing reconnect or restart behavior.",
                 }
             )
         else:
@@ -1047,6 +1127,7 @@ class SubscriptionWatchBackgroundController:
         run_id: str | None = None,
         heartbeat_stale_after_seconds: float | int | None = None,
         watermark_stale_after_seconds: float | int | None = None,
+        reconnect_stale_after_seconds: float | int | None = None,
         now_utc: datetime | str | None = None,
     ) -> dict[str, Any]:
         control = self._background_state()
@@ -1063,6 +1144,7 @@ class SubscriptionWatchBackgroundController:
                 watch_status=watch_status,
                 heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
                 watermark_stale_after_seconds=watermark_stale_after_seconds,
+                reconnect_stale_after_seconds=reconnect_stale_after_seconds,
                 now_utc=now_utc,
             ),
         }

@@ -678,6 +678,7 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_status_parser.add_argument("--worker", required=True)
     bridge_watch_status_parser.add_argument("--heartbeat-stale-after-seconds", type=float)
     bridge_watch_status_parser.add_argument("--watermark-stale-after-seconds", type=float)
+    bridge_watch_status_parser.add_argument("--reconnect-stale-after-seconds", type=float)
     bridge_watch_status_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
 
     bridge_watch_events_parser = bridge_subparsers.add_parser("watch-events")
@@ -4503,6 +4504,7 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                 worker_id=args.worker,
                 heartbeat_stale_after_seconds=args.heartbeat_stale_after_seconds,
                 watermark_stale_after_seconds=args.watermark_stale_after_seconds,
+                reconnect_stale_after_seconds=args.reconnect_stale_after_seconds,
             )
             if args.view == "summary":
                 payload = _build_bridge_watch_status_summary_payload(payload, worker_id=args.worker)
