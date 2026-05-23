@@ -1298,6 +1298,8 @@ class ApiCliParserTests(unittest.TestCase):
                 "--probe-all",
                 "--probe-timeout",
                 "1.5",
+                "--view",
+                "summary",
             ]
         )
         self.assertEqual(args.command, "provider-replay")
@@ -1309,6 +1311,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.probe_watch_stream, True)
         self.assertEqual(args.probe_all, True)
         self.assertEqual(args.probe_timeout, 1.5)
+        self.assertEqual(args.view, "summary")
 
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
@@ -2287,6 +2290,8 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "--probe-all",
                     "--probe-timeout",
                     "1.5",
+                    "--view",
+                    "summary",
                 ]
             )
             health_probe_result = {
@@ -2369,6 +2374,16 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             "/provider/v1/replay/watch/events/stream",
         )
         self.assertEqual(result.data["status"]["capabilities"]["writes_supported"], False)
+        self.assertEqual(result.data["summary_view"]["mode"], "summary")
+        self.assertEqual(result.data["summary_view"]["provider_id"], "provider-replay-a")
+        self.assertEqual(result.data["summary_view"]["transport_mode"], "replay_only")
+        self.assertEqual(result.data["summary_view"]["lifecycle"]["start_stop_managed"], False)
+        self.assertEqual(result.data["summary_view"]["lifecycle"]["daemon_managed"], False)
+        self.assertEqual(result.data["summary_view"]["runtime"]["runtime_observed"], True)
+        self.assertEqual(result.data["summary_view"]["runtime"]["probe_requested"], True)
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["status"], "healthy")
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["requested_count"], 4)
+        self.assertIn("no daemon start/stop lifecycle management", result.data["summary_view"]["boundaries"])
         mocked_serve.assert_not_called()
         mocked_probe.assert_called_once()
         self.assertEqual(mocked_probe.call_args.kwargs["timeout_seconds"], 1.5)

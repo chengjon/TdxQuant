@@ -733,6 +733,7 @@ def _build_provider_replay_parser(
     provider_replay_status_parser.add_argument("--probe-watch-stream", action="store_true")
     provider_replay_status_parser.add_argument("--probe-all", action="store_true")
     provider_replay_status_parser.add_argument("--probe-timeout", type=float, default=1.0)
+    provider_replay_status_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
     provider_replay_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     return provider_replay_parser
@@ -4588,20 +4589,24 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             watch_events_probe = probe_provider_transport_replay_watch_events(config, timeout_seconds=args.probe_timeout)
         if args.probe_watch_stream or args.probe_all:
             watch_stream_probe = probe_provider_transport_replay_watch_stream(config, timeout_seconds=args.probe_timeout)
+        status = build_provider_transport_replay_status(
+            config,
+            health_probe=health_probe,
+            watch_status_probe=watch_status_probe,
+            watch_events_probe=watch_events_probe,
+            watch_stream_probe=watch_stream_probe,
+        )
+        data: dict[str, object] = {
+            "status": status,
+            "config": config_summary,
+        }
+        if args.view == "summary":
+            data["summary_view"] = _build_provider_replay_status_summary_view(status)
         return Result(
             ok=True,
             code=ErrorCode.OK,
             message="reported provider replay lifecycle status",
-            data={
-                "status": build_provider_transport_replay_status(
-                    config,
-                    health_probe=health_probe,
-                    watch_status_probe=watch_status_probe,
-                    watch_events_probe=watch_events_probe,
-                    watch_stream_probe=watch_stream_probe,
-                ),
-                "config": config_summary,
-            },
+            data=data,
         )
     if args.provider_replay_command == "serve":
         exit_code = serve_provider_transport_replay(config)
@@ -4612,6 +4617,33 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             data={"exit_code": exit_code, "config": config_summary},
         )
     return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported provider replay command: {args.provider_replay_command}")
+
+
+def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dict[str, object]:
+    runtime = status.get("runtime") if isinstance(status.get("runtime"), dict) else {}
+    lifecycle = status.get("lifecycle") if isinstance(status.get("lifecycle"), dict) else {}
+    probe_summary = runtime.get("probe_summary") if isinstance(runtime.get("probe_summary"), dict) else {}
+    boundaries = status.get("boundaries") if isinstance(status.get("boundaries"), list) else []
+    return {
+        "mode": "summary",
+        "provider_id": status.get("provider_id"),
+        "transport_mode": status.get("transport_mode"),
+        "runtime": {
+            "runtime_observed": runtime.get("runtime_observed"),
+            "probe_requested": bool(probe_summary.get("requested_count")),
+            "live_runtime_required": runtime.get("live_runtime_required"),
+            "live_market_session_supported": runtime.get("live_market_session_supported"),
+        },
+        "lifecycle": {
+            "mode": lifecycle.get("mode"),
+            "start_stop_managed": lifecycle.get("start_stop_managed"),
+            "daemon_managed": lifecycle.get("daemon_managed"),
+            "scheduler_managed": lifecycle.get("scheduler_managed"),
+            "restart_policy": lifecycle.get("restart_policy"),
+        },
+        "probe_summary": copy.deepcopy(probe_summary),
+        "boundaries": copy.deepcopy(boundaries),
+    }
 
 
 def _emit_bridge_payload(payload: dict[str, object]) -> int:
