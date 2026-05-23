@@ -3921,6 +3921,16 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(entry["preset"], "sell-submit-once-default")
         self.assertIn("sell-submit-once", entry["labels"])
 
+    def test_handle_catalog_list_exposes_buy_submit_once_task_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "buy-submit-once"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entry = next(row for row in result.data["entries"] if row["name"] == "task-buy-submit-once")
+        self.assertEqual(entry["source"], "task")
+        self.assertEqual(entry["preset"], "buy-submit-once-default")
+        self.assertIn("buy-submit-once", entry["labels"])
+
     def test_handle_catalog_bundle_list_returns_read_zxg_review_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "read-zxg-review"])
@@ -4383,6 +4393,32 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["resolved_args"]["side"], "sell")
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_buy_submit_once_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--entry",
+                "task-buy-submit-once",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "task-buy-submit-once")
+        self.assertEqual(result.data["dispatch"]["command_group"], "task")
+        self.assertEqual(result.data["dispatch"]["command_name"], "trade-submit-once")
+        self.assertEqual(result.data["resolved_args"]["task_command"], "trade-submit-once")
+        self.assertEqual(result.data["resolved_args"]["side"], "buy")
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_sell_submit_once_bundle_without_execution(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -4406,6 +4442,34 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual([step["entry"] for step in result.data["steps"]], ["task-sell-submit-once", "audit-daily-pingan-sell-submit-once-exceptions"])
         self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-submit-once")
         self.assertEqual(result.data["steps"][0]["resolved_args"]["side"], "sell")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_buy_submit_once_bundle_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "buy-submit-once-pingan-exception-review",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_bundle"]["name"], "buy-submit-once-pingan-exception-review")
+        self.assertEqual(
+            [step["entry"] for step in result.data["steps"]],
+            ["task-buy-submit-once", "audit-daily-pingan-submit-once-exceptions"],
+        )
+        self.assertEqual(result.data["steps"][0]["dispatch"]["command_name"], "trade-submit-once")
+        self.assertEqual(result.data["steps"][0]["resolved_args"]["side"], "buy")
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_preview_bundle_summary_view_is_reduced(self) -> None:

@@ -65,6 +65,21 @@
       "close_result_dialog": true
     }
   },
+  "buy-submit-once-default": {
+    "command": "trade-submit-once",
+    "description": "买入侧完整提交 task 模板。",
+    "profile": "trade_submit_once",
+    "api_profile": "safe_read",
+    "trade_profile": "submit_once",
+    "options": {
+      "side": "buy",
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "max_depth": 12,
+      "close_result_dialog": true
+    }
+  },
   "sell-submit-once-default": {
     "command": "trade-submit-once",
     "description": "卖出侧完整提交 task 模板。",
