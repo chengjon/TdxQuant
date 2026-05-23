@@ -947,6 +947,9 @@ def _build_api_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     _add_block_sync_arguments(api_block_sync_parser)
     _add_api_common_arguments(api_block_sync_parser)
 
+    api_formula_capabilities_parser = api_subparsers.add_parser("formula-capabilities")
+    _add_api_common_arguments(api_formula_capabilities_parser)
+
     api_formula_format_data_parser = api_subparsers.add_parser("formula-format-data")
     api_formula_format_data_parser.add_argument("--input-json-file", required=True)
     _add_api_common_arguments(api_formula_format_data_parser)
@@ -3584,6 +3587,8 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
             show=args.show,
             **options,
         )
+    if args.api_command == "formula-capabilities":
+        return manager.formula.capabilities()
     if args.api_command == "formula-format-data":
         return manager.formula.format_data(json.loads(Path(args.input_json_file).read_text(encoding="utf-8")))
     if args.api_command == "formula-set-data":

@@ -221,6 +221,12 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.api_command, "formula-xg")
         self.assertEqual(args.formula_name, "MY_FORMULA")
 
+    def test_api_formula_capabilities_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "formula-capabilities"])
+        self.assertEqual(args.command, "api")
+        self.assertEqual(args.api_command, "formula-capabilities")
+
     def test_api_formula_screen_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -3170,6 +3176,19 @@ class ApiCliDispatchTests(unittest.TestCase):
             result = _handle_api_subcommand(args)
         self.assertIs(result, expected)
         manager.formula.xg.assert_called_once_with(formula_name="SCAN", formula_arg="")
+
+    def test_handle_api_formula_capabilities_uses_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["api", "formula-capabilities"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.formula.capabilities.return_value = expected
+        with patch("tdxquant.cli.TdxApiManager", return_value=manager):
+            result = _handle_api_subcommand(args)
+        self.assertIs(result, expected)
+        manager.formula.capabilities.assert_called_once_with()
+        manager.formula.xg.assert_not_called()
+        manager.formula.screen.assert_not_called()
 
     def test_handle_api_formula_screen_uses_manager(self) -> None:
         parser = build_parser()

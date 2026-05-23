@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import Result
+from ..formula_capabilities import build_formula_capability_registry
+from ..models import ErrorCode, Result
 from ..replay_provider import execute_sync_replay, is_replay_mode, normalize_provider_mode
 from .block import BlockApi
 from .bridge import run_tdx_refresh_cache
@@ -333,6 +334,26 @@ class _FormulaManagerProxy:
 
     def __init__(self, manager: "TdxApiManager") -> None:
         self._manager = manager
+
+    def capabilities(self) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+        result, timing = capture_api_timing(
+            "formula.capabilities",
+            lambda: Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="formula capability contract registry",
+                data=build_formula_capability_registry(),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="formula",
+            method="capabilities",
+            timing=timing,
+        )
 
     def format_data(self, kline_payload: dict[str, Any]) -> Result:
         effective_profile = self._manager._build_effective_profile({})

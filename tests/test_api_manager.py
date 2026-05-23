@@ -2721,6 +2721,25 @@ class TdxApiManagerTests(unittest.TestCase):
         manager = TdxApiManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
 
+    def test_manager_formula_capabilities_returns_contract_status_registry_without_execution(self) -> None:
+        manager = TdxApiManager(profile="default")
+        with patch.object(type(manager._formula_api), "screen") as mocked_screen:
+            result = manager.formula.capabilities()
+        self.assertTrue(result.ok)
+        self.assertEqual(result.code, ErrorCode.OK)
+        self.assertEqual(result.data["summary"]["provider_contract_stable"], 1)
+        self.assertEqual(result.data["summary"]["bridge_only"], 9)
+        capabilities = {item["capability"]: item for item in result.data["capabilities"]}
+        self.assertTrue(capabilities["formula.screen"]["provider_contract_stable"])
+        self.assertEqual(capabilities["formula.screen"]["status"], "provider_contract_stable")
+        self.assertEqual(capabilities["formula.screen"]["replay_fixtures"], ["formula-screen-success", "formula-screen-failure"])
+        self.assertFalse(capabilities["formula.xg"]["provider_contract_stable"])
+        self.assertEqual(capabilities["formula.xg"]["status"], "bridge_only")
+        self.assertIn("not available as a stable provider/replay contract", capabilities["formula.xg"]["boundary"])
+        self.assertEqual(result.data["manager"]["domain"], "formula")
+        self.assertEqual(result.data["manager"]["method"], "capabilities")
+        mocked_screen.assert_not_called()
+
     def test_manager_formula_screen_replay_mode_uses_default_fixture_without_live_call(self) -> None:
         live_result = Result(
             ok=False,
