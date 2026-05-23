@@ -724,6 +724,7 @@ def _build_provider_replay_parser(
 
     provider_replay_config_check_parser = provider_replay_subparsers.add_parser("config-check")
     provider_replay_config_check_parser.add_argument("--config", required=True)
+    provider_replay_config_check_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
     provider_replay_config_check_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     provider_replay_status_parser = provider_replay_subparsers.add_parser("status")
@@ -4592,6 +4593,27 @@ def _provider_replay_config_summary(config: object) -> dict[str, object]:
     }
 
 
+def _build_provider_replay_config_check_summary_view(config_summary: dict[str, object]) -> dict[str, object]:
+    return {
+        "mode": "config-check",
+        "provider_id": config_summary.get("provider_id"),
+        "bind_host": config_summary.get("bind_host"),
+        "port": config_summary.get("port"),
+        "master_allowlist_count": config_summary.get("master_allowlist_count"),
+        "replay_fixture": config_summary.get("replay_fixture"),
+        "replay_fixture_path": config_summary.get("replay_fixture_path"),
+        "serve_started": False,
+        "probe_requested": False,
+        "daemon_lifecycle_managed": False,
+        "boundaries": [
+            "config_validation_only",
+            "server_not_started",
+            "probe_not_requested",
+            "daemon_lifecycle_not_managed",
+        ],
+    }
+
+
 def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
     try:
         config = load_provider_transport_replay_config(args.config)
@@ -4600,11 +4622,14 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
 
     config_summary = _provider_replay_config_summary(config)
     if args.provider_replay_command == "config-check":
+        data: dict[str, object] = {"config": config_summary}
+        if args.view == "summary":
+            data["summary_view"] = _build_provider_replay_config_check_summary_view(config_summary)
         return Result(
             ok=True,
             code=ErrorCode.OK,
             message="validated provider replay config",
-            data={"config": config_summary},
+            data=data,
         )
     if args.provider_replay_command == "status":
         health_probe = None

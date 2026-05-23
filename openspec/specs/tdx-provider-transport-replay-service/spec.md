@@ -75,6 +75,13 @@ The system SHALL provide a CLI entry that loads a replay transport config and de
 - **THEN** the CLI MUST load the replay transport config and return a machine-readable summary
 - **AND** the command MUST NOT start the HTTP server
 
+#### Scenario: Caller requests a config-check summary view
+
+- **WHEN** a caller executes `provider-replay config-check --config <path> --view summary`
+- **THEN** the CLI MUST include a machine-readable `summary_view` derived from the loaded config
+- **AND** the summary MUST indicate that the command did not start serving, did not request probes, and does not provide daemon lifecycle management
+- **AND** the command MUST NOT expose bearer token values
+
 #### Scenario: Caller starts the replay service in the foreground
 
 - **WHEN** a caller executes `provider-replay serve --config <path>`

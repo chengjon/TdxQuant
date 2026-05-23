@@ -1282,6 +1282,24 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.command, "provider-replay")
         self.assertEqual(args.provider_replay_command, "config-check")
         self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
+        self.assertEqual(args.view, "detailed")
+
+    def test_provider_replay_config_check_summary_view_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "provider-replay",
+                "config-check",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+                "--view",
+                "summary",
+            ]
+        )
+        self.assertEqual(args.command, "provider-replay")
+        self.assertEqual(args.provider_replay_command, "config-check")
+        self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
+        self.assertEqual(args.view, "summary")
 
     def test_provider_replay_status_command_parses(self) -> None:
         parser = build_parser()
@@ -2274,6 +2292,57 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["config"]["master_allowlist_count"], 1)
         self.assertEqual(result.data["config"]["replay_fixture"], "market-snapshot-default")
         mocked_serve.assert_not_called()
+
+    def test_handle_provider_replay_config_check_summary_view_is_config_only(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(
+                ["provider-replay", "config-check", "--config", str(config_path), "--view", "summary"]
+            )
+            with (
+                patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
+                patch("tdxquant.cli.probe_provider_transport_replay_health") as mocked_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_status") as mocked_watch_status_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_events") as mocked_watch_events_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_stream") as mocked_watch_stream_probe,
+            ):
+                result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["config"]["provider_id"], "provider-replay-a")
+        self.assertNotIn("token", result.data["config"])
+        self.assertEqual(result.data["summary_view"]["mode"], "config-check")
+        self.assertEqual(result.data["summary_view"]["provider_id"], "provider-replay-a")
+        self.assertEqual(result.data["summary_view"]["bind_host"], "127.0.0.1")
+        self.assertEqual(result.data["summary_view"]["port"], 0)
+        self.assertEqual(result.data["summary_view"]["master_allowlist_count"], 1)
+        self.assertEqual(result.data["summary_view"]["replay_fixture"], "market-snapshot-default")
+        self.assertEqual(result.data["summary_view"]["serve_started"], False)
+        self.assertEqual(result.data["summary_view"]["probe_requested"], False)
+        self.assertEqual(result.data["summary_view"]["daemon_lifecycle_managed"], False)
+        self.assertIn("config_validation_only", result.data["summary_view"]["boundaries"])
+        self.assertIn("server_not_started", result.data["summary_view"]["boundaries"])
+        self.assertIn("probe_not_requested", result.data["summary_view"]["boundaries"])
+        self.assertIn("daemon_lifecycle_not_managed", result.data["summary_view"]["boundaries"])
+        mocked_serve.assert_not_called()
+        mocked_probe.assert_not_called()
+        mocked_watch_status_probe.assert_not_called()
+        mocked_watch_events_probe.assert_not_called()
+        mocked_watch_stream_probe.assert_not_called()
 
     def test_handle_provider_replay_status_returns_lifecycle_boundary_without_serving(self) -> None:
         parser = build_parser()
