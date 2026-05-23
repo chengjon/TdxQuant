@@ -12,6 +12,7 @@ from tdxquant.provider_transport_replay import (
     ProviderTransportReplayHTTPServer,
     build_provider_transport_replay_status,
     probe_provider_transport_replay_health,
+    probe_provider_transport_replay_watch_status,
 )
 from tdxquant.replay_fixtures import list_provider_replay_fixtures, load_provider_replay_fixture
 
@@ -39,6 +40,8 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["live_market_session_supported"], False)
         self.assertEqual(status["runtime"]["health_probe"]["enabled"], False)
         self.assertEqual(status["runtime"]["health_probe"]["status"], "not_requested")
+        self.assertEqual(status["runtime"]["watch_status_probe"]["enabled"], False)
+        self.assertEqual(status["runtime"]["watch_status_probe"]["status"], "not_requested")
         self.assertEqual(status["lifecycle"]["mode"], "foreground_process")
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
@@ -83,6 +86,45 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["runtime_observed"], True)
         self.assertEqual(status["runtime"]["health_probe"]["status"], "healthy")
         self.assertEqual(status["runtime"]["health_probe"]["service"], "provider-transport-replay")
+        self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
+        self.assertEqual(status["lifecycle"]["daemon_managed"], False)
+
+    def test_status_can_include_explicit_replay_watch_status_probe(self) -> None:
+        server = ProviderTransportReplayHTTPServer(
+            ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+            )
+        )
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            probe_config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=server.server_address[1],
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+            )
+            probe = probe_provider_transport_replay_watch_status(probe_config, timeout_seconds=1.5)
+            status = build_provider_transport_replay_status(probe_config, watch_status_probe=probe)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
+        self.assertEqual(probe["status"], "healthy")
+        self.assertEqual(probe["endpoint"], "/provider/v1/replay/watch/status")
+        self.assertEqual(probe["http_status"], 200)
+        self.assertEqual(probe["reachable"], True)
+        self.assertEqual(probe["timeout_seconds"], 1.5)
+        self.assertNotIn("secret-token", json.dumps(status))
+        self.assertEqual(status["runtime"]["runtime_observed"], True)
+        self.assertEqual(status["runtime"]["watch_status_probe"]["status"], "healthy")
+        self.assertEqual(status["runtime"]["watch_status_probe"]["endpoint"], "/provider/v1/replay/watch/status")
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
 

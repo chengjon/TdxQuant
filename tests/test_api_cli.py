@@ -1270,6 +1270,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "--config",
                 "runtime/provider-transport-replay.example.json",
                 "--probe-health",
+                "--probe-watch-status",
                 "--probe-timeout",
                 "1.5",
             ]
@@ -1278,6 +1279,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.provider_replay_command, "status")
         self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
         self.assertEqual(args.probe_health, True)
+        self.assertEqual(args.probe_watch_status, True)
         self.assertEqual(args.probe_timeout, 1.5)
 
     def test_task_block_read_watchlist_command_parses(self) -> None:
@@ -2239,10 +2241,29 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                 encoding="utf-8",
             )
             args = parser.parse_args(
-                ["provider-replay", "status", "--config", str(config_path), "--probe-health", "--probe-timeout", "1.5"]
+                [
+                    "provider-replay",
+                    "status",
+                    "--config",
+                    str(config_path),
+                    "--probe-health",
+                    "--probe-watch-status",
+                    "--probe-timeout",
+                    "1.5",
+                ]
             )
-            probe_result = {
+            health_probe_result = {
                 "enabled": True,
+                "status": "healthy",
+                "reachable": True,
+                "http_status": 200,
+                "timeout_seconds": 1.5,
+                "service": "provider-transport-replay",
+            }
+            watch_status_probe_result = {
+                "enabled": True,
+                "target": "watch_status",
+                "endpoint": "/provider/v1/replay/watch/status",
                 "status": "healthy",
                 "reachable": True,
                 "http_status": 200,
@@ -2251,7 +2272,11 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             }
             with (
                 patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
-                patch("tdxquant.cli.probe_provider_transport_replay_health", return_value=probe_result) as mocked_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_health", return_value=health_probe_result) as mocked_probe,
+                patch(
+                    "tdxquant.cli.probe_provider_transport_replay_watch_status",
+                    return_value=watch_status_probe_result,
+                ) as mocked_watch_status_probe,
             ):
                 result = _handle_provider_replay_subcommand(args)
 
@@ -2261,10 +2286,17 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["status"]["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(result.data["status"]["runtime"]["runtime_observed"], True)
         self.assertEqual(result.data["status"]["runtime"]["health_probe"]["status"], "healthy")
+        self.assertEqual(result.data["status"]["runtime"]["watch_status_probe"]["status"], "healthy")
+        self.assertEqual(
+            result.data["status"]["runtime"]["watch_status_probe"]["endpoint"],
+            "/provider/v1/replay/watch/status",
+        )
         self.assertEqual(result.data["status"]["capabilities"]["writes_supported"], False)
         mocked_serve.assert_not_called()
         mocked_probe.assert_called_once()
         self.assertEqual(mocked_probe.call_args.kwargs["timeout_seconds"], 1.5)
+        mocked_watch_status_probe.assert_called_once()
+        self.assertEqual(mocked_watch_status_probe.call_args.kwargs["timeout_seconds"], 1.5)
 
     def test_handle_provider_replay_serve_delegates_to_foreground_server(self) -> None:
         parser = build_parser()

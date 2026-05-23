@@ -52,6 +52,7 @@ from .provider_transport_replay import (
     build_provider_transport_replay_status,
     load_provider_transport_replay_config,
     probe_provider_transport_replay_health,
+    probe_provider_transport_replay_watch_status,
     serve_provider_transport_replay,
 )
 from .models import ErrorCode, OrderRequest, Result
@@ -715,6 +716,7 @@ def _build_provider_replay_parser(
     provider_replay_status_parser = provider_replay_subparsers.add_parser("status")
     provider_replay_status_parser.add_argument("--config", required=True)
     provider_replay_status_parser.add_argument("--probe-health", action="store_true")
+    provider_replay_status_parser.add_argument("--probe-watch-status", action="store_true")
     provider_replay_status_parser.add_argument("--probe-timeout", type=float, default=1.0)
     provider_replay_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -4480,13 +4482,23 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
         )
     if args.provider_replay_command == "status":
         health_probe = None
+        watch_status_probe = None
         if args.probe_health:
             health_probe = probe_provider_transport_replay_health(config, timeout_seconds=args.probe_timeout)
+        if args.probe_watch_status:
+            watch_status_probe = probe_provider_transport_replay_watch_status(config, timeout_seconds=args.probe_timeout)
         return Result(
             ok=True,
             code=ErrorCode.OK,
             message="reported provider replay lifecycle status",
-            data={"status": build_provider_transport_replay_status(config, health_probe=health_probe), "config": config_summary},
+            data={
+                "status": build_provider_transport_replay_status(
+                    config,
+                    health_probe=health_probe,
+                    watch_status_probe=watch_status_probe,
+                ),
+                "config": config_summary,
+            },
         )
     if args.provider_replay_command == "serve":
         exit_code = serve_provider_transport_replay(config)
