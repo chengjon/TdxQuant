@@ -56,6 +56,7 @@ def build_provider_transport_replay_status(
     health_probe: dict[str, Any] | None = None,
     watch_status_probe: dict[str, Any] | None = None,
     watch_events_probe: dict[str, Any] | None = None,
+    watch_stream_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     source_kind = "default_fixture_resolution"
     if config.replay_fixture_path:
@@ -67,6 +68,7 @@ def build_provider_transport_replay_status(
     resolved_health_probe = _normalize_provider_replay_health_probe(health_probe)
     resolved_watch_status_probe = _normalize_provider_replay_watch_status_probe(watch_status_probe)
     resolved_watch_events_probe = _normalize_provider_replay_watch_events_probe(watch_events_probe)
+    resolved_watch_stream_probe = _normalize_provider_replay_watch_stream_probe(watch_stream_probe)
     return {
         "provider_id": config.provider_id,
         "service": "provider-transport-replay",
@@ -98,12 +100,14 @@ def build_provider_transport_replay_status(
                 resolved_health_probe.get("enabled")
                 or resolved_watch_status_probe.get("enabled")
                 or resolved_watch_events_probe.get("enabled")
+                or resolved_watch_stream_probe.get("enabled")
             ),
             "live_runtime_required": False,
             "live_market_session_supported": False,
             "health_probe": resolved_health_probe,
             "watch_status_probe": resolved_watch_status_probe,
             "watch_events_probe": resolved_watch_events_probe,
+            "watch_stream_probe": resolved_watch_stream_probe,
         },
         "lifecycle": {
             "mode": "foreground_process",
@@ -403,6 +407,101 @@ def probe_provider_transport_replay_watch_events(
     )
 
 
+def probe_provider_transport_replay_watch_stream(
+    config: ProviderTransportReplayConfig,
+    *,
+    timeout_seconds: float | int = 1.0,
+) -> dict[str, Any]:
+    endpoint = "/provider/v1/replay/watch/events/stream"
+    try:
+        resolved_timeout = float(timeout_seconds)
+    except (TypeError, ValueError):
+        return _build_probe_result(
+            status="invalid_timeout",
+            reachable=False,
+            timeout_seconds=None,
+            error="timeout_seconds must be numeric",
+            url=_provider_replay_watch_stream_probe_url(config),
+            target="watch_stream",
+            endpoint=endpoint,
+        )
+    if resolved_timeout <= 0:
+        return _build_probe_result(
+            status="invalid_timeout",
+            reachable=False,
+            timeout_seconds=resolved_timeout,
+            error="timeout_seconds must be positive",
+            url=_provider_replay_watch_stream_probe_url(config),
+            target="watch_stream",
+            endpoint=endpoint,
+        )
+
+    url = _provider_replay_watch_stream_probe_url(config)
+    request = Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {config.token}",
+            "X-Request-Id": uuid4().hex,
+        },
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=resolved_timeout) as response:
+            http_status = int(response.getcode())
+            content_type = str(response.headers.get("Content-Type") or "")
+            body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        details = _decode_probe_http_error(exc)
+        return _build_probe_result(
+            status="http_error",
+            reachable=True,
+            timeout_seconds=resolved_timeout,
+            http_status=exc.code,
+            error=details.get("message"),
+            error_code=details.get("code"),
+            url=url,
+            target="watch_stream",
+            endpoint=endpoint,
+        )
+    except (URLError, TimeoutError, OSError) as exc:
+        return _build_probe_result(
+            status="unreachable",
+            reachable=False,
+            timeout_seconds=resolved_timeout,
+            error=_probe_error_message(exc),
+            url=url,
+            target="watch_stream",
+            endpoint=endpoint,
+        )
+    except UnicodeDecodeError as exc:
+        return _build_probe_result(
+            status="invalid_response",
+            reachable=True,
+            timeout_seconds=resolved_timeout,
+            http_status=None,
+            error=str(exc),
+            url=url,
+            target="watch_stream",
+            endpoint=endpoint,
+        )
+
+    frame_count = sum(1 for line in body.splitlines() if line.startswith("data: "))
+    healthy = bool(http_status == 200 and "text/event-stream" in content_type and frame_count > 0)
+    return _build_probe_result(
+        status="healthy" if healthy else "unexpected_response",
+        reachable=True,
+        timeout_seconds=resolved_timeout,
+        http_status=http_status,
+        service="provider-transport-replay",
+        provider_id=config.provider_id,
+        provider_mode="replay",
+        url=url,
+        target="watch_stream",
+        endpoint=endpoint,
+        frame_count=frame_count,
+    )
+
+
 def _normalize_provider_replay_health_probe(health_probe: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(health_probe, dict):
         return {
@@ -459,6 +558,26 @@ def _normalize_provider_replay_watch_events_probe(watch_events_probe: dict[str, 
     return resolved
 
 
+def _normalize_provider_replay_watch_stream_probe(watch_stream_probe: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(watch_stream_probe, dict):
+        return {
+            "enabled": False,
+            "target": "watch_stream",
+            "endpoint": "/provider/v1/replay/watch/events/stream",
+            "status": "not_requested",
+            "reachable": None,
+            "http_status": None,
+        }
+    resolved = dict(watch_stream_probe)
+    resolved["enabled"] = True
+    resolved.setdefault("target", "watch_stream")
+    resolved.setdefault("endpoint", "/provider/v1/replay/watch/events/stream")
+    resolved.setdefault("status", "unknown")
+    resolved.setdefault("reachable", None)
+    resolved.setdefault("http_status", None)
+    return resolved
+
+
 def _provider_replay_health_probe_url(config: ProviderTransportReplayConfig) -> str:
     host = config.bind_host.strip()
     if host in {"0.0.0.0", "::"}:
@@ -486,6 +605,15 @@ def _provider_replay_watch_events_probe_url(config: ProviderTransportReplayConfi
     return f"http://{host}:{config.port}/provider/v1/replay/watch/events"
 
 
+def _provider_replay_watch_stream_probe_url(config: ProviderTransportReplayConfig) -> str:
+    host = config.bind_host.strip()
+    if host in {"0.0.0.0", "::"}:
+        host = "127.0.0.1"
+    elif ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{config.port}/provider/v1/replay/watch/events/stream?playback=immediate"
+
+
 def _build_probe_result(
     *,
     status: str,
@@ -502,6 +630,7 @@ def _build_probe_result(
     endpoint: str | None = None,
     state: str | None = None,
     event_count: int | None = None,
+    frame_count: int | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "enabled": True,
@@ -529,6 +658,8 @@ def _build_probe_result(
         result["state"] = state
     if event_count is not None:
         result["event_count"] = event_count
+    if frame_count is not None:
+        result["frame_count"] = frame_count
     return result
 
 

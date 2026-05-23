@@ -1272,6 +1272,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "--probe-health",
                 "--probe-watch-status",
                 "--probe-watch-events",
+                "--probe-watch-stream",
                 "--probe-timeout",
                 "1.5",
             ]
@@ -1282,6 +1283,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.probe_health, True)
         self.assertEqual(args.probe_watch_status, True)
         self.assertEqual(args.probe_watch_events, True)
+        self.assertEqual(args.probe_watch_stream, True)
         self.assertEqual(args.probe_timeout, 1.5)
 
     def test_task_block_read_watchlist_command_parses(self) -> None:
@@ -2251,6 +2253,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "--probe-health",
                     "--probe-watch-status",
                     "--probe-watch-events",
+                    "--probe-watch-stream",
                     "--probe-timeout",
                     "1.5",
                 ]
@@ -2284,6 +2287,17 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                 "service": "provider-transport-replay",
                 "event_count": 2,
             }
+            watch_stream_probe_result = {
+                "enabled": True,
+                "target": "watch_stream",
+                "endpoint": "/provider/v1/replay/watch/events/stream",
+                "status": "healthy",
+                "reachable": True,
+                "http_status": 200,
+                "timeout_seconds": 1.5,
+                "service": "provider-transport-replay",
+                "frame_count": 3,
+            }
             with (
                 patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
                 patch("tdxquant.cli.probe_provider_transport_replay_health", return_value=health_probe_result) as mocked_probe,
@@ -2295,6 +2309,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "tdxquant.cli.probe_provider_transport_replay_watch_events",
                     return_value=watch_events_probe_result,
                 ) as mocked_watch_events_probe,
+                patch(
+                    "tdxquant.cli.probe_provider_transport_replay_watch_stream",
+                    return_value=watch_stream_probe_result,
+                ) as mocked_watch_stream_probe,
             ):
                 result = _handle_provider_replay_subcommand(args)
 
@@ -2314,6 +2332,11 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             result.data["status"]["runtime"]["watch_events_probe"]["endpoint"],
             "/provider/v1/replay/watch/events",
         )
+        self.assertEqual(result.data["status"]["runtime"]["watch_stream_probe"]["status"], "healthy")
+        self.assertEqual(
+            result.data["status"]["runtime"]["watch_stream_probe"]["endpoint"],
+            "/provider/v1/replay/watch/events/stream",
+        )
         self.assertEqual(result.data["status"]["capabilities"]["writes_supported"], False)
         mocked_serve.assert_not_called()
         mocked_probe.assert_called_once()
@@ -2322,6 +2345,8 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(mocked_watch_status_probe.call_args.kwargs["timeout_seconds"], 1.5)
         mocked_watch_events_probe.assert_called_once()
         self.assertEqual(mocked_watch_events_probe.call_args.kwargs["timeout_seconds"], 1.5)
+        mocked_watch_stream_probe.assert_called_once()
+        self.assertEqual(mocked_watch_stream_probe.call_args.kwargs["timeout_seconds"], 1.5)
 
     def test_handle_provider_replay_serve_delegates_to_foreground_server(self) -> None:
         parser = build_parser()
