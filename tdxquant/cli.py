@@ -4755,7 +4755,14 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
 
     if governance:
         governance_view: dict[str, object] = {}
-        for key in ("decision", "requires_manual_review", "staleness_evaluated", "action_summary", "evaluation_summary"):
+        for key in (
+            "decision",
+            "requires_manual_review",
+            "staleness_evaluated",
+            "boundary",
+            "action_summary",
+            "evaluation_summary",
+        ):
             if key in governance:
                 governance_view[key] = copy.deepcopy(governance[key])
         summary_view["governance"] = governance_view

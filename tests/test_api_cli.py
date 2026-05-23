@@ -8204,6 +8204,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "decision": "manual_review",
                         "requires_manual_review": True,
                         "staleness_evaluated": True,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
                         "action_summary": {
                             "count": 1,
                             "primary_action": "review_subscription_watch_heartbeat",
@@ -8260,6 +8261,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "decision": "manual_review",
                         "requires_manual_review": True,
                         "staleness_evaluated": True,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
                         "action_summary": {
                             "count": 1,
                             "primary_action": "review_subscription_watch_heartbeat",
@@ -8281,6 +8283,7 @@ class ReportCliDispatchTests(unittest.TestCase):
         summary_payload = json.loads(stdout.getvalue())["result"]
         self.assertNotIn("control", summary_payload)
         self.assertNotIn("watch_status", summary_payload)
+        self.assertNotIn("actions", summary_payload["governance"])
 
     def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(
