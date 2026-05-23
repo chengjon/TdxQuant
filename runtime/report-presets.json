@@ -260,6 +260,18 @@
       "statuses": ["rejected", "failed"]
     }
   },
+  "audit-daily-pingan-sell-submit-once-exceptions": {
+    "command": "audit-daily",
+    "description": "当日平安券商 sell_submit_once rejected + failed trade_audit 异常复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
+      "method": "sell_submit_once",
+      "statuses": ["rejected", "failed"]
+    }
+  },
   "audit-daily-submit-once-rejected": {
     "command": "audit-daily",
     "description": "当日 buy_submit_once rejected trade_audit 拒单诊断复盘。",
@@ -303,6 +315,30 @@
       "recent_limit": 20,
       "broker": "pingan",
       "method": "buy_submit_once",
+      "status": "failed"
+    }
+  },
+  "audit-daily-pingan-sell-submit-once-rejected": {
+    "command": "audit-daily",
+    "description": "当日平安券商 sell_submit_once rejected trade_audit 拒单诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
+      "method": "sell_submit_once",
+      "status": "rejected"
+    }
+  },
+  "audit-daily-pingan-sell-submit-once-failed": {
+    "command": "audit-daily",
+    "description": "当日平安券商 sell_submit_once failed trade_audit 失败诊断复盘。",
+    "profile": "trade_audit_daily_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 20,
+      "broker": "pingan",
+      "method": "sell_submit_once",
       "status": "failed"
     }
   },
@@ -798,6 +834,18 @@
       "statuses": ["rejected", "failed"]
     }
   },
+  "audit-period-pingan-sell-submit-once-exceptions": {
+    "command": "audit-period",
+    "description": "区间平安券商 sell_submit_once rejected + failed trade_audit 异常复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
+      "method": "sell_submit_once",
+      "statuses": ["rejected", "failed"]
+    }
+  },
   "audit-period-submit-once-rejected": {
     "command": "audit-period",
     "description": "区间 buy_submit_once rejected trade_audit 拒单诊断复盘模板。",
@@ -841,6 +889,30 @@
       "recent_limit": 50,
       "broker": "pingan",
       "method": "buy_submit_once",
+      "status": "failed"
+    }
+  },
+  "audit-period-pingan-sell-submit-once-rejected": {
+    "command": "audit-period",
+    "description": "区间平安券商 sell_submit_once rejected trade_audit 拒单诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
+      "method": "sell_submit_once",
+      "status": "rejected"
+    }
+  },
+  "audit-period-pingan-sell-submit-once-failed": {
+    "command": "audit-period",
+    "description": "区间平安券商 sell_submit_once failed trade_audit 失败诊断复盘模板。",
+    "profile": "trade_audit_period_report",
+    "options": {
+      "timezone": "Asia/Shanghai",
+      "recent_limit": 50,
+      "broker": "pingan",
+      "method": "sell_submit_once",
       "status": "failed"
     }
   },

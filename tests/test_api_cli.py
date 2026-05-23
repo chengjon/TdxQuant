@@ -4255,6 +4255,33 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["steps"][1]["resolved_args"]["block_code"], "MYZXG")
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_sell_submit_once_pingan_review_preserves_sell_side(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "sell-submit-once-pingan-exception-review",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--view",
+                "summary",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["steps"][0]["entry"], "task-submit-once")
+        self.assertEqual(result.data["steps"][0]["resolved_args"]["side"], "sell")
+        self.assertEqual(result.data["steps"][1]["entry"], "audit-daily-pingan-sell-submit-once-exceptions")
+        self.assertEqual(result.data["summary_view"]["steps"][0]["resolved_args"]["side"], "sell")
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_read_zxg_review_and_export_bundle_applies_block_code_override(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

@@ -173,6 +173,24 @@
     "description": "统一入口下的当日平安券商 buy_submit_once 失败 trade_audit 诊断复盘。",
     "labels": ["report", "audit", "daily", "pingan", "submit-once", "failed", "diagnostics"]
   },
+  "audit-daily-pingan-sell-submit-once-exceptions": {
+    "source": "report",
+    "preset": "audit-daily-pingan-sell-submit-once-exceptions",
+    "description": "统一入口下的当日平安券商 sell_submit_once 异常 trade_audit 复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "sell-submit-once", "exceptions", "diagnostics"]
+  },
+  "audit-daily-pingan-sell-submit-once-rejected": {
+    "source": "report",
+    "preset": "audit-daily-pingan-sell-submit-once-rejected",
+    "description": "统一入口下的当日平安券商 sell_submit_once 拒单 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "sell-submit-once", "rejected", "diagnostics"]
+  },
+  "audit-daily-pingan-sell-submit-once-failed": {
+    "source": "report",
+    "preset": "audit-daily-pingan-sell-submit-once-failed",
+    "description": "统一入口下的当日平安券商 sell_submit_once 失败 trade_audit 诊断复盘。",
+    "labels": ["report", "audit", "daily", "pingan", "sell-submit-once", "failed", "diagnostics"]
+  },
   "audit-daily-buy-exceptions": {
     "source": "report",
     "preset": "audit-daily-buy-exceptions",
@@ -460,6 +478,24 @@
     "preset": "audit-period-pingan-submit-once-failed",
     "description": "统一入口下的区间平安券商 buy_submit_once 失败 trade_audit 诊断复盘模板。",
     "labels": ["report", "audit", "period", "pingan", "submit-once", "failed", "diagnostics"]
+  },
+  "audit-period-pingan-sell-submit-once-exceptions": {
+    "source": "report",
+    "preset": "audit-period-pingan-sell-submit-once-exceptions",
+    "description": "统一入口下的区间平安券商 sell_submit_once 异常 trade_audit 复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "sell-submit-once", "exceptions", "diagnostics"]
+  },
+  "audit-period-pingan-sell-submit-once-rejected": {
+    "source": "report",
+    "preset": "audit-period-pingan-sell-submit-once-rejected",
+    "description": "统一入口下的区间平安券商 sell_submit_once 拒单 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "sell-submit-once", "rejected", "diagnostics"]
+  },
+  "audit-period-pingan-sell-submit-once-failed": {
+    "source": "report",
+    "preset": "audit-period-pingan-sell-submit-once-failed",
+    "description": "统一入口下的区间平安券商 sell_submit_once 失败 trade_audit 诊断复盘模板。",
+    "labels": ["report", "audit", "period", "pingan", "sell-submit-once", "failed", "diagnostics"]
   },
   "audit-period-buy-exceptions": {
     "source": "report",

@@ -2549,6 +2549,7 @@ def _extract_catalog_key_fields(payload: dict[str, object]) -> dict[str, object]
     keys = (
         "block_code",
         "broker",
+        "side",
         "code",
         "price",
         "quantity",

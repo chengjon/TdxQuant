@@ -180,3 +180,19 @@ The system SHALL expose stable report presets for trade-audit daily and period w
 #### Scenario: Caller runs a broker-scoped submit-path exception report preset
 - **WHEN** a caller executes a named report preset whose target command is `audit-daily` or `audit-period` and whose defaults fix `broker=pingan`, `methods=[buy_submit_once, confirm_current]`, and `statuses=[rejected, failed]`
 - **THEN** the system MUST resolve the preset defaults and run the existing stable report workflow through the report/task path
+
+### Requirement: Report preset registry SHALL expose Ping An sell submit-once audit views
+
+The runtime report preset registry SHALL expose Ping An `sell_submit_once` trade-audit views for exception and status diagnostics.
+
+#### Scenario: Caller discovers Ping An sell submit-once daily audit presets
+
+- **WHEN** a caller loads runtime report presets
+- **THEN** the registry MUST include daily Ping An `sell_submit_once` exception, rejected, and failed presets
+- **AND** each preset MUST filter `broker=pingan` and `method=sell_submit_once`
+
+#### Scenario: Caller discovers Ping An sell submit-once period audit presets
+
+- **WHEN** a caller loads runtime report presets
+- **THEN** the registry MUST include period Ping An `sell_submit_once` exception, rejected, and failed presets
+- **AND** each preset MUST filter `broker=pingan` and `method=sell_submit_once`
