@@ -79,11 +79,23 @@ class ApiCliParserTests(unittest.TestCase):
 
     def test_bridge_watch_status_command_parses(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"])
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--heartbeat-stale-after-seconds",
+                "60",
+            ]
+        )
         self.assertEqual(args.command, "bridge")
         self.assertEqual(args.bridge_command, "watch-status")
         self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
         self.assertEqual(args.worker, "worker-a")
+        self.assertEqual(args.heartbeat_stale_after_seconds, 60.0)
 
     def test_bridge_watch_start_command_parses(self) -> None:
         parser = build_parser()
@@ -6876,7 +6888,16 @@ class ReportCliDispatchTests(unittest.TestCase):
 
     def test_handle_bridge_watch_status_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(
-            ["bridge", "watch-status", "--registry", "runtime/bridge/master-workers.json", "--worker", "worker-a"]
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--heartbeat-stale-after-seconds",
+                "60",
+            ]
         )
         with (
             patch("tdxquant.cli.run_bridge_watch_status", return_value={"ok": True, "result": {"status": "idle"}}) as mocked_run,
@@ -6885,7 +6906,11 @@ class ReportCliDispatchTests(unittest.TestCase):
             exit_code = _handle_bridge_subcommand(args)
 
         self.assertEqual(exit_code, 0)
-        mocked_run.assert_called_once_with(registry_path="runtime/bridge/master-workers.json", worker_id="worker-a")
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            heartbeat_stale_after_seconds=60.0,
+        )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "idle"}})
 
     def test_handle_bridge_watch_start_dispatches_registry_client(self) -> None:

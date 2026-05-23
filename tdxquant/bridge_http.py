@@ -305,7 +305,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         self._write_control_result(result, request_id=request_id)
 
     def _handle_watch_status(self, request_id: str) -> None:
-        result = self.server.bridge_controller.status()
+        result = self.server.bridge_controller.status(
+            heartbeat_stale_after_seconds=self._query_optional_float("heartbeat_stale_after_seconds")
+        )
         self._write_json(
             200,
             build_bridge_success(
@@ -559,6 +561,20 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return int(raw_value)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"query parameter {name} must be an integer") from exc
+
+    def _query_optional_float(self, name: str) -> float | None:
+        parsed = urlparse(self.path)
+        query = parse_qs(parsed.query)
+        if name not in query:
+            return None
+        raw_value = query.get(name, [""])[0]
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"query parameter {name} must be a number") from exc
+        if value <= 0:
+            raise ValueError(f"query parameter {name} must be positive")
+        return value
 
     @staticmethod
     def _optional_int(value: Any) -> int | None:

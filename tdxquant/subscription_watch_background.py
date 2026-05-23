@@ -10,6 +10,7 @@ import signal
 import subprocess
 import threading
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 from .subscription_watch_run import build_subscription_watch_run_paths
@@ -25,23 +26,26 @@ def build_subscription_watch_status_summary(
     *,
     control: dict[str, Any] | None,
     watch_status: dict[str, Any] | None,
+    heartbeat_stale_after_seconds: float | int | None = None,
+    now_utc: datetime | str | None = None,
 ) -> dict[str, Any]:
     resolved_control = control if isinstance(control, dict) else {}
     resolved_status = watch_status if isinstance(watch_status, dict) else {}
     state = _optional_str(resolved_status.get("state")) or _optional_str(resolved_control.get("state")) or "unknown"
     run_id = _optional_str(resolved_status.get("run_id")) or _optional_str(resolved_control.get("run_id"))
     active = bool(resolved_control.get("active"))
+    heartbeat = _build_heartbeat_summary(
+        heartbeat_at=_optional_str(resolved_status.get("heartbeat_at")),
+        heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
+        now_utc=now_utc,
+    )
     return {
         "schema_version": SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION,
         "overall_status": _subscription_watch_overall_status(state=state, active=active),
         "state": state,
         "active": active,
         "run_id": run_id,
-        "heartbeat": {
-            "status": "present" if _optional_str(resolved_status.get("heartbeat_at")) else "missing",
-            "heartbeat_at": _optional_str(resolved_status.get("heartbeat_at")),
-            "staleness": "not_evaluated",
-        },
+        "heartbeat": heartbeat,
         "watermark": {
             "event_count": _optional_int(resolved_status.get("event_count"), default=0),
             "unique_symbol_count": _optional_int(resolved_status.get("unique_symbol_count"), default=0),
@@ -63,8 +67,76 @@ def build_subscription_watch_status_summary(
             ),
             "last_error": resolved_status.get("last_error") if isinstance(resolved_status.get("last_error"), dict) else None,
         },
-        "boundary": "summary_projection_only; does not evaluate wall-clock heartbeat staleness or change reconnect/backoff behavior",
+        "boundary": "summary_projection_only; optional heartbeat staleness evaluation only; does not change reconnect/backoff behavior",
     }
+
+
+def _build_heartbeat_summary(
+    *,
+    heartbeat_at: str | None,
+    heartbeat_stale_after_seconds: float | int | None,
+    now_utc: datetime | str | None,
+) -> dict[str, Any]:
+    heartbeat = {
+        "status": "present" if heartbeat_at else "missing",
+        "heartbeat_at": heartbeat_at,
+        "staleness": "not_evaluated",
+    }
+    if not heartbeat_at or heartbeat_stale_after_seconds is None:
+        return heartbeat
+    try:
+        stale_after_seconds = float(heartbeat_stale_after_seconds)
+    except (TypeError, ValueError):
+        heartbeat["staleness"] = "invalid_threshold"
+        return heartbeat
+    if stale_after_seconds <= 0:
+        heartbeat["staleness"] = "invalid_threshold"
+        heartbeat["stale_after_seconds"] = stale_after_seconds
+        return heartbeat
+    try:
+        heartbeat_dt = _parse_rfc3339_datetime(heartbeat_at)
+        evaluated_at_dt = _coerce_utc_datetime(now_utc)
+    except ValueError:
+        heartbeat["staleness"] = "invalid_timestamp"
+        heartbeat["stale_after_seconds"] = stale_after_seconds
+        return heartbeat
+    age_seconds = max(0.0, (evaluated_at_dt - heartbeat_dt).total_seconds())
+    heartbeat.update(
+        {
+            "staleness": "stale" if age_seconds > stale_after_seconds else "fresh",
+            "age_seconds": age_seconds,
+            "stale_after_seconds": stale_after_seconds,
+            "evaluated_at": evaluated_at_dt.isoformat(),
+        }
+    )
+    return heartbeat
+
+
+def _coerce_utc_datetime(value: datetime | str | None) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    if isinstance(value, datetime):
+        candidate = value
+    else:
+        candidate = _parse_rfc3339_datetime(value)
+    if candidate.tzinfo is None:
+        candidate = candidate.replace(tzinfo=timezone.utc)
+    return candidate.astimezone(timezone.utc)
+
+
+def _parse_rfc3339_datetime(value: str) -> datetime:
+    text = str(value).strip()
+    if not text:
+        raise ValueError("empty timestamp")
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"invalid timestamp: {value}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _subscription_watch_overall_status(*, state: str, active: bool) -> str:
@@ -818,7 +890,13 @@ class SubscriptionWatchBackgroundController:
             finally:
                 _release_control_lock(control_lock)
 
-    def status(self, *, run_id: str | None = None) -> dict[str, Any]:
+    def status(
+        self,
+        *,
+        run_id: str | None = None,
+        heartbeat_stale_after_seconds: float | int | None = None,
+        now_utc: datetime | str | None = None,
+    ) -> dict[str, Any]:
         control = self._background_state()
         resolved_run_id = self._resolve_run_id(run_id=run_id)
         watch_status = None
@@ -828,7 +906,12 @@ class SubscriptionWatchBackgroundController:
         return {
             "control": control,
             "watch_status": watch_status,
-            "status_summary": build_subscription_watch_status_summary(control=control, watch_status=watch_status),
+            "status_summary": build_subscription_watch_status_summary(
+                control=control,
+                watch_status=watch_status,
+                heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
+                now_utc=now_utc,
+            ),
         }
 
     def list_runs(self) -> dict[str, Any]:

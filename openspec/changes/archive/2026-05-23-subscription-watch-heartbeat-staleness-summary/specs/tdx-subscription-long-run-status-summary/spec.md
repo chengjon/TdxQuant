@@ -1,22 +1,4 @@
-# tdx-subscription-long-run-status-summary Specification
-
-## Purpose
-TBD - created by archiving change subscription-long-run-status-summary. Update Purpose after archive.
-## Requirements
-### Requirement: Subscription long-run status SHALL expose stable summary projection
-The system SHALL expose a stable `status_summary` projection for subscription-watch background status responses while preserving raw `control` and `watch_status` payloads.
-
-#### Scenario: Caller inspects stopped background status
-- **WHEN** a caller requests background subscription-watch status with no active run
-- **THEN** the response MUST include `status_summary`
-- **AND** the summary MUST identify the state as `stopped`
-- **AND** the summary MUST include heartbeat, watermark, and reconnect sub-objects
-
-#### Scenario: Caller inspects active background status
-- **WHEN** a caller requests background subscription-watch status for an active run with a persisted status payload
-- **THEN** the summary MUST include the active run id
-- **AND** the summary MUST include event watermark metadata from the persisted status payload
-- **AND** the raw `control` and `watch_status` payloads MUST remain available
+## MODIFIED Requirements
 
 ### Requirement: Subscription long-run status summary SHALL surface resilience metadata without changing lifecycle behavior
 The system SHALL surface reconnect and degraded metadata in the status summary and MUST NOT change process lifecycle, reconnect scheduling, or bridge event-stream behavior.
@@ -36,4 +18,3 @@ The system SHALL surface reconnect and degraded metadata in the status summary a
 - **THEN** the summary heartbeat sub-object MUST include the evaluated staleness state, age in seconds, threshold seconds, and evaluation timestamp
 - **AND** the response MUST preserve the raw `control` and `watch_status` payloads
 - **AND** the evaluation MUST NOT change process lifecycle, reconnect scheduling, or bridge event-stream behavior
-

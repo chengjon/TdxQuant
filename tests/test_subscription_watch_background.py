@@ -15,6 +15,7 @@ from tdxquant.subscription_watch_background import (
     SubscriptionWatchBackgroundController,
     SubscriptionWatchBackgroundPaths,
     build_background_paths,
+    build_subscription_watch_status_summary,
     reconcile_background_state,
     read_active_payload,
     write_terminal_background_state,
@@ -551,6 +552,49 @@ def test_status_view_returns_explicit_empty_watch_status_when_no_run_is_active(t
     assert status_view["status_summary"]["reconnect"]["reconnect_count"] == 0
 
 
+def test_status_summary_keeps_heartbeat_staleness_not_evaluated_without_threshold() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "running", "active": True, "run_id": "run-001"},
+        watch_status={"run_id": "run-001", "state": "running", "heartbeat_at": "2026-05-17T09:30:00+00:00"},
+    )
+
+    assert summary["heartbeat"] == {
+        "status": "present",
+        "heartbeat_at": "2026-05-17T09:30:00+00:00",
+        "staleness": "not_evaluated",
+    }
+
+
+@pytest.mark.parametrize(
+    ("now_utc", "threshold", "expected_staleness", "expected_age"),
+    [
+        ("2026-05-17T09:31:30+00:00", 60, "stale", 90.0),
+        ("2026-05-17T09:30:45+00:00", 60, "fresh", 45.0),
+    ],
+)
+def test_status_summary_evaluates_heartbeat_staleness_when_threshold_is_explicit(
+    now_utc: str,
+    threshold: int,
+    expected_staleness: str,
+    expected_age: float,
+) -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "running", "active": True, "run_id": "run-001"},
+        watch_status={"run_id": "run-001", "state": "running", "heartbeat_at": "2026-05-17T09:30:00+00:00"},
+        heartbeat_stale_after_seconds=threshold,
+        now_utc=now_utc,
+    )
+
+    assert summary["heartbeat"] == {
+        "status": "present",
+        "heartbeat_at": "2026-05-17T09:30:00+00:00",
+        "staleness": expected_staleness,
+        "age_seconds": expected_age,
+        "stale_after_seconds": float(threshold),
+        "evaluated_at": now_utc,
+    }
+
+
 def test_status_view_returns_active_control_and_current_run_status(tmp_path: Path) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     run_dir = tmp_path / "run-001"
@@ -600,6 +644,43 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
         "last_symbol": "688318.SH",
         "last_source_ts": None,
     }
+
+
+def test_status_view_evaluates_heartbeat_staleness_when_threshold_is_passed(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    run_dir = tmp_path / "run-001"
+    run_dir.mkdir(parents=True)
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
+    controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    (run_dir / "status.json").write_text(
+        json.dumps(
+            {
+                "run_id": "run-001",
+                "state": "running",
+                "heartbeat_at": "2026-05-17T09:30:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status_view = controller.status(
+        heartbeat_stale_after_seconds=60,
+        now_utc="2026-05-17T09:31:30+00:00",
+    )
+
+    assert status_view["status_summary"]["heartbeat"]["staleness"] == "stale"
+    assert status_view["status_summary"]["heartbeat"]["age_seconds"] == 90.0
+    assert status_view["watch_status"]["heartbeat_at"] == "2026-05-17T09:30:00+00:00"
 
 
 @pytest.mark.parametrize("state", ["reconnecting", "degraded"])

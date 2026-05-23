@@ -653,6 +653,7 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_status_parser = bridge_subparsers.add_parser("watch-status")
     bridge_watch_status_parser.add_argument("--registry", required=True)
     bridge_watch_status_parser.add_argument("--worker", required=True)
+    bridge_watch_status_parser.add_argument("--heartbeat-stale-after-seconds", type=float)
 
     bridge_watch_start_parser = bridge_subparsers.add_parser("watch-start")
     bridge_watch_start_parser.add_argument("--registry", required=True)
@@ -4309,7 +4310,13 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
         if args.bridge_command == "serve":
             return serve_bridge_from_config(args.config)
         if args.bridge_command == "watch-status":
-            return _emit_bridge_payload(run_bridge_watch_status(registry_path=args.registry, worker_id=args.worker))
+            return _emit_bridge_payload(
+                run_bridge_watch_status(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    heartbeat_stale_after_seconds=args.heartbeat_stale_after_seconds,
+                )
+            )
         if args.bridge_command == "watch-start":
             return _emit_bridge_payload(
                 run_bridge_watch_start(

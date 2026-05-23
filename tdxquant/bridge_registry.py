@@ -131,12 +131,20 @@ def call_worker_text(
         raise RuntimeError(f"bridge worker request failed: {_normalize_url_error_reason(exc.reason)}") from exc
 
 
-def run_bridge_watch_status(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
+def run_bridge_watch_status(
+    *,
+    registry_path: str | Path,
+    worker_id: str,
+    heartbeat_stale_after_seconds: float | int | None = None,
+) -> dict[str, Any]:
     worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
     return call_worker(
         worker,
         method="GET",
-        route="/bridge/v1/watch/status",
+        route=_build_route(
+            "/bridge/v1/watch/status",
+            heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
+        ),
         token=resolve_worker_token(worker),
     )
 

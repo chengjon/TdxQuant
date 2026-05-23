@@ -390,6 +390,31 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["watch_status"]["reconnect_count"], 1)
         self.assertEqual(payload["result"]["watch_status"]["last_error"]["code"], "SESSION_LOST")
 
+    def test_watch_status_forwards_heartbeat_stale_threshold_to_controller(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(
+                    f"{base_url}/bridge/v1/watch/status?heartbeat_stale_after_seconds=60",
+                    token="secret-token",
+                )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(controller.status_calls, [{"heartbeat_stale_after_seconds": 60.0}])
+
     def test_watch_event_stream_projects_status_and_event_rows_as_sse(self) -> None:
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()
