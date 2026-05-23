@@ -2725,6 +2725,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "entry_count": validation.get("entry_count"),
             "bundle_count": validation.get("bundle_count"),
             "task_report_bundle_count": validation.get("task_report_bundle_count"),
+            "task_report_bundle_samples": copy.deepcopy(validation.get("task_report_bundle_samples", [])),
             "invalid_count": validation.get("invalid_count"),
             "valid": validation.get("valid"),
             "non_execution": validation.get("non_execution"),
@@ -3384,6 +3385,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     validated_entry_count = 0
     validated_bundle_count = 0
     task_report_bundle_count = 0
+    task_report_bundle_samples: list[str] = []
 
     if effective_kind in {"entry", "all"}:
         if selected_entry:
@@ -3414,6 +3416,8 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                 step_sources = {step["source"] for step in resolved_bundle["steps"]}
                 if "task" in step_sources and "report" in step_sources:
                     task_report_bundle_count += 1
+                    if len(task_report_bundle_samples) < 5:
+                        task_report_bundle_samples.append(bundle_name)
             except ValueError as exc:
                 errors.append({"target_type": "bundle", "target": bundle_name, "message": str(exc)})
 
@@ -3425,6 +3429,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "entry_count": validated_entry_count,
         "bundle_count": validated_bundle_count,
         "task_report_bundle_count": task_report_bundle_count,
+        "task_report_bundle_samples": task_report_bundle_samples,
         "invalid_count": len(errors),
         "valid": not errors,
         "errors": errors,

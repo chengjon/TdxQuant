@@ -4039,6 +4039,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["valid"], True)
         self.assertGreaterEqual(validation["bundle_count"], validation["task_report_bundle_count"])
         self.assertGreater(validation["task_report_bundle_count"], 0)
+        self.assertEqual(len(validation["task_report_bundle_samples"]), 5)
+        self.assertEqual(validation["task_report_bundle_samples"][0], "buy-pingan-complete-review")
 
     def test_handle_catalog_validate_summary_view_projects_counts_without_execution(self) -> None:
         parser = build_parser()
@@ -4057,6 +4059,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["entry_count"], 0)
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
+        self.assertEqual(summary_view["task_report_bundle_samples"], validation["task_report_bundle_samples"])
+        self.assertEqual(summary_view["task_report_bundle_samples"][0], "buy-pingan-complete-review")
         self.assertEqual(summary_view["invalid_count"], 0)
         self.assertEqual(summary_view["valid"], True)
         self.assertEqual(summary_view["non_execution"], True)
@@ -9748,6 +9752,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                     "selected_label": "followup",
                     "bundle_count": 12,
                     "task_report_bundle_count": 12,
+                    "task_report_bundle_samples": ["buy-pingan-complete-review", "confirm-complete-review"],
                     "invalid_count": 0,
                     "valid": True,
                     "non_execution": True,
@@ -9767,6 +9772,7 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertEqual(parsed["mode"], "validate")
         self.assertEqual(parsed["kind"], "bundle")
         self.assertEqual(parsed["selected_label"], "followup")
+        self.assertEqual(parsed["task_report_bundle_samples"], ["buy-pingan-complete-review", "confirm-complete-review"])
         self.assertEqual(parsed["non_execution"], True)
 
     def test_main_api_snapshot_prints_provider_result_envelope(self) -> None:
