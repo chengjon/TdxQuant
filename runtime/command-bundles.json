@@ -1601,6 +1601,24 @@
       }
     ]
   },
+  "buy-submit-once-pingan-complete-review": {
+    "description": "完整 buy submit-once 流程后继续查看当日成功成交日报和当日平安券商已确认 trade_audit 复盘。",
+    "labels": ["trading", "submit", "pingan", "buy-submit-once", "audit", "success", "followup"],
+    "steps": [
+      {
+        "name": "trade",
+        "entry": "task-buy-submit-once"
+      },
+      {
+        "name": "success",
+        "entry": "daily-success"
+      },
+      {
+        "name": "audit",
+        "entry": "audit-daily-pingan-confirmed"
+      }
+    ]
+  },
   "buy-submit-once-pingan-rejection-review": {
     "description": "完整 buy submit-once 流程后继续回看当日平安券商 buy_submit_once rejected trade_audit 拒单诊断复盘。",
     "labels": ["trading", "submit", "pingan", "buy-submit-once", "audit", "rejected", "followup"],
