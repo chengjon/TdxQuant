@@ -36,6 +36,17 @@ OPENSPEC_EVIDENCE_RE = re.compile(
     r"OpenSpec(?:\s+覆盖)?\s+(?P<references>`[^`]+`(?:\s*(?:/|、|,|，|至|和)\s*`[^`]+`)*)"
 )
 BACKTICK_VALUE_RE = re.compile(r"`([^`]+)`")
+LOCAL_EVIDENCE_PATH_PREFIXES = (
+    "docs/",
+    "openspec/changes/archive/",
+    "openspec/specs/",
+    "runtime/",
+    "scripts/",
+    "tdxquant/",
+    "tests/",
+)
+AMBIGUOUS_PATH_VALUE_RE = re.compile(r"[\s*?\[\]{}$]")
+FILE_SEGMENT_BEFORE_END_RE = re.compile(r"\.[^/]+/")
 
 
 @dataclass(frozen=True)
@@ -99,6 +110,40 @@ def _openspec_change_exists(root: Path, change_id: str) -> bool:
     return False
 
 
+def _is_literal_local_evidence_path(value: str) -> bool:
+    if not value or "\\" in value or "://" in value:
+        return False
+    if AMBIGUOUS_PATH_VALUE_RE.search(value):
+        return False
+    if FILE_SEGMENT_BEFORE_END_RE.search(value):
+        return False
+    if not any(value.startswith(prefix) for prefix in LOCAL_EVIDENCE_PATH_PREFIXES):
+        return False
+    path = Path(value)
+    return not path.is_absolute() and ".." not in path.parts
+
+
+def _extract_local_evidence_paths(evidence: str) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+    for value in (match.strip() for match in BACKTICK_VALUE_RE.findall(evidence)):
+        if value in seen or not _is_literal_local_evidence_path(value):
+            continue
+        seen.add(value)
+        paths.append(value)
+    return paths
+
+
+def _local_evidence_path_exists(root: Path, relative_path: str) -> bool:
+    root = root.resolve()
+    evidence_path = (root / relative_path).resolve()
+    try:
+        evidence_path.relative_to(root)
+    except ValueError:
+        return False
+    return evidence_path.exists()
+
+
 def validate_registry(root: Path) -> tuple[list[FeatureRow], list[str]]:
     errors: list[str] = []
     function_tree_path = root / "FUNCTION_TREE.md"
@@ -133,6 +178,9 @@ def validate_registry(root: Path) -> tuple[list[FeatureRow], list[str]]:
         for change_id in _extract_openspec_change_ids(row.evidence):
             if not _openspec_change_exists(root, change_id):
                 errors.append(f"line {row.line_number} {row.node_id}: missing OpenSpec evidence {change_id}")
+        for evidence_path in _extract_local_evidence_paths(row.evidence):
+            if not _local_evidence_path_exists(root, evidence_path):
+                errors.append(f"line {row.line_number} {row.node_id}: missing local evidence path {evidence_path}")
 
     return rows, errors
 

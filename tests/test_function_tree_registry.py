@@ -150,6 +150,61 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
             self.assertIn("A-01", result.stderr)
             self.assertIn("missing-change", result.stderr)
 
+    def test_validator_accepts_existing_local_evidence_paths(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "tests").mkdir()
+            (root / "scripts").mkdir()
+            (root / "tests" / "test_registry.py").write_text("def test_ok():\n    pass\n", encoding="utf-8")
+            (root / "scripts" / "validate_registry.py").write_text("print('ok')\n", encoding="utf-8")
+            _write_function_tree(
+                root,
+                """
+                | ID | 功能 | 状态 | 证据 | 边界 |
+                | --- | --- | --- | --- | --- |
+                | A-01 | sample | `[已实现]` | `tests/test_registry.py`；`scripts/validate_registry.py` | implemented boundary |
+                """,
+            )
+
+            result = _run_validator(root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("rows=1", result.stdout)
+
+    def test_validator_rejects_missing_local_evidence_path(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_function_tree(
+                root,
+                """
+                | ID | 功能 | 状态 | 证据 | 边界 |
+                | --- | --- | --- | --- | --- |
+                | A-01 | sample | `[已实现]` | `tests/missing_registry_test.py` | implemented boundary |
+                """,
+            )
+
+            result = _run_validator(root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("A-01", result.stderr)
+            self.assertIn("tests/missing_registry_test.py", result.stderr)
+
+    def test_validator_ignores_non_literal_evidence_paths(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_function_tree(
+                root,
+                """
+                | ID | 功能 | 状态 | 证据 | 边界 |
+                | --- | --- | --- | --- | --- |
+                | A-01 | sample | `[已实现]` | `build_subscription_watch_status_summary()`；`catalog validate --kind all`；`runtime/trade-audits/*`；`runtime/watchlist-imports/zxg-watchlist-import.example.json/csv/txt` | implemented boundary |
+                """,
+            )
+
+            result = _run_validator(root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
