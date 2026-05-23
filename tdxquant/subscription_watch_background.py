@@ -20,6 +20,9 @@ DEFAULT_START_TIMEOUT_SECONDS = 10
 DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
 ACTIVE_PROCESS_STATES = {"starting", "running", "reconnecting", "degraded", "stopping"}
 SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION = "tdx.subscription_watch.status_summary.v1"
+SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
+    "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes"
+)
 
 
 def build_subscription_watch_status_summary(
@@ -51,9 +54,10 @@ def build_subscription_watch_status_summary(
         watermark_stale_after_seconds=watermark_stale_after_seconds,
         now_utc=now_utc,
     )
+    overall_status = _subscription_watch_overall_status(state=state, active=active)
     return {
         "schema_version": SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION,
-        "overall_status": _subscription_watch_overall_status(state=state, active=active),
+        "overall_status": overall_status,
         "state": state,
         "active": active,
         "run_id": run_id,
@@ -71,6 +75,11 @@ def build_subscription_watch_status_summary(
             ),
             "last_error": resolved_status.get("last_error") if isinstance(resolved_status.get("last_error"), dict) else None,
         },
+        "governance": _build_subscription_watch_governance_summary(
+            overall_status=overall_status,
+            heartbeat=heartbeat,
+            watermark=watermark,
+        ),
         "boundary": "summary_projection_only; optional heartbeat/watermark staleness evaluation only; does not change reconnect/backoff behavior",
     }
 
@@ -168,6 +177,32 @@ def _build_watermark_summary(
         }
     )
     return watermark
+
+
+def _build_subscription_watch_governance_summary(
+    *,
+    overall_status: str,
+    heartbeat: dict[str, Any],
+    watermark: dict[str, Any],
+) -> dict[str, Any]:
+    reasons: list[str] = []
+    if overall_status in {"reconnecting", "degraded", "failed"}:
+        reasons.append(f"overall_status:{overall_status}")
+
+    staleness_evaluated = False
+    for name, summary in (("heartbeat", heartbeat), ("watermark", watermark)):
+        staleness = summary.get("staleness")
+        if staleness != "not_evaluated":
+            staleness_evaluated = True
+        if staleness == "stale":
+            reasons.append(f"{name}:stale")
+
+    return {
+        "decision": "manual_review" if reasons else "observe",
+        "reasons": reasons,
+        "staleness_evaluated": staleness_evaluated,
+        "boundary": SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY,
+    }
 
 
 def _coerce_utc_datetime(value: datetime | str | None) -> datetime:

@@ -639,6 +639,56 @@ def test_status_summary_evaluates_watermark_staleness_when_threshold_is_explicit
     assert summary["watermark"]["evaluated_at"] == now_utc
 
 
+def test_status_summary_governance_observes_without_stale_thresholds() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "running", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "running",
+            "heartbeat_at": "2026-05-17T09:30:00+00:00",
+            "last_event_ts": "2026-05-17T09:30:00+00:00",
+        },
+    )
+
+    assert summary["governance"] == {
+        "decision": "observe",
+        "reasons": [],
+        "staleness_evaluated": False,
+        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+    }
+
+
+@pytest.mark.parametrize("state", ["reconnecting", "degraded", "failed"])
+def test_status_summary_governance_requests_manual_review_for_resilience_states(state: str) -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": state, "active": True, "run_id": "run-001"},
+        watch_status={"run_id": "run-001", "state": state},
+    )
+
+    assert summary["governance"]["decision"] == "manual_review"
+    assert summary["governance"]["staleness_evaluated"] is False
+    assert summary["governance"]["reasons"] == [f"overall_status:{state}"]
+
+
+def test_status_summary_governance_requests_manual_review_for_explicit_stale_inputs() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "running", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "running",
+            "heartbeat_at": "2026-05-17T09:30:00+00:00",
+            "last_event_ts": "2026-05-17T09:30:00+00:00",
+        },
+        heartbeat_stale_after_seconds=60,
+        watermark_stale_after_seconds=60,
+        now_utc="2026-05-17T09:31:30+00:00",
+    )
+
+    assert summary["governance"]["decision"] == "manual_review"
+    assert summary["governance"]["staleness_evaluated"] is True
+    assert summary["governance"]["reasons"] == ["heartbeat:stale", "watermark:stale"]
+
+
 def test_status_view_returns_active_control_and_current_run_status(tmp_path: Path) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     run_dir = tmp_path / "run-001"
@@ -689,6 +739,8 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
         "last_source_ts": None,
         "staleness": "not_evaluated",
     }
+    assert status_view["status_summary"]["governance"]["decision"] == "observe"
+    assert status_view["status_summary"]["governance"]["staleness_evaluated"] is False
 
 
 def test_status_view_evaluates_heartbeat_staleness_when_threshold_is_passed(tmp_path: Path) -> None:
