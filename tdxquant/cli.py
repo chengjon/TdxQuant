@@ -48,7 +48,11 @@ from .bridge_registry import (
     run_bridge_watch_stop,
 )
 from .bridge_http import serve_bridge_from_config
-from .provider_transport_replay import load_provider_transport_replay_config, serve_provider_transport_replay
+from .provider_transport_replay import (
+    build_provider_transport_replay_status,
+    load_provider_transport_replay_config,
+    serve_provider_transport_replay,
+)
 from .models import ErrorCode, OrderRequest, Result
 from .result_contract import DEFAULT_CAPABILITY_VERSION, DEFAULT_SCHEMA_VERSION, build_runtime_metadata, format_rfc3339, utc_now
 from .api.bridge import (
@@ -704,6 +708,10 @@ def _build_provider_replay_parser(
     provider_replay_config_check_parser = provider_replay_subparsers.add_parser("config-check")
     provider_replay_config_check_parser.add_argument("--config", required=True)
     provider_replay_config_check_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    provider_replay_status_parser = provider_replay_subparsers.add_parser("status")
+    provider_replay_status_parser.add_argument("--config", required=True)
+    provider_replay_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     return provider_replay_parser
 
@@ -4402,6 +4410,13 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             code=ErrorCode.OK,
             message="validated provider replay config",
             data={"config": config_summary},
+        )
+    if args.provider_replay_command == "status":
+        return Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="reported provider replay lifecycle status",
+            data={"status": build_provider_transport_replay_status(config), "config": config_summary},
         )
     if args.provider_replay_command == "serve":
         exit_code = serve_provider_transport_replay(config)

@@ -19,6 +19,14 @@ from .replay_provider import (
 REPLAY_TRANSPORT_VERSION = "provider-transport-replay.v1"
 WATCH_EVENT_STREAM_SCHEMA_VERSION = "tdx.bridge.watch.event_stream.v1"
 WATCH_TERMINAL_STATES = {"completed", "failed", "stopped", "stopping", "cancelled"}
+REPLAY_READ_ONLY_ENDPOINTS = [
+    "/provider/v1/replay/health",
+    "/provider/v1/replay/fixtures",
+    "/provider/v1/replay/result",
+    "/provider/v1/replay/watch/status",
+    "/provider/v1/replay/watch/events",
+    "/provider/v1/replay/watch/events/stream",
+]
 
 
 @dataclass(frozen=True)
@@ -38,6 +46,62 @@ class ProviderTransportReplayConfig:
             raise ValueError("bind_host is required")
         if not self.token:
             raise ValueError("token is required")
+
+
+def build_provider_transport_replay_status(config: ProviderTransportReplayConfig) -> dict[str, Any]:
+    source_kind = "default_fixture_resolution"
+    if config.replay_fixture_path:
+        source_kind = "fixture_path"
+    elif config.replay_fixture:
+        source_kind = "built_in_fixture"
+
+    master_allowlist = list(config.master_allowlist or [])
+    return {
+        "provider_id": config.provider_id,
+        "service": "provider-transport-replay",
+        "provider_mode": "replay",
+        "transport": "http",
+        "transport_mode": "replay_only",
+        "schema_version": REPLAY_TRANSPORT_VERSION,
+        "bind": {
+            "host": config.bind_host,
+            "port": config.port,
+        },
+        "security": {
+            "bearer_token_required": True,
+            "source_allowlist_enabled": bool(master_allowlist),
+            "master_allowlist_count": len(master_allowlist),
+        },
+        "replay_source": {
+            "source_kind": source_kind,
+            "fixture": config.replay_fixture,
+            "fixture_path": config.replay_fixture_path,
+        },
+        "capabilities": {
+            "read_only": True,
+            "writes_supported": False,
+            "endpoints": list(REPLAY_READ_ONLY_ENDPOINTS),
+        },
+        "runtime": {
+            "runtime_observed": False,
+            "live_runtime_required": False,
+            "live_market_session_supported": False,
+        },
+        "lifecycle": {
+            "mode": "foreground_process",
+            "start_stop_managed": False,
+            "daemon_managed": False,
+            "scheduler_managed": False,
+            "restart_policy": "not_managed",
+        },
+        "boundaries": [
+            "fixture-backed replay only",
+            "read-only provider surface",
+            "no daemon start/stop lifecycle management",
+            "no scheduler or restart governance",
+            "no live market session",
+        ],
+    }
 
 
 def build_replay_transport_success(

@@ -10,8 +10,40 @@ from urllib.request import Request, urlopen
 from tdxquant.provider_transport_replay import (
     ProviderTransportReplayConfig,
     ProviderTransportReplayHTTPServer,
+    build_provider_transport_replay_status,
 )
 from tdxquant.replay_fixtures import list_provider_replay_fixtures, load_provider_replay_fixture
+
+
+class ProviderTransportReplayStatusTests(unittest.TestCase):
+    def test_status_reports_replay_only_foreground_lifecycle_boundary(self) -> None:
+        config = ProviderTransportReplayConfig(
+            provider_id="provider-replay-a",
+            bind_host="127.0.0.1",
+            port=0,
+            token="secret-token",
+            master_allowlist=["127.0.0.1"],
+            replay_fixture="market-snapshot-default",
+        )
+
+        status = build_provider_transport_replay_status(config)
+
+        self.assertEqual(status["provider_id"], "provider-replay-a")
+        self.assertEqual(status["transport_mode"], "replay_only")
+        self.assertEqual(status["bind"]["host"], "127.0.0.1")
+        self.assertEqual(status["bind"]["port"], 0)
+        self.assertEqual(status["replay_source"]["fixture"], "market-snapshot-default")
+        self.assertEqual(status["runtime"]["runtime_observed"], False)
+        self.assertEqual(status["runtime"]["live_runtime_required"], False)
+        self.assertEqual(status["runtime"]["live_market_session_supported"], False)
+        self.assertEqual(status["lifecycle"]["mode"], "foreground_process")
+        self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
+        self.assertEqual(status["lifecycle"]["daemon_managed"], False)
+        self.assertEqual(status["lifecycle"]["restart_policy"], "not_managed")
+        self.assertEqual(status["capabilities"]["read_only"], True)
+        self.assertEqual(status["capabilities"]["writes_supported"], False)
+        self.assertIn("/provider/v1/replay/watch/events/stream", status["capabilities"]["endpoints"])
+        self.assertIn("no daemon start/stop lifecycle management", status["boundaries"])
 
 
 class ProviderTransportReplayHTTPTests(unittest.TestCase):
