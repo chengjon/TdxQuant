@@ -197,8 +197,10 @@ def _build_subscription_watch_governance_summary(
         if staleness == "stale":
             reasons.append(f"{name}:stale")
 
+    requires_manual_review = bool(reasons)
     return {
-        "decision": "manual_review" if reasons else "observe",
+        "decision": "manual_review" if requires_manual_review else "observe",
+        "requires_manual_review": requires_manual_review,
         "reasons": reasons,
         "actions": _build_subscription_watch_governance_actions(reasons),
         "staleness_evaluated": staleness_evaluated,
