@@ -2819,6 +2819,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "bundle_label_counts": copy.deepcopy(validation.get("bundle_label_counts", {})),
             "bundle_step_source_counts": copy.deepcopy(validation.get("bundle_step_source_counts", {})),
             "bundle_step_name_counts": copy.deepcopy(validation.get("bundle_step_name_counts", {})),
+            "bundle_step_entry_counts": copy.deepcopy(validation.get("bundle_step_entry_counts", {})),
             "task_report_bundle_count": validation.get("task_report_bundle_count"),
             "task_report_bundle_step_count": validation.get("task_report_bundle_step_count"),
             "task_report_bundle_samples": copy.deepcopy(validation.get("task_report_bundle_samples", [])),
@@ -3513,6 +3514,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     bundle_label_counts: dict[str, int] = {}
     bundle_step_source_counts: dict[str, int] = {}
     bundle_step_name_counts: dict[str, int] = {}
+    bundle_step_entry_counts: dict[str, int] = {}
     task_report_bundle_count = 0
     task_report_bundle_step_count = 0
     task_report_bundle_samples: list[str] = []
@@ -3563,6 +3565,11 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                     step_name = step.get("name")
                     if isinstance(step_name, str) and step_name:
                         bundle_step_name_counts[step_name] = bundle_step_name_counts.get(step_name, 0) + 1
+                    step_entry = step.get("entry")
+                    if isinstance(step_entry, str) and step_entry:
+                        bundle_step_entry_counts[step_entry] = (
+                            bundle_step_entry_counts.get(step_entry, 0) + 1
+                        )
                 if "task" in step_sources and "report" in step_sources:
                     task_report_bundle_count += 1
                     task_report_bundle_step_count += len(resolved_bundle["steps"])
@@ -3616,6 +3623,9 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         },
         "bundle_step_name_counts": {
             name: bundle_step_name_counts[name] for name in sorted(bundle_step_name_counts)
+        },
+        "bundle_step_entry_counts": {
+            entry: bundle_step_entry_counts[entry] for entry in sorted(bundle_step_entry_counts)
         },
         "task_report_bundle_count": task_report_bundle_count,
         "task_report_bundle_step_count": task_report_bundle_step_count,

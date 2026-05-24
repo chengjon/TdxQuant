@@ -4091,10 +4091,13 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["bundle_label_counts"]["followup"], validation["bundle_count"])
         self.assertEqual(validation["bundle_step_count"], sum(validation["bundle_step_source_counts"].values()))
         self.assertEqual(validation["bundle_step_count"], sum(validation["bundle_step_name_counts"].values()))
+        self.assertEqual(validation["bundle_step_count"], sum(validation["bundle_step_entry_counts"].values()))
         self.assertGreater(validation["bundle_step_source_counts"]["task"], 0)
         self.assertGreater(validation["bundle_step_source_counts"]["report"], 0)
         self.assertGreater(validation["bundle_step_name_counts"]["audit"], 0)
         self.assertGreater(validation["bundle_step_name_counts"]["trade"], 0)
+        self.assertGreater(validation["bundle_step_entry_counts"]["daily-success"], 0)
+        self.assertGreater(validation["bundle_step_entry_counts"]["guarded-buy"], 0)
         self.assertGreaterEqual(
             validation["bundle_label_counts"]["pingan"],
             validation["task_report_bundle_label_counts"]["pingan"],
@@ -4142,6 +4145,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_step_count"], sum(summary_view["bundle_step_source_counts"].values()))
         self.assertEqual(summary_view["bundle_step_name_counts"], validation["bundle_step_name_counts"])
         self.assertEqual(summary_view["bundle_step_count"], sum(summary_view["bundle_step_name_counts"].values()))
+        self.assertEqual(summary_view["bundle_step_entry_counts"], validation["bundle_step_entry_counts"])
+        self.assertEqual(summary_view["bundle_step_count"], sum(summary_view["bundle_step_entry_counts"].values()))
         self.assertEqual(summary_view["bundle_label_counts"], validation["bundle_label_counts"])
         self.assertEqual(summary_view["bundle_label_counts"]["followup"], summary_view["bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
