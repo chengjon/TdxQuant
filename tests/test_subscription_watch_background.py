@@ -727,9 +727,11 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         "evaluation_summary": {
             "evaluated_components": [],
             "stale_components": [],
+            "fresh_components": [],
             "not_evaluated_components": ["heartbeat", "watermark", "reconnect"],
             "evaluated_count": 0,
             "stale_count": 0,
+            "fresh_count": 0,
             "not_evaluated_count": 3,
         },
         "staleness_evaluated": False,
@@ -809,9 +811,37 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark"],
         "stale_components": ["heartbeat", "watermark"],
+        "fresh_components": [],
         "not_evaluated_components": ["reconnect"],
         "evaluated_count": 2,
         "stale_count": 2,
+        "fresh_count": 0,
+        "not_evaluated_count": 1,
+    }
+
+
+def test_status_summary_evaluation_summary_lists_fresh_components() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "running", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "running",
+            "heartbeat_at": "2026-05-17T09:31:00+00:00",
+            "last_event_ts": "2026-05-17T09:30:00+00:00",
+        },
+        heartbeat_stale_after_seconds=60,
+        watermark_stale_after_seconds=60,
+        now_utc="2026-05-17T09:31:30+00:00",
+    )
+
+    assert summary["governance"]["evaluation_summary"] == {
+        "evaluated_components": ["heartbeat", "watermark"],
+        "stale_components": ["watermark"],
+        "fresh_components": ["heartbeat"],
+        "not_evaluated_components": ["reconnect"],
+        "evaluated_count": 2,
+        "stale_count": 1,
+        "fresh_count": 1,
         "not_evaluated_count": 1,
     }
 
@@ -857,11 +887,43 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["reconnect"],
         "stale_components": ["reconnect"],
+        "fresh_components": [],
         "not_evaluated_components": ["heartbeat", "watermark"],
         "evaluated_count": 1,
         "stale_count": 1,
+        "fresh_count": 0,
         "not_evaluated_count": 2,
     }
+
+
+def test_status_summary_evaluation_summary_preserves_fresh_counts_when_reconnect_is_stale() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "reconnecting", "active": True, "run_id": "run-001"},
+        watch_status={
+            "run_id": "run-001",
+            "state": "reconnecting",
+            "heartbeat_at": "2026-05-17T09:31:15+00:00",
+            "last_event_ts": "2026-05-17T09:31:10+00:00",
+            "last_disconnect_at": "2026-05-17T09:30:00+00:00",
+        },
+        heartbeat_stale_after_seconds=60,
+        watermark_stale_after_seconds=60,
+        reconnect_stale_after_seconds=60,
+        now_utc="2026-05-17T09:31:30+00:00",
+    )
+
+    assert summary["governance"]["reasons"] == ["overall_status:reconnecting", "reconnect:stale"]
+    assert summary["governance"]["evaluation_summary"] == {
+        "evaluated_components": ["heartbeat", "watermark", "reconnect"],
+        "stale_components": ["reconnect"],
+        "fresh_components": ["heartbeat", "watermark"],
+        "not_evaluated_components": [],
+        "evaluated_count": 3,
+        "stale_count": 1,
+        "fresh_count": 2,
+        "not_evaluated_count": 0,
+    }
+    assert summary["governance"]["action_summary"]["count"] == 2
 
 
 def test_status_view_returns_active_control_and_current_run_status(tmp_path: Path) -> None:
