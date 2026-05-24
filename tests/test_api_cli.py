@@ -8492,6 +8492,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                     "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
                     "watch_status": {"state": "running", "run_id": "run-001"},
                     "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
                     "overall_status": "manual_review",
                     "heartbeat": {"staleness": "stale"},
                     "watermark": {"staleness": "not_evaluated"},
@@ -8586,6 +8587,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "pid": 1234,
                     },
                     "status_summary": {
+                        "schema_version": "tdx.subscription_watch.status_summary.v1",
                         "overall_status": "manual_review",
                         "heartbeat": {"staleness": "stale"},
                         "watermark": {"staleness": "not_evaluated"},

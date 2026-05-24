@@ -432,6 +432,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
                 "watch_status": {"state": "running", "run_id": "run-001", "event_count": 3},
                 "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
                     "overall_status": "degraded",
                     "heartbeat": {"status": "stale", "age_seconds": 180.0},
                     "watermark": {"status": "fresh", "age_seconds": 15.0},
@@ -527,6 +528,10 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "run_id": "run-001",
                 "pid": 1234,
             },
+        )
+        self.assertEqual(
+            payload["result"]["status_summary"]["schema_version"],
+            "tdx.subscription_watch.status_summary.v1",
         )
         self.assertEqual(payload["result"]["status_summary"]["heartbeat"]["status"], "stale")
         self.assertEqual(payload["result"]["status_summary"]["watermark"]["status"], "fresh")
