@@ -4764,6 +4764,21 @@ def _build_provider_replay_config_check_summary_view(config_summary: dict[str, o
     }
 
 
+def _build_provider_replay_endpoint_family_counts(endpoints: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for endpoint in endpoints:
+        if not isinstance(endpoint, str) or not endpoint:
+            family = "other"
+        elif endpoint.startswith("/provider/v1/replay/watch/"):
+            family = "watch"
+        elif endpoint.startswith("/provider/v1/replay/"):
+            family = "core"
+        else:
+            family = "other"
+        counts[family] = counts.get(family, 0) + 1
+    return {family: counts[family] for family in sorted(counts)}
+
+
 def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
     try:
         config = load_provider_transport_replay_config(args.config)
@@ -4866,6 +4881,7 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "endpoint_samples": endpoint_samples,
             "endpoint_sample_limit": PROVIDER_REPLAY_ENDPOINT_SAMPLE_LIMIT,
             "endpoint_sample_truncated": len(endpoints) > len(endpoint_samples),
+            "endpoint_family_counts": _build_provider_replay_endpoint_family_counts(endpoints),
         },
         "runtime": {
             "runtime_observed": runtime.get("runtime_observed"),

@@ -2482,6 +2482,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(result.data["summary_view"]["capabilities"]["endpoint_sample_limit"], 3)
         self.assertEqual(result.data["summary_view"]["capabilities"]["endpoint_sample_truncated"], True)
+        self.assertEqual(
+            result.data["summary_view"]["capabilities"]["endpoint_family_counts"],
+            {"core": 3, "watch": 3},
+        )
         self.assertNotIn("endpoints", result.data["summary_view"]["capabilities"])
         self.assertEqual(result.data["summary_view"]["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(result.data["summary_view"]["lifecycle"]["daemon_managed"], False)
