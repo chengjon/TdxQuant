@@ -484,6 +484,12 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "count": 4,
                             "primary_action": "inspect_worker",
                             "actions": ["inspect_worker"],
+                            "action_name_counts": {
+                                "inspect_process": 1,
+                                "inspect_reconnect": 1,
+                                "inspect_watermark": 1,
+                                "inspect_worker": 1,
+                            },
                         },
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat", "watermark"],
@@ -555,6 +561,15 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["governance"]["reason_sample_limit"], 3)
         self.assertEqual(payload["result"]["governance"]["reason_sample_truncated"], True)
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_action"], "inspect_worker")
+        self.assertEqual(
+            payload["result"]["governance"]["action_summary"]["action_name_counts"],
+            {
+                "inspect_process": 1,
+                "inspect_reconnect": 1,
+                "inspect_watermark": 1,
+                "inspect_worker": 1,
+            },
+        )
         self.assertEqual(
             payload["result"]["governance"]["action_samples"],
             [

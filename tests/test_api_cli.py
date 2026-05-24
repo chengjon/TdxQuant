@@ -8522,6 +8522,12 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "primary_action": "review_subscription_watch_heartbeat",
                             "primary_reason": "heartbeat:stale",
                             "severity": "review",
+                            "action_name_counts": {
+                                "review_subscription_watch_heartbeat": 1,
+                                "review_subscription_watch_reconnect": 1,
+                                "review_subscription_watch_resilience": 1,
+                                "review_subscription_watch_watermark": 1,
+                            },
                         },
                         "actions": [
                             {
@@ -8616,6 +8622,12 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "primary_action": "review_subscription_watch_heartbeat",
                             "primary_reason": "heartbeat:stale",
                             "severity": "review",
+                            "action_name_counts": {
+                                "review_subscription_watch_heartbeat": 1,
+                                "review_subscription_watch_reconnect": 1,
+                                "review_subscription_watch_resilience": 1,
+                                "review_subscription_watch_watermark": 1,
+                            },
                         },
                         "action_samples": [
                             {
