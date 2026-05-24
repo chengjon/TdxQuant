@@ -2429,6 +2429,10 @@ def _run_trade_trade_query(args: argparse.Namespace) -> Result:
     )
 
 
+def _is_catalog_non_executing_plan(args: argparse.Namespace) -> bool:
+    return getattr(args, "catalog_command", None) in {"plan", "preview"}
+
+
 def _build_trade_preset_namespace(args: argparse.Namespace) -> argparse.Namespace:
     resolved_preset = resolve_trade_preset(args.preset)
     command_name = str(resolved_preset.get("command", "")).strip()
@@ -2458,7 +2462,7 @@ def _build_trade_preset_namespace(args: argparse.Namespace) -> argparse.Namespac
         "submit-once": ("port", "code", "price", "quantity"),
     }
     missing_required = [name for name in required_fields_by_command.get(command_name, ()) if merged.get(name) is None]
-    if missing_required:
+    if missing_required and not _is_catalog_non_executing_plan(args):
         joined = ", ".join(missing_required)
         raise ValueError(f"trade preset execution requires: {joined}")
     return argparse.Namespace(**merged)
@@ -2694,6 +2698,14 @@ CATALOG_TRADE_PLAN_INPUT_KIND: dict[str, str] = {
 }
 
 
+def _derive_catalog_input_coverage_status(required_fields: list[str], missing_fields: list[str]) -> str:
+    if not required_fields:
+        return "no_required_inputs"
+    if missing_fields:
+        return "missing_required_inputs"
+    return "complete"
+
+
 def _build_catalog_trade_plan_boundary(
     dispatch: object,
     resolved_args: object,
@@ -2724,6 +2736,7 @@ def _build_catalog_trade_plan_boundary(
         "required_input_count": len(required_fields),
         "provided_input_count": len(provided_fields),
         "missing_input_count": len(missing_fields),
+        "input_coverage_status": _derive_catalog_input_coverage_status(required_fields, missing_fields),
     }
     side = args.get("side")
     if command_name == "trade-submit-once" and isinstance(side, str):
@@ -4344,7 +4357,7 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
 
     if command_name in {"trade-buy", "trade-sell", "trade-submit-once", "trade-submit-ready", "guarded-trade-buy"}:
         missing_required = [name for name in ("port", "code", "price", "quantity") if merged.get(name) is None]
-        if missing_required:
+        if missing_required and not _is_catalog_non_executing_plan(args):
             raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
 
     merged["task_command"] = command_name

@@ -4923,8 +4923,47 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(boundary["required_input_count"], 4)
         self.assertEqual(boundary["provided_input_count"], 4)
         self.assertEqual(boundary["missing_input_count"], 0)
+        self.assertEqual(boundary["input_coverage_status"], "complete")
         self.assertEqual(boundary["live_trade_requires_explicit_run"], True)
         self.assertEqual(output_payload["constraints"]["execution_mode"], "non_executing")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_task_sell_summary_marks_missing_trade_inputs(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "task-sell", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        boundary = output_payload["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "trade-sell")
+        self.assertEqual(boundary["required_input_fields"], ["port", "code", "price", "quantity"])
+        self.assertEqual(boundary["provided_input_fields"], ["port"])
+        self.assertEqual(boundary["missing_input_fields"], ["code", "price", "quantity"])
+        self.assertEqual(boundary["required_input_count"], 4)
+        self.assertEqual(boundary["provided_input_count"], 1)
+        self.assertEqual(boundary["missing_input_count"], 3)
+        self.assertEqual(boundary["input_coverage_status"], "missing_required_inputs")
+        self.assertEqual(boundary["dispatch_executed"], False)
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_confirm_current_summary_marks_no_required_inputs(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "task-confirm-current", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        boundary = output_payload["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "trade-confirm-current")
+        self.assertEqual(boundary["required_input_fields"], [])
+        self.assertEqual(boundary["provided_input_fields"], [])
+        self.assertEqual(boundary["missing_input_fields"], [])
+        self.assertEqual(boundary["required_input_count"], 0)
+        self.assertEqual(boundary["provided_input_count"], 0)
+        self.assertEqual(boundary["missing_input_count"], 0)
+        self.assertEqual(boundary["input_coverage_status"], "no_required_inputs")
+        self.assertEqual(boundary["dispatch_executed"], False)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_sell_followup_bundle_without_execution(self) -> None:
@@ -5097,6 +5136,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(boundary["required_input_count"], 5)
         self.assertEqual(boundary["provided_input_count"], 5)
         self.assertEqual(boundary["missing_input_count"], 0)
+        self.assertEqual(boundary["input_coverage_status"], "complete")
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_sell_submit_once_bundle_without_execution(self) -> None:
