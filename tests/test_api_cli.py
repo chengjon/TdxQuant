@@ -4079,6 +4079,11 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["valid"], True)
         self.assertGreaterEqual(validation["bundle_count"], validation["task_report_bundle_count"])
         self.assertGreaterEqual(validation["bundle_step_count"], validation["task_report_bundle_step_count"])
+        self.assertEqual(validation["bundle_label_counts"]["followup"], validation["bundle_count"])
+        self.assertGreaterEqual(
+            validation["bundle_label_counts"]["pingan"],
+            validation["task_report_bundle_label_counts"]["pingan"],
+        )
         self.assertGreater(validation["task_report_bundle_count"], 0)
         self.assertEqual(len(validation["task_report_bundle_samples"]), 5)
         self.assertEqual(validation["task_report_bundle_sample_limit"], 5)
@@ -4118,6 +4123,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["entry_count"], 0)
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
         self.assertEqual(summary_view["bundle_step_count"], validation["bundle_step_count"])
+        self.assertEqual(summary_view["bundle_label_counts"], validation["bundle_label_counts"])
+        self.assertEqual(summary_view["bundle_label_counts"]["followup"], summary_view["bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_step_count"], validation["task_report_bundle_step_count"])
         self.assertEqual(summary_view["task_report_bundle_samples"], validation["task_report_bundle_samples"])
@@ -4164,6 +4171,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         validation = result.data["validation"]
         self.assertGreater(validation["bundle_count"], 0)
         self.assertGreater(validation["bundle_step_count"], 0)
+        self.assertEqual(validation["bundle_label_counts"]["diagnostics"], validation["bundle_count"])
         self.assertEqual(validation["task_report_bundle_count"], 0)
         self.assertEqual(validation["task_report_bundle_step_count"], 0)
         self.assertEqual(validation["task_report_bundle_step_source_counts"], {})
