@@ -447,9 +447,34 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "watermark:stale",
                             "reconnect:stale",
                         ],
-                        "actions": [{"action": "inspect_worker", "reason": "heartbeat_stale"}],
+                        "actions": [
+                            {
+                                "action": "inspect_worker",
+                                "reason": "heartbeat_stale",
+                                "severity": "review",
+                                "description": "Inspect worker heartbeat.",
+                            },
+                            {
+                                "action": "inspect_watermark",
+                                "reason": "watermark_stale",
+                                "severity": "review",
+                                "description": "Inspect event watermark.",
+                            },
+                            {
+                                "action": "inspect_reconnect",
+                                "reason": "reconnect_stale",
+                                "severity": "review",
+                                "description": "Inspect reconnect duration.",
+                            },
+                            {
+                                "action": "inspect_process",
+                                "reason": "overall_status:degraded",
+                                "severity": "review",
+                                "description": "Inspect long-run process health.",
+                            },
+                        ],
                         "action_summary": {
-                            "count": 1,
+                            "count": 4,
                             "primary_action": "inspect_worker",
                             "actions": ["inspect_worker"],
                         },
@@ -515,6 +540,16 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["governance"]["reason_sample_limit"], 3)
         self.assertEqual(payload["result"]["governance"]["reason_sample_truncated"], True)
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_action"], "inspect_worker")
+        self.assertEqual(
+            payload["result"]["governance"]["action_samples"],
+            [
+                {"action": "inspect_worker", "reason": "heartbeat_stale", "severity": "review"},
+                {"action": "inspect_watermark", "reason": "watermark_stale", "severity": "review"},
+                {"action": "inspect_reconnect", "reason": "reconnect_stale", "severity": "review"},
+            ],
+        )
+        self.assertEqual(payload["result"]["governance"]["action_sample_limit"], 3)
+        self.assertEqual(payload["result"]["governance"]["action_sample_truncated"], True)
         self.assertEqual(
             payload["result"]["governance"]["evaluation_summary"],
             {

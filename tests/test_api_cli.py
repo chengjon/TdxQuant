@@ -8296,11 +8296,37 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "overall_status:degraded",
                         ],
                         "action_summary": {
-                            "count": 1,
+                            "count": 4,
                             "primary_action": "review_subscription_watch_heartbeat",
                             "primary_reason": "heartbeat:stale",
                             "severity": "review",
                         },
+                        "actions": [
+                            {
+                                "action": "review_subscription_watch_heartbeat",
+                                "reason": "heartbeat:stale",
+                                "severity": "review",
+                                "description": "Inspect heartbeat freshness.",
+                            },
+                            {
+                                "action": "review_subscription_watch_watermark",
+                                "reason": "watermark:stale",
+                                "severity": "review",
+                                "description": "Inspect event watermark freshness.",
+                            },
+                            {
+                                "action": "review_subscription_watch_reconnect",
+                                "reason": "reconnect:stale",
+                                "severity": "review",
+                                "description": "Inspect reconnect duration.",
+                            },
+                            {
+                                "action": "review_subscription_watch_resilience",
+                                "reason": "overall_status:degraded",
+                                "severity": "review",
+                                "description": "Inspect long-run process health.",
+                            },
+                        ],
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat"],
                             "stale_components": ["heartbeat"],
@@ -8357,11 +8383,30 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "reason_sample_limit": 3,
                         "reason_sample_truncated": True,
                         "action_summary": {
-                            "count": 1,
+                            "count": 4,
                             "primary_action": "review_subscription_watch_heartbeat",
                             "primary_reason": "heartbeat:stale",
                             "severity": "review",
                         },
+                        "action_samples": [
+                            {
+                                "action": "review_subscription_watch_heartbeat",
+                                "reason": "heartbeat:stale",
+                                "severity": "review",
+                            },
+                            {
+                                "action": "review_subscription_watch_watermark",
+                                "reason": "watermark:stale",
+                                "severity": "review",
+                            },
+                            {
+                                "action": "review_subscription_watch_reconnect",
+                                "reason": "reconnect:stale",
+                                "severity": "review",
+                            },
+                        ],
+                        "action_sample_limit": 3,
+                        "action_sample_truncated": True,
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat"],
                             "stale_components": ["heartbeat"],

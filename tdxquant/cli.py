@@ -161,6 +161,7 @@ TASK_REPORT_BUNDLE_SAMPLE_LIMIT = 5
 SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT = 5
 PINGAN_BUNDLE_SAMPLE_LIMIT = 5
 WATCH_STATUS_REASON_SAMPLE_LIMIT = 3
+WATCH_STATUS_ACTION_SAMPLE_LIMIT = 3
 PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
     name: dict(resolve_trade_profile(name, profiles=load_trade_profiles()))
     for name in PINGAN_BUY_PROFILE_NAMES
@@ -4858,9 +4859,32 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             governance_view["reason_samples"] = reason_samples
             governance_view["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
             governance_view["reason_sample_truncated"] = len(reasons) > len(reason_samples)
+        actions = governance.get("actions")
+        if isinstance(actions, list):
+            action_samples = _build_bridge_watch_status_action_samples(actions)
+            governance_view["action_samples"] = action_samples
+            governance_view["action_sample_limit"] = WATCH_STATUS_ACTION_SAMPLE_LIMIT
+            governance_view["action_sample_truncated"] = len(actions) > len(action_samples)
         summary_view["governance"] = governance_view
 
     return {"ok": True, "result": summary_view}
+
+
+def _build_bridge_watch_status_action_samples(actions: list[object]) -> list[dict[str, str]]:
+    samples: list[dict[str, str]] = []
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        sample: dict[str, str] = {}
+        for key in ("action", "reason", "severity"):
+            value = action.get(key)
+            if isinstance(value, str) and value:
+                sample[key] = value
+        if sample:
+            samples.append(sample)
+        if len(samples) >= WATCH_STATUS_ACTION_SAMPLE_LIMIT:
+            break
+    return samples
 
 
 def _build_bridge_watch_status_runtime_view(result: dict[str, object]) -> dict[str, object]:
