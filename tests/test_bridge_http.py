@@ -447,6 +447,12 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "watermark:stale",
                             "reconnect:stale",
                         ],
+                        "reason_source_counts": {
+                            "heartbeat": 1,
+                            "overall_status": 1,
+                            "reconnect": 1,
+                            "watermark": 1,
+                        },
                         "actions": [
                             {
                                 "action": "inspect_worker",
@@ -533,6 +539,10 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
         )
         self.assertEqual(payload["result"]["governance"]["reason_count"], 4)
+        self.assertEqual(
+            payload["result"]["governance"]["reason_source_counts"],
+            {"heartbeat": 1, "overall_status": 1, "reconnect": 1, "watermark": 1},
+        )
         self.assertEqual(
             payload["result"]["governance"]["reason_samples"],
             ["heartbeat:stale", "overall_status:degraded", "watermark:stale"],

@@ -109,6 +109,7 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             "requires_manual_review",
             "staleness_evaluated",
             "boundary",
+            "reason_source_counts",
             "action_summary",
             "evaluation_summary",
         ):

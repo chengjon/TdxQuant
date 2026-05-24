@@ -8415,6 +8415,12 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "reconnect:stale",
                             "overall_status:degraded",
                         ],
+                        "reason_source_counts": {
+                            "heartbeat": 1,
+                            "overall_status": 1,
+                            "reconnect": 1,
+                            "watermark": 1,
+                        },
                         "action_summary": {
                             "count": 4,
                             "primary_action": "review_subscription_watch_heartbeat",
@@ -8499,6 +8505,12 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "staleness_evaluated": True,
                         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
                         "reason_count": 4,
+                        "reason_source_counts": {
+                            "heartbeat": 1,
+                            "overall_status": 1,
+                            "reconnect": 1,
+                            "watermark": 1,
+                        },
                         "reason_samples": ["heartbeat:stale", "watermark:stale", "reconnect:stale"],
                         "reason_sample_limit": 3,
                         "reason_sample_truncated": True,

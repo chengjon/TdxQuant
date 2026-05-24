@@ -274,6 +274,7 @@ def _build_subscription_watch_governance_summary(
         "decision": "manual_review" if requires_manual_review else "observe",
         "requires_manual_review": requires_manual_review,
         "reasons": reasons,
+        "reason_source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
         "actions": actions,
         "action_summary": _build_subscription_watch_governance_action_summary(actions),
         "evaluation_summary": _build_subscription_watch_governance_evaluation_summary(
@@ -284,6 +285,18 @@ def _build_subscription_watch_governance_summary(
         "staleness_evaluated": staleness_evaluated,
         "boundary": SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY,
     }
+
+
+def _build_subscription_watch_governance_reason_source_counts(reasons: list[Any]) -> dict[str, int]:
+    source_counts: dict[str, int] = {}
+    for reason in reasons:
+        source = "unknown"
+        if isinstance(reason, str) and ":" in reason:
+            candidate = reason.split(":", maxsplit=1)[0].strip()
+            if candidate:
+                source = candidate
+        source_counts[source] = source_counts.get(source, 0) + 1
+    return {source: source_counts[source] for source in sorted(source_counts)}
 
 
 def _build_subscription_watch_governance_evaluation_summary(
