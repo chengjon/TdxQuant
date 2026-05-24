@@ -58,6 +58,10 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["healthy"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], [])
         self.assertEqual(
+            status["runtime"]["probe_summary"]["not_requested"],
+            ["health_probe", "watch_status_probe", "watch_events_probe", "watch_stream_probe"],
+        )
+        self.assertEqual(
             status["runtime"]["probe_summary"]["boundary"],
             "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",
         )
@@ -149,6 +153,10 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["healthy"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], ["health_probe"])
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["not_requested"],
+            ["watch_status_probe", "watch_events_probe", "watch_stream_probe"],
+        )
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
 
