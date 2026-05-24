@@ -593,6 +593,7 @@ def _normalize_provider_replay_watch_stream_probe(watch_stream_probe: dict[str, 
 
 def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> dict[str, Any]:
     requested: list[str] = []
+    healthy: list[str] = []
     unhealthy: list[str] = []
     healthy_count = 0
     status_counts: dict[str, int] = {}
@@ -605,6 +606,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             continue
         requested.append(key)
         if probe_status == "healthy":
+            healthy.append(key)
             healthy_count += 1
         else:
             unhealthy.append(key)
@@ -626,6 +628,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "not_requested_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS) - requested_count,
         "status_counts": {status: status_counts[status] for status in sorted(status_counts)},
         "requested": requested,
+        "healthy": healthy,
         "unhealthy": unhealthy,
         "boundary": "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",
     }
