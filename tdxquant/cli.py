@@ -2676,6 +2676,57 @@ def _build_catalog_step_source_counts(steps: object) -> dict[str, int]:
     return {source: counts[source] for source in sorted(counts)}
 
 
+CATALOG_TRADE_PLAN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "trade-buy": ("port", "code", "price", "quantity"),
+    "trade-sell": ("port", "code", "price", "quantity"),
+    "trade-submit-once": ("side", "port", "code", "price", "quantity"),
+    "trade-submit-ready": ("port", "code", "price", "quantity"),
+    "guarded-trade-buy": ("port", "code", "price", "quantity"),
+    "trade-confirm-current": (),
+}
+CATALOG_TRADE_PLAN_INPUT_KIND: dict[str, str] = {
+    "trade-buy": "order",
+    "trade-sell": "order",
+    "trade-submit-once": "submit_once_order",
+    "trade-submit-ready": "submit_ready_order",
+    "guarded-trade-buy": "guarded_order",
+    "trade-confirm-current": "confirmation",
+}
+
+
+def _build_catalog_trade_plan_boundary(
+    dispatch: object,
+    resolved_args: object,
+) -> dict[str, object] | None:
+    if not isinstance(dispatch, dict):
+        return None
+    command_name = dispatch.get("command_name")
+    if not isinstance(command_name, str) or command_name not in CATALOG_TRADE_PLAN_REQUIRED_FIELDS:
+        return None
+
+    args = resolved_args if isinstance(resolved_args, dict) else {}
+    required_fields = list(CATALOG_TRADE_PLAN_REQUIRED_FIELDS[command_name])
+    provided_fields = [
+        field
+        for field in required_fields
+        if field in args and args[field] is not None and args[field] != ""
+    ]
+    boundary: dict[str, object] = {
+        "trade_command": command_name,
+        "input_kind": CATALOG_TRADE_PLAN_INPUT_KIND[command_name],
+        "execution_mode": "non_executing_catalog_plan",
+        "dispatch_executed": False,
+        "live_trade_requires_explicit_run": True,
+        "required_input_fields": required_fields,
+        "provided_input_fields": provided_fields,
+        "missing_input_fields": [field for field in required_fields if field not in provided_fields],
+    }
+    side = args.get("side")
+    if command_name == "trade-submit-once" and isinstance(side, str):
+        boundary["side"] = side
+    return boundary
+
+
 def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dict[str, object] | None:
     if args.catalog_command == "list":
         summary_payload = result.data.get("summary", {})
@@ -2795,6 +2846,12 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             resolved_args = result.data.get("resolved_args", {})
             if isinstance(resolved_args, dict):
                 summary["resolved_args"] = _extract_catalog_key_fields(resolved_args)
+            trade_boundary = _build_catalog_trade_plan_boundary(
+                result.data.get("dispatch"),
+                resolved_args,
+            )
+            if trade_boundary:
+                summary["trade_plan_boundary"] = trade_boundary
             _copy_catalog_non_execution_metadata(summary, result)
         else:
             input_payload = result.data.get("input", {})
@@ -2839,6 +2896,12 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                         step_view["dispatch"] = copy.deepcopy(step["dispatch"])
                     if isinstance(step.get("resolved_args"), dict):
                         step_view["resolved_args"] = _extract_catalog_key_fields(step["resolved_args"])
+                    trade_boundary = _build_catalog_trade_plan_boundary(
+                        step.get("dispatch"),
+                        step.get("resolved_args"),
+                    )
+                    if trade_boundary:
+                        step_view["trade_plan_boundary"] = trade_boundary
                     plan_steps.append(step_view)
             summary["steps"] = plan_steps
             _copy_catalog_non_execution_metadata(summary, result)
