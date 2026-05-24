@@ -574,6 +574,16 @@ The command catalog validation workflow SHALL expose an opt-in summary view that
 - **AND** the summary payload MUST declare `non_execution=true`
 - **AND** the summary payload MUST NOT include full entry or bundle detail rows
 
+#### Scenario: Caller validates submit-once bundles with summary view
+
+- **WHEN** a caller runs `catalog validate --kind bundle --label submit-once --view summary`
+- **THEN** the summary payload MUST include `submit_once_bundle_count`
+- **AND** the summary payload MUST include a bounded deterministic `submit_once_bundle_samples` list when matching submit-once bundles exist
+- **AND** the summary payload MUST include `submit_once_bundle_sample_limit`
+- **AND** the summary payload MUST include `submit_once_bundle_sample_truncated`
+- **AND** the summary payload MUST declare `non_execution=true`
+- **AND** the summary payload MUST NOT include full entry or bundle detail rows
+
 #### Scenario: Caller validates missing target with summary view
 
 - **WHEN** a caller runs `catalog validate --bundle <missing> --view summary`

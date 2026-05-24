@@ -158,6 +158,7 @@ PINGAN_SUBMISSION_LEDGER_PATH = get_pingan_submission_ledger_path()
 TRADER_RUNTIME_DIR = Path(__file__).resolve().parents[1] / "runtime" / "trader"
 PINGAN_BUY_PROFILE_NAMES = ("stable", "balanced", "fast", "turbo")
 TASK_REPORT_BUNDLE_SAMPLE_LIMIT = 5
+SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT = 5
 PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
     name: dict(resolve_trade_profile(name, profiles=load_trade_profiles()))
     for name in PINGAN_BUY_PROFILE_NAMES
@@ -2729,6 +2730,10 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "task_report_bundle_samples": copy.deepcopy(validation.get("task_report_bundle_samples", [])),
             "task_report_bundle_sample_limit": validation.get("task_report_bundle_sample_limit"),
             "task_report_bundle_sample_truncated": validation.get("task_report_bundle_sample_truncated"),
+            "submit_once_bundle_count": validation.get("submit_once_bundle_count"),
+            "submit_once_bundle_samples": copy.deepcopy(validation.get("submit_once_bundle_samples", [])),
+            "submit_once_bundle_sample_limit": validation.get("submit_once_bundle_sample_limit"),
+            "submit_once_bundle_sample_truncated": validation.get("submit_once_bundle_sample_truncated"),
             "invalid_count": validation.get("invalid_count"),
             "valid": validation.get("valid"),
             "non_execution": validation.get("non_execution"),
@@ -3389,6 +3394,8 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     validated_bundle_count = 0
     task_report_bundle_count = 0
     task_report_bundle_samples: list[str] = []
+    submit_once_bundle_count = 0
+    submit_once_bundle_samples: list[str] = []
 
     if effective_kind in {"entry", "all"}:
         if selected_entry:
@@ -3421,6 +3428,17 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                     task_report_bundle_count += 1
                     if len(task_report_bundle_samples) < TASK_REPORT_BUNDLE_SAMPLE_LIMIT:
                         task_report_bundle_samples.append(bundle_name)
+                step_entries = {str(step["entry"]) for step in resolved_bundle["steps"]}
+                bundle_labels = {str(label) for label in resolved_bundle["labels"]}
+                is_submit_once_bundle = (
+                    "submit-once" in bundle_name
+                    or any("submit-once" in label for label in bundle_labels)
+                    or any("submit-once" in entry for entry in step_entries)
+                )
+                if is_submit_once_bundle:
+                    submit_once_bundle_count += 1
+                    if len(submit_once_bundle_samples) < SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT:
+                        submit_once_bundle_samples.append(bundle_name)
             except ValueError as exc:
                 errors.append({"target_type": "bundle", "target": bundle_name, "message": str(exc)})
 
@@ -3435,6 +3453,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "task_report_bundle_samples": task_report_bundle_samples,
         "task_report_bundle_sample_limit": TASK_REPORT_BUNDLE_SAMPLE_LIMIT,
         "task_report_bundle_sample_truncated": task_report_bundle_count > len(task_report_bundle_samples),
+        "submit_once_bundle_count": submit_once_bundle_count,
+        "submit_once_bundle_samples": submit_once_bundle_samples,
+        "submit_once_bundle_sample_limit": SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT,
+        "submit_once_bundle_sample_truncated": submit_once_bundle_count > len(submit_once_bundle_samples),
         "invalid_count": len(errors),
         "valid": not errors,
         "errors": errors,
