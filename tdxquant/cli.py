@@ -2657,6 +2657,23 @@ def _copy_catalog_non_execution_metadata(summary: dict[str, object], result: Res
             summary[key] = copy.deepcopy(value)
 
 
+def _build_catalog_step_source_counts(steps: object) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    if not isinstance(steps, list):
+        return counts
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        dispatch = step.get("dispatch")
+        if not isinstance(dispatch, dict):
+            continue
+        source = dispatch.get("source")
+        if not isinstance(source, str) or not source:
+            continue
+        counts[source] = counts.get(source, 0) + 1
+    return {source: counts[source] for source in sorted(counts)}
+
+
 def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dict[str, object] | None:
     if args.catalog_command == "list":
         summary_payload = result.data.get("summary", {})
@@ -2806,6 +2823,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
         if mode in {"plan", "preview"}:
             plan_steps: list[dict[str, object]] = []
             steps = result.data.get("steps", [])
+            summary["step_source_counts"] = _build_catalog_step_source_counts(steps)
             if isinstance(steps, list):
                 for step in steps:
                     if not isinstance(step, dict):

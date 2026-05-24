@@ -4775,6 +4775,20 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][2]["dispatch"]["command_name"], "audit-daily")
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_task_report_combo_summary_counts_step_sources(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--bundle", "confirm-complete-review", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        self.assertEqual(output_payload["target"]["name"], "confirm-complete-review")
+        self.assertEqual(output_payload["selected_step_count"], 3)
+        self.assertEqual(output_payload["step_source_counts"], {"task": 1, "report": 2})
+        self.assertEqual(output_payload["constraints"]["execution_mode"], "non_executing")
+        self.assertFalse(output_payload["constraints"]["dispatch_executed"])
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_confirm_current_pingan_bundle_without_execution(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "plan", "--bundle", "confirm-current-pingan-exception-review"])
@@ -5150,6 +5164,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["mode"], "preview")
         self.assertEqual(output_payload["target"]["type"], "bundle")
         self.assertEqual(output_payload["selected_step_count"], 1)
+        self.assertEqual(output_payload["step_source_counts"], {"report": 1})
         self.assertEqual(output_payload["steps"][0]["name"], "review")
         self.assertNotIn("catalog_bundle", output_payload)
         mocked_dispatch.assert_not_called()
