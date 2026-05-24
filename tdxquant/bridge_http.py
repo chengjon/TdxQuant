@@ -20,6 +20,7 @@ BRIDGE_VERSION = "v1"
 WATCH_EVENT_STREAM_SCHEMA_VERSION = "tdx.bridge.watch.event_stream.v1"
 WATCH_EVENT_STREAM_TRANSPORT = "sse"
 WATCH_TERMINAL_STATES = {"completed", "interrupted", "failed", "stopped"}
+WATCH_STATUS_REASON_SAMPLE_LIMIT = 3
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,12 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
         reasons = governance.get("reasons")
         if isinstance(reasons, list):
             governance_view["reason_count"] = len(reasons)
+            reason_samples = [reason for reason in reasons if isinstance(reason, str)][
+                :WATCH_STATUS_REASON_SAMPLE_LIMIT
+            ]
+            governance_view["reason_samples"] = reason_samples
+            governance_view["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
+            governance_view["reason_sample_truncated"] = len(reasons) > len(reason_samples)
         summary_view["governance"] = governance_view
 
     return summary_view

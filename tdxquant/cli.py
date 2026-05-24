@@ -160,6 +160,7 @@ PINGAN_BUY_PROFILE_NAMES = ("stable", "balanced", "fast", "turbo")
 TASK_REPORT_BUNDLE_SAMPLE_LIMIT = 5
 SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT = 5
 PINGAN_BUNDLE_SAMPLE_LIMIT = 5
+WATCH_STATUS_REASON_SAMPLE_LIMIT = 3
 PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
     name: dict(resolve_trade_profile(name, profiles=load_trade_profiles()))
     for name in PINGAN_BUY_PROFILE_NAMES
@@ -4822,6 +4823,12 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
         reasons = governance.get("reasons")
         if isinstance(reasons, list):
             governance_view["reason_count"] = len(reasons)
+            reason_samples = [reason for reason in reasons if isinstance(reason, str)][
+                :WATCH_STATUS_REASON_SAMPLE_LIMIT
+            ]
+            governance_view["reason_samples"] = reason_samples
+            governance_view["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
+            governance_view["reason_sample_truncated"] = len(reasons) > len(reason_samples)
         summary_view["governance"] = governance_view
 
     return {"ok": True, "result": summary_view}

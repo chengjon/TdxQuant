@@ -8272,7 +8272,12 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "requires_manual_review": True,
                         "staleness_evaluated": True,
                         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
-                        "reasons": ["heartbeat:stale"],
+                        "reasons": [
+                            "heartbeat:stale",
+                            "watermark:stale",
+                            "reconnect:stale",
+                            "overall_status:degraded",
+                        ],
                         "action_summary": {
                             "count": 1,
                             "primary_action": "review_subscription_watch_heartbeat",
@@ -8330,7 +8335,10 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "requires_manual_review": True,
                         "staleness_evaluated": True,
                         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
-                        "reason_count": 1,
+                        "reason_count": 4,
+                        "reason_samples": ["heartbeat:stale", "watermark:stale", "reconnect:stale"],
+                        "reason_sample_limit": 3,
+                        "reason_sample_truncated": True,
                         "action_summary": {
                             "count": 1,
                             "primary_action": "review_subscription_watch_heartbeat",

@@ -441,7 +441,12 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                         "requires_manual_review": True,
                         "staleness_evaluated": True,
                         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
-                        "reasons": ["heartbeat:stale", "overall_status:degraded"],
+                        "reasons": [
+                            "heartbeat:stale",
+                            "overall_status:degraded",
+                            "watermark:stale",
+                            "reconnect:stale",
+                        ],
                         "actions": [{"action": "inspect_worker", "reason": "heartbeat_stale"}],
                         "action_summary": {
                             "count": 1,
@@ -502,7 +507,13 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             payload["result"]["governance"]["boundary"],
             "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
         )
-        self.assertEqual(payload["result"]["governance"]["reason_count"], 2)
+        self.assertEqual(payload["result"]["governance"]["reason_count"], 4)
+        self.assertEqual(
+            payload["result"]["governance"]["reason_samples"],
+            ["heartbeat:stale", "overall_status:degraded", "watermark:stale"],
+        )
+        self.assertEqual(payload["result"]["governance"]["reason_sample_limit"], 3)
+        self.assertEqual(payload["result"]["governance"]["reason_sample_truncated"], True)
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_action"], "inspect_worker")
         self.assertEqual(
             payload["result"]["governance"]["evaluation_summary"],
