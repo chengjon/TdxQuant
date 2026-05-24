@@ -4736,6 +4736,15 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
     probe_summary = runtime.get("probe_summary") if isinstance(runtime.get("probe_summary"), dict) else {}
     boundaries = status.get("boundaries") if isinstance(status.get("boundaries"), list) else []
     endpoints = capabilities.get("endpoints") if isinstance(capabilities.get("endpoints"), list) else []
+    restart_policy = lifecycle.get("restart_policy")
+    restart_managed = bool(restart_policy and restart_policy != "not_managed")
+    lifecycle_support_flags = (
+        bool(lifecycle.get("start_stop_managed")),
+        bool(lifecycle.get("daemon_managed")),
+        bool(lifecycle.get("scheduler_managed")),
+        restart_managed,
+    )
+    managed_operation_count = sum(1 for supported in lifecycle_support_flags if supported)
     return {
         "mode": "summary",
         "provider_id": status.get("provider_id"),
@@ -4766,7 +4775,9 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "start_stop_managed": lifecycle.get("start_stop_managed"),
             "daemon_managed": lifecycle.get("daemon_managed"),
             "scheduler_managed": lifecycle.get("scheduler_managed"),
-            "restart_policy": lifecycle.get("restart_policy"),
+            "restart_policy": restart_policy,
+            "control_supported": managed_operation_count > 0,
+            "managed_operation_count": managed_operation_count,
         },
         "probe_summary": copy.deepcopy(probe_summary),
         "boundaries": copy.deepcopy(boundaries),
