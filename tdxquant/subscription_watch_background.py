@@ -276,6 +276,7 @@ def _build_subscription_watch_governance_summary(
         "reasons": reasons,
         "reason_count": len(reasons),
         "reason_source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
+        "reason_summary": _build_subscription_watch_governance_reason_summary(reasons),
         "actions": actions,
         "action_summary": _build_subscription_watch_governance_action_summary(actions),
         "evaluation_summary": _build_subscription_watch_governance_evaluation_summary(
@@ -291,13 +292,29 @@ def _build_subscription_watch_governance_summary(
 def _build_subscription_watch_governance_reason_source_counts(reasons: list[Any]) -> dict[str, int]:
     source_counts: dict[str, int] = {}
     for reason in reasons:
-        source = "unknown"
-        if isinstance(reason, str) and ":" in reason:
-            candidate = reason.split(":", maxsplit=1)[0].strip()
-            if candidate:
-                source = candidate
+        source = _subscription_watch_governance_reason_source(reason)
         source_counts[source] = source_counts.get(source, 0) + 1
     return {source: source_counts[source] for source in sorted(source_counts)}
+
+
+def _build_subscription_watch_governance_reason_summary(reasons: list[Any]) -> dict[str, Any]:
+    primary_reason = reasons[0] if reasons and isinstance(reasons[0], str) else None
+    return {
+        "count": len(reasons),
+        "primary_reason": primary_reason,
+        "primary_source": _subscription_watch_governance_reason_source(primary_reason)
+        if primary_reason is not None
+        else None,
+        "source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
+    }
+
+
+def _subscription_watch_governance_reason_source(reason: Any) -> str:
+    if isinstance(reason, str) and ":" in reason:
+        candidate = reason.split(":", maxsplit=1)[0].strip()
+        if candidate:
+            return candidate
+    return "unknown"
 
 
 def _build_subscription_watch_governance_evaluation_summary(

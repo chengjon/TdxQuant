@@ -717,6 +717,12 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         "reasons": [],
         "reason_count": 0,
         "reason_source_counts": {},
+        "reason_summary": {
+            "count": 0,
+            "primary_reason": None,
+            "primary_source": None,
+            "source_counts": {},
+        },
         "actions": [],
         "action_summary": {
             "count": 0,
@@ -792,6 +798,12 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
     assert summary["governance"]["reasons"] == ["heartbeat:stale", "watermark:stale"]
     assert summary["governance"]["reason_count"] == 2
     assert summary["governance"]["reason_source_counts"] == {"heartbeat": 1, "watermark": 1}
+    assert summary["governance"]["reason_summary"] == {
+        "count": 2,
+        "primary_reason": "heartbeat:stale",
+        "primary_source": "heartbeat",
+        "source_counts": {"heartbeat": 1, "watermark": 1},
+    }
     assert summary["governance"]["actions"] == [
         {
             "action": "review_subscription_watch_heartbeat",
@@ -873,6 +885,12 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
     assert summary["governance"]["reasons"] == ["overall_status:reconnecting", "reconnect:stale"]
     assert summary["governance"]["reason_count"] == len(summary["governance"]["reasons"])
     assert summary["governance"]["reason_source_counts"] == {"overall_status": 1, "reconnect": 1}
+    assert summary["governance"]["reason_summary"] == {
+        "count": 2,
+        "primary_reason": "overall_status:reconnecting",
+        "primary_source": "overall_status",
+        "source_counts": {"overall_status": 1, "reconnect": 1},
+    }
     assert summary["governance"]["actions"] == [
         {
             "action": "review_subscription_watch_resilience",
