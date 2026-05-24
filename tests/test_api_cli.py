@@ -4084,6 +4084,11 @@ class ApiCliDispatchTests(unittest.TestCase):
             len(validation["task_report_bundle_samples"]), validation["task_report_bundle_sample_limit"]
         )
         self.assertEqual(validation["task_report_bundle_samples"][0], "buy-pingan-complete-review")
+        self.assertEqual(
+            validation["task_report_bundle_step_count"],
+            sum(validation["task_report_bundle_step_source_counts"].values()),
+        )
+        self.assertGreater(validation["task_report_bundle_step_count"], validation["task_report_bundle_count"])
         self.assertGreater(validation["task_report_bundle_step_source_counts"]["task"], 0)
         self.assertGreater(validation["task_report_bundle_step_source_counts"]["report"], 0)
         self.assertNotIn("trade", validation["task_report_bundle_step_source_counts"])
@@ -4110,6 +4115,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["entry_count"], 0)
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
+        self.assertEqual(summary_view["task_report_bundle_step_count"], validation["task_report_bundle_step_count"])
         self.assertEqual(summary_view["task_report_bundle_samples"], validation["task_report_bundle_samples"])
         self.assertEqual(
             summary_view["task_report_bundle_sample_limit"], validation["task_report_bundle_sample_limit"]
@@ -4127,6 +4133,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertGreater(summary_view["task_report_bundle_step_source_counts"]["task"], 0)
         self.assertGreater(summary_view["task_report_bundle_step_source_counts"]["report"], 0)
         self.assertEqual(
+            summary_view["task_report_bundle_step_count"],
+            sum(summary_view["task_report_bundle_step_source_counts"].values()),
+        )
+        self.assertEqual(
             summary_view["task_report_bundle_label_counts"],
             validation["task_report_bundle_label_counts"],
         )
@@ -4139,6 +4149,20 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)
+
+    def test_handle_catalog_validate_diagnostics_label_has_zero_task_report_step_count(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "validate", "--kind", "bundle", "--label", "diagnostics"])
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        self.assertGreater(validation["bundle_count"], 0)
+        self.assertEqual(validation["task_report_bundle_count"], 0)
+        self.assertEqual(validation["task_report_bundle_step_count"], 0)
+        self.assertEqual(validation["task_report_bundle_step_source_counts"], {})
+        self.assertEqual(validation["task_report_bundle_label_counts"], {})
 
     def test_handle_catalog_validate_summary_view_projects_submit_once_samples(self) -> None:
         parser = build_parser()
