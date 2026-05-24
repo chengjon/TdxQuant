@@ -1,0 +1,5 @@
+- [x] Add OpenSpec delta for detailed and summary governance action counts.
+- [x] Add failing tests for detailed summary, HTTP summary view, and CLI summary view.
+- [x] Implement additive `governance.action_count`.
+- [x] Update `FUNCTION_TREE.md` B-16/E-09 evidence and boundary.
+- [x] Validate tests, OpenSpec, diff whitespace, and FUNCTION_TREE registry.

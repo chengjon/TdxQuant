@@ -278,6 +278,7 @@ def _build_subscription_watch_governance_summary(
         "reason_source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
         "reason_summary": _build_subscription_watch_governance_reason_summary(reasons),
         "actions": actions,
+        "action_count": len(actions),
         "action_summary": _build_subscription_watch_governance_action_summary(actions),
         "evaluation_summary": _build_subscription_watch_governance_evaluation_summary(
             heartbeat=heartbeat,

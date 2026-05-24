@@ -8574,6 +8574,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                                 "review_subscription_watch_watermark": 1,
                             },
                         },
+                        "action_count": 4,
                         "actions": [
                             {
                                 "action": "review_subscription_watch_heartbeat",
@@ -8673,6 +8674,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "reason_samples": ["heartbeat:stale", "watermark:stale", "reconnect:stale"],
                         "reason_sample_limit": 3,
                         "reason_sample_truncated": True,
+                        "action_count": 4,
                         "action_summary": {
                             "count": 4,
                             "primary_action": "review_subscription_watch_heartbeat",

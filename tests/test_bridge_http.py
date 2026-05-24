@@ -580,6 +580,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         )
         self.assertEqual(payload["result"]["governance"]["reason_sample_limit"], 3)
         self.assertEqual(payload["result"]["governance"]["reason_sample_truncated"], True)
+        self.assertEqual(payload["result"]["governance"]["action_count"], 4)
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_action"], "inspect_worker")
         self.assertEqual(
             payload["result"]["governance"]["action_summary"]["action_name_counts"],

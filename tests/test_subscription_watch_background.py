@@ -724,6 +724,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
             "source_counts": {},
         },
         "actions": [],
+        "action_count": 0,
         "action_summary": {
             "count": 0,
             "primary_action": None,
@@ -760,6 +761,7 @@ def test_status_summary_governance_requests_manual_review_for_resilience_states(
     assert summary["governance"]["reasons"] == [f"overall_status:{state}"]
     assert summary["governance"]["reason_count"] == 1
     assert summary["governance"]["reason_source_counts"] == {"overall_status": 1}
+    assert summary["governance"]["action_count"] == 1
     assert summary["governance"]["actions"] == [
         {
             "action": "review_subscription_watch_resilience",
@@ -818,6 +820,7 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
             "description": "Inspect event watermark freshness before changing reconnect or restart behavior.",
         },
     ]
+    assert summary["governance"]["action_count"] == 2
     assert summary["governance"]["action_summary"] == {
         "count": 2,
         "primary_action": "review_subscription_watch_heartbeat",
