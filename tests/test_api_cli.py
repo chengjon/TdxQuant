@@ -2407,12 +2407,12 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                 "enabled": True,
                 "target": "watch_stream",
                 "endpoint": "/provider/v1/replay/watch/events/stream",
-                "status": "healthy",
-                "reachable": True,
-                "http_status": 200,
+                "status": "unhealthy",
+                "reachable": False,
+                "http_status": None,
+                "error_code": "stream_timeout",
                 "timeout_seconds": 1.5,
-                "service": "provider-transport-replay",
-                "frame_count": 3,
+                "error": {"code": "stream_timeout", "message": "stream probe timed out"},
             }
             with (
                 patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
@@ -2448,7 +2448,8 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             result.data["status"]["runtime"]["watch_events_probe"]["endpoint"],
             "/provider/v1/replay/watch/events",
         )
-        self.assertEqual(result.data["status"]["runtime"]["watch_stream_probe"]["status"], "healthy")
+        self.assertEqual(result.data["status"]["runtime"]["watch_stream_probe"]["status"], "unhealthy")
+        self.assertEqual(result.data["status"]["runtime"]["watch_stream_probe"]["error_code"], "stream_timeout")
         self.assertEqual(
             result.data["status"]["runtime"]["watch_stream_probe"]["endpoint"],
             "/provider/v1/replay/watch/events/stream",
@@ -2493,16 +2494,23 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["lifecycle"]["managed_operation_count"], 0)
         self.assertEqual(result.data["summary_view"]["runtime"]["runtime_observed"], True)
         self.assertEqual(result.data["summary_view"]["runtime"]["probe_requested"], True)
-        self.assertEqual(result.data["summary_view"]["probe_summary"]["status"], "healthy")
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["status"], "degraded")
         self.assertEqual(result.data["summary_view"]["probe_summary"]["total_count"], 4)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["requested_count"], 4)
-        self.assertEqual(result.data["summary_view"]["probe_summary"]["unhealthy_count"], 0)
-        self.assertEqual(result.data["summary_view"]["probe_summary"]["status_counts"], {"healthy": 4})
-        self.assertEqual(result.data["summary_view"]["probe_summary"]["error_code_counts"], {})
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["unhealthy_count"], 1)
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["status_counts"], {"healthy": 3, "unhealthy": 1})
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["error_code_counts"], {"stream_timeout": 1})
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["error_samples"],
+            [{"probe": "watch_stream_probe", "status": "unhealthy", "error_code": "stream_timeout"}],
+        )
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_limit"], 3)
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(
             result.data["summary_view"]["probe_summary"]["healthy"],
-            ["health_probe", "watch_status_probe", "watch_events_probe", "watch_stream_probe"],
+            ["health_probe", "watch_status_probe", "watch_events_probe"],
         )
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["unhealthy"], ["watch_stream_probe"])
         self.assertEqual(result.data["summary_view"]["probe_summary"]["not_requested"], [])
         self.assertIn("no daemon start/stop lifecycle management", result.data["summary_view"]["boundaries"])
         mocked_serve.assert_not_called()

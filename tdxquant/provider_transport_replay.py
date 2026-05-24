@@ -35,6 +35,7 @@ PROVIDER_REPLAY_STATUS_PROBE_KEYS = (
     "watch_events_probe",
     "watch_stream_probe",
 )
+PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT = 3
 
 
 @dataclass(frozen=True)
@@ -599,6 +600,8 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     healthy_count = 0
     status_counts: dict[str, int] = {}
     error_code_counts: dict[str, int] = {}
+    error_samples: list[dict[str, Any]] = []
+    error_sample_count = 0
 
     for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
         probe = probes.get(key) or {}
@@ -607,6 +610,16 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         error_code = probe.get("error_code")
         if isinstance(error_code, str) and error_code:
             error_code_counts[error_code] = error_code_counts.get(error_code, 0) + 1
+        if probe_status not in {"healthy", "not_requested"} or (isinstance(error_code, str) and error_code):
+            error_sample_count += 1
+            if len(error_samples) < PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT:
+                sample: dict[str, Any] = {"probe": key, "status": probe_status}
+                if isinstance(error_code, str) and error_code:
+                    sample["error_code"] = error_code
+                http_status = probe.get("http_status")
+                if isinstance(http_status, int):
+                    sample["http_status"] = http_status
+                error_samples.append(sample)
         if probe_status == "not_requested":
             not_requested.append(key)
             continue
@@ -636,6 +649,9 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "not_requested_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS) - requested_count,
         "status_counts": {status: status_counts[status] for status in sorted(status_counts)},
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
+        "error_samples": error_samples,
+        "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
+        "error_sample_truncated": error_sample_count > len(error_samples),
         "requested": requested,
         "healthy": healthy,
         "unhealthy": unhealthy,
