@@ -4077,6 +4077,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["invalid_count"], 0)
         self.assertEqual(validation["valid"], True)
         self.assertGreaterEqual(validation["bundle_count"], validation["task_report_bundle_count"])
+        self.assertGreaterEqual(validation["bundle_step_count"], validation["task_report_bundle_step_count"])
         self.assertGreater(validation["task_report_bundle_count"], 0)
         self.assertEqual(len(validation["task_report_bundle_samples"]), 5)
         self.assertEqual(validation["task_report_bundle_sample_limit"], 5)
@@ -4115,6 +4116,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["selected_label"], "followup")
         self.assertEqual(summary_view["entry_count"], 0)
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
+        self.assertEqual(summary_view["bundle_step_count"], validation["bundle_step_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_step_count"], validation["task_report_bundle_step_count"])
         self.assertEqual(summary_view["task_report_bundle_samples"], validation["task_report_bundle_samples"])
@@ -4160,6 +4162,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertTrue(result.ok)
         validation = result.data["validation"]
         self.assertGreater(validation["bundle_count"], 0)
+        self.assertGreater(validation["bundle_step_count"], 0)
         self.assertEqual(validation["task_report_bundle_count"], 0)
         self.assertEqual(validation["task_report_bundle_step_count"], 0)
         self.assertEqual(validation["task_report_bundle_step_source_counts"], {})

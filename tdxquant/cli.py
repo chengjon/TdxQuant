@@ -2815,6 +2815,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "selected_label": validation.get("selected_label"),
             "entry_count": validation.get("entry_count"),
             "bundle_count": validation.get("bundle_count"),
+            "bundle_step_count": validation.get("bundle_step_count"),
             "task_report_bundle_count": validation.get("task_report_bundle_count"),
             "task_report_bundle_step_count": validation.get("task_report_bundle_step_count"),
             "task_report_bundle_samples": copy.deepcopy(validation.get("task_report_bundle_samples", [])),
@@ -3505,6 +3506,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     errors: list[dict[str, object]] = []
     validated_entry_count = 0
     validated_bundle_count = 0
+    bundle_step_count = 0
     task_report_bundle_count = 0
     task_report_bundle_step_count = 0
     task_report_bundle_samples: list[str] = []
@@ -3541,6 +3543,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                 if selected_label and selected_label not in resolved_bundle["labels"]:
                     continue
                 validated_bundle_count += 1
+                bundle_step_count += len(resolved_bundle["steps"])
                 step_sources = {step["source"] for step in resolved_bundle["steps"]}
                 step_entries = {str(step["entry"]) for step in resolved_bundle["steps"]}
                 bundle_labels = {str(label) for label in resolved_bundle["labels"]}
@@ -3588,6 +3591,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "selected_label": selected_label,
         "entry_count": validated_entry_count,
         "bundle_count": validated_bundle_count,
+        "bundle_step_count": bundle_step_count,
         "task_report_bundle_count": task_report_bundle_count,
         "task_report_bundle_step_count": task_report_bundle_step_count,
         "task_report_bundle_samples": task_report_bundle_samples,
