@@ -595,10 +595,12 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     requested: list[str] = []
     unhealthy: list[str] = []
     healthy_count = 0
+    status_counts: dict[str, int] = {}
 
     for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
         probe = probes.get(key) or {}
-        probe_status = probe.get("status")
+        probe_status = probe.get("status") if isinstance(probe.get("status"), str) else "not_requested"
+        status_counts[probe_status] = status_counts.get(probe_status, 0) + 1
         if probe_status == "not_requested":
             continue
         requested.append(key)
@@ -622,6 +624,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "healthy_count": healthy_count,
         "failed_count": failed_count,
         "not_requested_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS) - requested_count,
+        "status_counts": {status: status_counts[status] for status in sorted(status_counts)},
         "requested": requested,
         "unhealthy": unhealthy,
         "boundary": "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",
