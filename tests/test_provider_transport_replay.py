@@ -63,6 +63,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["healthy"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], [])
+        self.assertEqual(status["runtime"]["probe_summary"]["failed"], [])
         self.assertEqual(
             status["runtime"]["probe_summary"]["not_requested"],
             ["health_probe", "watch_status_probe", "watch_events_probe", "watch_stream_probe"],
@@ -126,6 +127,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["healthy"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], [])
+        self.assertEqual(status["runtime"]["probe_summary"]["failed"], [])
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
 
@@ -161,6 +163,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["unhealthy_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["not_requested_count"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["status_counts"], {"not_requested": 3, "unhealthy": 1})
+        self.assertEqual(status["runtime"]["probe_summary"]["failed"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {"connection_failed": 1})
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_samples"],

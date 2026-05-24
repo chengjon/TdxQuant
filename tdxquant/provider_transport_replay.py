@@ -595,6 +595,7 @@ def _normalize_provider_replay_watch_stream_probe(watch_stream_probe: dict[str, 
 def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> dict[str, Any]:
     requested: list[str] = []
     healthy: list[str] = []
+    failed: list[str] = []
     unhealthy: list[str] = []
     not_requested: list[str] = []
     healthy_count = 0
@@ -628,6 +629,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             healthy.append(key)
             healthy_count += 1
         else:
+            failed.append(key)
             unhealthy.append(key)
 
     requested_count = len(requested)
@@ -654,6 +656,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "error_sample_truncated": error_sample_count > len(error_samples),
         "requested": requested,
         "healthy": healthy,
+        "failed": failed,
         "unhealthy": unhealthy,
         "not_requested": not_requested,
         "boundary": "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",

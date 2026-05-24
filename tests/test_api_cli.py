@@ -2511,6 +2511,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             ["health_probe", "watch_status_probe", "watch_events_probe"],
         )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["unhealthy"], ["watch_stream_probe"])
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["failed"], ["watch_stream_probe"])
         self.assertEqual(result.data["summary_view"]["probe_summary"]["not_requested"], [])
         self.assertIn("no daemon start/stop lifecycle management", result.data["summary_view"]["boundaries"])
         mocked_serve.assert_not_called()
