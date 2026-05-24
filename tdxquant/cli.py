@@ -162,6 +162,7 @@ SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT = 5
 PINGAN_BUNDLE_SAMPLE_LIMIT = 5
 WATCH_STATUS_REASON_SAMPLE_LIMIT = 3
 WATCH_STATUS_ACTION_SAMPLE_LIMIT = 3
+PROVIDER_REPLAY_ENDPOINT_SAMPLE_LIMIT = 3
 PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
     name: dict(resolve_trade_profile(name, profiles=load_trade_profiles()))
     for name in PINGAN_BUY_PROFILE_NAMES
@@ -4764,6 +4765,9 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
         restart_managed,
     )
     managed_operation_count = sum(1 for supported in lifecycle_support_flags if supported)
+    endpoint_samples = [endpoint for endpoint in endpoints if isinstance(endpoint, str)][
+        :PROVIDER_REPLAY_ENDPOINT_SAMPLE_LIMIT
+    ]
     return {
         "mode": "summary",
         "provider_id": status.get("provider_id"),
@@ -4782,6 +4786,9 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "read_only": capabilities.get("read_only"),
             "writes_supported": capabilities.get("writes_supported"),
             "endpoint_count": len(endpoints),
+            "endpoint_samples": endpoint_samples,
+            "endpoint_sample_limit": PROVIDER_REPLAY_ENDPOINT_SAMPLE_LIMIT,
+            "endpoint_sample_truncated": len(endpoints) > len(endpoint_samples),
         },
         "runtime": {
             "runtime_observed": runtime.get("runtime_observed"),
