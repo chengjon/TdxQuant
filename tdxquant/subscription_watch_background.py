@@ -274,6 +274,7 @@ def _build_subscription_watch_governance_summary(
         "decision": "manual_review" if requires_manual_review else "observe",
         "requires_manual_review": requires_manual_review,
         "reasons": reasons,
+        "reason_count": len(reasons),
         "reason_source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
         "actions": actions,
         "action_summary": _build_subscription_watch_governance_action_summary(actions),

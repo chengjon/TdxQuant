@@ -715,6 +715,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         "decision": "observe",
         "requires_manual_review": False,
         "reasons": [],
+        "reason_count": 0,
         "reason_source_counts": {},
         "actions": [],
         "action_summary": {
@@ -750,6 +751,7 @@ def test_status_summary_governance_requests_manual_review_for_resilience_states(
     assert summary["governance"]["requires_manual_review"] is True
     assert summary["governance"]["staleness_evaluated"] is False
     assert summary["governance"]["reasons"] == [f"overall_status:{state}"]
+    assert summary["governance"]["reason_count"] == 1
     assert summary["governance"]["reason_source_counts"] == {"overall_status": 1}
     assert summary["governance"]["actions"] == [
         {
@@ -786,6 +788,7 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
     assert summary["governance"]["requires_manual_review"] is True
     assert summary["governance"]["staleness_evaluated"] is True
     assert summary["governance"]["reasons"] == ["heartbeat:stale", "watermark:stale"]
+    assert summary["governance"]["reason_count"] == 2
     assert summary["governance"]["reason_source_counts"] == {"heartbeat": 1, "watermark": 1}
     assert summary["governance"]["actions"] == [
         {
@@ -862,6 +865,7 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
     assert summary["governance"]["requires_manual_review"] is True
     assert summary["governance"]["staleness_evaluated"] is True
     assert summary["governance"]["reasons"] == ["overall_status:reconnecting", "reconnect:stale"]
+    assert summary["governance"]["reason_count"] == len(summary["governance"]["reasons"])
     assert summary["governance"]["reason_source_counts"] == {"overall_status": 1, "reconnect": 1}
     assert summary["governance"]["actions"] == [
         {
