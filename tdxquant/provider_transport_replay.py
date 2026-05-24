@@ -598,11 +598,15 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     not_requested: list[str] = []
     healthy_count = 0
     status_counts: dict[str, int] = {}
+    error_code_counts: dict[str, int] = {}
 
     for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
         probe = probes.get(key) or {}
         probe_status = probe.get("status") if isinstance(probe.get("status"), str) else "not_requested"
         status_counts[probe_status] = status_counts.get(probe_status, 0) + 1
+        error_code = probe.get("error_code")
+        if isinstance(error_code, str) and error_code:
+            error_code_counts[error_code] = error_code_counts.get(error_code, 0) + 1
         if probe_status == "not_requested":
             not_requested.append(key)
             continue
@@ -631,6 +635,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "unhealthy_count": len(unhealthy),
         "not_requested_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS) - requested_count,
         "status_counts": {status: status_counts[status] for status in sorted(status_counts)},
+        "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
         "requested": requested,
         "healthy": healthy,
         "unhealthy": unhealthy,
