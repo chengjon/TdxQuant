@@ -628,6 +628,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "requested_count": requested_count,
         "healthy_count": healthy_count,
         "failed_count": failed_count,
+        "unhealthy_count": len(unhealthy),
         "not_requested_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS) - requested_count,
         "status_counts": {status: status_counts[status] for status in sorted(status_counts)},
         "requested": requested,
