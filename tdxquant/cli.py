@@ -2711,6 +2711,7 @@ def _build_catalog_trade_plan_boundary(
         for field in required_fields
         if field in args and args[field] is not None and args[field] != ""
     ]
+    missing_fields = [field for field in required_fields if field not in provided_fields]
     boundary: dict[str, object] = {
         "trade_command": command_name,
         "input_kind": CATALOG_TRADE_PLAN_INPUT_KIND[command_name],
@@ -2719,7 +2720,10 @@ def _build_catalog_trade_plan_boundary(
         "live_trade_requires_explicit_run": True,
         "required_input_fields": required_fields,
         "provided_input_fields": provided_fields,
-        "missing_input_fields": [field for field in required_fields if field not in provided_fields],
+        "missing_input_fields": missing_fields,
+        "required_input_count": len(required_fields),
+        "provided_input_count": len(provided_fields),
+        "missing_input_count": len(missing_fields),
     }
     side = args.get("side")
     if command_name == "trade-submit-once" and isinstance(side, str):
