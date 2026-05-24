@@ -4128,6 +4128,32 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)
 
+    def test_handle_catalog_validate_summary_view_projects_pingan_samples(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "validate", "--kind", "bundle", "--label", "pingan", "--view", "summary"]
+        )
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        summary_view = result.data["summary_view"]
+        self.assertEqual(summary_view["selected_label"], "pingan")
+        self.assertEqual(summary_view["pingan_bundle_count"], validation["pingan_bundle_count"])
+        self.assertGreater(summary_view["pingan_bundle_count"], 0)
+        self.assertEqual(summary_view["pingan_bundle_samples"], validation["pingan_bundle_samples"])
+        self.assertEqual(summary_view["pingan_bundle_sample_limit"], validation["pingan_bundle_sample_limit"])
+        self.assertEqual(
+            summary_view["pingan_bundle_sample_truncated"],
+            validation["pingan_bundle_sample_truncated"],
+        )
+        self.assertEqual(summary_view["pingan_bundle_sample_truncated"], True)
+        self.assertEqual(summary_view["pingan_bundle_samples"][0], "audit-pingan-buy-exception-diagnostics")
+        self.assertEqual(summary_view["non_execution"], True)
+        self.assertNotIn("entries", summary_view)
+        self.assertNotIn("bundles", summary_view)
+
     def test_handle_catalog_validate_missing_bundle_returns_invalid_request(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "validate", "--bundle", "missing-review"])

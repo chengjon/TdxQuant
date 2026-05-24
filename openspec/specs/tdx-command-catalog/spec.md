@@ -584,6 +584,16 @@ The command catalog validation workflow SHALL expose an opt-in summary view that
 - **AND** the summary payload MUST declare `non_execution=true`
 - **AND** the summary payload MUST NOT include full entry or bundle detail rows
 
+#### Scenario: Caller validates PingAn bundles with summary view
+
+- **WHEN** a caller runs `catalog validate --kind bundle --label pingan --view summary`
+- **THEN** the summary payload MUST include `pingan_bundle_count`
+- **AND** the summary payload MUST include a bounded deterministic `pingan_bundle_samples` list when matching PingAn bundles exist
+- **AND** the summary payload MUST include `pingan_bundle_sample_limit`
+- **AND** the summary payload MUST include `pingan_bundle_sample_truncated`
+- **AND** the summary payload MUST declare `non_execution=true`
+- **AND** the summary payload MUST NOT include full entry or bundle detail rows
+
 #### Scenario: Caller validates missing target with summary view
 
 - **WHEN** a caller runs `catalog validate --bundle <missing> --view summary`

@@ -159,6 +159,7 @@ TRADER_RUNTIME_DIR = Path(__file__).resolve().parents[1] / "runtime" / "trader"
 PINGAN_BUY_PROFILE_NAMES = ("stable", "balanced", "fast", "turbo")
 TASK_REPORT_BUNDLE_SAMPLE_LIMIT = 5
 SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT = 5
+PINGAN_BUNDLE_SAMPLE_LIMIT = 5
 PINGAN_BUY_PROFILES: dict[str, dict[str, object]] = {
     name: dict(resolve_trade_profile(name, profiles=load_trade_profiles()))
     for name in PINGAN_BUY_PROFILE_NAMES
@@ -2734,6 +2735,10 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "submit_once_bundle_samples": copy.deepcopy(validation.get("submit_once_bundle_samples", [])),
             "submit_once_bundle_sample_limit": validation.get("submit_once_bundle_sample_limit"),
             "submit_once_bundle_sample_truncated": validation.get("submit_once_bundle_sample_truncated"),
+            "pingan_bundle_count": validation.get("pingan_bundle_count"),
+            "pingan_bundle_samples": copy.deepcopy(validation.get("pingan_bundle_samples", [])),
+            "pingan_bundle_sample_limit": validation.get("pingan_bundle_sample_limit"),
+            "pingan_bundle_sample_truncated": validation.get("pingan_bundle_sample_truncated"),
             "invalid_count": validation.get("invalid_count"),
             "valid": validation.get("valid"),
             "non_execution": validation.get("non_execution"),
@@ -3396,6 +3401,8 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     task_report_bundle_samples: list[str] = []
     submit_once_bundle_count = 0
     submit_once_bundle_samples: list[str] = []
+    pingan_bundle_count = 0
+    pingan_bundle_samples: list[str] = []
 
     if effective_kind in {"entry", "all"}:
         if selected_entry:
@@ -3439,6 +3446,15 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                     submit_once_bundle_count += 1
                     if len(submit_once_bundle_samples) < SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT:
                         submit_once_bundle_samples.append(bundle_name)
+                is_pingan_bundle = (
+                    "pingan" in bundle_name
+                    or any("pingan" in label for label in bundle_labels)
+                    or any("pingan" in entry for entry in step_entries)
+                )
+                if is_pingan_bundle:
+                    pingan_bundle_count += 1
+                    if len(pingan_bundle_samples) < PINGAN_BUNDLE_SAMPLE_LIMIT:
+                        pingan_bundle_samples.append(bundle_name)
             except ValueError as exc:
                 errors.append({"target_type": "bundle", "target": bundle_name, "message": str(exc)})
 
@@ -3457,6 +3473,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "submit_once_bundle_samples": submit_once_bundle_samples,
         "submit_once_bundle_sample_limit": SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT,
         "submit_once_bundle_sample_truncated": submit_once_bundle_count > len(submit_once_bundle_samples),
+        "pingan_bundle_count": pingan_bundle_count,
+        "pingan_bundle_samples": pingan_bundle_samples,
+        "pingan_bundle_sample_limit": PINGAN_BUNDLE_SAMPLE_LIMIT,
+        "pingan_bundle_sample_truncated": pingan_bundle_count > len(pingan_bundle_samples),
         "invalid_count": len(errors),
         "valid": not errors,
         "errors": errors,
