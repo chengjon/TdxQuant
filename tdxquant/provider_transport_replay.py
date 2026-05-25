@@ -730,6 +730,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "requested": requested,
         "healthy": healthy,
         "failed": failed,
+        "primary_failed_probe": failed[0] if failed else None,
         "unhealthy": unhealthy,
         "not_requested": not_requested,
         "boundary": "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",
