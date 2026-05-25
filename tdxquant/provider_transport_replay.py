@@ -603,6 +603,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     requested_status_counts: dict[str, int] = {}
     failed_status_counts: dict[str, int] = {}
     requested_reachability_counts: dict[str, int] = {}
+    requested_http_status_counts: dict[str, int] = {}
     error_code_counts: dict[str, int] = {}
     error_samples: list[dict[str, Any]] = []
     error_sample_count = 0
@@ -629,6 +630,12 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             continue
         requested.append(key)
         requested_status_counts[probe_status] = requested_status_counts.get(probe_status, 0) + 1
+        http_status = probe.get("http_status")
+        if isinstance(http_status, int) and not isinstance(http_status, bool):
+            http_status_key = str(http_status)
+            requested_http_status_counts[http_status_key] = (
+                requested_http_status_counts.get(http_status_key, 0) + 1
+            )
         reachable = probe.get("reachable")
         if reachable is True:
             reachability_status = "reachable"
@@ -671,6 +678,10 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "failed_status_counts": {status: failed_status_counts[status] for status in sorted(failed_status_counts)},
         "requested_reachability_counts": {
             status: requested_reachability_counts[status] for status in sorted(requested_reachability_counts)
+        },
+        "requested_http_status_counts": {
+            status: requested_http_status_counts[status]
+            for status in sorted(requested_http_status_counts, key=int)
         },
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
         "error_samples": error_samples,
