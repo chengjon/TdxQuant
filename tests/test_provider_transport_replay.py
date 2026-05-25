@@ -67,6 +67,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["error_samples"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 0)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_status_counts"], {})
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_probe_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], [])
@@ -197,6 +198,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         )
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_status_counts"], {"unhealthy": 1})
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_probe_counts"], {"health_probe": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
@@ -247,6 +249,15 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_sample_status_counts"],
             {"healthy": 1, "unhealthy": 3},
+        )
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["error_sample_probe_counts"],
+            {
+                "health_probe": 1,
+                "watch_events_probe": 1,
+                "watch_status_probe": 1,
+                "watch_stream_probe": 1,
+            },
         )
         self.assertEqual(status["runtime"]["probe_summary"]["failed_status_counts"], {"unhealthy": 3})
         self.assertEqual(len(status["runtime"]["probe_summary"]["error_samples"]), 3)
