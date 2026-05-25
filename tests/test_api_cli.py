@@ -2495,6 +2495,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["runtime"]["runtime_observed"], True)
         self.assertEqual(result.data["summary_view"]["runtime"]["probe_requested"], True)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["status"], "degraded")
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["request_coverage_status"],
+            "complete",
+        )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["total_count"], 4)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["requested_count"], 4)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["unhealthy_count"], 1)

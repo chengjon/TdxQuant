@@ -675,21 +675,26 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
 
     requested_count = len(requested)
     failed_count = len(unhealthy)
+    total_count = len(PROVIDER_REPLAY_STATUS_PROBE_KEYS)
     if requested_count == 0:
         summary_status = "not_requested"
+        request_coverage_status = "none"
     elif failed_count:
         summary_status = "degraded"
+        request_coverage_status = "complete" if requested_count == total_count else "partial"
     else:
         summary_status = "healthy"
+        request_coverage_status = "complete" if requested_count == total_count else "partial"
 
     return {
         "status": summary_status,
-        "total_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS),
+        "request_coverage_status": request_coverage_status,
+        "total_count": total_count,
         "requested_count": requested_count,
         "healthy_count": healthy_count,
         "failed_count": failed_count,
         "unhealthy_count": len(unhealthy),
-        "not_requested_count": len(PROVIDER_REPLAY_STATUS_PROBE_KEYS) - requested_count,
+        "not_requested_count": total_count - requested_count,
         "status_counts": {status: status_counts[status] for status in sorted(status_counts)},
         "requested_status_counts": {
             status: requested_status_counts[status] for status in sorted(requested_status_counts)

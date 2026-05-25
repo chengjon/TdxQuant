@@ -154,6 +154,8 @@ TdxQuant
 
 > E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay status --probe-* --view summary` 与 detailed payload 新增只读 `runtime.probe_summary.error_sample_probe_counts`，证据为 `tdxquant/provider_transport_replay.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-probe-error-sample-probe-counts`；该字段只统计进入紧凑错误样本候选集合的 probe key 分布，并独立于被截断的 `error_samples` 列表，不暴露完整 probe payload，不证明失败覆盖/健康状态，也不新增 probe 端点、socket 启动、provider mutation 或 daemon 生命周期管理。
 
+> E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay status --probe-* --view summary` 与 detailed payload 新增只读 `runtime.probe_summary.request_coverage_status`，证据为 `tdxquant/provider_transport_replay.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-probe-request-coverage-status`；该字段只从既有 `requested_count/total_count` 派生 `none` / `partial` / `complete` 请求覆盖状态，不请求额外 probe、不证明健康状态或 endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。
+
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup` 和 `--view summary` 新增只读 `bundle_step_source_entry_counts`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-bundle-step-source-entry-counts`；该字段只统计已解析 selected bundle step 的 `source:entry` 分布，不列出完整 bundle/step manifest，不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、执行覆盖或 readiness 证明。
 >
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup` 和 `--view summary` 新增只读 `task_report_bundle_step_source_entry_counts`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-task-report-step-source-entry-counts`；该字段只统计已解析 task+report bundle step 的 `source:entry` 分布，不列出完整 step manifest，不执行 task/report/trade/catalog entry/bundle step，也不代表 workflow builder、执行覆盖或 readiness 证明。
@@ -205,6 +207,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-26 | E-06 补充 provider-replay `probe_summary.request_coverage_status` 登记：只从既有 `requested_count/total_count` 派生 `none` / `partial` / `complete` 请求覆盖状态；不请求额外 probe、不证明健康状态或 endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。 |
 | 2026-05-26 | E-11 补充 `catalog validate` 的 `submit_once_bundle_step_source_entry_counts` 与 `pingan_bundle_step_source_entry_counts` 登记：只统计 selected resolved submit-once/PingAn bundle step `source:entry` 分布；不列出完整 step manifest、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate` 的 `submit_once_bundle_step_count` 与 `pingan_bundle_step_count` 登记：只统计 selected resolved submit-once/PingAn bundle step 总数；不列出完整 step manifest、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate` 的 `submit_once_bundle_step_source_option_key_counts` 与 `pingan_bundle_step_source_option_key_counts` 登记：只统计 selected resolved submit-once/PingAn bundle step `source:option_key` 分布；空 map 仅表示当前选集无 source-qualified option key，不暴露 option value、不执行 entry/bundle step，也不代表 broker readiness、交易安全证明或执行覆盖。 |

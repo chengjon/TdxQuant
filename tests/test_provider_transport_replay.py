@@ -49,6 +49,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["watch_stream_probe"]["enabled"], False)
         self.assertEqual(status["runtime"]["watch_stream_probe"]["status"], "not_requested")
         self.assertEqual(status["runtime"]["probe_summary"]["status"], "not_requested")
+        self.assertEqual(status["runtime"]["probe_summary"]["request_coverage_status"], "none")
         self.assertEqual(status["runtime"]["probe_summary"]["total_count"], 4)
         self.assertEqual(status["runtime"]["probe_summary"]["requested_count"], 0)
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_count"], 0)
@@ -127,6 +128,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["health_probe"]["status"], "healthy")
         self.assertEqual(status["runtime"]["health_probe"]["service"], "provider-transport-replay")
         self.assertEqual(status["runtime"]["probe_summary"]["status"], "healthy")
+        self.assertEqual(status["runtime"]["probe_summary"]["request_coverage_status"], "partial")
         self.assertEqual(status["runtime"]["probe_summary"]["total_count"], 4)
         self.assertEqual(status["runtime"]["probe_summary"]["requested_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_count"], 1)
@@ -246,6 +248,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         )
 
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 4)
+        self.assertEqual(status["runtime"]["probe_summary"]["request_coverage_status"], "complete")
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_sample_status_counts"],
             {"healthy": 1, "unhealthy": 3},
