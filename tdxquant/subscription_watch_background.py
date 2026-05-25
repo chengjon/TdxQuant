@@ -377,6 +377,7 @@ def _build_subscription_watch_governance_action_summary(actions: list[dict[str, 
     severity_counts: dict[str, int] = {}
     action_name_counts: dict[str, int] = {}
     reason_source_counts: dict[str, int] = {}
+    reason_code_counts: dict[str, int] = {}
     for action in actions:
         severity = action.get("severity")
         if severity:
@@ -384,8 +385,11 @@ def _build_subscription_watch_governance_action_summary(actions: list[dict[str, 
         action_name = action.get("action")
         if action_name:
             action_name_counts[action_name] = action_name_counts.get(action_name, 0) + 1
-        reason_source = _subscription_watch_governance_reason_source(action.get("reason"))
+        action_reason = action.get("reason")
+        reason_source = _subscription_watch_governance_reason_source(action_reason)
         reason_source_counts[reason_source] = reason_source_counts.get(reason_source, 0) + 1
+        if isinstance(action_reason, str) and action_reason:
+            reason_code_counts[action_reason] = reason_code_counts.get(action_reason, 0) + 1
     return {
         "count": len(actions),
         "primary_action": first_action.get("action") if first_action else None,
@@ -398,6 +402,7 @@ def _build_subscription_watch_governance_action_summary(actions: list[dict[str, 
         "reason_source_counts": {
             reason_source: reason_source_counts[reason_source] for reason_source in sorted(reason_source_counts)
         },
+        "reason_code_counts": {reason: reason_code_counts[reason] for reason in sorted(reason_code_counts)},
     }
 
 

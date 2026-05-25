@@ -8690,6 +8690,12 @@ class ReportCliDispatchTests(unittest.TestCase):
                                 "reconnect": 1,
                                 "watermark": 1,
                             },
+                            "reason_code_counts": {
+                                "heartbeat:stale": 1,
+                                "overall_status:degraded": 1,
+                                "reconnect:stale": 1,
+                                "watermark:stale": 1,
+                            },
                         },
                         "action_count": 4,
                         "actions": [
@@ -8816,6 +8822,12 @@ class ReportCliDispatchTests(unittest.TestCase):
                                 "overall_status": 1,
                                 "reconnect": 1,
                                 "watermark": 1,
+                            },
+                            "reason_code_counts": {
+                                "heartbeat:stale": 1,
+                                "overall_status:degraded": 1,
+                                "reconnect:stale": 1,
+                                "watermark:stale": 1,
                             },
                         },
                         "action_samples": [
