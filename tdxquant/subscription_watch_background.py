@@ -307,7 +307,17 @@ def _build_subscription_watch_governance_reason_summary(reasons: list[Any]) -> d
         if primary_reason is not None
         else None,
         "source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
+        "reason_code_counts": _build_subscription_watch_governance_reason_code_counts(reasons),
     }
+
+
+def _build_subscription_watch_governance_reason_code_counts(reasons: list[Any]) -> dict[str, int]:
+    reason_code_counts: dict[str, int] = {}
+    for reason in reasons:
+        if not isinstance(reason, str) or not reason:
+            continue
+        reason_code_counts[reason] = reason_code_counts.get(reason, 0) + 1
+    return {reason: reason_code_counts[reason] for reason in sorted(reason_code_counts)}
 
 
 def _subscription_watch_governance_reason_source(reason: Any) -> str:
