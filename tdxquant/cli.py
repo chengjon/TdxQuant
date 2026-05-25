@@ -2880,6 +2880,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "submit_once_bundle_step_entry_counts": copy.deepcopy(
                 validation.get("submit_once_bundle_step_entry_counts", {})
             ),
+            "submit_once_bundle_step_source_entry_counts": copy.deepcopy(
+                validation.get("submit_once_bundle_step_source_entry_counts", {})
+            ),
             "submit_once_bundle_step_option_key_counts": copy.deepcopy(
                 validation.get("submit_once_bundle_step_option_key_counts", {})
             ),
@@ -2905,6 +2908,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             ),
             "pingan_bundle_step_entry_counts": copy.deepcopy(
                 validation.get("pingan_bundle_step_entry_counts", {})
+            ),
+            "pingan_bundle_step_source_entry_counts": copy.deepcopy(
+                validation.get("pingan_bundle_step_source_entry_counts", {})
             ),
             "pingan_bundle_step_option_key_counts": copy.deepcopy(
                 validation.get("pingan_bundle_step_option_key_counts", {})
@@ -3616,6 +3622,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     submit_once_bundle_step_name_counts: dict[str, int] = {}
     submit_once_bundle_step_source_name_counts: dict[str, int] = {}
     submit_once_bundle_step_entry_counts: dict[str, int] = {}
+    submit_once_bundle_step_source_entry_counts: dict[str, int] = {}
     submit_once_bundle_step_option_key_counts: dict[str, int] = {}
     submit_once_bundle_step_source_option_key_counts: dict[str, int] = {}
     pingan_bundle_count = 0
@@ -3626,6 +3633,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     pingan_bundle_step_name_counts: dict[str, int] = {}
     pingan_bundle_step_source_name_counts: dict[str, int] = {}
     pingan_bundle_step_entry_counts: dict[str, int] = {}
+    pingan_bundle_step_source_entry_counts: dict[str, int] = {}
     pingan_bundle_step_option_key_counts: dict[str, int] = {}
     pingan_bundle_step_source_option_key_counts: dict[str, int] = {}
 
@@ -3794,6 +3802,14 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                             submit_once_bundle_step_entry_counts[step_entry] = (
                                 submit_once_bundle_step_entry_counts.get(step_entry, 0) + 1
                             )
+                            if isinstance(source, str) and source:
+                                source_entry = f"{source}:{step_entry}"
+                                submit_once_bundle_step_source_entry_counts[source_entry] = (
+                                    submit_once_bundle_step_source_entry_counts.get(
+                                        source_entry, 0
+                                    )
+                                    + 1
+                                )
                         step_options = step.get("options")
                         if isinstance(step_options, dict):
                             for option_key in step_options:
@@ -3848,6 +3864,11 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                             pingan_bundle_step_entry_counts[step_entry] = (
                                 pingan_bundle_step_entry_counts.get(step_entry, 0) + 1
                             )
+                            if isinstance(source, str) and source:
+                                source_entry = f"{source}:{step_entry}"
+                                pingan_bundle_step_source_entry_counts[source_entry] = (
+                                    pingan_bundle_step_source_entry_counts.get(source_entry, 0) + 1
+                                )
                         step_options = step.get("options")
                         if isinstance(step_options, dict):
                             for option_key in step_options:
@@ -3970,6 +3991,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
             entry: submit_once_bundle_step_entry_counts[entry]
             for entry in sorted(submit_once_bundle_step_entry_counts)
         },
+        "submit_once_bundle_step_source_entry_counts": {
+            source_entry: submit_once_bundle_step_source_entry_counts[source_entry]
+            for source_entry in sorted(submit_once_bundle_step_source_entry_counts)
+        },
         "submit_once_bundle_step_option_key_counts": {
             option_key: submit_once_bundle_step_option_key_counts[option_key]
             for option_key in sorted(submit_once_bundle_step_option_key_counts)
@@ -4001,6 +4026,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         },
         "pingan_bundle_step_entry_counts": {
             entry: pingan_bundle_step_entry_counts[entry] for entry in sorted(pingan_bundle_step_entry_counts)
+        },
+        "pingan_bundle_step_source_entry_counts": {
+            source_entry: pingan_bundle_step_source_entry_counts[source_entry]
+            for source_entry in sorted(pingan_bundle_step_source_entry_counts)
         },
         "pingan_bundle_step_option_key_counts": {
             option_key: pingan_bundle_step_option_key_counts[option_key]

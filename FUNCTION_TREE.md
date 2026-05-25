@@ -168,6 +168,8 @@ TdxQuant
 
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup` 和 `--view summary` 新增只读 `submit_once_bundle_step_count` 与 `pingan_bundle_step_count`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-submit-pingan-step-counts`；这两个字段只统计已解析 submit-once/PingAn bundle 子集的 resolved step 总数，不列出完整 step manifest、不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
 
+> E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup` 和 `--view summary` 新增只读 `submit_once_bundle_step_source_entry_counts` 与 `pingan_bundle_step_source_entry_counts`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-submit-pingan-step-source-entry-counts`；这两个字段只统计已解析 submit-once/PingAn bundle 子集的 `source:entry` 分布，不列出完整 step manifest、不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
@@ -203,6 +205,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-26 | E-11 补充 `catalog validate` 的 `submit_once_bundle_step_source_entry_counts` 与 `pingan_bundle_step_source_entry_counts` 登记：只统计 selected resolved submit-once/PingAn bundle step `source:entry` 分布；不列出完整 step manifest、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate` 的 `submit_once_bundle_step_count` 与 `pingan_bundle_step_count` 登记：只统计 selected resolved submit-once/PingAn bundle step 总数；不列出完整 step manifest、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate` 的 `submit_once_bundle_step_source_option_key_counts` 与 `pingan_bundle_step_source_option_key_counts` 登记：只统计 selected resolved submit-once/PingAn bundle step `source:option_key` 分布；空 map 仅表示当前选集无 source-qualified option key，不暴露 option value、不执行 entry/bundle step，也不代表 broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate` 的 `submit_once_bundle_step_option_key_counts` 与 `pingan_bundle_step_option_key_counts` 登记：只统计 selected resolved submit-once/PingAn bundle step option key 分布；空 map 仅表示当前选集无 option key，不暴露 option value、不执行 entry/bundle step，也不代表 broker readiness、交易安全证明或执行覆盖。 |

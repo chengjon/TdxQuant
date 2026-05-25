@@ -4235,6 +4235,14 @@ class ApiCliDispatchTests(unittest.TestCase):
             validation["submit_once_bundle_step_count"],
             sum(validation["submit_once_bundle_step_source_counts"].values()),
         )
+        self.assertEqual(
+            validation["submit_once_bundle_step_count"],
+            sum(validation["submit_once_bundle_step_source_entry_counts"].values()),
+        )
+        self.assertGreater(
+            validation["submit_once_bundle_step_source_entry_counts"]["report:recent-ledger"],
+            0,
+        )
         self.assertGreater(validation["submit_once_bundle_step_count"], validation["submit_once_bundle_count"])
         self.assertEqual(
             sum(validation["submit_once_bundle_step_source_option_key_counts"].values()),
@@ -4243,6 +4251,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             validation["pingan_bundle_step_count"],
             sum(validation["pingan_bundle_step_source_counts"].values()),
+        )
+        self.assertEqual(
+            validation["pingan_bundle_step_count"],
+            sum(validation["pingan_bundle_step_source_entry_counts"].values()),
+        )
+        self.assertGreater(
+            validation["pingan_bundle_step_source_entry_counts"]["task:task-confirm-current"],
+            0,
         )
         self.assertGreater(validation["pingan_bundle_step_count"], validation["pingan_bundle_count"])
         self.assertEqual(validation["pingan_bundle_step_option_key_counts"], {})
@@ -4388,6 +4404,14 @@ class ApiCliDispatchTests(unittest.TestCase):
             sum(summary_view["submit_once_bundle_step_source_counts"].values()),
         )
         self.assertEqual(
+            summary_view["submit_once_bundle_step_source_entry_counts"],
+            validation["submit_once_bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["submit_once_bundle_step_count"],
+            sum(summary_view["submit_once_bundle_step_source_entry_counts"].values()),
+        )
+        self.assertEqual(
             summary_view["submit_once_bundle_step_option_key_counts"],
             validation["submit_once_bundle_step_option_key_counts"],
         )
@@ -4415,6 +4439,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["pingan_bundle_step_count"],
             sum(summary_view["pingan_bundle_step_source_counts"].values()),
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_source_entry_counts"],
+            validation["pingan_bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_count"],
+            sum(summary_view["pingan_bundle_step_source_entry_counts"].values()),
         )
         self.assertEqual(summary_view["pingan_bundle_step_option_key_counts"], {})
         self.assertEqual(
@@ -4463,6 +4495,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["submit_once_bundle_step_count"], 0)
         self.assertEqual(validation["pingan_bundle_step_count"], 0)
         self.assertEqual(summary_view["pingan_bundle_step_count"], 0)
+        self.assertEqual(validation["submit_once_bundle_step_source_entry_counts"], {})
+        self.assertEqual(summary_view["submit_once_bundle_step_source_entry_counts"], {})
+        self.assertEqual(validation["pingan_bundle_step_source_entry_counts"], {})
+        self.assertEqual(summary_view["pingan_bundle_step_source_entry_counts"], {})
         self.assertEqual(summary_view["bundle_label_counts"], {})
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
@@ -4509,6 +4545,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["submit_once_bundle_step_count"],
             sum(summary_view["submit_once_bundle_step_source_counts"].values()),
+        )
+        self.assertEqual(
+            summary_view["submit_once_bundle_step_source_entry_counts"],
+            validation["submit_once_bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["submit_once_bundle_step_count"],
+            sum(summary_view["submit_once_bundle_step_source_entry_counts"].values()),
+        )
+        self.assertGreater(
+            validation["submit_once_bundle_step_source_entry_counts"]["report:recent-failures"],
+            0,
         )
         self.assertGreater(
             summary_view["submit_once_bundle_step_count"],
@@ -4591,6 +4639,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["pingan_bundle_step_count"],
             sum(summary_view["pingan_bundle_step_source_counts"].values()),
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_source_entry_counts"],
+            validation["pingan_bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_count"],
+            sum(summary_view["pingan_bundle_step_source_entry_counts"].values()),
+        )
+        self.assertGreater(
+            validation["pingan_bundle_step_source_entry_counts"]["task:task-confirm-current"],
+            0,
         )
         self.assertGreater(summary_view["pingan_bundle_step_count"], summary_view["pingan_bundle_count"])
         self.assertEqual(summary_view["pingan_bundle_label_counts"], validation["pingan_bundle_label_counts"])
