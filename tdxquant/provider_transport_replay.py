@@ -603,6 +603,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     requested_status_counts: dict[str, int] = {}
     failed_status_counts: dict[str, int] = {}
     requested_reachability_counts: dict[str, int] = {}
+    healthy_reachability_counts: dict[str, int] = {}
     failed_reachability_counts: dict[str, int] = {}
     requested_http_status_counts: dict[str, int] = {}
     healthy_http_status_counts: dict[str, int] = {}
@@ -657,6 +658,9 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         if probe_status == "healthy":
             healthy.append(key)
             healthy_count += 1
+            healthy_reachability_counts[reachability_status] = (
+                healthy_reachability_counts.get(reachability_status, 0) + 1
+            )
             if isinstance(http_status, int) and not isinstance(http_status, bool):
                 http_status_key = str(http_status)
                 healthy_http_status_counts[http_status_key] = (
@@ -706,6 +710,9 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "failed_status_counts": {status: failed_status_counts[status] for status in sorted(failed_status_counts)},
         "requested_reachability_counts": {
             status: requested_reachability_counts[status] for status in sorted(requested_reachability_counts)
+        },
+        "healthy_reachability_counts": {
+            status: healthy_reachability_counts[status] for status in sorted(healthy_reachability_counts)
         },
         "failed_reachability_counts": {
             status: failed_reachability_counts[status] for status in sorted(failed_reachability_counts)
