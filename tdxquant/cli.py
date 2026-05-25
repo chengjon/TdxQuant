@@ -2879,6 +2879,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "submit_once_bundle_step_entry_counts": copy.deepcopy(
                 validation.get("submit_once_bundle_step_entry_counts", {})
             ),
+            "submit_once_bundle_step_option_key_counts": copy.deepcopy(
+                validation.get("submit_once_bundle_step_option_key_counts", {})
+            ),
             "submit_once_bundle_samples": copy.deepcopy(validation.get("submit_once_bundle_samples", [])),
             "submit_once_bundle_sample_limit": validation.get("submit_once_bundle_sample_limit"),
             "submit_once_bundle_sample_truncated": validation.get("submit_once_bundle_sample_truncated"),
@@ -2897,6 +2900,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             ),
             "pingan_bundle_step_entry_counts": copy.deepcopy(
                 validation.get("pingan_bundle_step_entry_counts", {})
+            ),
+            "pingan_bundle_step_option_key_counts": copy.deepcopy(
+                validation.get("pingan_bundle_step_option_key_counts", {})
             ),
             "pingan_bundle_samples": copy.deepcopy(validation.get("pingan_bundle_samples", [])),
             "pingan_bundle_sample_limit": validation.get("pingan_bundle_sample_limit"),
@@ -3601,6 +3607,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     submit_once_bundle_step_name_counts: dict[str, int] = {}
     submit_once_bundle_step_source_name_counts: dict[str, int] = {}
     submit_once_bundle_step_entry_counts: dict[str, int] = {}
+    submit_once_bundle_step_option_key_counts: dict[str, int] = {}
     pingan_bundle_count = 0
     pingan_bundle_samples: list[str] = []
     pingan_bundle_label_counts: dict[str, int] = {}
@@ -3608,6 +3615,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     pingan_bundle_step_name_counts: dict[str, int] = {}
     pingan_bundle_step_source_name_counts: dict[str, int] = {}
     pingan_bundle_step_entry_counts: dict[str, int] = {}
+    pingan_bundle_step_option_key_counts: dict[str, int] = {}
 
     if effective_kind in {"entry", "all"}:
         if selected_entry:
@@ -3773,6 +3781,14 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                             submit_once_bundle_step_entry_counts[step_entry] = (
                                 submit_once_bundle_step_entry_counts.get(step_entry, 0) + 1
                             )
+                        step_options = step.get("options")
+                        if isinstance(step_options, dict):
+                            for option_key in step_options:
+                                if isinstance(option_key, str) and option_key:
+                                    submit_once_bundle_step_option_key_counts[option_key] = (
+                                        submit_once_bundle_step_option_key_counts.get(option_key, 0)
+                                        + 1
+                                    )
                     if len(submit_once_bundle_samples) < SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT:
                         submit_once_bundle_samples.append(bundle_name)
                 is_pingan_bundle = (
@@ -3808,6 +3824,13 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                             pingan_bundle_step_entry_counts[step_entry] = (
                                 pingan_bundle_step_entry_counts.get(step_entry, 0) + 1
                             )
+                        step_options = step.get("options")
+                        if isinstance(step_options, dict):
+                            for option_key in step_options:
+                                if isinstance(option_key, str) and option_key:
+                                    pingan_bundle_step_option_key_counts[option_key] = (
+                                        pingan_bundle_step_option_key_counts.get(option_key, 0) + 1
+                                    )
                     if len(pingan_bundle_samples) < PINGAN_BUNDLE_SAMPLE_LIMIT:
                         pingan_bundle_samples.append(bundle_name)
             except ValueError as exc:
@@ -3912,6 +3935,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
             entry: submit_once_bundle_step_entry_counts[entry]
             for entry in sorted(submit_once_bundle_step_entry_counts)
         },
+        "submit_once_bundle_step_option_key_counts": {
+            option_key: submit_once_bundle_step_option_key_counts[option_key]
+            for option_key in sorted(submit_once_bundle_step_option_key_counts)
+        },
         "submit_once_bundle_samples": submit_once_bundle_samples,
         "submit_once_bundle_sample_limit": SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT,
         "submit_once_bundle_sample_truncated": submit_once_bundle_count > len(submit_once_bundle_samples),
@@ -3932,6 +3959,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         },
         "pingan_bundle_step_entry_counts": {
             entry: pingan_bundle_step_entry_counts[entry] for entry in sorted(pingan_bundle_step_entry_counts)
+        },
+        "pingan_bundle_step_option_key_counts": {
+            option_key: pingan_bundle_step_option_key_counts[option_key]
+            for option_key in sorted(pingan_bundle_step_option_key_counts)
         },
         "pingan_bundle_samples": pingan_bundle_samples,
         "pingan_bundle_sample_limit": PINGAN_BUNDLE_SAMPLE_LIMIT,
