@@ -516,6 +516,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "stale_count": 1,
                             "not_evaluated_count": 1,
                             "component_status_counts": {"fresh": 1, "not_evaluated": 1, "stale": 1},
+                            "evaluated_status_counts": {"fresh": 1, "stale": 1},
                         },
                     },
                 },
@@ -624,6 +625,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "stale_count": 1,
                 "not_evaluated_count": 1,
                 "component_status_counts": {"fresh": 1, "not_evaluated": 1, "stale": 1},
+                "evaluated_status_counts": {"fresh": 1, "stale": 1},
             },
         )
         self.assertNotIn("reasons", payload["result"]["governance"])

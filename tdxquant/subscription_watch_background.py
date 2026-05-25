@@ -339,6 +339,7 @@ def _build_subscription_watch_governance_evaluation_summary(
     fresh_components: list[str] = []
     not_evaluated_components: list[str] = []
     component_status_counts: dict[str, int] = {}
+    evaluated_status_counts: dict[str, int] = {}
     for name, summary in (("heartbeat", heartbeat), ("watermark", watermark), ("reconnect", reconnect)):
         staleness = summary.get("staleness")
         component_status = staleness if isinstance(staleness, str) and staleness else "unknown"
@@ -347,6 +348,7 @@ def _build_subscription_watch_governance_evaluation_summary(
             not_evaluated_components.append(name)
         else:
             evaluated_components.append(name)
+            evaluated_status_counts[component_status] = evaluated_status_counts.get(component_status, 0) + 1
         if staleness == "stale":
             stale_components.append(name)
         if staleness == "fresh":
@@ -363,6 +365,9 @@ def _build_subscription_watch_governance_evaluation_summary(
         "not_evaluated_count": len(not_evaluated_components),
         "component_status_counts": {
             status: component_status_counts[status] for status in sorted(component_status_counts)
+        },
+        "evaluated_status_counts": {
+            status: evaluated_status_counts[status] for status in sorted(evaluated_status_counts)
         },
     }
 

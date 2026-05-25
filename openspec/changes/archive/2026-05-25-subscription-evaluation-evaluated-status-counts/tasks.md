@@ -1,0 +1,5 @@
+- [x] Add OpenSpec delta for evaluated component status counts.
+- [x] Add failing tests for no-evaluation, mixed stale/fresh, and reconnect-stale summaries.
+- [x] Implement additive `governance.evaluation_summary.evaluated_status_counts`.
+- [x] Update `FUNCTION_TREE.md` B-16/E-09 evidence and boundary.
+- [x] Validate tests, OpenSpec, diff whitespace, and FUNCTION_TREE registry.

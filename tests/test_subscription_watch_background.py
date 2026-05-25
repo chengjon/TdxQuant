@@ -744,6 +744,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
             "fresh_count": 0,
             "not_evaluated_count": 3,
             "component_status_counts": {"not_evaluated": 3},
+            "evaluated_status_counts": {},
         },
         "staleness_evaluated": False,
         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
@@ -845,6 +846,7 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
         "fresh_count": 0,
         "not_evaluated_count": 1,
         "component_status_counts": {"not_evaluated": 1, "stale": 2},
+        "evaluated_status_counts": {"stale": 2},
     }
 
 
@@ -872,6 +874,7 @@ def test_status_summary_evaluation_summary_lists_fresh_components() -> None:
         "fresh_count": 1,
         "not_evaluated_count": 1,
         "component_status_counts": {"fresh": 1, "not_evaluated": 1, "stale": 1},
+        "evaluated_status_counts": {"fresh": 1, "stale": 1},
     }
 
 
@@ -935,6 +938,7 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
         "fresh_count": 0,
         "not_evaluated_count": 2,
         "component_status_counts": {"not_evaluated": 2, "stale": 1},
+        "evaluated_status_counts": {"stale": 1},
     }
 
 
@@ -965,6 +969,7 @@ def test_status_summary_evaluation_summary_preserves_fresh_counts_when_reconnect
         "fresh_count": 2,
         "not_evaluated_count": 0,
         "component_status_counts": {"fresh": 2, "stale": 1},
+        "evaluated_status_counts": {"fresh": 2, "stale": 1},
     }
     assert summary["governance"]["action_summary"]["count"] == 2
 
