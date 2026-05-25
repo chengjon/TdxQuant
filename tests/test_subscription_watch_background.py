@@ -733,6 +733,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
             "severity": "none",
             "severity_counts": {},
             "action_name_counts": {},
+            "reason_source_counts": {},
         },
         "evaluation_summary": {
             "evaluated_components": [],
@@ -780,6 +781,7 @@ def test_status_summary_governance_requests_manual_review_for_resilience_states(
         "severity": "review",
         "severity_counts": {"review": 1},
         "action_name_counts": {"review_subscription_watch_resilience": 1},
+        "reason_source_counts": {"overall_status": 1},
     }
 
 
@@ -835,6 +837,7 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
             "review_subscription_watch_heartbeat": 1,
             "review_subscription_watch_watermark": 1,
         },
+        "reason_source_counts": {"heartbeat": 1, "watermark": 1},
     }
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark"],
@@ -927,6 +930,7 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
             "review_subscription_watch_reconnect": 1,
             "review_subscription_watch_resilience": 1,
         },
+        "reason_source_counts": {"overall_status": 1, "reconnect": 1},
     }
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["reconnect"],
