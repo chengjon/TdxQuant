@@ -2864,6 +2864,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                 validation.get("task_report_bundle_label_counts", {})
             ),
             "submit_once_bundle_count": validation.get("submit_once_bundle_count"),
+            "submit_once_bundle_step_count": validation.get("submit_once_bundle_step_count"),
             "submit_once_bundle_label_counts": copy.deepcopy(
                 validation.get("submit_once_bundle_label_counts", {})
             ),
@@ -2889,6 +2890,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "submit_once_bundle_sample_limit": validation.get("submit_once_bundle_sample_limit"),
             "submit_once_bundle_sample_truncated": validation.get("submit_once_bundle_sample_truncated"),
             "pingan_bundle_count": validation.get("pingan_bundle_count"),
+            "pingan_bundle_step_count": validation.get("pingan_bundle_step_count"),
             "pingan_bundle_label_counts": copy.deepcopy(
                 validation.get("pingan_bundle_label_counts", {})
             ),
@@ -3607,6 +3609,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     task_report_bundle_step_source_option_key_counts: dict[str, int] = {}
     task_report_bundle_label_counts: dict[str, int] = {}
     submit_once_bundle_count = 0
+    submit_once_bundle_step_count = 0
     submit_once_bundle_samples: list[str] = []
     submit_once_bundle_label_counts: dict[str, int] = {}
     submit_once_bundle_step_source_counts: dict[str, int] = {}
@@ -3616,6 +3619,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     submit_once_bundle_step_option_key_counts: dict[str, int] = {}
     submit_once_bundle_step_source_option_key_counts: dict[str, int] = {}
     pingan_bundle_count = 0
+    pingan_bundle_step_count = 0
     pingan_bundle_samples: list[str] = []
     pingan_bundle_label_counts: dict[str, int] = {}
     pingan_bundle_step_source_counts: dict[str, int] = {}
@@ -3769,6 +3773,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                                 submit_once_bundle_label_counts.get(label, 0) + 1
                             )
                     for step in resolved_bundle["steps"]:
+                        submit_once_bundle_step_count += 1
                         source = step.get("source")
                         if isinstance(source, str) and source:
                             submit_once_bundle_step_source_counts[source] = (
@@ -3822,6 +3827,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                                 pingan_bundle_label_counts.get(label, 0) + 1
                             )
                     for step in resolved_bundle["steps"]:
+                        pingan_bundle_step_count += 1
                         source = step.get("source")
                         if isinstance(source, str) and source:
                             pingan_bundle_step_source_counts[source] = (
@@ -3943,6 +3949,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
             label: task_report_bundle_label_counts[label] for label in sorted(task_report_bundle_label_counts)
         },
         "submit_once_bundle_count": submit_once_bundle_count,
+        "submit_once_bundle_step_count": submit_once_bundle_step_count,
         "submit_once_bundle_label_counts": {
             label: submit_once_bundle_label_counts[label]
             for label in sorted(submit_once_bundle_label_counts)
@@ -3977,6 +3984,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "submit_once_bundle_sample_limit": SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT,
         "submit_once_bundle_sample_truncated": submit_once_bundle_count > len(submit_once_bundle_samples),
         "pingan_bundle_count": pingan_bundle_count,
+        "pingan_bundle_step_count": pingan_bundle_step_count,
         "pingan_bundle_label_counts": {
             label: pingan_bundle_label_counts[label] for label in sorted(pingan_bundle_label_counts)
         },
