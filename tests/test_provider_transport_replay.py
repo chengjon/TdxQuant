@@ -65,6 +65,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_samples"], [])
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 0)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], [])
@@ -193,6 +194,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 }
             ],
         )
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
@@ -202,6 +204,47 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             status["runtime"]["probe_summary"]["not_requested"],
             ["watch_status_probe", "watch_events_probe", "watch_stream_probe"],
         )
+        self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
+        self.assertEqual(status["lifecycle"]["daemon_managed"], False)
+
+    def test_status_counts_all_probe_error_sample_candidates(self) -> None:
+        config = ProviderTransportReplayConfig(
+            provider_id="provider-replay-a",
+            bind_host="127.0.0.1",
+            port=0,
+            token="secret-token",
+            master_allowlist=["127.0.0.1"],
+        )
+
+        status = build_provider_transport_replay_status(
+            config,
+            health_probe={
+                "status": "unhealthy",
+                "reachable": False,
+                "http_status": 503,
+                "error_code": "health_failed",
+            },
+            watch_status_probe={
+                "status": "unhealthy",
+                "reachable": False,
+                "error_code": "watch_status_failed",
+            },
+            watch_events_probe={
+                "status": "unhealthy",
+                "reachable": False,
+                "error_code": "watch_events_failed",
+            },
+            watch_stream_probe={
+                "status": "unhealthy",
+                "reachable": False,
+                "error_code": "watch_stream_failed",
+            },
+        )
+
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 4)
+        self.assertEqual(len(status["runtime"]["probe_summary"]["error_samples"]), 3)
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], True)
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
 

@@ -709,6 +709,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             code: failed_error_code_counts[code] for code in sorted(failed_error_code_counts)
         },
         "error_samples": error_samples,
+        "error_sample_count": error_sample_count,
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_truncated": error_sample_count > len(error_samples),
         "requested": requested,
