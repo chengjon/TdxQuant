@@ -1,0 +1,5 @@
+- [x] Add OpenSpec delta for task/report bundle step entry counts.
+- [x] Add failing tests for detailed and summary catalog validation payloads.
+- [x] Implement additive `task_report_bundle_step_entry_counts`.
+- [x] Update `FUNCTION_TREE.md` E-11 evidence and boundary.
+- [x] Validate tests, OpenSpec, diff whitespace, and FUNCTION_TREE registry.

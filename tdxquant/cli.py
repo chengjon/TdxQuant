@@ -2837,6 +2837,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "task_report_bundle_step_source_name_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_source_name_counts", {})
             ),
+            "task_report_bundle_step_entry_counts": copy.deepcopy(
+                validation.get("task_report_bundle_step_entry_counts", {})
+            ),
             "task_report_bundle_label_counts": copy.deepcopy(
                 validation.get("task_report_bundle_label_counts", {})
             ),
@@ -3531,6 +3534,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     task_report_bundle_step_source_counts: dict[str, int] = {}
     task_report_bundle_step_name_counts: dict[str, int] = {}
     task_report_bundle_step_source_name_counts: dict[str, int] = {}
+    task_report_bundle_step_entry_counts: dict[str, int] = {}
     task_report_bundle_label_counts: dict[str, int] = {}
     submit_once_bundle_count = 0
     submit_once_bundle_samples: list[str] = []
@@ -3613,6 +3617,11 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                                 task_report_bundle_step_source_name_counts[source_name] = (
                                     task_report_bundle_step_source_name_counts.get(source_name, 0) + 1
                                 )
+                        step_entry = step.get("entry")
+                        if isinstance(step_entry, str) and step_entry:
+                            task_report_bundle_step_entry_counts[step_entry] = (
+                                task_report_bundle_step_entry_counts.get(step_entry, 0) + 1
+                            )
                 is_submit_once_bundle = (
                     "submit-once" in bundle_name
                     or any("submit-once" in label for label in bundle_labels)
@@ -3674,6 +3683,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "task_report_bundle_step_source_name_counts": {
             source_name: task_report_bundle_step_source_name_counts[source_name]
             for source_name in sorted(task_report_bundle_step_source_name_counts)
+        },
+        "task_report_bundle_step_entry_counts": {
+            entry: task_report_bundle_step_entry_counts[entry]
+            for entry in sorted(task_report_bundle_step_entry_counts)
         },
         "task_report_bundle_label_counts": {
             label: task_report_bundle_label_counts[label] for label in sorted(task_report_bundle_label_counts)
