@@ -4325,6 +4325,11 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["selected_label"], "submit-once")
         self.assertEqual(summary_view["submit_once_bundle_count"], validation["submit_once_bundle_count"])
         self.assertGreater(summary_view["submit_once_bundle_count"], 0)
+        self.assertEqual(
+            summary_view["submit_once_bundle_label_counts"],
+            validation["submit_once_bundle_label_counts"],
+        )
+        self.assertGreater(validation["submit_once_bundle_label_counts"]["submit-once"], 0)
         self.assertEqual(summary_view["submit_once_bundle_samples"], validation["submit_once_bundle_samples"])
         self.assertEqual(
             summary_view["submit_once_bundle_sample_limit"],
@@ -4357,6 +4362,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["selected_label"], "pingan")
         self.assertEqual(summary_view["pingan_bundle_count"], validation["pingan_bundle_count"])
         self.assertGreater(summary_view["pingan_bundle_count"], 0)
+        self.assertEqual(summary_view["pingan_bundle_label_counts"], validation["pingan_bundle_label_counts"])
+        self.assertEqual(validation["pingan_bundle_label_counts"]["pingan"], validation["pingan_bundle_count"])
         self.assertEqual(summary_view["pingan_bundle_samples"], validation["pingan_bundle_samples"])
         self.assertEqual(summary_view["pingan_bundle_sample_limit"], validation["pingan_bundle_sample_limit"])
         self.assertEqual(
