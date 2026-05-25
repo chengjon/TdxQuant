@@ -300,12 +300,14 @@ def _build_subscription_watch_governance_reason_source_counts(reasons: list[Any]
 
 def _build_subscription_watch_governance_reason_summary(reasons: list[Any]) -> dict[str, Any]:
     primary_reason = reasons[0] if reasons and isinstance(reasons[0], str) else None
+    primary_source = (
+        _subscription_watch_governance_reason_source(primary_reason) if primary_reason is not None else None
+    )
     return {
         "count": len(reasons),
         "primary_reason": primary_reason,
-        "primary_source": _subscription_watch_governance_reason_source(primary_reason)
-        if primary_reason is not None
-        else None,
+        "primary_source": primary_source,
+        "primary_reason_source": primary_source,
         "source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
         "reason_code_counts": _build_subscription_watch_governance_reason_code_counts(reasons),
     }

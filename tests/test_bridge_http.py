@@ -458,6 +458,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "count": 4,
                             "primary_reason": "heartbeat:stale",
                             "primary_source": "heartbeat",
+                            "primary_reason_source": "heartbeat",
                             "source_counts": {
                                 "heartbeat": 1,
                                 "overall_status": 1,
@@ -592,6 +593,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "count": 4,
                 "primary_reason": "heartbeat:stale",
                 "primary_source": "heartbeat",
+                "primary_reason_source": "heartbeat",
                 "source_counts": {"heartbeat": 1, "overall_status": 1, "reconnect": 1, "watermark": 1},
                 "reason_code_counts": {
                     "heartbeat:stale": 1,
