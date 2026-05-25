@@ -731,6 +731,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
             "primary_action": None,
             "primary_reason": None,
             "primary_reason_source": None,
+            "primary_severity": "none",
             "severity": "none",
             "severity_counts": {},
             "action_name_counts": {},
@@ -784,6 +785,7 @@ def test_status_summary_governance_requests_manual_review_for_resilience_states(
         "primary_action": "review_subscription_watch_resilience",
         "primary_reason": f"overall_status:{state}",
         "primary_reason_source": "overall_status",
+        "primary_severity": "review",
         "severity": "review",
         "severity_counts": {"review": 1},
         "action_name_counts": {"review_subscription_watch_resilience": 1},
@@ -839,6 +841,7 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
         "primary_action": "review_subscription_watch_heartbeat",
         "primary_reason": "heartbeat:stale",
         "primary_reason_source": "heartbeat",
+        "primary_severity": "review",
         "severity": "review",
         "severity_counts": {"review": 2},
         "action_name_counts": {
@@ -940,6 +943,7 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
         "primary_action": "review_subscription_watch_resilience",
         "primary_reason": "overall_status:reconnecting",
         "primary_reason_source": "overall_status",
+        "primary_severity": "review",
         "severity": "review",
         "severity_counts": {"review": 2},
         "action_name_counts": {

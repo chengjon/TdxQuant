@@ -380,6 +380,7 @@ def _build_subscription_watch_governance_evaluation_summary(
 def _build_subscription_watch_governance_action_summary(actions: list[dict[str, str]]) -> dict[str, Any]:
     first_action = actions[0] if actions else None
     primary_reason = first_action.get("reason") if first_action else None
+    primary_severity = first_action.get("severity") if first_action else "none"
     severity_counts: dict[str, int] = {}
     action_name_counts: dict[str, int] = {}
     reason_source_counts: dict[str, int] = {}
@@ -405,7 +406,8 @@ def _build_subscription_watch_governance_action_summary(actions: list[dict[str, 
             if isinstance(primary_reason, str) and primary_reason
             else None
         ),
-        "severity": first_action.get("severity") if first_action else "none",
+        "primary_severity": primary_severity,
+        "severity": primary_severity,
         "severity_counts": {severity: severity_counts[severity] for severity in sorted(severity_counts)},
         "action_name_counts": {
             action_name: action_name_counts[action_name] for action_name in sorted(action_name_counts)

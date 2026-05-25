@@ -9026,6 +9026,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "primary_action": "review_subscription_watch_heartbeat",
                             "primary_reason": "heartbeat:stale",
                             "primary_reason_source": "heartbeat",
+                            "primary_severity": "review",
                             "severity": "review",
                             "action_name_counts": {
                                 "review_subscription_watch_heartbeat": 1,
@@ -9163,6 +9164,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "primary_action": "review_subscription_watch_heartbeat",
                             "primary_reason": "heartbeat:stale",
                             "primary_reason_source": "heartbeat",
+                            "primary_severity": "review",
                             "severity": "review",
                             "action_name_counts": {
                                 "review_subscription_watch_heartbeat": 1,
