@@ -2842,6 +2842,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "task_report_bundle_step_source_name_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_source_name_counts", {})
             ),
+            "task_report_bundle_step_source_entry_counts": copy.deepcopy(
+                validation.get("task_report_bundle_step_source_entry_counts", {})
+            ),
             "task_report_bundle_step_entry_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_entry_counts", {})
             ),
@@ -3575,6 +3578,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     task_report_bundle_step_source_counts: dict[str, int] = {}
     task_report_bundle_step_name_counts: dict[str, int] = {}
     task_report_bundle_step_source_name_counts: dict[str, int] = {}
+    task_report_bundle_step_source_entry_counts: dict[str, int] = {}
     task_report_bundle_step_entry_counts: dict[str, int] = {}
     task_report_bundle_step_option_key_counts: dict[str, int] = {}
     task_report_bundle_label_counts: dict[str, int] = {}
@@ -3687,6 +3691,12 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                             task_report_bundle_step_entry_counts[step_entry] = (
                                 task_report_bundle_step_entry_counts.get(step_entry, 0) + 1
                             )
+                            if isinstance(source, str) and source:
+                                source_entry = f"{source}:{step_entry}"
+                                task_report_bundle_step_source_entry_counts[source_entry] = (
+                                    task_report_bundle_step_source_entry_counts.get(source_entry, 0)
+                                    + 1
+                                )
                         step_options = step.get("options")
                         if isinstance(step_options, dict):
                             for option_key in step_options:
@@ -3816,6 +3826,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "task_report_bundle_step_source_name_counts": {
             source_name: task_report_bundle_step_source_name_counts[source_name]
             for source_name in sorted(task_report_bundle_step_source_name_counts)
+        },
+        "task_report_bundle_step_source_entry_counts": {
+            source_entry: task_report_bundle_step_source_entry_counts[source_entry]
+            for source_entry in sorted(task_report_bundle_step_source_entry_counts)
         },
         "task_report_bundle_step_entry_counts": {
             entry: task_report_bundle_step_entry_counts[entry]
