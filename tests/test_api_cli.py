@@ -2523,6 +2523,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             [{"probe": "watch_stream_probe", "status": "unhealthy", "error_code": "stream_timeout"}],
         )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_count"], 1)
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["error_sample_status_counts"],
+            {"unhealthy": 1},
+        )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(

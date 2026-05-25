@@ -66,6 +66,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_samples"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], [])
@@ -195,6 +196,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             ],
         )
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 1)
+        self.assertEqual(status["runtime"]["probe_summary"]["error_sample_status_counts"], {"unhealthy": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
@@ -219,10 +221,10 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         status = build_provider_transport_replay_status(
             config,
             health_probe={
-                "status": "unhealthy",
-                "reachable": False,
-                "http_status": 503,
-                "error_code": "health_failed",
+                "status": "healthy",
+                "reachable": True,
+                "http_status": 200,
+                "error_code": "health_warning",
             },
             watch_status_probe={
                 "status": "unhealthy",
@@ -242,6 +244,11 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         )
 
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 4)
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["error_sample_status_counts"],
+            {"healthy": 1, "unhealthy": 3},
+        )
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_status_counts"], {"unhealthy": 3})
         self.assertEqual(len(status["runtime"]["probe_summary"]["error_samples"]), 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], True)

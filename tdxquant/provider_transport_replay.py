@@ -609,6 +609,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     error_code_counts: dict[str, int] = {}
     failed_error_code_counts: dict[str, int] = {}
     error_samples: list[dict[str, Any]] = []
+    error_sample_status_counts: dict[str, int] = {}
     error_sample_count = 0
 
     for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
@@ -620,6 +621,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             error_code_counts[error_code] = error_code_counts.get(error_code, 0) + 1
         if probe_status not in {"healthy", "not_requested"} or (isinstance(error_code, str) and error_code):
             error_sample_count += 1
+            error_sample_status_counts[probe_status] = error_sample_status_counts.get(probe_status, 0) + 1
             if len(error_samples) < PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT:
                 sample: dict[str, Any] = {"probe": key, "status": probe_status}
                 if isinstance(error_code, str) and error_code:
@@ -710,6 +712,9 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         },
         "error_samples": error_samples,
         "error_sample_count": error_sample_count,
+        "error_sample_status_counts": {
+            status: error_sample_status_counts[status] for status in sorted(error_sample_status_counts)
+        },
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_truncated": error_sample_count > len(error_samples),
         "requested": requested,
