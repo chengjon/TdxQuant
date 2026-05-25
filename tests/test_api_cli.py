@@ -4122,12 +4122,18 @@ class ApiCliDispatchTests(unittest.TestCase):
             validation["task_report_bundle_step_count"],
             sum(validation["task_report_bundle_step_name_counts"].values()),
         )
+        self.assertEqual(
+            validation["task_report_bundle_step_count"],
+            sum(validation["task_report_bundle_step_source_name_counts"].values()),
+        )
         self.assertGreater(validation["task_report_bundle_step_count"], validation["task_report_bundle_count"])
         self.assertGreater(validation["task_report_bundle_step_source_counts"]["task"], 0)
         self.assertGreater(validation["task_report_bundle_step_source_counts"]["report"], 0)
         self.assertNotIn("trade", validation["task_report_bundle_step_source_counts"])
         self.assertGreater(validation["task_report_bundle_step_name_counts"]["audit"], 0)
         self.assertGreater(validation["task_report_bundle_step_name_counts"]["trade"], 0)
+        self.assertGreater(validation["task_report_bundle_step_source_name_counts"]["report:audit"], 0)
+        self.assertGreater(validation["task_report_bundle_step_source_name_counts"]["task:trade"], 0)
         self.assertEqual(
             validation["task_report_bundle_label_counts"]["followup"],
             validation["task_report_bundle_count"],
@@ -4192,6 +4198,14 @@ class ApiCliDispatchTests(unittest.TestCase):
             sum(summary_view["task_report_bundle_step_name_counts"].values()),
         )
         self.assertEqual(
+            summary_view["task_report_bundle_step_source_name_counts"],
+            validation["task_report_bundle_step_source_name_counts"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_count"],
+            sum(summary_view["task_report_bundle_step_source_name_counts"].values()),
+        )
+        self.assertEqual(
             summary_view["task_report_bundle_label_counts"],
             validation["task_report_bundle_label_counts"],
         )
@@ -4220,6 +4234,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["task_report_bundle_count"], 0)
         self.assertEqual(validation["task_report_bundle_step_count"], 0)
         self.assertEqual(validation["task_report_bundle_step_source_counts"], {})
+        self.assertEqual(validation["task_report_bundle_step_source_name_counts"], {})
         self.assertEqual(validation["task_report_bundle_label_counts"], {})
 
     def test_handle_catalog_validate_summary_view_projects_submit_once_samples(self) -> None:
