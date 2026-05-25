@@ -2513,6 +2513,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             {"reachable": 3, "unreachable": 1},
         )
         self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["failed_reachability_counts"],
+            {"unreachable": 1},
+        )
+        self.assertEqual(
             result.data["summary_view"]["probe_summary"]["requested_http_status_counts"],
             {"200": 3},
         )
