@@ -4149,6 +4149,11 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["bundle_step_count"], sum(validation["bundle_step_entry_counts"].values()))
         self.assertEqual(validation["bundle_step_count"], sum(validation["bundle_step_source_name_counts"].values()))
         self.assertEqual(validation["bundle_step_option_key_counts"]["limit"], 3)
+        self.assertEqual(validation["bundle_step_source_option_key_counts"]["report:limit"], 3)
+        self.assertEqual(
+            sum(validation["bundle_step_source_option_key_counts"].values()),
+            sum(validation["bundle_step_option_key_counts"].values()),
+        )
         self.assertGreater(validation["bundle_step_source_counts"]["task"], 0)
         self.assertGreater(validation["bundle_step_source_counts"]["report"], 0)
         self.assertGreater(validation["bundle_step_name_counts"]["audit"], 0)
@@ -4245,6 +4250,15 @@ class ApiCliDispatchTests(unittest.TestCase):
             summary_view["bundle_step_option_key_counts"], validation["bundle_step_option_key_counts"]
         )
         self.assertEqual(summary_view["bundle_step_option_key_counts"]["limit"], 3)
+        self.assertEqual(
+            summary_view["bundle_step_source_option_key_counts"],
+            validation["bundle_step_source_option_key_counts"],
+        )
+        self.assertEqual(summary_view["bundle_step_source_option_key_counts"]["report:limit"], 3)
+        self.assertEqual(
+            sum(summary_view["bundle_step_source_option_key_counts"].values()),
+            sum(summary_view["bundle_step_option_key_counts"].values()),
+        )
         self.assertEqual(summary_view["bundle_step_source_name_counts"], validation["bundle_step_source_name_counts"])
         self.assertEqual(summary_view["bundle_step_count"], sum(summary_view["bundle_step_source_name_counts"].values()))
         self.assertEqual(
@@ -4349,6 +4363,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["entry_label_counts"]["report"], validation["entry_count"])
         self.assertEqual(summary_view["entry_label_counts"], validation["entry_label_counts"])
         self.assertEqual(summary_view["entry_label_counts"]["report"], summary_view["entry_count"])
+        self.assertEqual(validation["bundle_step_source_option_key_counts"], {})
+        self.assertEqual(summary_view["bundle_step_source_option_key_counts"], {})
         self.assertEqual(summary_view["bundle_label_counts"], {})
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
