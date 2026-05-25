@@ -2814,6 +2814,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "selected_bundle": validation.get("selected_bundle"),
             "selected_label": validation.get("selected_label"),
             "entry_count": validation.get("entry_count"),
+            "entry_source_counts": copy.deepcopy(validation.get("entry_source_counts", {})),
             "entry_label_counts": copy.deepcopy(validation.get("entry_label_counts", {})),
             "bundle_count": validation.get("bundle_count"),
             "bundle_step_count": validation.get("bundle_step_count"),
@@ -3528,6 +3529,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
 
     errors: list[dict[str, object]] = []
     validated_entry_count = 0
+    entry_source_counts: dict[str, int] = {}
     entry_label_counts: dict[str, int] = {}
     validated_bundle_count = 0
     bundle_step_count = 0
@@ -3562,6 +3564,9 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                 if selected_label and selected_label not in resolved["labels"]:
                     continue
                 validated_entry_count += 1
+                source = resolved.get("source")
+                if isinstance(source, str) and source:
+                    entry_source_counts[source] = entry_source_counts.get(source, 0) + 1
                 for label in sorted({str(label) for label in resolved["labels"]}):
                     if label:
                         entry_label_counts[label] = entry_label_counts.get(label, 0) + 1
@@ -3677,6 +3682,9 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "selected_bundle": selected_bundle,
         "selected_label": selected_label,
         "entry_count": validated_entry_count,
+        "entry_source_counts": {
+            source: entry_source_counts[source] for source in sorted(entry_source_counts)
+        },
         "entry_label_counts": {label: entry_label_counts[label] for label in sorted(entry_label_counts)},
         "bundle_count": validated_bundle_count,
         "bundle_step_count": bundle_step_count,
