@@ -4073,6 +4073,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertGreater(validation["entry_count"], 0)
         self.assertGreater(validation["bundle_count"], 0)
         self.assertGreater(validation["task_report_bundle_count"], 0)
+        self.assertGreater(validation["entry_label_counts"]["report"], 0)
+        self.assertGreater(validation["entry_label_counts"]["task"], 0)
         self.assertEqual(validation["errors"], [])
 
     def test_handle_catalog_validate_followup_bundles_counts_task_report_combos(self) -> None:
@@ -4086,6 +4088,7 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["kind"], "bundle")
         self.assertEqual(validation["selected_label"], "followup")
         self.assertEqual(validation["entry_count"], 0)
+        self.assertEqual(validation["entry_label_counts"], {})
         self.assertEqual(validation["invalid_count"], 0)
         self.assertEqual(validation["valid"], True)
         self.assertGreaterEqual(validation["bundle_count"], validation["task_report_bundle_count"])
@@ -4164,6 +4167,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["kind"], "bundle")
         self.assertEqual(summary_view["selected_label"], "followup")
         self.assertEqual(summary_view["entry_count"], 0)
+        self.assertEqual(summary_view["entry_label_counts"], validation["entry_label_counts"])
+        self.assertEqual(summary_view["entry_label_counts"], {})
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
         self.assertEqual(summary_view["bundle_step_count"], validation["bundle_step_count"])
         self.assertEqual(summary_view["bundle_step_source_counts"], validation["bundle_step_source_counts"])
@@ -4241,6 +4246,27 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(summary_view["invalid_count"], 0)
         self.assertEqual(summary_view["valid"], True)
+        self.assertEqual(summary_view["non_execution"], True)
+        self.assertNotIn("entries", summary_view)
+        self.assertNotIn("bundles", summary_view)
+
+    def test_handle_catalog_validate_entry_summary_view_projects_entry_label_counts(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "validate", "--kind", "entry", "--label", "report", "--view", "summary"]
+        )
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        summary_view = result.data["summary_view"]
+        self.assertGreater(validation["entry_count"], 0)
+        self.assertEqual(validation["bundle_count"], 0)
+        self.assertEqual(validation["entry_label_counts"]["report"], validation["entry_count"])
+        self.assertEqual(summary_view["entry_label_counts"], validation["entry_label_counts"])
+        self.assertEqual(summary_view["entry_label_counts"]["report"], summary_view["entry_count"])
+        self.assertEqual(summary_view["bundle_label_counts"], {})
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)
