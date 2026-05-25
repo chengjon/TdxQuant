@@ -601,6 +601,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     healthy_count = 0
     status_counts: dict[str, int] = {}
     requested_status_counts: dict[str, int] = {}
+    failed_status_counts: dict[str, int] = {}
     error_code_counts: dict[str, int] = {}
     error_samples: list[dict[str, Any]] = []
     error_sample_count = 0
@@ -633,6 +634,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         else:
             failed.append(key)
             unhealthy.append(key)
+            failed_status_counts[probe_status] = failed_status_counts.get(probe_status, 0) + 1
 
     requested_count = len(requested)
     failed_count = len(unhealthy)
@@ -655,6 +657,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "requested_status_counts": {
             status: requested_status_counts[status] for status in sorted(requested_status_counts)
         },
+        "failed_status_counts": {status: failed_status_counts[status] for status in sorted(failed_status_counts)},
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
         "error_samples": error_samples,
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
