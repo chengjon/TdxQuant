@@ -602,6 +602,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     status_counts: dict[str, int] = {}
     requested_status_counts: dict[str, int] = {}
     failed_status_counts: dict[str, int] = {}
+    requested_reachability_counts: dict[str, int] = {}
     error_code_counts: dict[str, int] = {}
     error_samples: list[dict[str, Any]] = []
     error_sample_count = 0
@@ -628,6 +629,16 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             continue
         requested.append(key)
         requested_status_counts[probe_status] = requested_status_counts.get(probe_status, 0) + 1
+        reachable = probe.get("reachable")
+        if reachable is True:
+            reachability_status = "reachable"
+        elif reachable is False:
+            reachability_status = "unreachable"
+        else:
+            reachability_status = "unknown"
+        requested_reachability_counts[reachability_status] = (
+            requested_reachability_counts.get(reachability_status, 0) + 1
+        )
         if probe_status == "healthy":
             healthy.append(key)
             healthy_count += 1
@@ -658,6 +669,9 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             status: requested_status_counts[status] for status in sorted(requested_status_counts)
         },
         "failed_status_counts": {status: failed_status_counts[status] for status in sorted(failed_status_counts)},
+        "requested_reachability_counts": {
+            status: requested_reachability_counts[status] for status in sorted(requested_reachability_counts)
+        },
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
         "error_samples": error_samples,
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
