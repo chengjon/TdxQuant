@@ -2508,6 +2508,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             result.data["summary_view"]["probe_summary"]["requested_http_status_counts"],
             {"200": 3},
         )
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["healthy_http_status_counts"],
+            {"200": 3},
+        )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_code_counts"], {"stream_timeout": 1})
         self.assertEqual(
             result.data["summary_view"]["probe_summary"]["failed_error_code_counts"],
