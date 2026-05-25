@@ -2855,12 +2855,18 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "submit_once_bundle_label_counts": copy.deepcopy(
                 validation.get("submit_once_bundle_label_counts", {})
             ),
+            "submit_once_bundle_step_source_counts": copy.deepcopy(
+                validation.get("submit_once_bundle_step_source_counts", {})
+            ),
             "submit_once_bundle_samples": copy.deepcopy(validation.get("submit_once_bundle_samples", [])),
             "submit_once_bundle_sample_limit": validation.get("submit_once_bundle_sample_limit"),
             "submit_once_bundle_sample_truncated": validation.get("submit_once_bundle_sample_truncated"),
             "pingan_bundle_count": validation.get("pingan_bundle_count"),
             "pingan_bundle_label_counts": copy.deepcopy(
                 validation.get("pingan_bundle_label_counts", {})
+            ),
+            "pingan_bundle_step_source_counts": copy.deepcopy(
+                validation.get("pingan_bundle_step_source_counts", {})
             ),
             "pingan_bundle_samples": copy.deepcopy(validation.get("pingan_bundle_samples", [])),
             "pingan_bundle_sample_limit": validation.get("pingan_bundle_sample_limit"),
@@ -3557,9 +3563,11 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     submit_once_bundle_count = 0
     submit_once_bundle_samples: list[str] = []
     submit_once_bundle_label_counts: dict[str, int] = {}
+    submit_once_bundle_step_source_counts: dict[str, int] = {}
     pingan_bundle_count = 0
     pingan_bundle_samples: list[str] = []
     pingan_bundle_label_counts: dict[str, int] = {}
+    pingan_bundle_step_source_counts: dict[str, int] = {}
 
     if effective_kind in {"entry", "all"}:
         if selected_entry:
@@ -3675,6 +3683,12 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                             submit_once_bundle_label_counts[label] = (
                                 submit_once_bundle_label_counts.get(label, 0) + 1
                             )
+                    for step in resolved_bundle["steps"]:
+                        source = step.get("source")
+                        if isinstance(source, str) and source:
+                            submit_once_bundle_step_source_counts[source] = (
+                                submit_once_bundle_step_source_counts.get(source, 0) + 1
+                            )
                     if len(submit_once_bundle_samples) < SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT:
                         submit_once_bundle_samples.append(bundle_name)
                 is_pingan_bundle = (
@@ -3688,6 +3702,12 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                         if label:
                             pingan_bundle_label_counts[label] = (
                                 pingan_bundle_label_counts.get(label, 0) + 1
+                            )
+                    for step in resolved_bundle["steps"]:
+                        source = step.get("source")
+                        if isinstance(source, str) and source:
+                            pingan_bundle_step_source_counts[source] = (
+                                pingan_bundle_step_source_counts.get(source, 0) + 1
                             )
                     if len(pingan_bundle_samples) < PINGAN_BUNDLE_SAMPLE_LIMIT:
                         pingan_bundle_samples.append(bundle_name)
@@ -3759,12 +3779,20 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
             label: submit_once_bundle_label_counts[label]
             for label in sorted(submit_once_bundle_label_counts)
         },
+        "submit_once_bundle_step_source_counts": {
+            source: submit_once_bundle_step_source_counts[source]
+            for source in sorted(submit_once_bundle_step_source_counts)
+        },
         "submit_once_bundle_samples": submit_once_bundle_samples,
         "submit_once_bundle_sample_limit": SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT,
         "submit_once_bundle_sample_truncated": submit_once_bundle_count > len(submit_once_bundle_samples),
         "pingan_bundle_count": pingan_bundle_count,
         "pingan_bundle_label_counts": {
             label: pingan_bundle_label_counts[label] for label in sorted(pingan_bundle_label_counts)
+        },
+        "pingan_bundle_step_source_counts": {
+            source: pingan_bundle_step_source_counts[source]
+            for source in sorted(pingan_bundle_step_source_counts)
         },
         "pingan_bundle_samples": pingan_bundle_samples,
         "pingan_bundle_sample_limit": PINGAN_BUNDLE_SAMPLE_LIMIT,
