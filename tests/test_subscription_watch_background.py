@@ -740,6 +740,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         "evaluation_summary": {
             "evaluated_components": [],
             "stale_components": [],
+            "primary_stale_component": None,
             "fresh_components": [],
             "not_evaluated_components": ["heartbeat", "watermark", "reconnect"],
             "evaluated_count": 0,
@@ -848,6 +849,7 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark"],
         "stale_components": ["heartbeat", "watermark"],
+        "primary_stale_component": "heartbeat",
         "fresh_components": [],
         "not_evaluated_components": ["reconnect"],
         "evaluated_count": 2,
@@ -876,6 +878,7 @@ def test_status_summary_evaluation_summary_lists_fresh_components() -> None:
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark"],
         "stale_components": ["watermark"],
+        "primary_stale_component": "watermark",
         "fresh_components": ["heartbeat"],
         "not_evaluated_components": ["reconnect"],
         "evaluated_count": 2,
@@ -943,6 +946,7 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["reconnect"],
         "stale_components": ["reconnect"],
+        "primary_stale_component": "reconnect",
         "fresh_components": [],
         "not_evaluated_components": ["heartbeat", "watermark"],
         "evaluated_count": 1,
@@ -974,6 +978,7 @@ def test_status_summary_evaluation_summary_preserves_fresh_counts_when_reconnect
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark", "reconnect"],
         "stale_components": ["reconnect"],
+        "primary_stale_component": "reconnect",
         "fresh_components": ["heartbeat", "watermark"],
         "not_evaluated_components": [],
         "evaluated_count": 3,

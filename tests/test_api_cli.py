@@ -8852,6 +8852,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat"],
                             "stale_components": ["heartbeat"],
+                            "primary_stale_component": "heartbeat",
                             "not_evaluated_components": ["watermark", "reconnect"],
                             "evaluated_count": 1,
                             "stale_count": 1,
@@ -8978,6 +8979,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat"],
                             "stale_components": ["heartbeat"],
+                            "primary_stale_component": "heartbeat",
                             "not_evaluated_components": ["watermark", "reconnect"],
                             "evaluated_count": 1,
                             "stale_count": 1,

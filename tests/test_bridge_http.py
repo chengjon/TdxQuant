@@ -520,6 +520,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat", "watermark"],
                             "stale_components": ["heartbeat"],
+                            "primary_stale_component": "heartbeat",
                             "not_evaluated_components": ["reconnect"],
                             "evaluated_count": 2,
                             "stale_count": 1,
@@ -644,6 +645,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             {
                 "evaluated_components": ["heartbeat", "watermark"],
                 "stale_components": ["heartbeat"],
+                "primary_stale_component": "heartbeat",
                 "not_evaluated_components": ["reconnect"],
                 "evaluated_count": 2,
                 "stale_count": 1,
