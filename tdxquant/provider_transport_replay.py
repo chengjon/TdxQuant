@@ -605,6 +605,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     requested_reachability_counts: dict[str, int] = {}
     requested_http_status_counts: dict[str, int] = {}
     error_code_counts: dict[str, int] = {}
+    failed_error_code_counts: dict[str, int] = {}
     error_samples: list[dict[str, Any]] = []
     error_sample_count = 0
 
@@ -653,6 +654,8 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             failed.append(key)
             unhealthy.append(key)
             failed_status_counts[probe_status] = failed_status_counts.get(probe_status, 0) + 1
+            if isinstance(error_code, str) and error_code:
+                failed_error_code_counts[error_code] = failed_error_code_counts.get(error_code, 0) + 1
 
     requested_count = len(requested)
     failed_count = len(unhealthy)
@@ -684,6 +687,9 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             for status in sorted(requested_http_status_counts, key=int)
         },
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
+        "failed_error_code_counts": {
+            code: failed_error_code_counts[code] for code in sorted(failed_error_code_counts)
+        },
         "error_samples": error_samples,
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_truncated": error_sample_count > len(error_samples),

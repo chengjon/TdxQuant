@@ -61,6 +61,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["requested_reachability_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["requested_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {})
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_samples"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
@@ -174,6 +175,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["requested_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["failed"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {"connection_failed": 1})
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {"connection_failed": 1})
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_samples"],
             [{"probe": "health_probe", "status": "unhealthy", "error_code": "connection_failed"}],
