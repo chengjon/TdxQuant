@@ -500,6 +500,8 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                         "action_summary": {
                             "count": 4,
                             "primary_action": "inspect_worker",
+                            "primary_reason": "heartbeat_stale",
+                            "primary_reason_source": "unknown",
                             "actions": ["inspect_worker"],
                             "action_name_counts": {
                                 "inspect_process": 1,
@@ -603,6 +605,8 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["governance"]["reason_sample_truncated"], True)
         self.assertEqual(payload["result"]["governance"]["action_count"], 4)
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_action"], "inspect_worker")
+        self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_reason"], "heartbeat_stale")
+        self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_reason_source"], "unknown")
         self.assertEqual(
             payload["result"]["governance"]["action_summary"]["action_name_counts"],
             {
