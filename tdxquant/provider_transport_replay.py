@@ -605,6 +605,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     requested_reachability_counts: dict[str, int] = {}
     requested_http_status_counts: dict[str, int] = {}
     healthy_http_status_counts: dict[str, int] = {}
+    failed_http_status_counts: dict[str, int] = {}
     error_code_counts: dict[str, int] = {}
     failed_error_code_counts: dict[str, int] = {}
     error_samples: list[dict[str, Any]] = []
@@ -660,6 +661,11 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             failed.append(key)
             unhealthy.append(key)
             failed_status_counts[probe_status] = failed_status_counts.get(probe_status, 0) + 1
+            if isinstance(http_status, int) and not isinstance(http_status, bool):
+                http_status_key = str(http_status)
+                failed_http_status_counts[http_status_key] = (
+                    failed_http_status_counts.get(http_status_key, 0) + 1
+                )
             if isinstance(error_code, str) and error_code:
                 failed_error_code_counts[error_code] = failed_error_code_counts.get(error_code, 0) + 1
 
@@ -694,6 +700,9 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         },
         "healthy_http_status_counts": {
             status: healthy_http_status_counts[status] for status in sorted(healthy_http_status_counts, key=int)
+        },
+        "failed_http_status_counts": {
+            status: failed_http_status_counts[status] for status in sorted(failed_http_status_counts, key=int)
         },
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
         "failed_error_code_counts": {

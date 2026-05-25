@@ -61,6 +61,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["requested_reachability_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["requested_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_http_status_counts"], {})
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["error_samples"], [])
@@ -132,6 +133,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["status_counts"], {"healthy": 1, "not_requested": 3})
         self.assertEqual(status["runtime"]["probe_summary"]["requested_status_counts"], {"healthy": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_http_status_counts"], {"200": 1})
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["healthy"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["unhealthy"], [])
@@ -153,7 +155,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             health_probe={
                 "status": "unhealthy",
                 "reachable": False,
-                "http_status": None,
+                "http_status": 503,
                 "error_code": "connection_failed",
                 "error": {"code": "connection_failed", "message": "connection refused"},
             },
@@ -174,14 +176,22 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["requested_status_counts"], {"unhealthy": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_status_counts"], {"unhealthy": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["requested_reachability_counts"], {"unreachable": 1})
-        self.assertEqual(status["runtime"]["probe_summary"]["requested_http_status_counts"], {})
+        self.assertEqual(status["runtime"]["probe_summary"]["requested_http_status_counts"], {"503": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_http_status_counts"], {})
+        self.assertEqual(status["runtime"]["probe_summary"]["failed_http_status_counts"], {"503": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["failed"], ["health_probe"])
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {"connection_failed": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {"connection_failed": 1})
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_samples"],
-            [{"probe": "health_probe", "status": "unhealthy", "error_code": "connection_failed"}],
+            [
+                {
+                    "probe": "health_probe",
+                    "status": "unhealthy",
+                    "error_code": "connection_failed",
+                    "http_status": 503,
+                }
+            ],
         )
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
