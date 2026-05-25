@@ -1,0 +1,5 @@
+- [x] Add OpenSpec delta for provider replay requested probe status counts.
+- [x] Add failing tests for no-probe, healthy-probe, and degraded-probe summaries.
+- [x] Implement additive `runtime.probe_summary.requested_status_counts`.
+- [x] Update `FUNCTION_TREE.md` E-06 evidence and boundary.
+- [x] Validate tests, OpenSpec, diff whitespace, and FUNCTION_TREE registry.
