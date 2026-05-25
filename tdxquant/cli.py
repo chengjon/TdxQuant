@@ -2857,6 +2857,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "task_report_bundle_step_option_key_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_option_key_counts", {})
             ),
+            "task_report_bundle_step_source_option_key_counts": copy.deepcopy(
+                validation.get("task_report_bundle_step_source_option_key_counts", {})
+            ),
             "task_report_bundle_label_counts": copy.deepcopy(
                 validation.get("task_report_bundle_label_counts", {})
             ),
@@ -3589,6 +3592,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     task_report_bundle_step_source_entry_counts: dict[str, int] = {}
     task_report_bundle_step_entry_counts: dict[str, int] = {}
     task_report_bundle_step_option_key_counts: dict[str, int] = {}
+    task_report_bundle_step_source_option_key_counts: dict[str, int] = {}
     task_report_bundle_label_counts: dict[str, int] = {}
     submit_once_bundle_count = 0
     submit_once_bundle_samples: list[str] = []
@@ -3726,6 +3730,16 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                                         task_report_bundle_step_option_key_counts.get(option_key, 0)
                                         + 1
                                     )
+                                    if isinstance(source, str) and source:
+                                        source_option_key = f"{source}:{option_key}"
+                                        task_report_bundle_step_source_option_key_counts[
+                                            source_option_key
+                                        ] = (
+                                            task_report_bundle_step_source_option_key_counts.get(
+                                                source_option_key, 0
+                                            )
+                                            + 1
+                                        )
                 is_submit_once_bundle = (
                     "submit-once" in bundle_name
                     or any("submit-once" in label for label in bundle_labels)
@@ -3867,6 +3881,12 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "task_report_bundle_step_option_key_counts": {
             option_key: task_report_bundle_step_option_key_counts[option_key]
             for option_key in sorted(task_report_bundle_step_option_key_counts)
+        },
+        "task_report_bundle_step_source_option_key_counts": {
+            source_option_key: task_report_bundle_step_source_option_key_counts[
+                source_option_key
+            ]
+            for source_option_key in sorted(task_report_bundle_step_source_option_key_counts)
         },
         "task_report_bundle_label_counts": {
             label: task_report_bundle_label_counts[label] for label in sorted(task_report_bundle_label_counts)

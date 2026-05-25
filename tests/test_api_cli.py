@@ -4191,6 +4191,14 @@ class ApiCliDispatchTests(unittest.TestCase):
             sum(validation["task_report_bundle_step_entry_counts"].values()),
         )
         self.assertEqual(validation["task_report_bundle_step_option_key_counts"]["limit"], 3)
+        self.assertEqual(
+            validation["task_report_bundle_step_source_option_key_counts"]["report:limit"],
+            3,
+        )
+        self.assertEqual(
+            sum(validation["task_report_bundle_step_source_option_key_counts"].values()),
+            sum(validation["task_report_bundle_step_option_key_counts"].values()),
+        )
         self.assertGreater(validation["task_report_bundle_step_count"], validation["task_report_bundle_count"])
         self.assertGreater(validation["task_report_bundle_step_source_counts"]["task"], 0)
         self.assertGreater(validation["task_report_bundle_step_source_counts"]["report"], 0)
@@ -4331,6 +4339,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(summary_view["task_report_bundle_step_option_key_counts"]["limit"], 3)
         self.assertEqual(
+            summary_view["task_report_bundle_step_source_option_key_counts"],
+            validation["task_report_bundle_step_source_option_key_counts"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_source_option_key_counts"]["report:limit"],
+            3,
+        )
+        self.assertEqual(
+            sum(summary_view["task_report_bundle_step_source_option_key_counts"].values()),
+            sum(summary_view["task_report_bundle_step_option_key_counts"].values()),
+        )
+        self.assertEqual(
             summary_view["task_report_bundle_label_counts"],
             validation["task_report_bundle_label_counts"],
         )
@@ -4365,6 +4385,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["entry_label_counts"]["report"], summary_view["entry_count"])
         self.assertEqual(validation["bundle_step_source_option_key_counts"], {})
         self.assertEqual(summary_view["bundle_step_source_option_key_counts"], {})
+        self.assertEqual(validation["task_report_bundle_step_source_option_key_counts"], {})
+        self.assertEqual(summary_view["task_report_bundle_step_source_option_key_counts"], {})
         self.assertEqual(summary_view["bundle_label_counts"], {})
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
