@@ -4095,12 +4095,32 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertGreater(validation["entry_count"], 0)
         self.assertGreater(validation["bundle_count"], 0)
         self.assertGreater(validation["task_report_bundle_count"], 0)
+        self.assertGreater(validation["bundle_step_source_entry_counts"]["task:task-confirm-current"], 0)
+        self.assertGreater(validation["bundle_step_source_entry_counts"]["report:daily-success"], 0)
+        self.assertEqual(
+            validation["bundle_step_count"],
+            sum(validation["bundle_step_source_entry_counts"].values()),
+        )
         self.assertGreater(validation["entry_source_counts"]["report"], 0)
         self.assertGreater(validation["entry_source_counts"]["task"], 0)
         self.assertGreater(validation["entry_source_counts"]["trade"], 0)
         self.assertGreater(validation["entry_label_counts"]["report"], 0)
         self.assertGreater(validation["entry_label_counts"]["task"], 0)
         self.assertEqual(validation["errors"], [])
+
+    def test_handle_catalog_validate_entry_only_has_empty_bundle_source_entry_counts(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "validate", "--kind", "entry"])
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        self.assertEqual(validation["kind"], "entry")
+        self.assertGreater(validation["entry_count"], 0)
+        self.assertEqual(validation["bundle_count"], 0)
+        self.assertEqual(validation["bundle_step_count"], 0)
+        self.assertEqual(validation["bundle_step_source_entry_counts"], {})
 
     def test_handle_catalog_validate_followup_bundles_counts_task_report_combos(self) -> None:
         parser = build_parser()
@@ -4223,6 +4243,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_step_option_key_counts"]["limit"], 3)
         self.assertEqual(summary_view["bundle_step_source_name_counts"], validation["bundle_step_source_name_counts"])
         self.assertEqual(summary_view["bundle_step_count"], sum(summary_view["bundle_step_source_name_counts"].values()))
+        self.assertEqual(
+            summary_view["bundle_step_source_entry_counts"],
+            validation["bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["bundle_step_count"],
+            sum(summary_view["bundle_step_source_entry_counts"].values()),
+        )
         self.assertEqual(summary_view["bundle_label_counts"], validation["bundle_label_counts"])
         self.assertEqual(summary_view["bundle_label_counts"]["followup"], summary_view["bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
