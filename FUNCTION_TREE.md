@@ -160,6 +160,8 @@ TdxQuant
 
 > B-16/E-09 补充登记（状态仍为 `[部分实现]`）：HTTP/CLI `watch-status --view summary` 新增只读 `runtime.state_match`，证据为 `tdxquant/bridge_http.py`、`tdxquant/cli.py`、`tests/test_bridge_http.py`、`tests/test_api_cli.py` 与 OpenSpec `subscription-summary-runtime-state-match`；该字段只在 `control.state` 与 `watch_status.state` 同时存在时比较二者是否相等，不替代 `overall_status`、staleness 诊断或 governance decision，不证明健康/readiness，也不触发 reconnect、backoff、restart、lifecycle、HTTP、SSE 或 event-stream 行为。
 
+> B-16/E-09 补充登记（状态仍为 `[部分实现]`）：HTTP/CLI `watch-status --view summary` 新增只读 `runtime.run_id_source`，证据为 `tdxquant/bridge_http.py`、`tdxquant/cli.py`、`tests/test_bridge_http.py`、`tests/test_api_cli.py` 与 OpenSpec `subscription-summary-runtime-run-id-source`；该字段只说明 summary 中 `runtime.run_id` 来自 `watch_status.run_id` 还是 fallback `control.run_id`，不证明 run ownership、健康/readiness 或新旧程度，也不触发 reconnect、backoff、restart、lifecycle、HTTP、SSE 或 event-stream 行为。
+
 > E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay status --probe-* --view summary` 与 detailed payload 新增只读 `runtime.probe_summary.error_sample_probe_counts`，证据为 `tdxquant/provider_transport_replay.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-probe-error-sample-probe-counts`；该字段只统计进入紧凑错误样本候选集合的 probe key 分布，并独立于被截断的 `error_samples` 列表，不暴露完整 probe payload，不证明失败覆盖/健康状态，也不新增 probe 端点、socket 启动、provider mutation 或 daemon 生命周期管理。
 
 > E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay status --probe-* --view summary` 与 detailed payload 新增只读 `runtime.probe_summary.request_coverage_status`，证据为 `tdxquant/provider_transport_replay.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-probe-request-coverage-status`；该字段只从既有 `requested_count/total_count` 派生 `none` / `partial` / `complete` 请求覆盖状态，不请求额外 probe、不证明健康状态或 endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。
@@ -229,6 +231,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-26 | B-16/E-09 补充 subscription summary view `runtime.run_id_source` 登记：只说明 `runtime.run_id` 来自 `watch_status.run_id` 还是 fallback `control.run_id`，不证明 run ownership、健康/readiness 或新旧程度，也不触发 reconnect/backoff/restart/lifecycle、HTTP、SSE 或 event-stream 行为。 |
 | 2026-05-26 | B-16/E-09 补充 subscription summary view `runtime.state_match` 登记：只在 HTTP/CLI summary 中比较既有 `control.state` 与 `watch_status.state` 是否相等，不替代 overall status、staleness 诊断或 governance decision，不证明健康/readiness，也不触发 reconnect/backoff/restart/lifecycle、HTTP、SSE 或 event-stream 行为。 |
 | 2026-05-26 | E-11 补充 `catalog list --view summary` 的 `available_entry_label_count` / `available_bundle_label_count` 登记：只从 summary 已投影的 available label 数组派生 label discovery 数量，不替代 matched entry/bundle count，不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate` 的 `task_report_bundle_sample_count` / `submit_once_bundle_sample_count` / `pingan_bundle_sample_count` 登记：只从 summary 已投影的有界 bundle sample 数组派生可见样本数量，不替代完整 bundle count/step count、limit 或 truncated 标志，不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |

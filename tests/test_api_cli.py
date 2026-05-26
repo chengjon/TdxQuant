@@ -9146,6 +9146,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "watch_state": "running",
                         "state_match": True,
                         "run_id": "run-001",
+                        "run_id_source": "watch_status",
                         "pid": 1234,
                     },
                     "status_summary": {
