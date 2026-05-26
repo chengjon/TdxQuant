@@ -737,9 +737,13 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
             "primary_severity": "none",
             "severity": "none",
             "severity_counts": {},
+            "severity_key_count": 0,
             "action_name_counts": {},
+            "action_name_key_count": 0,
             "reason_source_counts": {},
+            "reason_source_key_count": 0,
             "reason_code_counts": {},
+            "reason_code_key_count": 0,
         },
         "evaluation_summary": {
             "evaluated_components": [],
@@ -793,9 +797,13 @@ def test_status_summary_governance_requests_manual_review_for_resilience_states(
         "primary_severity": "review",
         "severity": "review",
         "severity_counts": {"review": 1},
+        "severity_key_count": 1,
         "action_name_counts": {"review_subscription_watch_resilience": 1},
+        "action_name_key_count": 1,
         "reason_source_counts": {"overall_status": 1},
+        "reason_source_key_count": 1,
         "reason_code_counts": {f"overall_status:{state}": 1},
+        "reason_code_key_count": 1,
     }
 
 
@@ -852,12 +860,16 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
         "primary_severity": "review",
         "severity": "review",
         "severity_counts": {"review": 2},
+        "severity_key_count": 1,
         "action_name_counts": {
             "review_subscription_watch_heartbeat": 1,
             "review_subscription_watch_watermark": 1,
         },
+        "action_name_key_count": 2,
         "reason_source_counts": {"heartbeat": 1, "watermark": 1},
+        "reason_source_key_count": 2,
         "reason_code_counts": {"heartbeat:stale": 1, "watermark:stale": 1},
+        "reason_code_key_count": 2,
     }
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark"],
@@ -961,12 +973,16 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
         "primary_severity": "review",
         "severity": "review",
         "severity_counts": {"review": 2},
+        "severity_key_count": 1,
         "action_name_counts": {
             "review_subscription_watch_reconnect": 1,
             "review_subscription_watch_resilience": 1,
         },
+        "action_name_key_count": 2,
         "reason_source_counts": {"overall_status": 1, "reconnect": 1},
+        "reason_source_key_count": 2,
         "reason_code_counts": {"overall_status:reconnecting": 1, "reconnect:stale": 1},
+        "reason_code_key_count": 2,
     }
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["reconnect"],

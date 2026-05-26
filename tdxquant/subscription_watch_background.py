@@ -417,13 +417,17 @@ def _build_subscription_watch_governance_action_summary(actions: list[dict[str, 
         "primary_severity": primary_severity,
         "severity": primary_severity,
         "severity_counts": {severity: severity_counts[severity] for severity in sorted(severity_counts)},
+        "severity_key_count": len(severity_counts),
         "action_name_counts": {
             action_name: action_name_counts[action_name] for action_name in sorted(action_name_counts)
         },
+        "action_name_key_count": len(action_name_counts),
         "reason_source_counts": {
             reason_source: reason_source_counts[reason_source] for reason_source in sorted(reason_source_counts)
         },
+        "reason_source_key_count": len(reason_source_counts),
         "reason_code_counts": {reason: reason_code_counts[reason] for reason in sorted(reason_code_counts)},
+        "reason_code_key_count": len(reason_code_counts),
     }
 
 

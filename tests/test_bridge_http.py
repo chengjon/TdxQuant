@@ -507,19 +507,23 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "primary_reason_source": "unknown",
                             "primary_severity": "review",
                             "actions": ["inspect_worker"],
+                            "severity_key_count": 1,
                             "action_name_counts": {
                                 "inspect_process": 1,
                                 "inspect_reconnect": 1,
                                 "inspect_watermark": 1,
                                 "inspect_worker": 1,
                             },
+                            "action_name_key_count": 4,
                             "reason_source_counts": {"overall_status": 1, "unknown": 3},
+                            "reason_source_key_count": 2,
                             "reason_code_counts": {
                                 "heartbeat_stale": 1,
                                 "overall_status:degraded": 1,
                                 "reconnect_stale": 1,
                                 "watermark_stale": 1,
                             },
+                            "reason_code_key_count": 4,
                         },
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat", "watermark"],
@@ -625,6 +629,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_reason"], "heartbeat_stale")
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_reason_source"], "unknown")
         self.assertEqual(payload["result"]["governance"]["action_summary"]["primary_severity"], "review")
+        self.assertEqual(payload["result"]["governance"]["action_summary"]["severity_key_count"], 1)
         self.assertEqual(
             payload["result"]["governance"]["action_summary"]["action_name_counts"],
             {
@@ -634,10 +639,12 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "inspect_worker": 1,
             },
         )
+        self.assertEqual(payload["result"]["governance"]["action_summary"]["action_name_key_count"], 4)
         self.assertEqual(
             payload["result"]["governance"]["action_summary"]["reason_source_counts"],
             {"overall_status": 1, "unknown": 3},
         )
+        self.assertEqual(payload["result"]["governance"]["action_summary"]["reason_source_key_count"], 2)
         self.assertEqual(
             payload["result"]["governance"]["action_summary"]["reason_code_counts"],
             {
@@ -647,6 +654,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "watermark_stale": 1,
             },
         )
+        self.assertEqual(payload["result"]["governance"]["action_summary"]["reason_code_key_count"], 4)
         self.assertEqual(
             payload["result"]["governance"]["action_samples"],
             [

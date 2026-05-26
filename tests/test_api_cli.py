@@ -9208,24 +9208,28 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "primary_reason_source": "heartbeat",
                             "primary_severity": "review",
                             "severity": "review",
+                            "severity_key_count": 1,
                             "action_name_counts": {
                                 "review_subscription_watch_heartbeat": 1,
                                 "review_subscription_watch_reconnect": 1,
                                 "review_subscription_watch_resilience": 1,
                                 "review_subscription_watch_watermark": 1,
                             },
+                            "action_name_key_count": 4,
                             "reason_source_counts": {
                                 "heartbeat": 1,
                                 "overall_status": 1,
                                 "reconnect": 1,
                                 "watermark": 1,
                             },
+                            "reason_source_key_count": 4,
                             "reason_code_counts": {
                                 "heartbeat:stale": 1,
                                 "overall_status:degraded": 1,
                                 "reconnect:stale": 1,
                                 "watermark:stale": 1,
                             },
+                            "reason_code_key_count": 4,
                         },
                         "action_count": 4,
                         "actions": [
@@ -9356,24 +9360,28 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "primary_reason_source": "heartbeat",
                             "primary_severity": "review",
                             "severity": "review",
+                            "severity_key_count": 1,
                             "action_name_counts": {
                                 "review_subscription_watch_heartbeat": 1,
                                 "review_subscription_watch_reconnect": 1,
                                 "review_subscription_watch_resilience": 1,
                                 "review_subscription_watch_watermark": 1,
                             },
+                            "action_name_key_count": 4,
                             "reason_source_counts": {
                                 "heartbeat": 1,
                                 "overall_status": 1,
                                 "reconnect": 1,
                                 "watermark": 1,
                             },
+                            "reason_source_key_count": 4,
                             "reason_code_counts": {
                                 "heartbeat:stale": 1,
                                 "overall_status:degraded": 1,
                                 "reconnect:stale": 1,
                                 "watermark:stale": 1,
                             },
+                            "reason_code_key_count": 4,
                         },
                         "action_samples": [
                             {
