@@ -2885,6 +2885,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "submit_once_bundle_step_source_counts": copy.deepcopy(
                 validation.get("submit_once_bundle_step_source_counts", {})
             ),
+            "submit_once_bundle_step_source_key_count": len(
+                validation.get("submit_once_bundle_step_source_counts") or {}
+            ),
             "submit_once_bundle_step_name_counts": copy.deepcopy(
                 validation.get("submit_once_bundle_step_name_counts", {})
             ),
@@ -2915,6 +2918,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "pingan_bundle_label_key_count": len(validation.get("pingan_bundle_label_counts") or {}),
             "pingan_bundle_step_source_counts": copy.deepcopy(
                 validation.get("pingan_bundle_step_source_counts", {})
+            ),
+            "pingan_bundle_step_source_key_count": len(
+                validation.get("pingan_bundle_step_source_counts") or {}
             ),
             "pingan_bundle_step_name_counts": copy.deepcopy(
                 validation.get("pingan_bundle_step_name_counts", {})
