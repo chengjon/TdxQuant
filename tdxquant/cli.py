@@ -2837,6 +2837,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "task_report_bundle_count": validation.get("task_report_bundle_count"),
             "task_report_bundle_step_count": validation.get("task_report_bundle_step_count"),
             "task_report_bundle_samples": copy.deepcopy(validation.get("task_report_bundle_samples", [])),
+            "task_report_bundle_sample_count": len(validation.get("task_report_bundle_samples", [])),
             "task_report_bundle_sample_limit": validation.get("task_report_bundle_sample_limit"),
             "task_report_bundle_sample_truncated": validation.get("task_report_bundle_sample_truncated"),
             "task_report_bundle_step_source_counts": copy.deepcopy(
@@ -2890,6 +2891,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                 validation.get("submit_once_bundle_step_source_option_key_counts", {})
             ),
             "submit_once_bundle_samples": copy.deepcopy(validation.get("submit_once_bundle_samples", [])),
+            "submit_once_bundle_sample_count": len(validation.get("submit_once_bundle_samples", [])),
             "submit_once_bundle_sample_limit": validation.get("submit_once_bundle_sample_limit"),
             "submit_once_bundle_sample_truncated": validation.get("submit_once_bundle_sample_truncated"),
             "pingan_bundle_count": validation.get("pingan_bundle_count"),
@@ -2919,6 +2921,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                 validation.get("pingan_bundle_step_source_option_key_counts", {})
             ),
             "pingan_bundle_samples": copy.deepcopy(validation.get("pingan_bundle_samples", [])),
+            "pingan_bundle_sample_count": len(validation.get("pingan_bundle_samples", [])),
             "pingan_bundle_sample_limit": validation.get("pingan_bundle_sample_limit"),
             "pingan_bundle_sample_truncated": validation.get("pingan_bundle_sample_truncated"),
             "invalid_count": validation.get("invalid_count"),

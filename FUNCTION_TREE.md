@@ -188,6 +188,8 @@ TdxQuant
 
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup` 和 `--view summary` 新增只读 `submit_once_bundle_step_source_entry_counts` 与 `pingan_bundle_step_source_entry_counts`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-submit-pingan-step-source-entry-counts`；这两个字段只统计已解析 submit-once/PingAn bundle 子集的 `source:entry` 分布，不列出完整 step manifest、不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
 
+> E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup|submit-once|pingan --view summary` 新增只读 `task_report_bundle_sample_count` / `submit_once_bundle_sample_count` / `pingan_bundle_sample_count`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-bundle-sample-counts`；这些字段只从已投影的有界 bundle sample 数组派生可见样本数量，不替代完整 bundle count/step count、limit 或 truncated 标志，不列出完整 bundle/step manifest、不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
@@ -223,6 +225,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-26 | E-11 补充 `catalog validate` 的 `task_report_bundle_sample_count` / `submit_once_bundle_sample_count` / `pingan_bundle_sample_count` 登记：只从 summary 已投影的有界 bundle sample 数组派生可见样本数量，不替代完整 bundle count/step count、limit 或 truncated 标志，不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | B-16/E-09 补充 subscription summary view `reason_sample_count` / `action_sample_count` 登记：只从 HTTP/CLI summary 已投影的有界 `reason_samples` / `action_samples` 可见数组派生，不替代完整 `reason_count` / `action_count`，不暴露 raw payload 或完整 governance arrays，也不触发 reconnect/backoff/restart/lifecycle、HTTP、SSE 或 event-stream 行为。 |
 | 2026-05-26 | E-06 补充 provider-replay `probe_summary.primary_not_requested_probe` 登记：只从既有 `not_requested` 目标列表派生首个未请求 probe；`null` 只表示当前没有 not-requested probe，不替代 request coverage 或单项 probe 证据，不证明该目标已被 probe、失败、不可用或需要执行，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。 |
 | 2026-05-26 | B-16/E-09 补充 subscription governance `reason_summary.primary_reason_source` 登记：只从既有 `primary_source` 同值派生，并通过 detailed/HTTP summary/CLI summary 投影；不移除 `primary_source`，不暴露完整 reasons，不代表治理策略、执行指令或自动化条件，也不触发 reconnect、backoff、restart、lifecycle、HTTP、SSE 或 event-stream 行为。 |
