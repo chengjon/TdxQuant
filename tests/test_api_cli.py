@@ -4319,6 +4319,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
         self.assertEqual(summary_view["bundle_step_count"], validation["bundle_step_count"])
         self.assertEqual(summary_view["bundle_step_source_counts"], validation["bundle_step_source_counts"])
+        self.assertEqual(
+            summary_view["bundle_step_source_key_count"],
+            len(summary_view["bundle_step_source_counts"]),
+        )
         self.assertEqual(summary_view["bundle_step_count"], sum(summary_view["bundle_step_source_counts"].values()))
         self.assertEqual(summary_view["bundle_step_name_counts"], validation["bundle_step_name_counts"])
         self.assertEqual(summary_view["bundle_step_count"], sum(summary_view["bundle_step_name_counts"].values()))
@@ -4368,6 +4372,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["task_report_bundle_step_source_counts"],
             validation["task_report_bundle_step_source_counts"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_source_key_count"],
+            len(summary_view["task_report_bundle_step_source_counts"]),
         )
         self.assertGreater(summary_view["task_report_bundle_step_source_counts"]["task"], 0)
         self.assertGreater(summary_view["task_report_bundle_step_source_counts"]["report"], 0)
