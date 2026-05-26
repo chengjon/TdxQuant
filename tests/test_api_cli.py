@@ -4404,6 +4404,21 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_label_counts"], validation["bundle_label_counts"])
         self.assertEqual(summary_view["bundle_label_key_count"], len(summary_view["bundle_label_counts"]))
         self.assertEqual(summary_view["bundle_label_counts"]["followup"], summary_view["bundle_count"])
+        self.assertEqual(
+            summary_view["bundle_step_summary"],
+            {
+                "bundle_count": summary_view["bundle_count"],
+                "step_count": summary_view["bundle_step_count"],
+                "label_key_count": summary_view["bundle_label_key_count"],
+                "step_source_key_count": summary_view["bundle_step_source_key_count"],
+                "step_name_key_count": summary_view["bundle_step_name_key_count"],
+                "step_entry_key_count": summary_view["bundle_step_entry_key_count"],
+                "step_source_name_key_count": summary_view["bundle_step_source_name_key_count"],
+                "step_source_entry_key_count": summary_view["bundle_step_source_entry_key_count"],
+                "step_option_key_count": summary_view["bundle_step_option_key_count"],
+                "step_source_option_key_count": summary_view["bundle_step_source_option_key_count"],
+            },
+        )
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_step_count"], validation["task_report_bundle_step_count"])
         self.assertEqual(summary_view["task_report_bundle_samples"], validation["task_report_bundle_samples"])
@@ -4670,6 +4685,21 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["pingan_bundle_step_source_entry_counts"], {})
         self.assertEqual(summary_view["pingan_bundle_step_source_entry_counts"], {})
         self.assertEqual(summary_view["bundle_label_counts"], {})
+        self.assertEqual(
+            summary_view["bundle_step_summary"],
+            {
+                "bundle_count": 0,
+                "step_count": 0,
+                "label_key_count": 0,
+                "step_source_key_count": 0,
+                "step_name_key_count": 0,
+                "step_entry_key_count": 0,
+                "step_source_name_key_count": 0,
+                "step_source_entry_key_count": 0,
+                "step_option_key_count": 0,
+                "step_source_option_key_count": 0,
+            },
+        )
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)

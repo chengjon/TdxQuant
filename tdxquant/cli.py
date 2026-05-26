@@ -3223,6 +3223,18 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "code": result.code.value,
             "message": result.message,
         }
+        summary["bundle_step_summary"] = {
+            "bundle_count": summary.get("bundle_count"),
+            "step_count": summary.get("bundle_step_count"),
+            "label_key_count": summary.get("bundle_label_key_count"),
+            "step_source_key_count": summary.get("bundle_step_source_key_count"),
+            "step_name_key_count": summary.get("bundle_step_name_key_count"),
+            "step_entry_key_count": summary.get("bundle_step_entry_key_count"),
+            "step_source_name_key_count": summary.get("bundle_step_source_name_key_count"),
+            "step_source_entry_key_count": summary.get("bundle_step_source_entry_key_count"),
+            "step_option_key_count": summary.get("bundle_step_option_key_count"),
+            "step_source_option_key_count": summary.get("bundle_step_source_option_key_count"),
+        }
         summary["task_report_bundle_summary"] = {
             "count": summary.get("task_report_bundle_count"),
             "step_count": summary.get("task_report_bundle_step_count"),
