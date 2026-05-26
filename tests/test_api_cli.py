@@ -2519,6 +2519,24 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             "watch_stream_probe",
         )
         self.assertIsNone(result.data["summary_view"]["probe_summary"]["primary_not_requested_probe"])
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["request_summary"],
+            {
+                "status": result.data["summary_view"]["probe_summary"]["request_coverage_status"],
+                "total_count": result.data["summary_view"]["probe_summary"]["total_count"],
+                "requested_count": result.data["summary_view"]["probe_summary"]["requested_count"],
+                "not_requested_count": result.data["summary_view"]["probe_summary"]["not_requested_count"],
+                "healthy_count": result.data["summary_view"]["probe_summary"]["healthy_count"],
+                "failed_count": result.data["summary_view"]["probe_summary"]["failed_count"],
+                "unhealthy_count": result.data["summary_view"]["probe_summary"]["unhealthy_count"],
+                "primary_requested_probe": result.data["summary_view"]["probe_summary"][
+                    "primary_requested_probe"
+                ],
+                "primary_not_requested_probe": result.data["summary_view"]["probe_summary"][
+                    "primary_not_requested_probe"
+                ],
+            },
+        )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["status_counts"], {"healthy": 3, "unhealthy": 1})
         self.assertEqual(result.data["summary_view"]["probe_summary"]["failed_status_counts"], {"unhealthy": 1})
         self.assertEqual(

@@ -747,9 +747,22 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         summary_status = "healthy"
         request_coverage_status = "complete" if requested_count == total_count else "partial"
 
+    request_summary = {
+        "status": request_coverage_status,
+        "total_count": total_count,
+        "requested_count": requested_count,
+        "not_requested_count": total_count - requested_count,
+        "healthy_count": healthy_count,
+        "failed_count": failed_count,
+        "unhealthy_count": len(unhealthy),
+        "primary_requested_probe": requested[0] if requested else None,
+        "primary_not_requested_probe": not_requested[0] if not_requested else None,
+    }
+
     return {
         "status": summary_status,
         "request_coverage_status": request_coverage_status,
+        "request_summary": request_summary,
         "total_count": total_count,
         "requested_count": requested_count,
         "healthy_count": healthy_count,
