@@ -2514,6 +2514,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             result.data["summary_view"]["probe_summary"]["primary_failed_probe"],
             "watch_stream_probe",
         )
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["primary_unhealthy_probe"],
+            "watch_stream_probe",
+        )
         self.assertIsNone(result.data["summary_view"]["probe_summary"]["primary_not_requested_probe"])
         self.assertEqual(result.data["summary_view"]["probe_summary"]["status_counts"], {"healthy": 3, "unhealthy": 1})
         self.assertEqual(result.data["summary_view"]["probe_summary"]["failed_status_counts"], {"unhealthy": 1})
