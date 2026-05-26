@@ -4890,6 +4890,26 @@ class ApiCliDispatchTests(unittest.TestCase):
             summary_view["submit_once_bundle_samples"][0],
             "audit-pingan-submit-once-exception-diagnostics",
         )
+        self.assertEqual(
+            summary_view["submit_once_bundle_summary"],
+            {
+                "count": summary_view["submit_once_bundle_count"],
+                "step_count": summary_view["submit_once_bundle_step_count"],
+                "sample_count": summary_view["submit_once_bundle_sample_count"],
+                "sample_limit": summary_view["submit_once_bundle_sample_limit"],
+                "sample_truncated": summary_view["submit_once_bundle_sample_truncated"],
+                "label_key_count": summary_view["submit_once_bundle_label_key_count"],
+                "step_source_key_count": summary_view["submit_once_bundle_step_source_key_count"],
+                "step_name_key_count": summary_view["submit_once_bundle_step_name_key_count"],
+                "step_source_name_key_count": summary_view["submit_once_bundle_step_source_name_key_count"],
+                "step_entry_key_count": summary_view["submit_once_bundle_step_entry_key_count"],
+                "step_source_entry_key_count": summary_view["submit_once_bundle_step_source_entry_key_count"],
+                "step_option_key_count": summary_view["submit_once_bundle_step_option_key_count"],
+                "step_source_option_key_count": summary_view[
+                    "submit_once_bundle_step_source_option_key_count"
+                ],
+            },
+        )
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)
@@ -5003,6 +5023,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(summary_view["pingan_bundle_sample_truncated"], True)
         self.assertEqual(summary_view["pingan_bundle_samples"][0], "audit-pingan-buy-exception-diagnostics")
+        self.assertEqual(
+            summary_view["pingan_bundle_summary"],
+            {
+                "count": summary_view["pingan_bundle_count"],
+                "step_count": summary_view["pingan_bundle_step_count"],
+                "sample_count": summary_view["pingan_bundle_sample_count"],
+                "sample_limit": summary_view["pingan_bundle_sample_limit"],
+                "sample_truncated": summary_view["pingan_bundle_sample_truncated"],
+                "label_key_count": summary_view["pingan_bundle_label_key_count"],
+                "step_source_key_count": summary_view["pingan_bundle_step_source_key_count"],
+                "step_name_key_count": summary_view["pingan_bundle_step_name_key_count"],
+                "step_source_name_key_count": summary_view["pingan_bundle_step_source_name_key_count"],
+                "step_entry_key_count": summary_view["pingan_bundle_step_entry_key_count"],
+                "step_source_entry_key_count": summary_view["pingan_bundle_step_source_entry_key_count"],
+                "step_option_key_count": summary_view["pingan_bundle_step_option_key_count"],
+                "step_source_option_key_count": summary_view["pingan_bundle_step_source_option_key_count"],
+            },
+        )
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)

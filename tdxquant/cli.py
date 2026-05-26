@@ -3255,6 +3255,36 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "step_option_key_count": summary.get("task_report_bundle_step_option_key_count"),
             "step_source_option_key_count": summary.get("task_report_bundle_step_source_option_key_count"),
         }
+        summary["submit_once_bundle_summary"] = {
+            "count": summary.get("submit_once_bundle_count"),
+            "step_count": summary.get("submit_once_bundle_step_count"),
+            "sample_count": summary.get("submit_once_bundle_sample_count"),
+            "sample_limit": summary.get("submit_once_bundle_sample_limit"),
+            "sample_truncated": summary.get("submit_once_bundle_sample_truncated"),
+            "label_key_count": summary.get("submit_once_bundle_label_key_count"),
+            "step_source_key_count": summary.get("submit_once_bundle_step_source_key_count"),
+            "step_name_key_count": summary.get("submit_once_bundle_step_name_key_count"),
+            "step_source_name_key_count": summary.get("submit_once_bundle_step_source_name_key_count"),
+            "step_entry_key_count": summary.get("submit_once_bundle_step_entry_key_count"),
+            "step_source_entry_key_count": summary.get("submit_once_bundle_step_source_entry_key_count"),
+            "step_option_key_count": summary.get("submit_once_bundle_step_option_key_count"),
+            "step_source_option_key_count": summary.get("submit_once_bundle_step_source_option_key_count"),
+        }
+        summary["pingan_bundle_summary"] = {
+            "count": summary.get("pingan_bundle_count"),
+            "step_count": summary.get("pingan_bundle_step_count"),
+            "sample_count": summary.get("pingan_bundle_sample_count"),
+            "sample_limit": summary.get("pingan_bundle_sample_limit"),
+            "sample_truncated": summary.get("pingan_bundle_sample_truncated"),
+            "label_key_count": summary.get("pingan_bundle_label_key_count"),
+            "step_source_key_count": summary.get("pingan_bundle_step_source_key_count"),
+            "step_name_key_count": summary.get("pingan_bundle_step_name_key_count"),
+            "step_source_name_key_count": summary.get("pingan_bundle_step_source_name_key_count"),
+            "step_entry_key_count": summary.get("pingan_bundle_step_entry_key_count"),
+            "step_source_entry_key_count": summary.get("pingan_bundle_step_source_entry_key_count"),
+            "step_option_key_count": summary.get("pingan_bundle_step_option_key_count"),
+            "step_source_option_key_count": summary.get("pingan_bundle_step_source_option_key_count"),
+        }
         errors = validation.get("errors")
         if errors:
             summary["errors"] = copy.deepcopy(errors)
