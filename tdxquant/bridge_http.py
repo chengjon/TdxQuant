@@ -181,6 +181,7 @@ def build_bridge_watch_status_runtime_view(result: dict[str, Any]) -> dict[str, 
             runtime_view["run_id_match"] = control["run_id"] == watch_status["run_id"]
     if "pid" in control:
         runtime_view["pid"] = control["pid"]
+        runtime_view["pid_source"] = "control"
     return runtime_view
 
 

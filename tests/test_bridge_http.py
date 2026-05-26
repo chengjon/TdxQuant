@@ -569,6 +569,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "run_id_source": "watch_status",
                 "run_id_match": True,
                 "pid": 1234,
+                "pid_source": "control",
             },
         )
         self.assertEqual(

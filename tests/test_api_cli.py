@@ -9149,6 +9149,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "run_id_source": "watch_status",
                         "run_id_match": True,
                         "pid": 1234,
+                        "pid_source": "control",
                     },
                     "status_summary": {
                         "schema_version": "tdx.subscription_watch.status_summary.v1",
