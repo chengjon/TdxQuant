@@ -737,17 +737,21 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         },
         "failed_http_status_key_count": len(failed_http_status_counts),
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
+        "error_code_key_count": len(error_code_counts),
         "failed_error_code_counts": {
             code: failed_error_code_counts[code] for code in sorted(failed_error_code_counts)
         },
+        "failed_error_code_key_count": len(failed_error_code_counts),
         "error_samples": error_samples,
         "error_sample_count": error_sample_count,
         "error_sample_status_counts": {
             status: error_sample_status_counts[status] for status in sorted(error_sample_status_counts)
         },
+        "error_sample_status_key_count": len(error_sample_status_counts),
         "error_sample_probe_counts": {
             probe: error_sample_probe_counts[probe] for probe in sorted(error_sample_probe_counts)
         },
+        "error_sample_probe_key_count": len(error_sample_probe_counts),
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_truncated": error_sample_count > len(error_samples),
         "requested": requested,

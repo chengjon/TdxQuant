@@ -106,11 +106,27 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             len(status["runtime"]["probe_summary"]["failed_http_status_counts"]),
         )
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["error_code_key_count"],
+            len(status["runtime"]["probe_summary"]["error_code_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["failed_error_code_key_count"],
+            len(status["runtime"]["probe_summary"]["failed_error_code_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["error_samples"], [])
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 0)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_status_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["error_sample_status_key_count"],
+            len(status["runtime"]["probe_summary"]["error_sample_status_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_probe_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["error_sample_probe_key_count"],
+            len(status["runtime"]["probe_summary"]["error_sample_probe_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], [])
