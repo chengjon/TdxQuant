@@ -707,6 +707,36 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     primary_error_sample = error_samples[0] if error_samples else {}
     error_sample_visible_count = len(error_samples)
     error_sample_hidden_count = max(error_sample_count - len(error_samples), 0)
+    error_sample_truncated = error_sample_count > error_sample_visible_count
+    primary_error_sample_probe = (
+        primary_error_sample.get("probe") if isinstance(primary_error_sample.get("probe"), str) else None
+    )
+    primary_error_sample_status = (
+        primary_error_sample.get("status") if isinstance(primary_error_sample.get("status"), str) else None
+    )
+    primary_error_sample_error_code = (
+        primary_error_sample.get("error_code")
+        if isinstance(primary_error_sample.get("error_code"), str)
+        else None
+    )
+    primary_error_sample_http_status = (
+        primary_error_sample.get("http_status")
+        if isinstance(primary_error_sample.get("http_status"), int)
+        and not isinstance(primary_error_sample.get("http_status"), bool)
+        else None
+    )
+    error_sample_summary = {
+        "count": error_sample_count,
+        "visible_count": error_sample_visible_count,
+        "hidden_count": error_sample_hidden_count,
+        "limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
+        "truncated": error_sample_truncated,
+        "primary_probe": primary_error_sample_probe,
+        "primary_status": primary_error_sample_status,
+        "primary_error_code": primary_error_sample_error_code,
+        "primary_http_status": primary_error_sample_http_status,
+        "primary_reachability": primary_error_sample_reachability,
+    }
     if requested_count == 0:
         summary_status = "not_requested"
         request_coverage_status = "none"
@@ -766,19 +796,10 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         },
         "failed_error_code_key_count": len(failed_error_code_counts),
         "error_samples": error_samples,
-        "primary_error_sample_probe": primary_error_sample.get("probe")
-        if isinstance(primary_error_sample.get("probe"), str)
-        else None,
-        "primary_error_sample_status": primary_error_sample.get("status")
-        if isinstance(primary_error_sample.get("status"), str)
-        else None,
-        "primary_error_sample_error_code": primary_error_sample.get("error_code")
-        if isinstance(primary_error_sample.get("error_code"), str)
-        else None,
-        "primary_error_sample_http_status": primary_error_sample.get("http_status")
-        if isinstance(primary_error_sample.get("http_status"), int)
-        and not isinstance(primary_error_sample.get("http_status"), bool)
-        else None,
+        "primary_error_sample_probe": primary_error_sample_probe,
+        "primary_error_sample_status": primary_error_sample_status,
+        "primary_error_sample_error_code": primary_error_sample_error_code,
+        "primary_error_sample_http_status": primary_error_sample_http_status,
         "primary_error_sample_reachability": primary_error_sample_reachability,
         "error_sample_count": error_sample_count,
         "error_sample_status_counts": {
@@ -802,7 +823,8 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_visible_count": error_sample_visible_count,
         "error_sample_hidden_count": error_sample_hidden_count,
-        "error_sample_truncated": error_sample_count > len(error_samples),
+        "error_sample_truncated": error_sample_truncated,
+        "error_sample_summary": error_sample_summary,
         "requested": requested,
         "primary_requested_probe": requested[0] if requested else None,
         "healthy": healthy,
