@@ -373,9 +373,11 @@ def _build_subscription_watch_governance_evaluation_summary(
         "component_status_counts": {
             status: component_status_counts[status] for status in sorted(component_status_counts)
         },
+        "component_status_key_count": len(component_status_counts),
         "evaluated_status_counts": {
             status: evaluated_status_counts[status] for status in sorted(evaluated_status_counts)
         },
+        "evaluated_status_key_count": len(evaluated_status_counts),
     }
 
 
