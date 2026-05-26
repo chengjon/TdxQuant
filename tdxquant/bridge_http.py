@@ -202,6 +202,21 @@ def build_bridge_watch_status_runtime_view(result: dict[str, Any]) -> dict[str, 
     if "pid" in control:
         runtime_view["pid"] = control["pid"]
         runtime_view["pid_source"] = "control"
+    if runtime_view:
+        identity_summary: dict[str, Any] = {}
+        for key in (
+            "control_state",
+            "watch_state",
+            "state_match",
+            "run_id_source",
+            "run_id_match",
+            "pid_source",
+        ):
+            if key in runtime_view:
+                identity_summary[key] = runtime_view[key]
+        identity_summary["has_run_id"] = "run_id" in runtime_view
+        identity_summary["has_pid"] = "pid" in runtime_view
+        runtime_view["identity_summary"] = identity_summary
     return runtime_view
 
 
