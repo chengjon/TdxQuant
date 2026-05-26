@@ -3086,7 +3086,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
         if mode in {"plan", "preview"}:
             plan_steps: list[dict[str, object]] = []
             steps = result.data.get("steps", [])
-            summary["step_source_counts"] = _build_catalog_step_source_counts(steps)
+            step_source_counts = _build_catalog_step_source_counts(steps)
+            summary["step_source_counts"] = step_source_counts
+            summary["step_source_key_count"] = len(step_source_counts)
             if isinstance(steps, list):
                 for step in steps:
                     if not isinstance(step, dict):
