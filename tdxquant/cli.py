@@ -2798,7 +2798,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "matched_entry_count": summary_payload.get("matched_entry_count"),
             "matched_bundle_count": summary_payload.get("matched_bundle_count"),
             "available_entry_labels": copy.deepcopy(summary_payload.get("available_entry_labels")),
+            "available_entry_label_count": len(summary_payload.get("available_entry_labels") or []),
             "available_bundle_labels": copy.deepcopy(summary_payload.get("available_bundle_labels")),
+            "available_bundle_label_count": len(summary_payload.get("available_bundle_labels") or []),
             "entries": entry_summaries,
             "bundles": bundle_summaries,
         }

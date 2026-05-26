@@ -4054,6 +4054,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(discovery["matched_entry_count"], result.data["summary"]["entry_count"])
         self.assertIn("report", discovery["available_entry_labels"])
         self.assertEqual(summary_view["available_entry_labels"], discovery["available_entry_labels"])
+        self.assertEqual(
+            summary_view["available_entry_label_count"],
+            len(summary_view["available_entry_labels"]),
+        )
 
     def test_handle_catalog_list_filters_bundles_by_label(self) -> None:
         parser = build_parser()
@@ -4074,6 +4078,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(discovery["matched_bundle_count"], result.data["summary"]["bundle_count"])
         self.assertIn("diagnostics", discovery["available_bundle_labels"])
         self.assertEqual(summary_view["available_bundle_labels"], discovery["available_bundle_labels"])
+        self.assertEqual(
+            summary_view["available_bundle_label_count"],
+            len(summary_view["available_bundle_labels"]),
+        )
 
     def test_handle_catalog_bundle_list_includes_read_zxg_review(self) -> None:
         parser = build_parser()
