@@ -704,10 +704,13 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "unhealthy_count": len(unhealthy),
         "not_requested_count": total_count - requested_count,
         "status_counts": {status: status_counts[status] for status in sorted(status_counts)},
+        "status_key_count": len(status_counts),
         "requested_status_counts": {
             status: requested_status_counts[status] for status in sorted(requested_status_counts)
         },
+        "requested_status_key_count": len(requested_status_counts),
         "failed_status_counts": {status: failed_status_counts[status] for status in sorted(failed_status_counts)},
+        "failed_status_key_count": len(failed_status_counts),
         "requested_reachability_counts": {
             status: requested_reachability_counts[status] for status in sorted(requested_reachability_counts)
         },
