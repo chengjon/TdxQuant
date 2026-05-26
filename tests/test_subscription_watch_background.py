@@ -748,6 +748,7 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         },
         "evaluation_summary": {
             "evaluated_components": [],
+            "primary_evaluated_component": None,
             "stale_components": [],
             "primary_stale_component": None,
             "fresh_components": [],
@@ -876,6 +877,7 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
     }
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark"],
+        "primary_evaluated_component": "heartbeat",
         "stale_components": ["heartbeat", "watermark"],
         "primary_stale_component": "heartbeat",
         "fresh_components": [],
@@ -909,6 +911,7 @@ def test_status_summary_evaluation_summary_lists_fresh_components() -> None:
 
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark"],
+        "primary_evaluated_component": "heartbeat",
         "stale_components": ["watermark"],
         "primary_stale_component": "watermark",
         "fresh_components": ["heartbeat"],
@@ -990,6 +993,7 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
     }
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["reconnect"],
+        "primary_evaluated_component": "reconnect",
         "stale_components": ["reconnect"],
         "primary_stale_component": "reconnect",
         "fresh_components": [],
@@ -1026,6 +1030,7 @@ def test_status_summary_evaluation_summary_preserves_fresh_counts_when_reconnect
     assert summary["governance"]["reasons"] == ["overall_status:reconnecting", "reconnect:stale"]
     assert summary["governance"]["evaluation_summary"] == {
         "evaluated_components": ["heartbeat", "watermark", "reconnect"],
+        "primary_evaluated_component": "heartbeat",
         "stale_components": ["reconnect"],
         "primary_stale_component": "reconnect",
         "fresh_components": ["heartbeat", "watermark"],
