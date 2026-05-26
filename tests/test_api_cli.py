@@ -2503,6 +2503,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["probe_summary"]["requested_count"], 4)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["unhealthy_count"], 1)
         self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["primary_requested_probe"],
+            "health_probe",
+        )
+        self.assertEqual(
             result.data["summary_view"]["probe_summary"]["primary_healthy_probe"],
             "health_probe",
         )

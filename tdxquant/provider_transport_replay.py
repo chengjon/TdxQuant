@@ -742,6 +742,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_truncated": error_sample_count > len(error_samples),
         "requested": requested,
+        "primary_requested_probe": requested[0] if requested else None,
         "healthy": healthy,
         "primary_healthy_probe": healthy[0] if healthy else None,
         "failed": failed,
