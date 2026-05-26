@@ -613,6 +613,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     error_samples: list[dict[str, Any]] = []
     error_sample_status_counts: dict[str, int] = {}
     error_sample_probe_counts: dict[str, int] = {}
+    error_sample_http_status_counts: dict[str, int] = {}
     error_sample_count = 0
 
     for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
@@ -626,11 +627,16 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             error_sample_count += 1
             error_sample_status_counts[probe_status] = error_sample_status_counts.get(probe_status, 0) + 1
             error_sample_probe_counts[key] = error_sample_probe_counts.get(key, 0) + 1
+            http_status = probe.get("http_status")
+            if isinstance(http_status, int) and not isinstance(http_status, bool):
+                http_status_key = str(http_status)
+                error_sample_http_status_counts[http_status_key] = (
+                    error_sample_http_status_counts.get(http_status_key, 0) + 1
+                )
             if len(error_samples) < PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT:
                 sample: dict[str, Any] = {"probe": key, "status": probe_status}
                 if isinstance(error_code, str) and error_code:
                     sample["error_code"] = error_code
-                http_status = probe.get("http_status")
                 if isinstance(http_status, int):
                     sample["http_status"] = http_status
                 error_samples.append(sample)
@@ -768,6 +774,11 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             probe: error_sample_probe_counts[probe] for probe in sorted(error_sample_probe_counts)
         },
         "error_sample_probe_key_count": len(error_sample_probe_counts),
+        "error_sample_http_status_counts": {
+            status: error_sample_http_status_counts[status]
+            for status in sorted(error_sample_http_status_counts)
+        },
+        "error_sample_http_status_key_count": len(error_sample_http_status_counts),
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_visible_count": error_sample_visible_count,
         "error_sample_hidden_count": error_sample_hidden_count,
