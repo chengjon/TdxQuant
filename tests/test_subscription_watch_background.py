@@ -723,7 +723,9 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
             "primary_source": None,
             "primary_reason_source": None,
             "source_counts": {},
+            "source_key_count": 0,
             "reason_code_counts": {},
+            "reason_code_key_count": 0,
         },
         "actions": [],
         "action_count": 0,
@@ -823,7 +825,9 @@ def test_status_summary_governance_requests_manual_review_for_explicit_stale_inp
         "primary_source": "heartbeat",
         "primary_reason_source": "heartbeat",
         "source_counts": {"heartbeat": 1, "watermark": 1},
+        "source_key_count": 2,
         "reason_code_counts": {"heartbeat:stale": 1, "watermark:stale": 1},
+        "reason_code_key_count": 2,
     }
     assert summary["governance"]["actions"] == [
         {
@@ -931,7 +935,9 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
         "primary_source": "overall_status",
         "primary_reason_source": "overall_status",
         "source_counts": {"overall_status": 1, "reconnect": 1},
+        "source_key_count": 2,
         "reason_code_counts": {"overall_status:reconnecting": 1, "reconnect:stale": 1},
+        "reason_code_key_count": 2,
     }
     assert summary["governance"]["actions"] == [
         {

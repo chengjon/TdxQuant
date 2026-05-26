@@ -303,13 +303,17 @@ def _build_subscription_watch_governance_reason_summary(reasons: list[Any]) -> d
     primary_source = (
         _subscription_watch_governance_reason_source(primary_reason) if primary_reason is not None else None
     )
+    source_counts = _build_subscription_watch_governance_reason_source_counts(reasons)
+    reason_code_counts = _build_subscription_watch_governance_reason_code_counts(reasons)
     return {
         "count": len(reasons),
         "primary_reason": primary_reason,
         "primary_source": primary_source,
         "primary_reason_source": primary_source,
-        "source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
-        "reason_code_counts": _build_subscription_watch_governance_reason_code_counts(reasons),
+        "source_counts": source_counts,
+        "source_key_count": len(source_counts),
+        "reason_code_counts": reason_code_counts,
+        "reason_code_key_count": len(reason_code_counts),
     }
 
 

@@ -465,12 +465,14 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                                 "reconnect": 1,
                                 "watermark": 1,
                             },
+                            "source_key_count": 4,
                             "reason_code_counts": {
                                 "heartbeat:stale": 1,
                                 "overall_status:degraded": 1,
                                 "reconnect:stale": 1,
                                 "watermark:stale": 1,
                             },
+                            "reason_code_key_count": 4,
                         },
                         "actions": [
                             {
@@ -601,12 +603,14 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "primary_source": "heartbeat",
                 "primary_reason_source": "heartbeat",
                 "source_counts": {"heartbeat": 1, "overall_status": 1, "reconnect": 1, "watermark": 1},
+                "source_key_count": 4,
                 "reason_code_counts": {
                     "heartbeat:stale": 1,
                     "overall_status:degraded": 1,
                     "reconnect:stale": 1,
                     "watermark:stale": 1,
                 },
+                "reason_code_key_count": 4,
             },
         )
         self.assertEqual(
