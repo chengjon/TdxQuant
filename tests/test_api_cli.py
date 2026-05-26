@@ -4335,10 +4335,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["bundle_step_option_key_counts"], validation["bundle_step_option_key_counts"]
         )
+        self.assertEqual(
+            summary_view["bundle_step_option_key_count"],
+            len(summary_view["bundle_step_option_key_counts"]),
+        )
         self.assertEqual(summary_view["bundle_step_option_key_counts"]["limit"], 3)
         self.assertEqual(
             summary_view["bundle_step_source_option_key_counts"],
             validation["bundle_step_source_option_key_counts"],
+        )
+        self.assertEqual(
+            summary_view["bundle_step_source_option_key_count"],
+            len(summary_view["bundle_step_source_option_key_counts"]),
         )
         self.assertEqual(summary_view["bundle_step_source_option_key_counts"]["report:limit"], 3)
         self.assertEqual(
@@ -4448,10 +4456,18 @@ class ApiCliDispatchTests(unittest.TestCase):
             summary_view["task_report_bundle_step_option_key_counts"],
             validation["task_report_bundle_step_option_key_counts"],
         )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_option_key_count"],
+            len(summary_view["task_report_bundle_step_option_key_counts"]),
+        )
         self.assertEqual(summary_view["task_report_bundle_step_option_key_counts"]["limit"], 3)
         self.assertEqual(
             summary_view["task_report_bundle_step_source_option_key_counts"],
             validation["task_report_bundle_step_source_option_key_counts"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_source_option_key_count"],
+            len(summary_view["task_report_bundle_step_source_option_key_counts"]),
         )
         self.assertEqual(
             summary_view["task_report_bundle_step_source_option_key_counts"]["report:limit"],
