@@ -616,6 +616,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     error_sample_http_status_counts: dict[str, int] = {}
     error_sample_reachability_counts: dict[str, int] = {}
     error_sample_count = 0
+    primary_error_sample_reachability: str | None = None
 
     for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
         probe = probes.get(key) or {}
@@ -638,6 +639,8 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             error_sample_reachability_counts[error_sample_reachability_status] = (
                 error_sample_reachability_counts.get(error_sample_reachability_status, 0) + 1
             )
+            if primary_error_sample_reachability is None:
+                primary_error_sample_reachability = error_sample_reachability_status
             http_status = probe.get("http_status")
             if isinstance(http_status, int) and not isinstance(http_status, bool):
                 http_status_key = str(http_status)
@@ -776,6 +779,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         if isinstance(primary_error_sample.get("http_status"), int)
         and not isinstance(primary_error_sample.get("http_status"), bool)
         else None,
+        "primary_error_sample_reachability": primary_error_sample_reachability,
         "error_sample_count": error_sample_count,
         "error_sample_status_counts": {
             status: error_sample_status_counts[status] for status in sorted(error_sample_status_counts)

@@ -2567,6 +2567,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             {"unreachable": 1},
         )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_reachability_key_count"], 1)
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["primary_error_sample_reachability"],
+            "unreachable",
+        )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(
