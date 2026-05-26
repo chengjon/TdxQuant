@@ -4458,6 +4458,10 @@ class ApiCliDispatchTests(unittest.TestCase):
             validation["submit_once_bundle_step_source_entry_counts"],
         )
         self.assertEqual(
+            summary_view["submit_once_bundle_step_source_entry_key_count"],
+            len(summary_view["submit_once_bundle_step_source_entry_counts"]),
+        )
+        self.assertEqual(
             summary_view["submit_once_bundle_step_count"],
             sum(summary_view["submit_once_bundle_step_source_entry_counts"].values()),
         )
@@ -4493,6 +4497,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["pingan_bundle_step_source_entry_counts"],
             validation["pingan_bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_source_entry_key_count"],
+            len(summary_view["pingan_bundle_step_source_entry_counts"]),
         )
         self.assertEqual(
             summary_view["pingan_bundle_step_count"],
@@ -4599,6 +4607,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["submit_once_bundle_step_source_entry_counts"],
             validation["submit_once_bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["submit_once_bundle_step_source_entry_key_count"],
+            len(summary_view["submit_once_bundle_step_source_entry_counts"]),
         )
         self.assertEqual(
             summary_view["submit_once_bundle_step_count"],
@@ -4717,6 +4729,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["pingan_bundle_step_source_entry_counts"],
             validation["pingan_bundle_step_source_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_source_entry_key_count"],
+            len(summary_view["pingan_bundle_step_source_entry_counts"]),
         )
         self.assertEqual(
             summary_view["pingan_bundle_step_count"],
