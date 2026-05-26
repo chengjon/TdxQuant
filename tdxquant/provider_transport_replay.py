@@ -727,12 +727,15 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             status: requested_http_status_counts[status]
             for status in sorted(requested_http_status_counts, key=int)
         },
+        "requested_http_status_key_count": len(requested_http_status_counts),
         "healthy_http_status_counts": {
             status: healthy_http_status_counts[status] for status in sorted(healthy_http_status_counts, key=int)
         },
+        "healthy_http_status_key_count": len(healthy_http_status_counts),
         "failed_http_status_counts": {
             status: failed_http_status_counts[status] for status in sorted(failed_http_status_counts, key=int)
         },
+        "failed_http_status_key_count": len(failed_http_status_counts),
         "error_code_counts": {code: error_code_counts[code] for code in sorted(error_code_counts)},
         "failed_error_code_counts": {
             code: failed_error_code_counts[code] for code in sorted(failed_error_code_counts)
