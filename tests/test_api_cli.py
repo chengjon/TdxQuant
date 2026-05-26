@@ -4654,6 +4654,10 @@ class ApiCliDispatchTests(unittest.TestCase):
             summary_view["submit_once_bundle_step_entry_counts"],
             validation["submit_once_bundle_step_entry_counts"],
         )
+        self.assertEqual(
+            summary_view["submit_once_bundle_step_entry_key_count"],
+            len(summary_view["submit_once_bundle_step_entry_counts"]),
+        )
         self.assertGreater(validation["submit_once_bundle_step_entry_counts"]["recent-failures"], 0)
         self.assertGreater(
             validation["submit_once_bundle_step_entry_counts"]["audit-daily-pingan-submit-once-exceptions"],
@@ -4762,6 +4766,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["pingan_bundle_step_entry_counts"],
             validation["pingan_bundle_step_entry_counts"],
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_entry_key_count"],
+            len(summary_view["pingan_bundle_step_entry_counts"]),
         )
         self.assertGreater(validation["pingan_bundle_step_entry_counts"]["recent-failures"], 0)
         self.assertGreater(validation["pingan_bundle_step_entry_counts"]["task-confirm-current"], 0)

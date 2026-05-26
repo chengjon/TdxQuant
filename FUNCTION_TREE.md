@@ -214,6 +214,8 @@ TdxQuant
 
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label submit-once|pingan --view summary` 新增只读 `submit_once_bundle_step_source_name_key_count` 与 `pingan_bundle_step_source_name_key_count`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-submit-pingan-step-source-name-key-counts`；这两个字段只从已投影的 `submit_once_bundle_step_source_name_counts` / `pingan_bundle_step_source_name_counts` map 派生不同 `source:name` key 数量，不统计 resolved step 总数、不列出完整 bundle/step manifest、不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
 
+> E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label submit-once|pingan --view summary` 新增只读 `submit_once_bundle_step_entry_key_count` 与 `pingan_bundle_step_entry_key_count`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-submit-pingan-step-entry-key-counts`；这两个字段只从已投影的 `submit_once_bundle_step_entry_counts` / `pingan_bundle_step_entry_counts` map 派生不同 step-entry key 数量，不统计 resolved step 总数、不列出完整 bundle/step manifest、不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
@@ -249,6 +251,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-26 | E-11 补充 `catalog validate --view summary` 的 `submit_once_bundle_step_entry_key_count` / `pingan_bundle_step_entry_key_count` 登记：只从已投影 submit-once/PingAn step entry-count map 派生不同 step-entry key 数量；不统计 resolved step 总数、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate --view summary` 的 `submit_once_bundle_step_source_name_key_count` / `pingan_bundle_step_source_name_key_count` 登记：只从已投影 submit-once/PingAn step `source:name` count map 派生不同 `source:name` key 数量；不统计 resolved step 总数、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate --view summary` 的 `submit_once_bundle_step_name_key_count` / `pingan_bundle_step_name_key_count` 登记：只从已投影 submit-once/PingAn step name-count map 派生不同 step-name key 数量；不统计 resolved step 总数、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
 | 2026-05-26 | E-11 补充 `catalog validate --view summary` 的 `submit_once_bundle_step_source_key_count` / `pingan_bundle_step_source_key_count` 登记：只从已投影 submit-once/PingAn step source-count map 派生不同 source key 数量；不统计 resolved step 总数、不执行 entry/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。 |
