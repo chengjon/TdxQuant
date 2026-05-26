@@ -614,6 +614,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     error_sample_status_counts: dict[str, int] = {}
     error_sample_probe_counts: dict[str, int] = {}
     error_sample_http_status_counts: dict[str, int] = {}
+    error_sample_reachability_counts: dict[str, int] = {}
     error_sample_count = 0
 
     for key in PROVIDER_REPLAY_STATUS_PROBE_KEYS:
@@ -627,6 +628,16 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             error_sample_count += 1
             error_sample_status_counts[probe_status] = error_sample_status_counts.get(probe_status, 0) + 1
             error_sample_probe_counts[key] = error_sample_probe_counts.get(key, 0) + 1
+            reachable = probe.get("reachable")
+            if reachable is True:
+                error_sample_reachability_status = "reachable"
+            elif reachable is False:
+                error_sample_reachability_status = "unreachable"
+            else:
+                error_sample_reachability_status = "unknown"
+            error_sample_reachability_counts[error_sample_reachability_status] = (
+                error_sample_reachability_counts.get(error_sample_reachability_status, 0) + 1
+            )
             http_status = probe.get("http_status")
             if isinstance(http_status, int) and not isinstance(http_status, bool):
                 http_status_key = str(http_status)
@@ -779,6 +790,11 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
             for status in sorted(error_sample_http_status_counts)
         },
         "error_sample_http_status_key_count": len(error_sample_http_status_counts),
+        "error_sample_reachability_counts": {
+            status: error_sample_reachability_counts[status]
+            for status in sorted(error_sample_reachability_counts)
+        },
+        "error_sample_reachability_key_count": len(error_sample_reachability_counts),
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_visible_count": error_sample_visible_count,
         "error_sample_hidden_count": error_sample_hidden_count,
