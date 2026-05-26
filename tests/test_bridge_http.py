@@ -567,6 +567,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "state_match": True,
                 "run_id": "run-001",
                 "run_id_source": "watch_status",
+                "run_id_match": True,
                 "pid": 1234,
             },
         )

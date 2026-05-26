@@ -177,6 +177,8 @@ def build_bridge_watch_status_runtime_view(result: dict[str, Any]) -> dict[str, 
     if run_id is not None:
         runtime_view["run_id"] = run_id
         runtime_view["run_id_source"] = run_id_source
+        if "run_id" in control and "run_id" in watch_status:
+            runtime_view["run_id_match"] = control["run_id"] == watch_status["run_id"]
     if "pid" in control:
         runtime_view["pid"] = control["pid"]
     return runtime_view
