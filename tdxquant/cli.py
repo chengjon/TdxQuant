@@ -3223,6 +3223,11 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "code": result.code.value,
             "message": result.message,
         }
+        summary["entry_summary"] = {
+            "count": summary.get("entry_count"),
+            "source_key_count": summary.get("entry_source_key_count"),
+            "label_key_count": summary.get("entry_label_key_count"),
+        }
         summary["bundle_step_summary"] = {
             "bundle_count": summary.get("bundle_count"),
             "step_count": summary.get("bundle_step_count"),

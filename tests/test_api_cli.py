@@ -4348,6 +4348,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["entry_label_counts"], validation["entry_label_counts"])
         self.assertEqual(summary_view["entry_label_key_count"], len(summary_view["entry_label_counts"]))
         self.assertEqual(summary_view["entry_label_counts"], {})
+        self.assertEqual(
+            summary_view["entry_summary"],
+            {
+                "count": 0,
+                "source_key_count": 0,
+                "label_key_count": 0,
+            },
+        )
         self.assertEqual(summary_view["bundle_count"], validation["bundle_count"])
         self.assertEqual(summary_view["bundle_step_count"], validation["bundle_step_count"])
         self.assertEqual(summary_view["bundle_step_source_counts"], validation["bundle_step_source_counts"])
@@ -4664,6 +4672,14 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["entry_label_counts"], validation["entry_label_counts"])
         self.assertEqual(summary_view["entry_label_key_count"], len(summary_view["entry_label_counts"]))
         self.assertEqual(summary_view["entry_label_counts"]["report"], summary_view["entry_count"])
+        self.assertEqual(
+            summary_view["entry_summary"],
+            {
+                "count": summary_view["entry_count"],
+                "source_key_count": summary_view["entry_source_key_count"],
+                "label_key_count": summary_view["entry_label_key_count"],
+            },
+        )
         self.assertEqual(validation["bundle_step_source_option_key_counts"], {})
         self.assertEqual(summary_view["bundle_step_source_option_key_counts"], {})
         self.assertEqual(validation["task_report_bundle_step_source_option_key_counts"], {})
