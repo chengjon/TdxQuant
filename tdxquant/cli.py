@@ -5477,6 +5477,8 @@ def _build_bridge_watch_status_runtime_view(result: dict[str, object]) -> dict[s
         runtime_view["active"] = control["active"]
     if "state" in watch_status:
         runtime_view["watch_state"] = watch_status["state"]
+    if "state" in control and "state" in watch_status:
+        runtime_view["state_match"] = control["state"] == watch_status["state"]
 
     run_id = watch_status.get("run_id", control.get("run_id"))
     if run_id is not None:
