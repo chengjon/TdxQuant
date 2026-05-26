@@ -4421,6 +4421,26 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["task_report_bundle_sample_truncated"], True)
         self.assertEqual(summary_view["task_report_bundle_samples"][0], "buy-pingan-complete-review")
         self.assertEqual(
+            summary_view["task_report_bundle_summary"],
+            {
+                "count": summary_view["task_report_bundle_count"],
+                "step_count": summary_view["task_report_bundle_step_count"],
+                "sample_count": summary_view["task_report_bundle_sample_count"],
+                "sample_limit": summary_view["task_report_bundle_sample_limit"],
+                "sample_truncated": summary_view["task_report_bundle_sample_truncated"],
+                "label_key_count": summary_view["task_report_bundle_label_key_count"],
+                "step_source_key_count": summary_view["task_report_bundle_step_source_key_count"],
+                "step_name_key_count": summary_view["task_report_bundle_step_name_key_count"],
+                "step_source_name_key_count": summary_view["task_report_bundle_step_source_name_key_count"],
+                "step_entry_key_count": summary_view["task_report_bundle_step_entry_key_count"],
+                "step_source_entry_key_count": summary_view["task_report_bundle_step_source_entry_key_count"],
+                "step_option_key_count": summary_view["task_report_bundle_step_option_key_count"],
+                "step_source_option_key_count": summary_view[
+                    "task_report_bundle_step_source_option_key_count"
+                ],
+            },
+        )
+        self.assertEqual(
             summary_view["task_report_bundle_step_source_counts"],
             validation["task_report_bundle_step_source_counts"],
         )
@@ -4656,12 +4676,15 @@ class ApiCliDispatchTests(unittest.TestCase):
 
     def test_handle_catalog_validate_diagnostics_label_has_zero_task_report_step_count(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["catalog", "validate", "--kind", "bundle", "--label", "diagnostics"])
+        args = parser.parse_args(
+            ["catalog", "validate", "--kind", "bundle", "--label", "diagnostics", "--view", "summary"]
+        )
 
         result = _handle_catalog_subcommand(args)
 
         self.assertTrue(result.ok)
         validation = result.data["validation"]
+        summary_view = result.data["summary_view"]
         self.assertGreater(validation["bundle_count"], 0)
         self.assertGreater(validation["bundle_step_count"], 0)
         self.assertEqual(validation["bundle_step_count"], sum(validation["bundle_step_source_counts"].values()))
@@ -4673,6 +4696,24 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["task_report_bundle_step_source_entry_counts"], {})
         self.assertEqual(validation["task_report_bundle_step_entry_counts"], {})
         self.assertEqual(validation["task_report_bundle_label_counts"], {})
+        self.assertEqual(
+            summary_view["task_report_bundle_summary"],
+            {
+                "count": 0,
+                "step_count": 0,
+                "sample_count": 0,
+                "sample_limit": validation["task_report_bundle_sample_limit"],
+                "sample_truncated": False,
+                "label_key_count": 0,
+                "step_source_key_count": 0,
+                "step_name_key_count": 0,
+                "step_source_name_key_count": 0,
+                "step_entry_key_count": 0,
+                "step_source_entry_key_count": 0,
+                "step_option_key_count": 0,
+                "step_source_option_key_count": 0,
+            },
+        )
 
     def test_handle_catalog_validate_summary_view_projects_submit_once_samples(self) -> None:
         parser = build_parser()
