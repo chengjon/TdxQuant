@@ -4352,6 +4352,7 @@ class ApiCliDispatchTests(unittest.TestCase):
             sum(summary_view["bundle_step_source_entry_counts"].values()),
         )
         self.assertEqual(summary_view["bundle_label_counts"], validation["bundle_label_counts"])
+        self.assertEqual(summary_view["bundle_label_key_count"], len(summary_view["bundle_label_counts"]))
         self.assertEqual(summary_view["bundle_label_counts"]["followup"], summary_view["bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_count"], validation["task_report_bundle_count"])
         self.assertEqual(summary_view["task_report_bundle_step_count"], validation["task_report_bundle_step_count"])
@@ -4435,6 +4436,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["task_report_bundle_label_counts"],
             validation["task_report_bundle_label_counts"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_label_key_count"],
+            len(summary_view["task_report_bundle_label_counts"]),
         )
         self.assertEqual(
             summary_view["task_report_bundle_label_counts"]["followup"],
