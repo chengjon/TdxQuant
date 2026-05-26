@@ -624,6 +624,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             ["heartbeat:stale", "overall_status:degraded", "watermark:stale"],
         )
         self.assertEqual(payload["result"]["governance"]["reason_sample_count"], 3)
+        self.assertEqual(payload["result"]["governance"]["reason_sample_hidden_count"], 1)
         self.assertEqual(payload["result"]["governance"]["reason_sample_limit"], 3)
         self.assertEqual(payload["result"]["governance"]["reason_sample_truncated"], True)
         self.assertEqual(payload["result"]["governance"]["action_count"], 4)
@@ -666,6 +667,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             ],
         )
         self.assertEqual(payload["result"]["governance"]["action_sample_count"], 3)
+        self.assertEqual(payload["result"]["governance"]["action_sample_hidden_count"], 1)
         self.assertEqual(payload["result"]["governance"]["action_sample_limit"], 3)
         self.assertEqual(payload["result"]["governance"]["action_sample_truncated"], True)
         self.assertEqual(

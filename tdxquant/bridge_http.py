@@ -119,22 +119,28 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
                 governance_view[key] = copy.deepcopy(governance[key])
         reasons = governance.get("reasons")
         if isinstance(reasons, list):
-            governance_view["reason_count"] = len(reasons)
+            reason_count = len(reasons)
+            governance_view["reason_count"] = reason_count
             reason_samples = [reason for reason in reasons if isinstance(reason, str)][
                 :WATCH_STATUS_REASON_SAMPLE_LIMIT
             ]
+            reason_sample_count = len(reason_samples)
             governance_view["reason_samples"] = reason_samples
-            governance_view["reason_sample_count"] = len(reason_samples)
+            governance_view["reason_sample_count"] = reason_sample_count
+            governance_view["reason_sample_hidden_count"] = max(reason_count - reason_sample_count, 0)
             governance_view["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
-            governance_view["reason_sample_truncated"] = len(reasons) > len(reason_samples)
+            governance_view["reason_sample_truncated"] = reason_count > reason_sample_count
         actions = governance.get("actions")
         if isinstance(actions, list):
-            governance_view["action_count"] = len(actions)
+            action_count = len(actions)
+            governance_view["action_count"] = action_count
             action_samples = build_bridge_watch_status_action_samples(actions)
+            action_sample_count = len(action_samples)
             governance_view["action_samples"] = action_samples
-            governance_view["action_sample_count"] = len(action_samples)
+            governance_view["action_sample_count"] = action_sample_count
+            governance_view["action_sample_hidden_count"] = max(action_count - action_sample_count, 0)
             governance_view["action_sample_limit"] = WATCH_STATUS_ACTION_SAMPLE_LIMIT
-            governance_view["action_sample_truncated"] = len(actions) > len(action_samples)
+            governance_view["action_sample_truncated"] = action_count > action_sample_count
         summary_view["governance"] = governance_view
 
     return summary_view
