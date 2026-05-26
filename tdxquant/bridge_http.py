@@ -104,6 +104,7 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
 
     if governance:
         governance_view: dict[str, Any] = {}
+        sample_summary: dict[str, Any] = {}
         for key in (
             "decision",
             "requires_manual_review",
@@ -121,6 +122,7 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
         if isinstance(reasons, list):
             reason_count = len(reasons)
             governance_view["reason_count"] = reason_count
+            sample_summary["reason_count"] = reason_count
             reason_samples = [reason for reason in reasons if isinstance(reason, str)][
                 :WATCH_STATUS_REASON_SAMPLE_LIMIT
             ]
@@ -130,10 +132,15 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             governance_view["reason_sample_hidden_count"] = max(reason_count - reason_sample_count, 0)
             governance_view["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
             governance_view["reason_sample_truncated"] = reason_count > reason_sample_count
+            sample_summary["reason_sample_count"] = reason_sample_count
+            sample_summary["reason_sample_hidden_count"] = max(reason_count - reason_sample_count, 0)
+            sample_summary["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
+            sample_summary["reason_sample_truncated"] = reason_count > reason_sample_count
         actions = governance.get("actions")
         if isinstance(actions, list):
             action_count = len(actions)
             governance_view["action_count"] = action_count
+            sample_summary["action_count"] = action_count
             action_samples = build_bridge_watch_status_action_samples(actions)
             action_sample_count = len(action_samples)
             governance_view["action_samples"] = action_samples
@@ -141,6 +148,12 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             governance_view["action_sample_hidden_count"] = max(action_count - action_sample_count, 0)
             governance_view["action_sample_limit"] = WATCH_STATUS_ACTION_SAMPLE_LIMIT
             governance_view["action_sample_truncated"] = action_count > action_sample_count
+            sample_summary["action_sample_count"] = action_sample_count
+            sample_summary["action_sample_hidden_count"] = max(action_count - action_sample_count, 0)
+            sample_summary["action_sample_limit"] = WATCH_STATUS_ACTION_SAMPLE_LIMIT
+            sample_summary["action_sample_truncated"] = action_count > action_sample_count
+        if sample_summary:
+            governance_view["sample_summary"] = sample_summary
         summary_view["governance"] = governance_view
 
     return summary_view
