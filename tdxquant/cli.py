@@ -2827,7 +2827,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "bundle_step_source_counts": copy.deepcopy(validation.get("bundle_step_source_counts", {})),
             "bundle_step_source_key_count": len(validation.get("bundle_step_source_counts") or {}),
             "bundle_step_name_counts": copy.deepcopy(validation.get("bundle_step_name_counts", {})),
+            "bundle_step_name_key_count": len(validation.get("bundle_step_name_counts") or {}),
             "bundle_step_entry_counts": copy.deepcopy(validation.get("bundle_step_entry_counts", {})),
+            "bundle_step_entry_key_count": len(validation.get("bundle_step_entry_counts") or {}),
             "bundle_step_source_name_counts": copy.deepcopy(
                 validation.get("bundle_step_source_name_counts", {})
             ),
@@ -2855,6 +2857,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "task_report_bundle_step_name_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_name_counts", {})
             ),
+            "task_report_bundle_step_name_key_count": len(
+                validation.get("task_report_bundle_step_name_counts") or {}
+            ),
             "task_report_bundle_step_source_name_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_source_name_counts", {})
             ),
@@ -2863,6 +2868,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             ),
             "task_report_bundle_step_entry_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_entry_counts", {})
+            ),
+            "task_report_bundle_step_entry_key_count": len(
+                validation.get("task_report_bundle_step_entry_counts") or {}
             ),
             "task_report_bundle_step_option_key_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_option_key_counts", {})
