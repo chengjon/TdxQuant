@@ -4479,6 +4479,10 @@ class ApiCliDispatchTests(unittest.TestCase):
             validation["submit_once_bundle_step_source_option_key_counts"],
         )
         self.assertEqual(
+            summary_view["submit_once_bundle_step_source_option_key_count"],
+            len(summary_view["submit_once_bundle_step_source_option_key_counts"]),
+        )
+        self.assertEqual(
             summary_view["submit_once_bundle_step_source_option_key_counts"]["report:limit"],
             1,
         )
@@ -4518,6 +4522,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["pingan_bundle_step_source_option_key_counts"],
             validation["pingan_bundle_step_source_option_key_counts"],
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_source_option_key_count"],
+            len(summary_view["pingan_bundle_step_source_option_key_counts"]),
         )
         self.assertEqual(summary_view["pingan_bundle_step_source_option_key_counts"], {})
         self.assertEqual(summary_view["invalid_count"], 0)
@@ -4696,6 +4704,10 @@ class ApiCliDispatchTests(unittest.TestCase):
             summary_view["submit_once_bundle_step_source_option_key_counts"],
             validation["submit_once_bundle_step_source_option_key_counts"],
         )
+        self.assertEqual(
+            summary_view["submit_once_bundle_step_source_option_key_count"],
+            len(summary_view["submit_once_bundle_step_source_option_key_counts"]),
+        )
         self.assertEqual(validation["submit_once_bundle_step_source_option_key_counts"], {})
         self.assertEqual(summary_view["submit_once_bundle_samples"], validation["submit_once_bundle_samples"])
         self.assertEqual(
@@ -4813,6 +4825,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             summary_view["pingan_bundle_step_source_option_key_counts"],
             validation["pingan_bundle_step_source_option_key_counts"],
+        )
+        self.assertEqual(
+            summary_view["pingan_bundle_step_source_option_key_count"],
+            len(summary_view["pingan_bundle_step_source_option_key_counts"]),
         )
         self.assertEqual(validation["pingan_bundle_step_source_option_key_counts"], {})
         self.assertEqual(summary_view["pingan_bundle_samples"], validation["pingan_bundle_samples"])

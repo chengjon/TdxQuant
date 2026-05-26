@@ -1519,3 +1519,21 @@ Catalog validate summary view SHALL expose read-only submit-once and PingAn bund
 - **WHEN** the summary view includes `pingan_bundle_step_option_key_counts`
 - **THEN** the summary view MUST include `pingan_bundle_step_option_key_count` equal to the number of keys in `pingan_bundle_step_option_key_counts`
 - **AND** this field MUST NOT imply complete workflow coverage, execution readiness, broker readiness, or trading safety.
+
+### Requirement: Catalog Validate Submit/PingAn Step Source-Option-Key Counts
+
+Catalog validate summary view SHALL expose read-only submit-once and PingAn bundle step source-option-key count fields derived from already projected subset step `source:option_key` count maps, without executing catalog entries, tasks, reports, trades, or bundle steps.
+
+#### Scenario: Summary includes submit-once bundle step source-option-key count
+
+- **GIVEN** a caller validates catalog bundles with `--view summary`
+- **WHEN** the summary view includes `submit_once_bundle_step_source_option_key_counts`
+- **THEN** the summary view MUST include `submit_once_bundle_step_source_option_key_count` equal to the number of keys in `submit_once_bundle_step_source_option_key_counts`
+- **AND** this field MUST count distinct `source:option_key` keys, not resolved steps or option values.
+
+#### Scenario: Summary includes PingAn bundle step source-option-key count
+
+- **GIVEN** a caller validates catalog bundles with `--view summary`
+- **WHEN** the summary view includes `pingan_bundle_step_source_option_key_counts`
+- **THEN** the summary view MUST include `pingan_bundle_step_source_option_key_count` equal to the number of keys in `pingan_bundle_step_source_option_key_counts`
+- **AND** this field MUST NOT imply complete workflow coverage, execution readiness, broker readiness, or trading safety.
