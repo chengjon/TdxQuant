@@ -714,12 +714,15 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "requested_reachability_counts": {
             status: requested_reachability_counts[status] for status in sorted(requested_reachability_counts)
         },
+        "requested_reachability_key_count": len(requested_reachability_counts),
         "healthy_reachability_counts": {
             status: healthy_reachability_counts[status] for status in sorted(healthy_reachability_counts)
         },
+        "healthy_reachability_key_count": len(healthy_reachability_counts),
         "failed_reachability_counts": {
             status: failed_reachability_counts[status] for status in sorted(failed_reachability_counts)
         },
+        "failed_reachability_key_count": len(failed_reachability_counts),
         "requested_http_status_counts": {
             status: requested_http_status_counts[status]
             for status in sorted(requested_http_status_counts, key=int)

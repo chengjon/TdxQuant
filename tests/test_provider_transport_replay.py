@@ -76,8 +76,20 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             len(status["runtime"]["probe_summary"]["failed_status_counts"]),
         )
         self.assertEqual(status["runtime"]["probe_summary"]["requested_reachability_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["requested_reachability_key_count"],
+            len(status["runtime"]["probe_summary"]["requested_reachability_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_reachability_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["healthy_reachability_key_count"],
+            len(status["runtime"]["probe_summary"]["healthy_reachability_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["failed_reachability_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["failed_reachability_key_count"],
+            len(status["runtime"]["probe_summary"]["failed_reachability_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["requested_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_http_status_counts"], {})
@@ -171,8 +183,21 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             status["runtime"]["probe_summary"]["failed_status_key_count"],
             len(status["runtime"]["probe_summary"]["failed_status_counts"]),
         )
+        self.assertEqual(status["runtime"]["probe_summary"]["requested_reachability_counts"], {"reachable": 1})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["requested_reachability_key_count"],
+            len(status["runtime"]["probe_summary"]["requested_reachability_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_reachability_counts"], {"reachable": 1})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["healthy_reachability_key_count"],
+            len(status["runtime"]["probe_summary"]["healthy_reachability_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["failed_reachability_counts"], {})
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["failed_reachability_key_count"],
+            len(status["runtime"]["probe_summary"]["failed_reachability_counts"]),
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["healthy_http_status_counts"], {"200": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_http_status_counts"], {})
         self.assertEqual(status["runtime"]["probe_summary"]["requested"], ["health_probe"])
