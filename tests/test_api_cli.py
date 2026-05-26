@@ -5527,6 +5527,11 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["step_name_counts"], {"audit": 1, "confirm": 1, "success": 1})
         self.assertEqual(output_payload["step_name_key_count"], 3)
         self.assertEqual(
+            output_payload["step_source_name_counts"],
+            {"report:audit": 1, "report:success": 1, "task:confirm": 1},
+        )
+        self.assertEqual(output_payload["step_source_name_key_count"], 3)
+        self.assertEqual(
             output_payload["step_entry_counts"],
             {"audit-daily-confirmed": 1, "daily-success": 1, "task-confirm-current": 1},
         )
@@ -6059,6 +6064,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["step_source_key_count"], 1)
         self.assertEqual(output_payload["step_name_counts"], {"review": 1})
         self.assertEqual(output_payload["step_name_key_count"], 1)
+        self.assertEqual(output_payload["step_source_name_counts"], {"report:review": 1})
+        self.assertEqual(output_payload["step_source_name_key_count"], 1)
         self.assertEqual(output_payload["step_entry_counts"], {"recent-ledger": 1})
         self.assertEqual(output_payload["step_entry_key_count"], 1)
         self.assertEqual(output_payload["steps"][0]["name"], "review")
