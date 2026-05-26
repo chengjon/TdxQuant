@@ -5526,6 +5526,11 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["step_source_key_count"], 2)
         self.assertEqual(output_payload["step_name_counts"], {"audit": 1, "confirm": 1, "success": 1})
         self.assertEqual(output_payload["step_name_key_count"], 3)
+        self.assertEqual(
+            output_payload["step_entry_counts"],
+            {"audit-daily-confirmed": 1, "daily-success": 1, "task-confirm-current": 1},
+        )
+        self.assertEqual(output_payload["step_entry_key_count"], 3)
         self.assertEqual(output_payload["constraints"]["execution_mode"], "non_executing")
         self.assertFalse(output_payload["constraints"]["dispatch_executed"])
         mocked_dispatch.assert_not_called()
@@ -6054,6 +6059,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["step_source_key_count"], 1)
         self.assertEqual(output_payload["step_name_counts"], {"review": 1})
         self.assertEqual(output_payload["step_name_key_count"], 1)
+        self.assertEqual(output_payload["step_entry_counts"], {"recent-ledger": 1})
+        self.assertEqual(output_payload["step_entry_key_count"], 1)
         self.assertEqual(output_payload["steps"][0]["name"], "review")
         self.assertNotIn("catalog_bundle", output_payload)
         mocked_dispatch.assert_not_called()

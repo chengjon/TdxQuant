@@ -2694,6 +2694,20 @@ def _build_catalog_step_name_counts(steps: object) -> dict[str, int]:
     return {name: counts[name] for name in sorted(counts)}
 
 
+def _build_catalog_step_entry_counts(steps: object) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    if not isinstance(steps, list):
+        return counts
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        entry = step.get("entry")
+        if not isinstance(entry, str) or not entry:
+            continue
+        counts[entry] = counts.get(entry, 0) + 1
+    return {entry: counts[entry] for entry in sorted(counts)}
+
+
 CATALOG_TRADE_PLAN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
     "trade-buy": ("port", "code", "price", "quantity"),
     "trade-sell": ("port", "code", "price", "quantity"),
@@ -3106,6 +3120,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             step_name_counts = _build_catalog_step_name_counts(steps)
             summary["step_name_counts"] = step_name_counts
             summary["step_name_key_count"] = len(step_name_counts)
+            step_entry_counts = _build_catalog_step_entry_counts(steps)
+            summary["step_entry_counts"] = step_entry_counts
+            summary["step_entry_key_count"] = len(step_entry_counts)
             if isinstance(steps, list):
                 for step in steps:
                     if not isinstance(step, dict):
