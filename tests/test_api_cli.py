@@ -9181,6 +9181,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "reconnect": 1,
                             "watermark": 1,
                         },
+                        "reason_source_key_count": 4,
                         "reason_summary": {
                             "count": 4,
                             "primary_reason": "heartbeat:stale",
@@ -9328,6 +9329,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "reconnect": 1,
                             "watermark": 1,
                         },
+                        "reason_source_key_count": 4,
                         "reason_summary": {
                             "count": 4,
                             "primary_reason": "heartbeat:stale",

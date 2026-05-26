@@ -5506,6 +5506,7 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             "staleness_evaluated",
             "boundary",
             "reason_source_counts",
+            "reason_source_key_count",
             "reason_summary",
             "action_summary",
             "evaluation_summary",

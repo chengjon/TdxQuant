@@ -270,12 +270,14 @@ def _build_subscription_watch_governance_summary(
 
     requires_manual_review = bool(reasons)
     actions = _build_subscription_watch_governance_actions(reasons)
+    reason_source_counts = _build_subscription_watch_governance_reason_source_counts(reasons)
     return {
         "decision": "manual_review" if requires_manual_review else "observe",
         "requires_manual_review": requires_manual_review,
         "reasons": reasons,
         "reason_count": len(reasons),
-        "reason_source_counts": _build_subscription_watch_governance_reason_source_counts(reasons),
+        "reason_source_counts": reason_source_counts,
+        "reason_source_key_count": len(reason_source_counts),
         "reason_summary": _build_subscription_watch_governance_reason_summary(reasons),
         "actions": actions,
         "action_count": len(actions),

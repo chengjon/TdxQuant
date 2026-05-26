@@ -454,6 +454,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "reconnect": 1,
                             "watermark": 1,
                         },
+                        "reason_source_key_count": 4,
                         "reason_summary": {
                             "count": 4,
                             "primary_reason": "heartbeat:stale",
@@ -599,6 +600,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             payload["result"]["governance"]["reason_source_counts"],
             {"heartbeat": 1, "overall_status": 1, "reconnect": 1, "watermark": 1},
         )
+        self.assertEqual(payload["result"]["governance"]["reason_source_key_count"], 4)
         self.assertEqual(
             payload["result"]["governance"]["reason_summary"],
             {
