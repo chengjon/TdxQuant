@@ -685,6 +685,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     failed_count = len(unhealthy)
     total_count = len(PROVIDER_REPLAY_STATUS_PROBE_KEYS)
     primary_error_sample = error_samples[0] if error_samples else {}
+    error_sample_visible_count = len(error_samples)
     error_sample_hidden_count = max(error_sample_count - len(error_samples), 0)
     if requested_count == 0:
         summary_status = "not_requested"
@@ -768,6 +769,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         },
         "error_sample_probe_key_count": len(error_sample_probe_counts),
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
+        "error_sample_visible_count": error_sample_visible_count,
         "error_sample_hidden_count": error_sample_hidden_count,
         "error_sample_truncated": error_sample_count > len(error_samples),
         "requested": requested,
