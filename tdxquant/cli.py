@@ -5426,6 +5426,7 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
                 :WATCH_STATUS_REASON_SAMPLE_LIMIT
             ]
             governance_view["reason_samples"] = reason_samples
+            governance_view["reason_sample_count"] = len(reason_samples)
             governance_view["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
             governance_view["reason_sample_truncated"] = len(reasons) > len(reason_samples)
         actions = governance.get("actions")
@@ -5433,6 +5434,7 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             governance_view["action_count"] = len(actions)
             action_samples = _build_bridge_watch_status_action_samples(actions)
             governance_view["action_samples"] = action_samples
+            governance_view["action_sample_count"] = len(action_samples)
             governance_view["action_sample_limit"] = WATCH_STATUS_ACTION_SAMPLE_LIMIT
             governance_view["action_sample_truncated"] = len(actions) > len(action_samples)
         summary_view["governance"] = governance_view

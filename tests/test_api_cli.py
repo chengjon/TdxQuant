@@ -9167,6 +9167,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                             },
                         },
                         "reason_samples": ["heartbeat:stale", "watermark:stale", "reconnect:stale"],
+                        "reason_sample_count": 3,
                         "reason_sample_limit": 3,
                         "reason_sample_truncated": True,
                         "action_count": 4,
@@ -9213,6 +9214,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                                 "severity": "review",
                             },
                         ],
+                        "action_sample_count": 3,
                         "action_sample_limit": 3,
                         "action_sample_truncated": True,
                         "evaluation_summary": {
@@ -9237,6 +9239,8 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertNotIn("watch_status", summary_payload)
         self.assertNotIn("reasons", summary_payload["governance"])
         self.assertNotIn("actions", summary_payload["governance"])
+        self.assertEqual(summary_payload["governance"]["reason_sample_count"], 3)
+        self.assertEqual(summary_payload["governance"]["action_sample_count"], 3)
 
     def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(
