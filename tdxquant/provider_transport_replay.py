@@ -684,6 +684,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
     requested_count = len(requested)
     failed_count = len(unhealthy)
     total_count = len(PROVIDER_REPLAY_STATUS_PROBE_KEYS)
+    primary_error_sample = error_samples[0] if error_samples else {}
     if requested_count == 0:
         summary_status = "not_requested"
         request_coverage_status = "none"
@@ -743,6 +744,12 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         },
         "failed_error_code_key_count": len(failed_error_code_counts),
         "error_samples": error_samples,
+        "primary_error_sample_probe": primary_error_sample.get("probe")
+        if isinstance(primary_error_sample.get("probe"), str)
+        else None,
+        "primary_error_sample_status": primary_error_sample.get("status")
+        if isinstance(primary_error_sample.get("status"), str)
+        else None,
         "error_sample_count": error_sample_count,
         "error_sample_status_counts": {
             status: error_sample_status_counts[status] for status in sorted(error_sample_status_counts)
