@@ -5332,6 +5332,13 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["steps"][0]["dispatch"]["command_group"], "report")
         self.assertEqual(result.data["steps"][0]["resolved_args"]["limit"], 5)
         self.assertEqual(result.data["summary_view"]["selected_step_count"], 1)
+        self.assertEqual(result.data["summary_view"]["step_resolved_arg_key_counts"], {"limit": 1, "profile": 1})
+        self.assertEqual(result.data["summary_view"]["step_resolved_arg_key_count"], 2)
+        self.assertEqual(
+            result.data["summary_view"]["step_source_resolved_arg_key_counts"],
+            {"report:limit": 1, "report:profile": 1},
+        )
+        self.assertEqual(result.data["summary_view"]["step_source_resolved_arg_key_count"], 2)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_buy_pingan_complete_bundle_without_execution(self) -> None:
@@ -6077,6 +6084,13 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["step_entry_key_count"], 1)
         self.assertEqual(output_payload["step_source_entry_counts"], {"report:recent-ledger": 1})
         self.assertEqual(output_payload["step_source_entry_key_count"], 1)
+        self.assertEqual(output_payload["step_resolved_arg_key_counts"], {"limit": 1, "profile": 1})
+        self.assertEqual(output_payload["step_resolved_arg_key_count"], 2)
+        self.assertEqual(
+            output_payload["step_source_resolved_arg_key_counts"],
+            {"report:limit": 1, "report:profile": 1},
+        )
+        self.assertEqual(output_payload["step_source_resolved_arg_key_count"], 2)
         self.assertEqual(output_payload["steps"][0]["name"], "review")
         self.assertNotIn("catalog_bundle", output_payload)
         mocked_dispatch.assert_not_called()
