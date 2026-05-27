@@ -1489,7 +1489,10 @@ class _BlockManagerProxy:
         effective_profile = self._manager._build_effective_profile({})
         result, timing = capture_api_timing(
             "block.user_sectors",
-            lambda: self._manager._block_api.user_sectors(),
+            lambda: self._manager._dispatch_sync_capability(
+                "block.user_sectors",
+                lambda: self._manager._block_api.user_sectors(),
+            ),
         )
         return attach_manager_metadata(
             result,
@@ -1504,7 +1507,10 @@ class _BlockManagerProxy:
         effective_profile = self._manager._build_effective_profile({"block_code": block_code})
         result, timing = capture_api_timing(
             "block.read_watchlist_snapshot",
-            lambda: self._manager._block_api.read_watchlist_snapshot(block_code=block_code),
+            lambda: self._manager._dispatch_sync_capability(
+                "block.read_watchlist_snapshot",
+                lambda: self._manager._block_api.read_watchlist_snapshot(block_code=block_code),
+            ),
         )
         return attach_manager_metadata(
             result,
@@ -1537,10 +1543,13 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.create_sector",
-            lambda: self._manager._block_api.create_sector(
-                block_code=block_code,
-                block_name=block_name,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.create_sector",
+                lambda: self._manager._block_api.create_sector(
+                    block_code=block_code,
+                    block_name=block_name,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(
@@ -1572,9 +1581,12 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.delete_sector",
-            lambda: self._manager._block_api.delete_sector(
-                block_code=block_code,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.delete_sector",
+                lambda: self._manager._block_api.delete_sector(
+                    block_code=block_code,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(
@@ -1608,10 +1620,13 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.rename_sector",
-            lambda: self._manager._block_api.rename_sector(
-                block_code=block_code,
-                block_name=block_name,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.rename_sector",
+                lambda: self._manager._block_api.rename_sector(
+                    block_code=block_code,
+                    block_name=block_name,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(
@@ -1643,9 +1658,12 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.clear_sector",
-            lambda: self._manager._block_api.clear_sector(
-                block_code=block_code,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.clear_sector",
+                lambda: self._manager._block_api.clear_sector(
+                    block_code=block_code,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(

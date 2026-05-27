@@ -221,6 +221,7 @@ def _add_report_common_arguments(subparser: argparse.ArgumentParser, *, default_
         subparser.add_argument("--profile", default=default_profile)
     subparser.add_argument("--api-profile")
     subparser.add_argument("--strategy-path")
+    subparser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
     subparser.add_argument("--output", help="Optional path to write the JSON result")
 
 
@@ -2731,10 +2732,10 @@ def _build_catalog_non_execution_provenance(
         "mode": args.catalog_command,
         "target_type": target_type,
         "target_name": target_name,
-        "catalog_path": str(get_command_catalog_path()),
+        "catalog_path": get_command_catalog_path().as_posix(),
     }
     if target_type == "bundle":
-        provenance["bundle_path"] = str(get_command_bundle_path())
+        provenance["bundle_path"] = get_command_bundle_path().as_posix()
     return provenance
 
 
@@ -3364,6 +3365,37 @@ def _select_catalog_output_payload(args: argparse.Namespace, result: Result) -> 
     ):
         return copy.deepcopy(result.data["summary_view"])
     return result.to_dict()
+
+
+def _build_report_summary_payload(args: argparse.Namespace, result: Result) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "mode": "report",
+        "command": getattr(args, "report_command", None),
+        "ok": result.ok,
+        "code": result.code.value,
+        "message": result.message,
+    }
+    for key in ("summary", "source", "input"):
+        value = result.data.get(key)
+        if isinstance(value, dict):
+            payload[key] = copy.deepcopy(value)
+    entries = result.data.get("entries")
+    if isinstance(entries, list):
+        payload["entry_count"] = len(entries)
+        payload["entries"] = copy.deepcopy(entries[:5])
+        payload["entry_sample_count"] = min(len(entries), 5)
+        payload["entry_sample_truncated"] = len(entries) > 5
+    if result.warnings:
+        payload["warnings"] = list(result.warnings)
+    if result.next_action:
+        payload["next_action"] = result.next_action
+    return payload
+
+
+def _select_output_payload(args: argparse.Namespace, result: Result) -> dict[str, object]:
+    if args.command == "report" and getattr(args, "view", "detailed") == "summary":
+        return _build_report_summary_payload(args, result)
+    return _select_catalog_output_payload(args, result)
 
 
 _FLAT_PROVIDER_RESULT_COMMANDS = {
@@ -6568,7 +6600,7 @@ def main() -> int:
             elapsed_ms=total_ms,
         )
     else:
-        output_payload = _select_catalog_output_payload(args, result)
+        output_payload = _select_output_payload(args, result)
     serialized = json.dumps(output_payload, ensure_ascii=False, indent=2)
     if getattr(args, "output", None):
         output_path = Path(args.output)
