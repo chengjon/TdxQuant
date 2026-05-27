@@ -2830,6 +2830,14 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
         "code": outcome.get("code"),
         "selected_from_step": selected_steps.get("selected_from_step"),
         "selected_to_step": selected_steps.get("selected_to_step"),
+        "first_step_index": selected_steps.get("first_step_index"),
+        "last_step_index": selected_steps.get("last_step_index"),
+        "first_step_name": selected_steps.get("first_step_name"),
+        "last_step_name": selected_steps.get("last_step_name"),
+        "first_step_source": selected_steps.get("first_step_source"),
+        "last_step_source": selected_steps.get("last_step_source"),
+        "first_step_command_name": selected_steps.get("first_step_command_name"),
+        "last_step_command_name": selected_steps.get("last_step_command_name"),
         "selected_step_count": selected_steps.get(
             "selected_step_count", outcome.get("selected_step_count")
         ),
