@@ -303,6 +303,8 @@ TdxQuant
 
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label submit-once|pingan --view summary` 新增只读 `submit_once_bundle_step_source_option_key_count` 与 `pingan_bundle_step_source_option_key_count`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-submit-pingan-step-source-option-key-counts`；这两个字段只从已投影的 `submit_once_bundle_step_source_option_key_counts` / `pingan_bundle_step_source_option_key_counts` map 派生不同 `source:option_key` 数量，不暴露 option value、不校验 option 语义、不统计 resolved step 总数、不执行 catalog entry/task/report/trade/bundle step，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
 
+> E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup --view summary` 新增只读 `validation_outcome`，集中投影既有 kind、selected label、entry/bundle count、invalid count、valid/non-execution、result code/message 及 conservative outcome booleans，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-outcome-summary`；该对象只汇总 catalog registry validation metadata，不替代既有 count map、family summary 或 raw validation payload，不列出完整 entry/bundle manifest，不执行 catalog entry、bundle、task/report step、trade command、provider call 或 workflow action，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |

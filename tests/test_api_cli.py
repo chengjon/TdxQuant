@@ -4700,6 +4700,23 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["invalid_count"], 0)
         self.assertEqual(summary_view["valid"], True)
         self.assertEqual(summary_view["non_execution"], True)
+        self.assertEqual(
+            summary_view["validation_outcome"],
+            {
+                "kind": "bundle",
+                "selected_label": "followup",
+                "entry_count": 0,
+                "bundle_count": summary_view["bundle_count"],
+                "invalid_count": 0,
+                "valid": True,
+                "non_execution": True,
+                "ok": True,
+                "code": summary_view["code"],
+                "message": summary_view["message"],
+                "has_invalid_entries": False,
+                "has_selected_label": True,
+            },
+        )
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)
 

@@ -3223,6 +3223,21 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "code": result.code.value,
             "message": result.message,
         }
+        invalid_count = summary.get("invalid_count")
+        summary["validation_outcome"] = {
+            "kind": summary.get("kind"),
+            "selected_label": summary.get("selected_label"),
+            "entry_count": summary.get("entry_count"),
+            "bundle_count": summary.get("bundle_count"),
+            "invalid_count": invalid_count,
+            "valid": summary.get("valid"),
+            "non_execution": summary.get("non_execution"),
+            "ok": summary.get("ok"),
+            "code": summary.get("code"),
+            "message": summary.get("message"),
+            "has_invalid_entries": isinstance(invalid_count, int) and invalid_count > 0,
+            "has_selected_label": bool(summary.get("selected_label")),
+        }
         summary["entry_summary"] = {
             "count": summary.get("entry_count"),
             "source_key_count": summary.get("entry_source_key_count"),

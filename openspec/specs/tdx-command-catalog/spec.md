@@ -1808,6 +1808,7 @@ Command catalog validation summary views SHALL include additive read-only `task_
 - **AND** sample and map key counts MUST be `0`
 - **AND** `sample_truncated` MUST be falsey or `false`
 - **AND** the summary MUST remain non-executing and MUST NOT be treated as workflow-builder, broker-readiness, trade-safety, or execution-coverage proof
+
 ### Requirement: Catalog validation summary SHALL expose bundle step summary
 
 Command catalog validation summary views SHALL include additive read-only `bundle_step_summary` metadata derived from existing selected-bundle validation counts and maps without executing catalog entries, tasks, reports, trades, or bundle steps.
@@ -1879,3 +1880,21 @@ Command catalog validation summary views SHALL include additive read-only `submi
 - **THEN** the corresponding compact summary `count` MUST be `0`
 - **AND** `step_count`, sample metadata, and map key counts MUST remain deterministic zero/empty-derived values
 - **AND** the summary MUST remain non-executing and MUST NOT be treated as workflow-builder, broker-readiness, trade-safety, or execution-coverage proof
+
+### Requirement: Catalog validate summary SHALL expose validation outcome
+
+`catalog validate --view summary` SHALL include additive read-only `validation_outcome` metadata derived from existing validation summary fields without executing catalog entries, bundles, task/report steps, trade commands, provider calls, or workflow actions.
+
+#### Scenario: Bundle validation summary includes outcome
+
+- **WHEN** a caller runs `catalog validate --kind bundle --label followup --view summary`
+- **THEN** the summary payload MUST include `validation_outcome`
+- **AND** the object MUST derive kind, selected label, entry count, bundle count, invalid count, validity, non-execution flag, result code, and result message from existing summary siblings
+- **AND** `has_invalid_entries` MUST be false when the existing invalid count is zero
+- **AND** the summary MUST NOT include raw `entries` or raw `bundles`
+
+#### Scenario: Outcome remains non-executing
+
+- **WHEN** catalog validation reports `validation_outcome`
+- **THEN** the object MUST NOT indicate that any entry, bundle, task/report step, trade command, provider call, or workflow action was executed
+- **AND** existing count maps and family summary objects MUST remain available
