@@ -2494,6 +2494,26 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["lifecycle"]["managed_operation_count"], 0)
         self.assertEqual(result.data["summary_view"]["runtime"]["runtime_observed"], True)
         self.assertEqual(result.data["summary_view"]["runtime"]["probe_requested"], True)
+        self.assertEqual(
+            result.data["summary_view"]["status_summary"],
+            {
+                "provider_id": "provider-replay-a",
+                "transport_mode": "replay_only",
+                "source_kind": "built_in_fixture",
+                "fixture": "market-snapshot-default",
+                "read_only": True,
+                "writes_supported": False,
+                "endpoint_count": len(result.data["status"]["capabilities"]["endpoints"]),
+                "probe_requested": True,
+                "requested_probe_count": 4,
+                "failed_probe_count": 1,
+                "control_supported": False,
+                "managed_operation_count": 0,
+                "boundary_count": len(result.data["status"]["boundaries"]),
+                "runtime_observed": True,
+                "live_runtime_required": result.data["status"]["runtime"]["live_runtime_required"],
+            },
+        )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["status"], "degraded")
         self.assertEqual(
             result.data["summary_view"]["probe_summary"]["request_coverage_status"],

@@ -5966,10 +5966,29 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
     endpoint_samples = [endpoint for endpoint in endpoints if isinstance(endpoint, str)][
         :PROVIDER_REPLAY_ENDPOINT_SAMPLE_LIMIT
     ]
+    probe_requested = bool(probe_summary.get("requested_count"))
+    control_supported = managed_operation_count > 0
     return {
         "mode": "summary",
         "provider_id": status.get("provider_id"),
         "transport_mode": status.get("transport_mode"),
+        "status_summary": {
+            "provider_id": status.get("provider_id"),
+            "transport_mode": status.get("transport_mode"),
+            "source_kind": replay_source.get("source_kind"),
+            "fixture": replay_source.get("fixture"),
+            "read_only": capabilities.get("read_only"),
+            "writes_supported": capabilities.get("writes_supported"),
+            "endpoint_count": len(endpoints),
+            "probe_requested": probe_requested,
+            "requested_probe_count": probe_summary.get("requested_count"),
+            "failed_probe_count": probe_summary.get("failed_count"),
+            "control_supported": control_supported,
+            "managed_operation_count": managed_operation_count,
+            "boundary_count": len(boundaries),
+            "runtime_observed": runtime.get("runtime_observed"),
+            "live_runtime_required": runtime.get("live_runtime_required"),
+        },
         "replay_source": {
             "source_kind": replay_source.get("source_kind"),
             "fixture": replay_source.get("fixture"),
@@ -5991,7 +6010,7 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
         },
         "runtime": {
             "runtime_observed": runtime.get("runtime_observed"),
-            "probe_requested": bool(probe_summary.get("requested_count")),
+            "probe_requested": probe_requested,
             "live_runtime_required": runtime.get("live_runtime_required"),
             "live_market_session_supported": runtime.get("live_market_session_supported"),
         },
@@ -6001,7 +6020,7 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "daemon_managed": lifecycle.get("daemon_managed"),
             "scheduler_managed": lifecycle.get("scheduler_managed"),
             "restart_policy": restart_policy,
-            "control_supported": managed_operation_count > 0,
+            "control_supported": control_supported,
             "managed_operation_count": managed_operation_count,
         },
         "probe_summary": copy.deepcopy(probe_summary),
