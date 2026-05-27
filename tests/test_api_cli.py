@@ -4532,6 +4532,28 @@ class ApiCliDispatchTests(unittest.TestCase):
             },
         )
         self.assertEqual(
+            summary_view["catalog_summary"],
+            {
+                "mode": "validate",
+                "kind": "bundle",
+                "selected_entry": None,
+                "selected_bundle": None,
+                "selected_label": "followup",
+                "valid": summary_view["valid"],
+                "invalid_count": summary_view["invalid_count"],
+                "non_execution": summary_view["non_execution"],
+                "entry_count": summary_view["entry_count"],
+                "bundle_count": summary_view["bundle_count"],
+                "bundle_step_count": summary_view["bundle_step_count"],
+                "label_key_count": summary_view["label_summary"]["total_key_count"],
+                "source_key_count": summary_view["source_summary"]["total_key_count"],
+                "has_entries": False,
+                "has_bundles": True,
+                "has_invalid_entries": False,
+                "has_selected_label": True,
+            },
+        )
+        self.assertEqual(
             summary_view["bundle_step_summary"],
             {
                 "bundle_count": summary_view["bundle_count"],
@@ -5247,6 +5269,28 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "label_key_count": 0,
                 "has_bundles": False,
                 "has_selected_bundle": False,
+            },
+        )
+        self.assertEqual(
+            summary_view["catalog_summary"],
+            {
+                "mode": "validate",
+                "kind": "bundle",
+                "selected_entry": None,
+                "selected_bundle": None,
+                "selected_label": "no-such-label",
+                "valid": summary_view["valid"],
+                "invalid_count": summary_view["invalid_count"],
+                "non_execution": summary_view["non_execution"],
+                "entry_count": 0,
+                "bundle_count": 0,
+                "bundle_step_count": 0,
+                "label_key_count": summary_view["label_summary"]["total_key_count"],
+                "source_key_count": summary_view["source_summary"]["total_key_count"],
+                "has_entries": False,
+                "has_bundles": False,
+                "has_invalid_entries": False,
+                "has_selected_label": False,
             },
         )
         self.assertEqual(

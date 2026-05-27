@@ -3357,6 +3357,29 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "has_bundles": isinstance(bundle_count, int) and bundle_count > 0,
             "has_selected_bundle": bool(summary.get("selected_bundle")),
         }
+        entry_count = summary.get("entry_count")
+        label_summary = summary["label_summary"]
+        source_summary = summary["source_summary"]
+        bundle_summary = summary["bundle_summary"]
+        summary["catalog_summary"] = {
+            "mode": "validate",
+            "kind": summary.get("kind"),
+            "selected_entry": summary.get("selected_entry"),
+            "selected_bundle": summary.get("selected_bundle"),
+            "selected_label": selected_label,
+            "valid": summary.get("valid"),
+            "invalid_count": invalid_count,
+            "non_execution": summary.get("non_execution"),
+            "entry_count": entry_count,
+            "bundle_count": bundle_summary["count"],
+            "bundle_step_count": bundle_summary["step_count"],
+            "label_key_count": label_summary["total_key_count"],
+            "source_key_count": source_summary["total_key_count"],
+            "has_entries": isinstance(entry_count, int) and entry_count > 0,
+            "has_bundles": bundle_summary["has_bundles"],
+            "has_invalid_entries": isinstance(invalid_count, int) and invalid_count > 0,
+            "has_selected_label": label_summary["has_selected_label"],
+        }
         summary["entry_summary"] = {
             "count": summary.get("entry_count"),
             "source_key_count": summary.get("entry_source_key_count"),
