@@ -1,6 +1,8 @@
-> 功能状态入口：当前项目的唯一“功能全景图 + 状态注册表”是 [`FUNCTION_TREE.md`](FUNCTION_TREE.md)。
+> 用户可用功能清单：如果你想先看“当前能直接使用哪些项目功能”，请从 [`USER_FEATURES.md`](USER_FEATURES.md) 开始。
 >
-> 本 README 只说明当前分支定位和常用入口；具体功能是否已实现、部分实现、已设计待实现或属于非目标边界，以 `FUNCTION_TREE.md` 为准。
+> 工程状态入口：当前项目的唯一“功能全景图 + 状态注册表”仍是 [`FUNCTION_TREE.md`](FUNCTION_TREE.md)。
+>
+> 本 README 只说明当前分支定位和常用入口；用户视角功能导航以 `USER_FEATURES.md` 为准，具体功能是否已实现、部分实现、已设计待实现或属于非目标边界，以 `FUNCTION_TREE.md` 为准。
 
 ## 当前分支定位
 
