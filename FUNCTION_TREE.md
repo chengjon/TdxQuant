@@ -35,6 +35,7 @@ TdxQuant
 ├── B. 查询与运行时主线 [已实现为主]
 │   ├── market / meta / financial / transaction [已实现]
 │   ├── formula [已实现；更多 capability contract 部分覆盖]
+│   ├── TCalc plugin DLL example asset [非目标/边界]
 │   ├── block [部分实现]
 │   ├── runtime 基础能力 [已实现]
 │   ├── subscription session / watch / worker bridge [部分实现]
@@ -99,6 +100,7 @@ TdxQuant
 | B-17 | provider result contract | `[已实现]` | `tdxquant/result_contract.py`、`tdxquant/query_contract.py`；provider fixture `provider-result-*.json`；`tests/test_provider_result_contract.py` | 约束 provider 返回结构；不保证外部 provider 永不返回业务异常。 |
 | B-18 | provider capability discovery / health / doctor | `[已实现]` | `tdxquant/provider_discovery.py`；`tdxquant/api/bridge.py`：`run_tdx_provider_capabilities`、`run_tdx_provider_health`、`run_tdx_provider_doctor`；fixture `runtime-capabilities-success.json`、`runtime-health-degraded.json`、`runtime-doctor-degraded.json` | 发现和诊断是可观测能力；不自动修复本机 TDX、COM、窗口或行情源问题。 |
 | B-19 | provider fixtures / in-process replay | `[已实现]` | `tdxquant/fixtures/provider/*` 共 `57` 个 fixture；`tdxquant/replay_fixtures.py`、`tdxquant/replay_provider.py`；`tests/test_replay_fixtures.py`、`tests/test_replay_provider.py` | fixture/replay 用于契约测试和离线验证；不能替代真实行情、公式或交易联调。 |
+| B-20 | TongDaXin TCalc 插件 DLL 示例资产 | `[非目标/边界]` | `docs/tdx-plugin-dll-function-reference.md`；`examples/tdx_plugin_tcalc/`；`tests/test_tdx_plugin_tcalc_asset.py`；OpenSpec `register-tdx-plugin-dll-example` | 当前只采纳外部 `D:\MyCode3\tdx\docs\TestPluginTCale` 的源码级 ABI 示例和边界文档，用于保留 `pPluginFUNC`、`PluginTCalcFuncInfo`、`RegisterTdxFunc`、`{0,NULL}` 哨兵等接口形状；不编译 DLL、不部署到通达信 `T0002/dlls/`、不自动绑定公式管理器、不从 Python/CLI 加载或执行原生插件，也不扩展当前公式 bridge/runtime 能力。 |
 
 ### C. 任务、报告、目录主线
 

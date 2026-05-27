@@ -108,7 +108,7 @@
 
 ## 后续可拆项
 
-- 如需把 `D:\MyCode3\tdx\docs\TestPluginTCale` 或通达信 DLL 函数文档纳入当前项目，应单独拆 plugin/DLL 文档 change。
+- `D:\MyCode3\tdx\docs\TestPluginTCale` 已通过 `register-tdx-plugin-dll-example` 单独拆项纳入为源码级 ABI 示例资产：见 `docs/tdx-plugin-dll-function-reference.md` 与 `examples/tdx_plugin_tcalc/`；该拆项不声明当前项目可编译、部署、绑定或执行通达信原生插件 DLL。
 - 如需继续攻克通达信完整下单，应单独拆 TongDaXin trade execution blocker change，先解决交易业务层认可证券代码输入的问题。
 - 如需导入真实机 JSON 样本，应先做脱敏和体积筛选，再进入 `runtime/verification/`。
 
