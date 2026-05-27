@@ -2850,6 +2850,8 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
         ),
         "step_name_key_count": selected_steps.get("step_name_key_count"),
         "step_entry_key_count": selected_steps.get("step_entry_key_count"),
+        "step_source_name_key_count": selected_steps.get("step_source_name_key_count"),
+        "step_source_entry_key_count": selected_steps.get("step_source_entry_key_count"),
         "step_resolved_arg_key_count": selected_steps.get("step_resolved_arg_key_count"),
         "step_source_resolved_arg_key_count": selected_steps.get(
             "step_source_resolved_arg_key_count"
