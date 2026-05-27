@@ -112,6 +112,17 @@
 - 如需继续攻克通达信完整下单，应单独拆 TongDaXin trade execution blocker change，先解决交易业务层认可证券代码输入的问题。
 - 如需导入真实机 JSON 样本，应先做脱敏和体积筛选，再进入 `runtime/verification/`。
 
+## 补充迁移审计记录
+
+2026-05-27 对外部 `tdx` 剩余目录做了补充核对：
+
+- `D:\MyCode3\tdx\tdxquant` 中没有当前仓库缺失的 `.py` 源文件；当前仓库保留较新的 bridge、provider replay、subscription、function registry 和 trader 主线实现。
+- `D:\MyCode3\tdx\tests` 中唯一未按同名文件进入当前仓库的是 `tests/pingan.py`。该文件依赖旧式 `BrokerAdapter` scratch 结构，当前已由 `tdxquant/trader/*`、`tdxquant/trade/manager.py`、`tests/test_pingan_trader_gateway.py`、`tests/test_trade_manager.py` 等取代，不作为当前 pytest 面导入。
+- `D:\MyCode3\tdx\runtime` 顶层文件名均已由当前仓库覆盖或升级，未发现需要从外部 runtime 目录补拷贝的配置文件。
+- `D:\MyCode3\tdx\hardware\tdx_hid_keyboard\tdx_hid_keyboard.ino` 与当前 `firmware/arduino/tdx_hid_keyboard/tdx_hid_keyboard.ino` 内容 hash 一致；固件路径已经由 `tests/test_hid_firmware_asset.py` 保护。
+- 外部仍处于 active 目录的 `add-securities-trader-gateway`、`implement-pingan-win32-trading-adapter`、`implement-tdx-wsl-windows-bridge` 在当前仓库已有对应归档 change 和主 specs，例如 `tdx-securities-trader-gateway`、`pingan-win32-order-entry`、`tdx-windows-bridge`、`tdx-data-api-bridge`、`tdx-formula-bridge`、`tdx-trading-hid-bridge`。
+- 大型真实机 JSON dump 仍按本文件策略不导入；它们只作为外部历史证据路径存在，后续若要纳入必须先脱敏和体积筛选。
+
 ## 本轮验证记录
 
 通过：
