@@ -9625,6 +9625,15 @@ class ReportCliDispatchTests(unittest.TestCase):
                             },
                             "reason_code_key_count": 4,
                         },
+                        "decision_summary": {
+                            "decision": "manual_review",
+                            "requires_manual_review": True,
+                            "staleness_evaluated": True,
+                            "reason_count": 4,
+                            "action_count": 4,
+                            "primary_reason_source": "heartbeat",
+                            "primary_severity": "review",
+                        },
                         "action_samples": [
                             {
                                 "action": "review_subscription_watch_heartbeat",

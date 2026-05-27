@@ -154,6 +154,19 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             sample_summary["action_sample_truncated"] = action_count > action_sample_count
         if sample_summary:
             governance_view["sample_summary"] = sample_summary
+        reason_summary = governance_view.get("reason_summary")
+        reason_summary = reason_summary if isinstance(reason_summary, dict) else {}
+        action_summary = governance_view.get("action_summary")
+        action_summary = action_summary if isinstance(action_summary, dict) else {}
+        governance_view["decision_summary"] = {
+            "decision": governance_view.get("decision"),
+            "requires_manual_review": governance_view.get("requires_manual_review"),
+            "staleness_evaluated": governance_view.get("staleness_evaluated"),
+            "reason_count": governance_view.get("reason_count"),
+            "action_count": governance_view.get("action_count"),
+            "primary_reason_source": reason_summary.get("primary_reason_source"),
+            "primary_severity": action_summary.get("primary_severity"),
+        }
         summary_view["governance"] = governance_view
 
     return summary_view

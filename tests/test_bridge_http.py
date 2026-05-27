@@ -669,6 +669,18 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         )
         self.assertEqual(payload["result"]["governance"]["action_summary"]["reason_code_key_count"], 4)
         self.assertEqual(
+            payload["result"]["governance"]["decision_summary"],
+            {
+                "decision": "manual_review",
+                "requires_manual_review": True,
+                "staleness_evaluated": True,
+                "reason_count": 4,
+                "action_count": 4,
+                "primary_reason_source": "heartbeat",
+                "primary_severity": "review",
+            },
+        )
+        self.assertEqual(
             payload["result"]["governance"]["action_samples"],
             [
                 {"action": "inspect_worker", "reason": "heartbeat_stale", "severity": "review"},
