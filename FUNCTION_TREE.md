@@ -305,6 +305,8 @@ TdxQuant
 
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog validate --kind bundle --label followup --view summary` 新增只读 `validation_outcome`，集中投影既有 kind、selected label、entry/bundle count、invalid count、valid/non-execution、result code/message 及 conservative outcome booleans，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-validate-outcome-summary`；该对象只汇总 catalog registry validation metadata，不替代既有 count map、family summary 或 raw validation payload，不列出完整 entry/bundle manifest，不执行 catalog entry、bundle、task/report step、trade command、provider call 或 workflow action，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
 
+> E-11 补充登记（状态仍为 `[部分实现]`）：`catalog plan --bundle confirm-complete-review --view summary` 新增只读 `plan_outcome`，集中投影既有 mode、target、selected step count、step-source key count、result code/message 与 non-execution constraints，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-plan-outcome-summary`；该对象只汇总 catalog plan metadata，不替代既有 `constraints`、`steps`、count map、trade boundary 或 summary 字段，不列出完整 entry/bundle manifest，不执行 catalog entry、bundle、task/report step、trade command、provider call 或 workflow action，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |

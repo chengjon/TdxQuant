@@ -5770,6 +5770,23 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["step_source_entry_key_count"], 3)
         self.assertEqual(output_payload["constraints"]["execution_mode"], "non_executing")
         self.assertFalse(output_payload["constraints"]["dispatch_executed"])
+        self.assertEqual(
+            output_payload["plan_outcome"],
+            {
+                "mode": "plan",
+                "target_type": "bundle",
+                "target_name": "confirm-complete-review",
+                "selected_step_count": 3,
+                "step_source_key_count": 2,
+                "ok": True,
+                "code": output_payload["code"],
+                "message": output_payload["message"],
+                "execution_mode": "non_executing",
+                "dispatch_executed": False,
+                "non_execution": True,
+                "has_steps": True,
+            },
+        )
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_confirm_current_pingan_bundle_without_execution(self) -> None:

@@ -2754,6 +2754,29 @@ def _copy_catalog_non_execution_metadata(summary: dict[str, object], result: Res
             summary[key] = copy.deepcopy(value)
 
 
+def _build_catalog_plan_outcome(summary: dict[str, object]) -> dict[str, object]:
+    target = summary.get("target")
+    target = target if isinstance(target, dict) else {}
+    constraints = summary.get("constraints")
+    constraints = constraints if isinstance(constraints, dict) else {}
+    selected_step_count = summary.get("selected_step_count")
+    return {
+        "mode": summary.get("mode"),
+        "target_type": target.get("type"),
+        "target_name": target.get("name"),
+        "selected_step_count": selected_step_count,
+        "step_source_key_count": summary.get("step_source_key_count"),
+        "ok": summary.get("ok"),
+        "code": summary.get("code"),
+        "message": summary.get("message"),
+        "execution_mode": constraints.get("execution_mode"),
+        "dispatch_executed": constraints.get("dispatch_executed"),
+        "non_execution": constraints.get("execution_mode") == "non_executing"
+        and constraints.get("dispatch_executed") is False,
+        "has_steps": isinstance(selected_step_count, int) and selected_step_count > 0,
+    }
+
+
 def _build_catalog_step_source_counts(steps: object) -> dict[str, int]:
     counts: dict[str, int] = {}
     if not isinstance(steps, list):
@@ -3336,6 +3359,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             if trade_boundary:
                 summary["trade_plan_boundary"] = trade_boundary
             _copy_catalog_non_execution_metadata(summary, result)
+            summary["plan_outcome"] = _build_catalog_plan_outcome(summary)
         else:
             input_payload = result.data.get("input", {})
             if isinstance(input_payload, dict):
@@ -3408,6 +3432,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                     plan_steps.append(step_view)
             summary["steps"] = plan_steps
             _copy_catalog_non_execution_metadata(summary, result)
+            summary["plan_outcome"] = _build_catalog_plan_outcome(summary)
         else:
             run_steps: list[dict[str, object]] = []
             steps = bundle_meta.get("steps", [])
