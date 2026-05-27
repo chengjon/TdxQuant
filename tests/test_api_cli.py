@@ -10004,6 +10004,8 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "action_count": 4,
                             "primary_reason_source": "heartbeat",
                             "primary_severity": "review",
+                            "has_reasons": True,
+                            "has_actions": True,
                         },
                         "action_samples": [
                             {
