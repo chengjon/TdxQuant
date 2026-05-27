@@ -172,6 +172,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertIsNone(status["runtime"]["probe_summary"]["primary_error_sample_http_status"])
         self.assertIsNone(status["runtime"]["probe_summary"]["primary_error_sample_reachability"])
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_error_sample"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_status_counts"], {})
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_sample_status_key_count"],
@@ -396,6 +397,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["primary_error_sample_http_status"], 503)
         self.assertEqual(status["runtime"]["probe_summary"]["primary_error_sample_reachability"], "unreachable")
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_count"], 1)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_error_sample"], True)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_status_counts"], {"unhealthy": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_probe_counts"], {"health_probe": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_http_status_counts"], {"503": 1})

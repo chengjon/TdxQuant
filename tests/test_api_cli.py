@@ -2644,6 +2644,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                 "primary_reachability": "unreachable",
             },
         )
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["has_error_sample"], True)
         self.assertEqual(
             result.data["summary_view"]["probe_summary"]["healthy"],
             ["health_probe", "watch_status_probe", "watch_events_probe"],

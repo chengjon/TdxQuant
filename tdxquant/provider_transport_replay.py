@@ -844,6 +844,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "primary_error_sample_http_status": primary_error_sample_http_status,
         "primary_error_sample_reachability": primary_error_sample_reachability,
         "error_sample_count": error_sample_count,
+        "has_error_sample": bool(error_sample_count),
         "error_sample_status_counts": {
             status: error_sample_status_counts[status] for status in sorted(error_sample_status_counts)
         },
