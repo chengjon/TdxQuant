@@ -2629,6 +2629,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(result.data["summary_view"]["probe_summary"]["error_sample_truncated"], False)
+        self.assertEqual(result.data["summary_view"]["probe_summary"]["has_hidden_error_sample"], False)
         self.assertEqual(
             result.data["summary_view"]["probe_summary"]["error_sample_summary"],
             {

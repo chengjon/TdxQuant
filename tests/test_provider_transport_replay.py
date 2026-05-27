@@ -195,6 +195,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         )
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_visible_count"], 0)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_hidden_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_hidden_error_sample"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(
@@ -406,6 +407,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_reachability_key_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_hidden_error_sample"], False)
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_sample_summary"],
             {
@@ -529,6 +531,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_hidden_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], True)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_hidden_error_sample"], True)
         self.assertEqual(
             status["runtime"]["probe_summary"]["error_sample_summary"],
             {
