@@ -6030,6 +6030,7 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "first_step_entry": "task-confirm-current",
                 "last_step_entry": "audit-daily-confirmed",
                 "step_source_key_count": 2,
+                "step_name_counts": {"audit": 1, "confirm": 1, "success": 1},
                 "step_name_key_count": 3,
                 "step_entry_key_count": 3,
                 "step_source_name_key_count": 3,
@@ -6065,6 +6066,7 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "last_step_entry": "audit-daily-confirmed",
                 "selected_step_count": 3,
                 "step_source_key_count": 2,
+                "step_name_counts": {"audit": 1, "confirm": 1, "success": 1},
                 "step_name_key_count": 3,
                 "step_entry_key_count": 3,
                 "step_source_name_key_count": 3,
@@ -6097,6 +6099,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             output_payload["plan_summary"]["step_source_key_count"],
             output_payload["selected_step_summary"]["step_source_key_count"],
+        )
+        self.assertEqual(
+            output_payload["plan_summary"]["step_name_counts"],
+            output_payload["selected_step_summary"]["step_name_counts"],
         )
         self.assertEqual(output_payload["plan_summary"]["has_steps"], True)
         self.assertEqual(output_payload["plan_summary"]["has_step_slice"], True)

@@ -2193,6 +2193,7 @@ Command catalog plan summary views SHALL include additive read-only `plan_summar
 - **THEN** it MUST NOT execute catalog entries, bundle steps, task commands, report commands, trade commands, or provider calls
 - **AND** it MUST NOT expose full manifests, option values, resolved argument values, or workflow-builder internals
 - **AND** it MUST NOT claim broker readiness, trade safety, or execution coverage
+
 ### Requirement: Catalog selected-step summary SHALL expose source pair-key counts
 
 Command catalog bundle plan summary views SHALL include additive read-only `selected_step_summary.step_source_name_key_count` and `selected_step_summary.step_source_entry_key_count` metadata derived from existing selected bundle plan pair-key counts without executing catalog entries, bundles, tasks, reports, trades, providers, or bundle steps.
@@ -2228,3 +2229,23 @@ Command catalog bundle plan summary views SHALL include additive read-only `plan
 - **THEN** it MUST NOT execute catalog entries, bundle steps, task commands, report commands, trade commands, or provider calls
 - **AND** it MUST NOT expose full manifests, option values, resolved argument values, or workflow-builder internals
 - **AND** it MUST NOT claim broker readiness, trade safety, or execution coverage
+
+### Requirement: Command catalog plan summary SHALL expose selected step name counts
+
+The command catalog SHALL include additive read-only `step_name_counts` maps in `selected_step_summary` and `plan_summary` for bundle `plan` and `preview` summary views, derived from already-selected resolved steps without executing catalog dispatch.
+
+#### Scenario: Plan summary includes selected step name counts
+
+- **WHEN** a caller executes `catalog plan --bundle <task-report-bundle> --view summary`
+- **THEN** the summary view MUST include `selected_step_summary.step_name_counts`
+- **AND** the summary view MUST include `plan_summary.step_name_counts`
+- **AND** both maps MUST be derived from the selected resolved steps
+- **AND** the summary view MUST continue to include non-execution provenance and constraints
+- **AND** the underlying catalog step dispatch workflow MUST NOT be invoked
+
+#### Scenario: Preview summary includes selected step name counts
+
+- **WHEN** a caller executes `catalog preview --bundle <task-report-bundle> --view summary`
+- **THEN** `plan_summary.step_name_counts` MUST match `selected_step_summary.step_name_counts`
+- **AND** the summary view MUST continue to report the selected step count and source key count
+- **AND** the preview MUST remain non-executing
