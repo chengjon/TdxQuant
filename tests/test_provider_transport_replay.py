@@ -77,6 +77,19 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 ],
             },
         )
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["health_summary"],
+            {
+                "status": status["runtime"]["probe_summary"]["status"],
+                "healthy_count": status["runtime"]["probe_summary"]["healthy_count"],
+                "failed_count": status["runtime"]["probe_summary"]["failed_count"],
+                "unhealthy_count": status["runtime"]["probe_summary"]["unhealthy_count"],
+                "status_key_count": status["runtime"]["probe_summary"]["status_key_count"],
+                "primary_healthy_probe": status["runtime"]["probe_summary"]["primary_healthy_probe"],
+                "primary_failed_probe": status["runtime"]["probe_summary"]["primary_failed_probe"],
+                "primary_unhealthy_probe": status["runtime"]["probe_summary"]["primary_unhealthy_probe"],
+            },
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["status_counts"], {"not_requested": 4})
         self.assertEqual(
             status["runtime"]["probe_summary"]["status_key_count"],

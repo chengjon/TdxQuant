@@ -2537,6 +2537,21 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                 ],
             },
         )
+        self.assertEqual(
+            result.data["summary_view"]["probe_summary"]["health_summary"],
+            {
+                "status": result.data["summary_view"]["probe_summary"]["status"],
+                "healthy_count": result.data["summary_view"]["probe_summary"]["healthy_count"],
+                "failed_count": result.data["summary_view"]["probe_summary"]["failed_count"],
+                "unhealthy_count": result.data["summary_view"]["probe_summary"]["unhealthy_count"],
+                "status_key_count": result.data["summary_view"]["probe_summary"]["status_key_count"],
+                "primary_healthy_probe": result.data["summary_view"]["probe_summary"]["primary_healthy_probe"],
+                "primary_failed_probe": result.data["summary_view"]["probe_summary"]["primary_failed_probe"],
+                "primary_unhealthy_probe": result.data["summary_view"]["probe_summary"][
+                    "primary_unhealthy_probe"
+                ],
+            },
+        )
         self.assertEqual(result.data["summary_view"]["probe_summary"]["status_counts"], {"healthy": 3, "unhealthy": 1})
         self.assertEqual(result.data["summary_view"]["probe_summary"]["failed_status_counts"], {"unhealthy": 1})
         self.assertEqual(
