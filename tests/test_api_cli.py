@@ -6032,6 +6032,8 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "step_source_key_count": 2,
                 "step_name_key_count": 3,
                 "step_entry_key_count": 3,
+                "step_source_name_key_count": 3,
+                "step_source_entry_key_count": 3,
                 "step_resolved_arg_key_count": 5,
                 "step_source_resolved_arg_key_count": 6,
                 "has_step_slice": True,
