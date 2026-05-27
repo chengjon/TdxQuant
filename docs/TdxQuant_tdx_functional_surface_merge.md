@@ -123,6 +123,14 @@
 - 外部仍处于 active 目录的 `add-securities-trader-gateway`、`implement-pingan-win32-trading-adapter`、`implement-tdx-wsl-windows-bridge` 在当前仓库已有对应归档 change 和主 specs，例如 `tdx-securities-trader-gateway`、`pingan-win32-order-entry`、`tdx-windows-bridge`、`tdx-data-api-bridge`、`tdx-formula-bridge`、`tdx-trading-hid-bridge`。
 - 大型真实机 JSON dump 仍按本文件策略不导入；它们只作为外部历史证据路径存在，后续若要纳入必须先脱敏和体积筛选。
 
+上述核对已固化为可复跑脚本：
+
+```bash
+python scripts\audit_external_tdx_merge.py --external-root D:\MyCode3\tdx --json
+```
+
+当前真实目录审计结果为 `valid=true`、`problem_count=0`、`tdxquant_python.missing_count=0`、`runtime.missing_top_level_files=[]`、`hid_firmware.matches=true`、`plugin_dll_example.registered=true`、`openspec.uncovered_active_changes=[]`；唯一缺失测试为已知排除的历史 scratch `tests/pingan.py`。
+
 ## 本轮验证记录
 
 通过：

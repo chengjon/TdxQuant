@@ -31,7 +31,8 @@ TdxQuant
 │   ├── CLI 命令面 [已实现]
 │   ├── Manager API [已实现]
 │   ├── runtime profiles / presets [已实现]
-│   └── command catalog / bundle / report preset [已实现]
+│   ├── command catalog / bundle / report preset [已实现]
+│   └── external tdx merge audit [已实现]
 ├── B. 查询与运行时主线 [已实现为主]
 │   ├── market / meta / financial / transaction [已实现]
 │   ├── formula [已实现；更多 capability contract 部分覆盖]
@@ -76,6 +77,7 @@ TdxQuant
 | A-06 | command catalog | `[已实现]` | `tdxquant/catalog.py`；`runtime/command-catalog.json` 约 `115` 个 entry；`runtime/TdxQuant_Command_Catalog_Usage.md` | catalog 描述可运行命令和参数编排，不替代能力状态判断；状态以本文件为准。 |
 | A-07 | command bundle | `[已实现]` | `runtime/command-bundles.json` 约 `144` 个 bundle；`tdxquant/catalog.py` 支持 bundle 解析 | bundle 是组合执行入口；单个 step 仍受底层功能节点边界约束。 |
 | A-08 | OpenSpec 生命周期材料 | `[已实现]` | `openspec/changes/archive/**`、`openspec/specs/**`；`docs/superpowers/plans/**`；`scripts/validate_function_tree_registry.py` 与 `tests/test_function_tree_registry.py` 校验 `FUNCTION_TREE.md` 状态/证据/边界列、重复 ID、待实现边界措辞、OpenSpec evidence id 是否存在 active/archive 材料、显式本地证据路径是否存在、根目录 `ROADMAP.md` 缺席，以及 `--json` 成功/失败机器可读报告；OpenSpec `function-tree-registry-validator` / `function-tree-openspec-evidence-validation` / `function-tree-evidence-path-validation` / `function-tree-validator-json-report` / `function-tree-lifecycle-status-registry` | `[已实现]` 仅指 OpenSpec lifecycle 材料与 FUNCTION_TREE registry validator/报告能力已经有源码、测试、spec 和边界；可作为设计、归档和单一功能注册表结构/报告校验证据，不直接证明当前代码可运行；validator 只校验 `FUNCTION_TREE.md` 的状态注册表形状、OpenSpec evidence 引用存在性、保守识别的显式本地证据路径存在性、“无 ROADMAP.md 抢真相”约束和 JSON 报告结构；不会执行证据路径、解释 glob/命令/符号/自由文本证据，也不证明对应功能可用，`--json` 只是同一校验结果的机器可读投影，其他功能节点实现状态仍以各自源码/测试/运行时配置为准。 |
+| A-09 | external tdx merge audit | `[已实现]` | `scripts/audit_external_tdx_merge.py`；`tests/test_external_tdx_merge_audit.py`；`docs/TdxQuant_tdx_functional_surface_merge.md` | 这是外部 `D:\MyCode3\tdx` 迁移闭环审计脚本，只校验受控类别：`tdxquant` Python 源文件名覆盖、已知排除测试、runtime 顶层文件覆盖、HID 固件 hash、plugin/DLL 示例资产、外部 active OpenSpec change 到当前 specs/archive 的覆盖，以及大型 JSON dump 的排除统计；它不读取或脱敏真实机 raw dump 内容，不证明外部历史文档全部等价，也不把排除项升级为当前可用能力。 |
 
 ### B. 查询与运行时主线
 
