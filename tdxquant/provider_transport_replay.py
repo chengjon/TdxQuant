@@ -875,6 +875,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "primary_failed_probe": failed[0] if failed else None,
         "unhealthy": unhealthy,
         "primary_unhealthy_probe": unhealthy[0] if unhealthy else None,
+        "primary_problem_probe": primary_problem_probe,
         "not_requested": not_requested,
         "primary_not_requested_probe": not_requested[0] if not_requested else None,
         "boundary": "read_only_probe_rollup; does_not_start_socket_or_manage_daemon_lifecycle",
