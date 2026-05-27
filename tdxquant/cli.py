@@ -3344,6 +3344,19 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "has_entry_sources": bool(entry_source_counts),
             "has_bundle_step_sources": bool(bundle_step_source_counts),
         }
+        bundle_count = summary.get("bundle_count")
+        summary["bundle_summary"] = {
+            "selected_bundle": summary.get("selected_bundle"),
+            "selected_label": selected_label,
+            "count": bundle_count,
+            "step_count": summary.get("bundle_step_count"),
+            "sample_count": summary.get("bundle_sample_count"),
+            "sample_limit": summary.get("bundle_sample_limit"),
+            "sample_truncated": summary.get("bundle_sample_truncated"),
+            "label_key_count": summary.get("bundle_label_key_count"),
+            "has_bundles": isinstance(bundle_count, int) and bundle_count > 0,
+            "has_selected_bundle": bool(summary.get("selected_bundle")),
+        }
         summary["entry_summary"] = {
             "count": summary.get("entry_count"),
             "source_key_count": summary.get("entry_source_key_count"),

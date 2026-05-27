@@ -4517,6 +4517,21 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(summary_view["bundle_sample_truncated"], True)
         self.assertEqual(
+            summary_view["bundle_summary"],
+            {
+                "selected_bundle": None,
+                "selected_label": "followup",
+                "count": summary_view["bundle_count"],
+                "step_count": summary_view["bundle_step_count"],
+                "sample_count": summary_view["bundle_sample_count"],
+                "sample_limit": summary_view["bundle_sample_limit"],
+                "sample_truncated": summary_view["bundle_sample_truncated"],
+                "label_key_count": summary_view["bundle_label_key_count"],
+                "has_bundles": True,
+                "has_selected_bundle": False,
+            },
+        )
+        self.assertEqual(
             summary_view["bundle_step_summary"],
             {
                 "bundle_count": summary_view["bundle_count"],
@@ -5219,6 +5234,21 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_samples"], [])
         self.assertEqual(summary_view["bundle_sample_count"], 0)
         self.assertFalse(summary_view["bundle_sample_truncated"])
+        self.assertEqual(
+            summary_view["bundle_summary"],
+            {
+                "selected_bundle": None,
+                "selected_label": "no-such-label",
+                "count": 0,
+                "step_count": 0,
+                "sample_count": 0,
+                "sample_limit": summary_view["bundle_sample_limit"],
+                "sample_truncated": False,
+                "label_key_count": 0,
+                "has_bundles": False,
+                "has_selected_bundle": False,
+            },
+        )
         self.assertEqual(
             summary_view["bundle_step_summary"]["sample_count"],
             summary_view["bundle_sample_count"],
