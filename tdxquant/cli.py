@@ -2838,6 +2838,8 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
         "last_step_source": selected_steps.get("last_step_source"),
         "first_step_command_name": selected_steps.get("first_step_command_name"),
         "last_step_command_name": selected_steps.get("last_step_command_name"),
+        "first_step_entry": selected_steps.get("first_step_entry"),
+        "last_step_entry": selected_steps.get("last_step_entry"),
         "selected_step_count": selected_steps.get(
             "selected_step_count", outcome.get("selected_step_count")
         ),

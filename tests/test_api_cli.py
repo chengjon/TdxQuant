@@ -6059,6 +6059,8 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "last_step_source": "report",
                 "first_step_command_name": "trade-confirm-current",
                 "last_step_command_name": "audit-daily",
+                "first_step_entry": "task-confirm-current",
+                "last_step_entry": "audit-daily-confirmed",
                 "selected_step_count": 3,
                 "step_source_key_count": 2,
                 "step_name_key_count": 3,
