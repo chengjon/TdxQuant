@@ -2782,6 +2782,10 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
     steps = steps if isinstance(steps, list) else []
     first_step = steps[0] if steps and isinstance(steps[0], dict) else {}
     last_step = steps[-1] if steps and isinstance(steps[-1], dict) else {}
+    first_dispatch = first_step.get("dispatch") if isinstance(first_step, dict) else {}
+    first_dispatch = first_dispatch if isinstance(first_dispatch, dict) else {}
+    last_dispatch = last_step.get("dispatch") if isinstance(last_step, dict) else {}
+    last_dispatch = last_dispatch if isinstance(last_dispatch, dict) else {}
     selected_from_step = summary.get("selected_from_step")
     selected_to_step = summary.get("selected_to_step")
     selected_step_count = summary.get("selected_step_count")
@@ -2791,6 +2795,8 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "selected_step_count": selected_step_count,
         "first_step_name": first_step.get("name"),
         "last_step_name": last_step.get("name"),
+        "first_step_source": first_dispatch.get("source"),
+        "last_step_source": last_dispatch.get("source"),
         "first_step_entry": first_step.get("entry"),
         "last_step_entry": last_step.get("entry"),
         "step_source_key_count": summary.get("step_source_key_count"),

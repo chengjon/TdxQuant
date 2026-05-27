@@ -341,6 +341,8 @@ TdxQuant
 
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog plan --bundle ... --view summary` 的只读 `selected_step_summary` 新增 `step_resolved_arg_key_count` 与 `step_source_resolved_arg_key_count`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-plan-selected-step-arg-key-summary`；这两个字段只从既有 selected-step 顶层 resolved-arg key count metadata 派生并保持一致，不暴露 resolved arg value、不列出完整 step/bundle manifest、不执行 catalog entry、bundle、task/report step、trade command、provider call 或 workflow action，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
 
+> E-11 补充登记（状态仍为 `[部分实现]`）：`catalog plan --bundle ... --view summary` 的只读 `selected_step_summary` 新增 `first_step_source` 与 `last_step_source`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-plan-selected-step-source-hints`；这两个字段只从既有 selected step dispatch source metadata 派生 first/last source hint，不暴露完整 dispatch manifest、resolved arg value、完整 step/bundle manifest 或执行结果，不执行 catalog entry、bundle、task/report step、trade command、provider call 或 workflow action，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
