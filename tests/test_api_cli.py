@@ -4492,6 +4492,21 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "has_selected_label": True,
             },
         )
+        source_keys = set(summary_view["entry_source_counts"]) | set(
+            summary_view["bundle_step_source_counts"]
+        )
+        self.assertEqual(
+            summary_view["source_summary"],
+            {
+                "entry_key_count": summary_view["entry_source_key_count"],
+                "bundle_step_key_count": summary_view["bundle_step_source_key_count"],
+                "total_key_count": len(source_keys),
+                "entry_count": summary_view["entry_count"],
+                "bundle_step_count": summary_view["bundle_step_count"],
+                "has_entry_sources": False,
+                "has_bundle_step_sources": True,
+            },
+        )
         self.assertIn("bundle_samples", summary_view)
         self.assertEqual(summary_view["bundle_samples"], validation["bundle_samples"])
         self.assertEqual(summary_view["bundle_sample_count"], len(summary_view["bundle_samples"]))
@@ -4787,6 +4802,21 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "count": summary_view["entry_count"],
                 "source_key_count": summary_view["entry_source_key_count"],
                 "label_key_count": summary_view["entry_label_key_count"],
+            },
+        )
+        source_keys = set(summary_view["entry_source_counts"]) | set(
+            summary_view["bundle_step_source_counts"]
+        )
+        self.assertEqual(
+            summary_view["source_summary"],
+            {
+                "entry_key_count": summary_view["entry_source_key_count"],
+                "bundle_step_key_count": summary_view["bundle_step_source_key_count"],
+                "total_key_count": len(source_keys),
+                "entry_count": summary_view["entry_count"],
+                "bundle_step_count": summary_view["bundle_step_count"],
+                "has_entry_sources": True,
+                "has_bundle_step_sources": False,
             },
         )
         self.assertEqual(validation["bundle_step_source_option_key_counts"], {})

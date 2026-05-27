@@ -3329,6 +3329,21 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "selected_total_count": selected_entry_count + selected_bundle_count,
             "has_selected_label": selected_entry_count + selected_bundle_count > 0,
         }
+        entry_source_counts = summary.get("entry_source_counts")
+        if not isinstance(entry_source_counts, dict):
+            entry_source_counts = {}
+        bundle_step_source_counts = summary.get("bundle_step_source_counts")
+        if not isinstance(bundle_step_source_counts, dict):
+            bundle_step_source_counts = {}
+        summary["source_summary"] = {
+            "entry_key_count": summary.get("entry_source_key_count"),
+            "bundle_step_key_count": summary.get("bundle_step_source_key_count"),
+            "total_key_count": len(set(entry_source_counts) | set(bundle_step_source_counts)),
+            "entry_count": summary.get("entry_count"),
+            "bundle_step_count": summary.get("bundle_step_count"),
+            "has_entry_sources": bool(entry_source_counts),
+            "has_bundle_step_sources": bool(bundle_step_source_counts),
+        }
         summary["entry_summary"] = {
             "count": summary.get("entry_count"),
             "source_key_count": summary.get("entry_source_key_count"),
