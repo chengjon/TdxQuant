@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover - exercised on non-Windows platforms
 DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
 DEFAULT_START_TIMEOUT_SECONDS = 10
 DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
+FORCE_STOP_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
 ACTIVE_PROCESS_STATES = {"starting", "running", "reconnecting", "degraded", "stopping"}
 SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION = "tdx.subscription_watch.status_summary.v1"
 SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
@@ -1264,7 +1265,7 @@ class SubscriptionWatchBackgroundController:
                         },
                     }
 
-                if not self._signal_process(pid, signal.SIGKILL) and self._pid_is_alive(pid):
+                if not self._signal_process(pid, FORCE_STOP_SIGNAL) and self._pid_is_alive(pid):
                     return {
                         "ok": False,
                         "error": {
