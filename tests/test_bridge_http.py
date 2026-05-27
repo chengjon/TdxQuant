@@ -535,6 +535,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             "primary_not_evaluated_component": "reconnect",
                             "evaluated_count": 2,
                             "stale_count": 1,
+                            "fresh_count": 1,
                             "not_evaluated_count": 1,
                             "component_status_counts": {"fresh": 1, "not_evaluated": 1, "stale": 1},
                             "component_status_key_count": 3,
@@ -681,6 +682,22 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             },
         )
         self.assertEqual(
+            payload["result"]["governance"]["evaluation_rollup"],
+            {
+                "staleness_evaluated": True,
+                "evaluated_count": 2,
+                "stale_count": 1,
+                "fresh_count": 1,
+                "not_evaluated_count": 1,
+                "primary_stale_component": "heartbeat",
+                "primary_fresh_component": "watermark",
+                "primary_not_evaluated_component": "reconnect",
+                "has_stale_component": True,
+                "has_fresh_component": True,
+                "all_components_evaluated": False,
+            },
+        )
+        self.assertEqual(
             payload["result"]["governance"]["action_samples"],
             [
                 {"action": "inspect_worker", "reason": "heartbeat_stale", "severity": "review"},
@@ -718,6 +735,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "primary_not_evaluated_component": "reconnect",
                 "evaluated_count": 2,
                 "stale_count": 1,
+                "fresh_count": 1,
                 "not_evaluated_count": 1,
                 "component_status_counts": {"fresh": 1, "not_evaluated": 1, "stale": 1},
                 "component_status_key_count": 3,

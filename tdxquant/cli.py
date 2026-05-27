@@ -5905,6 +5905,27 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             "primary_reason_source": reason_summary.get("primary_reason_source"),
             "primary_severity": action_summary.get("primary_severity"),
         }
+        evaluation_summary = governance_view.get("evaluation_summary")
+        if isinstance(evaluation_summary, dict):
+            stale_count = evaluation_summary.get("stale_count")
+            fresh_count = evaluation_summary.get("fresh_count")
+            not_evaluated_count = evaluation_summary.get("not_evaluated_count")
+            governance_view["evaluation_rollup"] = {
+                "staleness_evaluated": governance_view.get("staleness_evaluated"),
+                "evaluated_count": evaluation_summary.get("evaluated_count"),
+                "stale_count": stale_count,
+                "fresh_count": fresh_count,
+                "not_evaluated_count": not_evaluated_count,
+                "primary_stale_component": evaluation_summary.get("primary_stale_component"),
+                "primary_fresh_component": evaluation_summary.get("primary_fresh_component"),
+                "primary_not_evaluated_component": evaluation_summary.get(
+                    "primary_not_evaluated_component"
+                ),
+                "has_stale_component": isinstance(stale_count, int) and stale_count > 0,
+                "has_fresh_component": isinstance(fresh_count, int) and fresh_count > 0,
+                "all_components_evaluated": isinstance(not_evaluated_count, int)
+                and not_evaluated_count == 0,
+            }
         summary_view["governance"] = governance_view
 
     return {"ok": True, "result": summary_view}
