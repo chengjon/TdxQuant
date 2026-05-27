@@ -35,6 +35,12 @@ python -m tdxquant.cli tdx-trade-buy-probe --window-key 通达信金融终端 --
 - 平安证券混合 UIA/HID/Win32 交易链路、HID 固件资产、TCalc plugin/DLL 示例资产和外部功能状态口径均已登记。
 - 大型真实机 JSON dump、旧 scratch 测试、本机生成文件和二进制 Word 原件不进入当前主线；后续如需继续，只按单独 change 引入脱敏样本或新 runtime 能力。
 
+可复跑迁移审计：
+
+```bash
+python scripts\audit_external_tdx_merge.py --external-root D:\MyCode3\tdx --json
+```
+
 TdxQuant 简介
 https://help.tdx.com.cn/quant/docs/
 https://help.tdx.com.cn/book.html

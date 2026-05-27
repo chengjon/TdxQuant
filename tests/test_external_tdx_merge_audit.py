@@ -18,17 +18,19 @@ def _write(path: Path, content: str = "sample\n") -> None:
     path.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
 
 
-def _run_audit(root: Path, external_root: Path) -> subprocess.CompletedProcess[str]:
+def _run_audit(root: Path, external_root: Path, *, json_output: bool = True) -> subprocess.CompletedProcess[str]:
+    args = [
+        sys.executable,
+        str(AUDIT_SCRIPT),
+        "--root",
+        str(root),
+        "--external-root",
+        str(external_root),
+    ]
+    if json_output:
+        args.append("--json")
     return subprocess.run(
-        [
-            sys.executable,
-            str(AUDIT_SCRIPT),
-            "--root",
-            str(root),
-            "--external-root",
-            str(external_root),
-            "--json",
-        ],
+        args,
         check=False,
         capture_output=True,
         text=True,
@@ -97,6 +99,22 @@ class ExternalTdxMergeAuditTests(unittest.TestCase):
         self.assertEqual(payload["hid_firmware"]["matches"], True)
         self.assertEqual(payload["plugin_dll_example"]["registered"], True)
         self.assertEqual(payload["openspec"]["uncovered_active_changes"], [])
+
+    def test_audit_summary_output_is_human_readable(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            root = base / "current"
+            external_root = base / "external"
+            _create_required_assets(root, external_root)
+
+            result = _run_audit(root, external_root, json_output=False)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("valid; problems=0", result.stdout)
+        self.assertIn("missing_py=0", result.stdout)
+        self.assertIn("unexpected_missing_tests=0", result.stdout)
+        self.assertIn("hid_matches=True", result.stdout)
+        self.assertEqual(result.stderr, "")
 
     def test_audit_rejects_unexpected_missing_candidates(self) -> None:
         with TemporaryDirectory() as temp_dir:
