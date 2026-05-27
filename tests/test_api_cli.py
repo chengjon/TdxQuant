@@ -6038,6 +6038,11 @@ class ApiCliDispatchTests(unittest.TestCase):
                     "task-confirm-current": 1,
                 },
                 "step_entry_key_count": 3,
+                "step_source_name_counts": {
+                    "report:audit": 1,
+                    "report:success": 1,
+                    "task:confirm": 1,
+                },
                 "step_source_name_key_count": 3,
                 "step_source_entry_counts": {
                     "report:audit-daily-confirmed": 1,
@@ -6084,6 +6089,11 @@ class ApiCliDispatchTests(unittest.TestCase):
                     "task-confirm-current": 1,
                 },
                 "step_entry_key_count": 3,
+                "step_source_name_counts": {
+                    "report:audit": 1,
+                    "report:success": 1,
+                    "task:confirm": 1,
+                },
                 "step_source_name_key_count": 3,
                 "step_source_entry_counts": {
                     "report:audit-daily-confirmed": 1,
@@ -6127,6 +6137,10 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(
             output_payload["plan_summary"]["step_entry_counts"],
             output_payload["selected_step_summary"]["step_entry_counts"],
+        )
+        self.assertEqual(
+            output_payload["plan_summary"]["step_source_name_counts"],
+            output_payload["selected_step_summary"]["step_source_name_counts"],
         )
         self.assertEqual(
             output_payload["plan_summary"]["step_source_entry_counts"],
