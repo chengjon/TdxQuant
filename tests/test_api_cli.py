@@ -5787,6 +5787,23 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "has_steps": True,
             },
         )
+        self.assertEqual(
+            output_payload["selected_step_summary"],
+            {
+                "selected_from_step": "confirm",
+                "selected_to_step": "audit",
+                "selected_step_count": 3,
+                "first_step_name": "confirm",
+                "last_step_name": "audit",
+                "first_step_entry": "task-confirm-current",
+                "last_step_entry": "audit-daily-confirmed",
+                "step_source_key_count": 2,
+                "step_name_key_count": 3,
+                "step_entry_key_count": 3,
+                "has_step_slice": True,
+                "has_steps": True,
+            },
+        )
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_confirm_current_pingan_bundle_without_execution(self) -> None:

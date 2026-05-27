@@ -2777,6 +2777,30 @@ def _build_catalog_plan_outcome(summary: dict[str, object]) -> dict[str, object]
     }
 
 
+def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str, object]:
+    steps = summary.get("steps")
+    steps = steps if isinstance(steps, list) else []
+    first_step = steps[0] if steps and isinstance(steps[0], dict) else {}
+    last_step = steps[-1] if steps and isinstance(steps[-1], dict) else {}
+    selected_from_step = summary.get("selected_from_step")
+    selected_to_step = summary.get("selected_to_step")
+    selected_step_count = summary.get("selected_step_count")
+    return {
+        "selected_from_step": selected_from_step,
+        "selected_to_step": selected_to_step,
+        "selected_step_count": selected_step_count,
+        "first_step_name": first_step.get("name"),
+        "last_step_name": last_step.get("name"),
+        "first_step_entry": first_step.get("entry"),
+        "last_step_entry": last_step.get("entry"),
+        "step_source_key_count": summary.get("step_source_key_count"),
+        "step_name_key_count": summary.get("step_name_key_count"),
+        "step_entry_key_count": summary.get("step_entry_key_count"),
+        "has_step_slice": bool(selected_from_step or selected_to_step),
+        "has_steps": isinstance(selected_step_count, int) and selected_step_count > 0,
+    }
+
+
 def _build_catalog_step_source_counts(steps: object) -> dict[str, int]:
     counts: dict[str, int] = {}
     if not isinstance(steps, list):
@@ -3431,6 +3455,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                         step_view["trade_plan_boundary"] = trade_boundary
                     plan_steps.append(step_view)
             summary["steps"] = plan_steps
+            summary["selected_step_summary"] = _build_catalog_selected_step_summary(summary)
             _copy_catalog_non_execution_metadata(summary, result)
             summary["plan_outcome"] = _build_catalog_plan_outcome(summary)
         else:
