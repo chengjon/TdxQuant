@@ -5583,6 +5583,8 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["selected_step_summary"]["last_step_source"], "report")
         self.assertEqual(result.data["summary_view"]["selected_step_summary"]["first_step_command_name"], "ledger")
         self.assertEqual(result.data["summary_view"]["selected_step_summary"]["last_step_command_name"], "ledger")
+        self.assertEqual(result.data["summary_view"]["selected_step_summary"]["first_step_index"], 2)
+        self.assertEqual(result.data["summary_view"]["selected_step_summary"]["last_step_index"], 2)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_buy_pingan_complete_bundle_without_execution(self) -> None:
@@ -5819,6 +5821,8 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "selected_from_step": "confirm",
                 "selected_to_step": "audit",
                 "selected_step_count": 3,
+                "first_step_index": 1,
+                "last_step_index": 3,
                 "first_step_name": "confirm",
                 "last_step_name": "audit",
                 "first_step_source": "task",

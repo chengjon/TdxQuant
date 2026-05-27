@@ -2793,6 +2793,8 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "selected_from_step": selected_from_step,
         "selected_to_step": selected_to_step,
         "selected_step_count": selected_step_count,
+        "first_step_index": first_step.get("index"),
+        "last_step_index": last_step.get("index"),
         "first_step_name": first_step.get("name"),
         "last_step_name": last_step.get("name"),
         "first_step_source": first_dispatch.get("source"),
