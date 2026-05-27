@@ -4478,6 +4478,20 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_label_counts"], validation["bundle_label_counts"])
         self.assertEqual(summary_view["bundle_label_key_count"], len(summary_view["bundle_label_counts"]))
         self.assertEqual(summary_view["bundle_label_counts"]["followup"], summary_view["bundle_count"])
+        label_keys = set(summary_view["entry_label_counts"]) | set(summary_view["bundle_label_counts"])
+        self.assertEqual(
+            summary_view["label_summary"],
+            {
+                "selected_label": "followup",
+                "entry_key_count": summary_view["entry_label_key_count"],
+                "bundle_key_count": summary_view["bundle_label_key_count"],
+                "total_key_count": len(label_keys),
+                "selected_entry_count": 0,
+                "selected_bundle_count": summary_view["bundle_label_counts"]["followup"],
+                "selected_total_count": summary_view["bundle_label_counts"]["followup"],
+                "has_selected_label": True,
+            },
+        )
         self.assertIn("bundle_samples", summary_view)
         self.assertEqual(summary_view["bundle_samples"], validation["bundle_samples"])
         self.assertEqual(summary_view["bundle_sample_count"], len(summary_view["bundle_samples"]))
@@ -5159,6 +5173,19 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["kind"], "bundle")
         self.assertEqual(summary_view["selected_label"], "no-such-label")
         self.assertEqual(summary_view["bundle_count"], 0)
+        self.assertEqual(
+            summary_view["label_summary"],
+            {
+                "selected_label": "no-such-label",
+                "entry_key_count": 0,
+                "bundle_key_count": 0,
+                "total_key_count": 0,
+                "selected_entry_count": 0,
+                "selected_bundle_count": 0,
+                "selected_total_count": 0,
+                "has_selected_label": False,
+            },
+        )
         self.assertEqual(summary_view["bundle_samples"], [])
         self.assertEqual(summary_view["bundle_sample_count"], 0)
         self.assertFalse(summary_view["bundle_sample_truncated"])
