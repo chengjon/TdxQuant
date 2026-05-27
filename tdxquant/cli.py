@@ -5974,6 +5974,11 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
     replay_source = status.get("replay_source") if isinstance(status.get("replay_source"), dict) else {}
     security = status.get("security") if isinstance(status.get("security"), dict) else {}
     probe_summary = runtime.get("probe_summary") if isinstance(runtime.get("probe_summary"), dict) else {}
+    probe_advisory = (
+        probe_summary.get("advisory_summary")
+        if isinstance(probe_summary.get("advisory_summary"), dict)
+        else {}
+    )
     boundaries = status.get("boundaries") if isinstance(status.get("boundaries"), list) else []
     endpoints = capabilities.get("endpoints") if isinstance(capabilities.get("endpoints"), list) else []
     restart_policy = lifecycle.get("restart_policy")
@@ -6005,6 +6010,19 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "probe_requested": probe_requested,
             "requested_probe_count": probe_summary.get("requested_count"),
             "failed_probe_count": probe_summary.get("failed_count"),
+            "probe_status": probe_advisory.get("status", probe_summary.get("status")),
+            "probe_request_coverage_status": probe_advisory.get(
+                "request_coverage_status",
+                probe_summary.get("request_coverage_status"),
+            ),
+            "has_problem_probe": probe_advisory.get(
+                "has_problem_probe",
+                probe_summary.get("has_problem_probe"),
+            ),
+            "primary_problem_probe": probe_advisory.get(
+                "primary_problem_probe",
+                probe_summary.get("primary_problem_probe"),
+            ),
             "control_supported": control_supported,
             "managed_operation_count": managed_operation_count,
             "boundary_count": len(boundaries),
