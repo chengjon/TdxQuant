@@ -1,0 +1,23 @@
+# provider replay health summary presence flags tasks
+
+## 1. Specification
+
+- [x] Add an OpenSpec delta requiring read-only `health_summary` presence flags and explicit non-lifecycle boundaries.
+- [x] Validate the active OpenSpec change in strict mode.
+
+## 2. Red Tests
+
+- [x] Add focused provider replay status assertions for `runtime.probe_summary.health_summary.has_healthy_probe`, `has_failed_probe`, and `has_unhealthy_probe`.
+- [x] Add CLI summary-view assertions that the copied `probe_summary.health_summary` exposes the same flags.
+- [x] Run focused tests and confirm the failure is the missing fields.
+
+## 3. Implementation
+
+- [x] Derive the three nested flags from existing normalized probe rollup data in `tdxquant/provider_transport_replay.py`.
+- [x] Keep CLI behavior unchanged except for the copied summary payload gaining the new fields.
+
+## 4. Registry and Verification
+
+- [x] Update `FUNCTION_TREE.md` E-06 evidence/boundary notes without claiming readiness or lifecycle management.
+- [x] Run focused pytest, OpenSpec strict validation, diff whitespace check, and FUNCTION_TREE registry validation.
+- [x] Archive the OpenSpec change, repeat verification, and commit only this slice.

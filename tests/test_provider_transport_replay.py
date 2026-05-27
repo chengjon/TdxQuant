@@ -92,6 +92,9 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 "healthy_count": status["runtime"]["probe_summary"]["healthy_count"],
                 "failed_count": status["runtime"]["probe_summary"]["failed_count"],
                 "unhealthy_count": status["runtime"]["probe_summary"]["unhealthy_count"],
+                "has_healthy_probe": status["runtime"]["probe_summary"]["has_healthy_probe"],
+                "has_failed_probe": status["runtime"]["probe_summary"]["has_failed_probe"],
+                "has_unhealthy_probe": status["runtime"]["probe_summary"]["has_unhealthy_probe"],
                 "status_key_count": status["runtime"]["probe_summary"]["status_key_count"],
                 "primary_healthy_probe": status["runtime"]["probe_summary"]["primary_healthy_probe"],
                 "primary_failed_probe": status["runtime"]["probe_summary"]["primary_failed_probe"],
@@ -381,6 +384,9 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["has_failed_probe"], True)
         self.assertEqual(status["runtime"]["probe_summary"]["has_unhealthy_probe"], True)
         self.assertEqual(status["runtime"]["probe_summary"]["has_problem_probe"], True)
+        self.assertEqual(status["runtime"]["probe_summary"]["health_summary"]["has_healthy_probe"], False)
+        self.assertEqual(status["runtime"]["probe_summary"]["health_summary"]["has_failed_probe"], True)
+        self.assertEqual(status["runtime"]["probe_summary"]["health_summary"]["has_unhealthy_probe"], True)
         self.assertEqual(status["runtime"]["probe_summary"]["status_counts"], {"not_requested": 3, "unhealthy": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["requested_status_counts"], {"unhealthy": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_status_counts"], {"unhealthy": 1})
