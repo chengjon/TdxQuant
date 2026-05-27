@@ -2796,6 +2796,8 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "step_source_key_count": summary.get("step_source_key_count"),
         "step_name_key_count": summary.get("step_name_key_count"),
         "step_entry_key_count": summary.get("step_entry_key_count"),
+        "step_resolved_arg_key_count": summary.get("step_resolved_arg_key_count"),
+        "step_source_resolved_arg_key_count": summary.get("step_source_resolved_arg_key_count"),
         "has_step_slice": bool(selected_from_step or selected_to_step),
         "has_steps": isinstance(selected_step_count, int) and selected_step_count > 0,
     }
