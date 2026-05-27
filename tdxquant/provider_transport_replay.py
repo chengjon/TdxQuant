@@ -800,6 +800,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "failed_count": failed_count,
         "has_failed_probe": bool(failed_count),
         "unhealthy_count": len(unhealthy),
+        "has_unhealthy_probe": bool(unhealthy),
         "not_requested_count": total_count - requested_count,
         "all_probes_requested": bool(total_count and requested_count == total_count),
         "has_not_requested_probe": bool(not_requested),
