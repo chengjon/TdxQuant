@@ -194,6 +194,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             len(status["runtime"]["probe_summary"]["error_sample_reachability_counts"]),
         )
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_visible_count"], 0)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_visible_error_sample"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_hidden_count"], 0)
         self.assertEqual(status["runtime"]["probe_summary"]["has_hidden_error_sample"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
@@ -406,6 +407,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_reachability_counts"], {"unreachable": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_reachability_key_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_visible_error_sample"], True)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], False)
         self.assertEqual(status["runtime"]["probe_summary"]["has_hidden_error_sample"], False)
         self.assertEqual(
@@ -528,6 +530,7 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertIsNone(status["runtime"]["probe_summary"]["primary_not_requested_probe"])
         self.assertEqual(len(status["runtime"]["probe_summary"]["error_samples"]), 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_visible_count"], 3)
+        self.assertEqual(status["runtime"]["probe_summary"]["has_visible_error_sample"], True)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_limit"], 3)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_hidden_count"], 1)
         self.assertEqual(status["runtime"]["probe_summary"]["error_sample_truncated"], True)

@@ -865,6 +865,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "error_sample_reachability_key_count": len(error_sample_reachability_counts),
         "error_sample_limit": PROVIDER_REPLAY_PROBE_ERROR_SAMPLE_LIMIT,
         "error_sample_visible_count": error_sample_visible_count,
+        "has_visible_error_sample": bool(error_sample_visible_count),
         "error_sample_hidden_count": error_sample_hidden_count,
         "has_hidden_error_sample": bool(error_sample_hidden_count),
         "error_sample_truncated": error_sample_truncated,
