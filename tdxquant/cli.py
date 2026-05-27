@@ -157,6 +157,7 @@ PINGAN_LAST_ORDER_STATE_PATH = get_pingan_last_order_state_path()
 PINGAN_SUBMISSION_LEDGER_PATH = get_pingan_submission_ledger_path()
 TRADER_RUNTIME_DIR = Path(__file__).resolve().parents[1] / "runtime" / "trader"
 PINGAN_BUY_PROFILE_NAMES = ("stable", "balanced", "fast", "turbo")
+BUNDLE_SAMPLE_LIMIT = 5
 TASK_REPORT_BUNDLE_SAMPLE_LIMIT = 5
 SUBMIT_ONCE_BUNDLE_SAMPLE_LIMIT = 5
 PINGAN_BUNDLE_SAMPLE_LIMIT = 5
@@ -3083,6 +3084,10 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "entry_label_key_count": len(validation.get("entry_label_counts") or {}),
             "bundle_count": validation.get("bundle_count"),
             "bundle_step_count": validation.get("bundle_step_count"),
+            "bundle_samples": copy.deepcopy(validation.get("bundle_samples", [])),
+            "bundle_sample_count": len(validation.get("bundle_samples", [])),
+            "bundle_sample_limit": validation.get("bundle_sample_limit"),
+            "bundle_sample_truncated": validation.get("bundle_sample_truncated"),
             "bundle_label_counts": copy.deepcopy(validation.get("bundle_label_counts", {})),
             "bundle_label_key_count": len(validation.get("bundle_label_counts") or {}),
             "bundle_step_source_counts": copy.deepcopy(validation.get("bundle_step_source_counts", {})),
@@ -3305,6 +3310,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
         summary["bundle_step_summary"] = {
             "bundle_count": summary.get("bundle_count"),
             "step_count": summary.get("bundle_step_count"),
+            "sample_count": summary.get("bundle_sample_count"),
+            "sample_limit": summary.get("bundle_sample_limit"),
+            "sample_truncated": summary.get("bundle_sample_truncated"),
             "label_key_count": summary.get("bundle_label_key_count"),
             "step_source_key_count": summary.get("bundle_step_source_key_count"),
             "step_name_key_count": summary.get("bundle_step_name_key_count"),
@@ -4049,6 +4057,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     entry_label_counts: dict[str, int] = {}
     validated_bundle_count = 0
     bundle_step_count = 0
+    bundle_samples: list[str] = []
     bundle_label_counts: dict[str, int] = {}
     bundle_step_source_counts: dict[str, int] = {}
     bundle_step_name_counts: dict[str, int] = {}
@@ -4124,6 +4133,8 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                     continue
                 validated_bundle_count += 1
                 bundle_step_count += len(resolved_bundle["steps"])
+                if len(bundle_samples) < BUNDLE_SAMPLE_LIMIT:
+                    bundle_samples.append(bundle_name)
                 step_sources = {step["source"] for step in resolved_bundle["steps"]}
                 step_entries = {str(step["entry"]) for step in resolved_bundle["steps"]}
                 bundle_labels = {str(label) for label in resolved_bundle["labels"]}
@@ -4357,6 +4368,9 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "entry_label_counts": {label: entry_label_counts[label] for label in sorted(entry_label_counts)},
         "bundle_count": validated_bundle_count,
         "bundle_step_count": bundle_step_count,
+        "bundle_samples": bundle_samples,
+        "bundle_sample_limit": BUNDLE_SAMPLE_LIMIT,
+        "bundle_sample_truncated": validated_bundle_count > len(bundle_samples),
         "bundle_label_counts": {
             label: bundle_label_counts[label] for label in sorted(bundle_label_counts)
         },

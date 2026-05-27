@@ -4478,11 +4478,23 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["bundle_label_counts"], validation["bundle_label_counts"])
         self.assertEqual(summary_view["bundle_label_key_count"], len(summary_view["bundle_label_counts"]))
         self.assertEqual(summary_view["bundle_label_counts"]["followup"], summary_view["bundle_count"])
+        self.assertIn("bundle_samples", summary_view)
+        self.assertEqual(summary_view["bundle_samples"], validation["bundle_samples"])
+        self.assertEqual(summary_view["bundle_sample_count"], len(summary_view["bundle_samples"]))
+        self.assertEqual(summary_view["bundle_sample_limit"], validation["bundle_sample_limit"])
+        self.assertEqual(
+            summary_view["bundle_sample_truncated"],
+            validation["bundle_sample_truncated"],
+        )
+        self.assertEqual(summary_view["bundle_sample_truncated"], True)
         self.assertEqual(
             summary_view["bundle_step_summary"],
             {
                 "bundle_count": summary_view["bundle_count"],
                 "step_count": summary_view["bundle_step_count"],
+                "sample_count": summary_view["bundle_sample_count"],
+                "sample_limit": summary_view["bundle_sample_limit"],
+                "sample_truncated": summary_view["bundle_sample_truncated"],
                 "label_key_count": summary_view["bundle_label_key_count"],
                 "step_source_key_count": summary_view["bundle_step_source_key_count"],
                 "step_name_key_count": summary_view["bundle_step_name_key_count"],
@@ -4784,11 +4796,17 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(validation["pingan_bundle_step_source_entry_counts"], {})
         self.assertEqual(summary_view["pingan_bundle_step_source_entry_counts"], {})
         self.assertEqual(summary_view["bundle_label_counts"], {})
+        self.assertEqual(summary_view["bundle_samples"], [])
+        self.assertEqual(summary_view["bundle_sample_count"], 0)
+        self.assertFalse(summary_view["bundle_sample_truncated"])
         self.assertEqual(
             summary_view["bundle_step_summary"],
             {
                 "bundle_count": 0,
                 "step_count": 0,
+                "sample_count": summary_view["bundle_sample_count"],
+                "sample_limit": summary_view["bundle_sample_limit"],
+                "sample_truncated": summary_view["bundle_sample_truncated"],
                 "label_key_count": 0,
                 "step_source_key_count": 0,
                 "step_name_key_count": 0,
@@ -5127,6 +5145,35 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_view["non_execution"], True)
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)
+
+    def test_handle_catalog_validate_summary_view_projects_empty_bundle_samples(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "validate", "--kind", "bundle", "--label", "no-such-label", "--view", "summary"]
+        )
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        summary_view = result.data["summary_view"]
+        self.assertEqual(summary_view["kind"], "bundle")
+        self.assertEqual(summary_view["selected_label"], "no-such-label")
+        self.assertEqual(summary_view["bundle_count"], 0)
+        self.assertEqual(summary_view["bundle_samples"], [])
+        self.assertEqual(summary_view["bundle_sample_count"], 0)
+        self.assertFalse(summary_view["bundle_sample_truncated"])
+        self.assertEqual(
+            summary_view["bundle_step_summary"]["sample_count"],
+            summary_view["bundle_sample_count"],
+        )
+        self.assertEqual(
+            summary_view["bundle_step_summary"]["sample_limit"],
+            summary_view["bundle_sample_limit"],
+        )
+        self.assertEqual(
+            summary_view["bundle_step_summary"]["sample_truncated"],
+            summary_view["bundle_sample_truncated"],
+        )
 
     def test_handle_catalog_validate_missing_bundle_returns_invalid_request(self) -> None:
         parser = build_parser()
