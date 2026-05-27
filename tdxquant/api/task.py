@@ -4,6 +4,7 @@ import copy
 import csv
 import json
 import os
+import re
 import threading
 import time
 from datetime import datetime, timezone
@@ -30,6 +31,8 @@ from ..subscription_watch_run import (
 from ..trade import TdxTradeManager, get_pingan_submission_ledger_path
 from ..trade_audit_index import query_trade_audit_cross_ledger
 from .manager import TdxApiManager
+
+_MAX_FULL_JSONL_LINE_BYTES = 20 * 1024 * 1024
 
 
 def get_task_profile_path() -> Path:
@@ -189,6 +192,17 @@ def _resolve_ledger_stem(profile_options: dict[str, Any], default_stem: str) -> 
     return str(profile_options.get("ledger_stem", default_stem))
 
 
+def _resolve_optional_path(value: Any) -> Path | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        normalized = value.strip()
+        if not normalized:
+            return None
+        return Path(normalized)
+    return Path(str(value))
+
+
 def _resolve_status_stem(profile_options: dict[str, Any], default_stem: str) -> str:
     return str(profile_options.get("status_stem", default_stem))
 
@@ -269,16 +283,229 @@ def _parse_boolish(value: Any) -> bool | None:
     return None
 
 
+def _strip_json_array_values(raw: bytes, key: bytes) -> bytes:
+    if key not in raw:
+        return raw
+    output = bytearray()
+    index = 0
+    raw_length = len(raw)
+    while index < raw_length:
+        key_index = raw.find(key, index)
+        if key_index < 0:
+            output.extend(raw[index:])
+            break
+        colon_index = key_index + len(key)
+        while colon_index < raw_length and raw[colon_index] in b" \t\r\n":
+            colon_index += 1
+        if colon_index >= raw_length or raw[colon_index] != ord(":"):
+            output.extend(raw[index : key_index + len(key)])
+            index = key_index + len(key)
+            continue
+        value_index = colon_index + 1
+        while value_index < raw_length and raw[value_index] in b" \t\r\n":
+            value_index += 1
+        if value_index >= raw_length or raw[value_index] != ord("["):
+            output.extend(raw[index : key_index + len(key)])
+            index = key_index + len(key)
+            continue
+
+        end_index = _find_json_array_end(raw, value_index)
+        if end_index is None:
+            output.extend(raw[index:])
+            break
+        output.extend(raw[index:value_index])
+        output.extend(b"[]")
+        index = end_index
+    return bytes(output)
+
+
+def _find_json_array_end(raw: bytes, start_index: int) -> int | None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start_index, len(raw)):
+        char = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == ord("\\"):
+                escaped = True
+            elif char == ord('"'):
+                in_string = False
+            continue
+        if char == ord('"'):
+            in_string = True
+        elif char == ord("["):
+            depth += 1
+        elif char == ord("]"):
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return None
+
+
+def _find_json_object_end(raw: bytes, start_index: int) -> int | None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start_index, len(raw)):
+        char = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == ord("\\"):
+                escaped = True
+            elif char == ord('"'):
+                in_string = False
+            continue
+        if char == ord('"'):
+            in_string = True
+        elif char == ord("{"):
+            depth += 1
+        elif char == ord("}"):
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return None
+
+
+def _extract_json_string_field(raw: bytes, field_name: str) -> str | None:
+    field_pattern = rb'"' + re.escape(field_name.encode("utf-8")) + rb'"\s*:\s*"((?:\\.|[^"\\])*)"'
+    match = re.search(field_pattern, raw)
+    if match is None:
+        return None
+    try:
+        value = json.loads(b'"' + match.group(1) + b'"')
+    except json.JSONDecodeError:
+        return None
+    return str(value) if value is not None else None
+
+
+def _extract_json_bool_field(raw: bytes, field_name: str) -> bool | None:
+    field_pattern = rb'"' + re.escape(field_name.encode("utf-8")) + rb'"\s*:\s*(true|false|null)'
+    match = re.search(field_pattern, raw)
+    if match is None:
+        return None
+    value = match.group(1)
+    if value == b"true":
+        return True
+    if value == b"false":
+        return False
+    return None
+
+
+def _extract_json_object_field(raw: bytes, field_name: str) -> dict[str, Any]:
+    key = b'"' + field_name.encode("utf-8") + b'"'
+    key_index = raw.find(key)
+    if key_index < 0:
+        return {}
+    colon_index = key_index + len(key)
+    while colon_index < len(raw) and raw[colon_index] in b" \t\r\n":
+        colon_index += 1
+    if colon_index >= len(raw) or raw[colon_index] != ord(":"):
+        return {}
+    value_index = colon_index + 1
+    while value_index < len(raw) and raw[value_index] in b" \t\r\n":
+        value_index += 1
+    if value_index >= len(raw) or raw[value_index] != ord("{"):
+        return {}
+    end_index = _find_json_object_end(raw, value_index)
+    if end_index is None:
+        return {}
+    try:
+        value = json.loads(raw[value_index:end_index])
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _normalize_large_submission_ledger_line(raw: bytes) -> dict[str, Any]:
+    head = raw[: min(len(raw), 4 * 1024 * 1024)]
+    normalized_request = _extract_json_object_field(head, "normalized_request")
+    method = normalized_request.get("method")
+    broker = normalized_request.get("broker")
+    return {
+        "timestamp": _extract_json_string_field(head, "timestamp"),
+        "task_name": method,
+        "method": method,
+        "broker": broker,
+        "code": normalized_request.get("code"),
+        "price": normalized_request.get("price"),
+        "quantity": normalized_request.get("quantity"),
+        "trade_ok": None,
+        "contract_no": None,
+        "submission_key": _extract_json_string_field(head, "submission_key"),
+        "risk_gate_passed": _extract_json_bool_field(head, "risk_gate_passed"),
+        "result_code": None,
+        "message": None,
+        "source_ledger": "pingan_submission",
+    }
+
+
 def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        payload = json.loads(line)
-        if isinstance(payload, dict):
-            rows.append(payload)
+    with path.open("rb") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+            if len(line) > _MAX_FULL_JSONL_LINE_BYTES and b'"normalized_request"' in line:
+                rows.append(_normalize_large_submission_ledger_line(line))
+                continue
+            line = _strip_json_array_values(line, b'"prior_pre_trade_rows"')
+            payload = json.loads(line)
+            if isinstance(payload, dict):
+                rows.append(_normalize_ledger_row(payload))
     return rows
+
+
+def _first_non_empty(*values: Any) -> Any:
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
+def _normalize_ledger_row(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized_request = payload.get("normalized_request")
+    result_payload = payload.get("result")
+    if not isinstance(normalized_request, dict) or not isinstance(result_payload, dict):
+        return payload
+
+    result_data = result_payload.get("data")
+    if not isinstance(result_data, dict):
+        result_data = result_payload
+    input_payload = result_data.get("input")
+    if not isinstance(input_payload, dict):
+        input_payload = {}
+    result_dialog = result_data.get("result_dialog")
+    if not isinstance(result_dialog, dict):
+        result_dialog = {}
+    manager_payload = result_data.get("manager")
+    if not isinstance(manager_payload, dict):
+        manager_payload = {}
+
+    method = _first_non_empty(normalized_request.get("method"), manager_payload.get("method"))
+    broker = _first_non_empty(normalized_request.get("broker"), manager_payload.get("broker"))
+    return {
+        "timestamp": payload.get("timestamp"),
+        "task_name": method,
+        "method": method,
+        "broker": broker,
+        "code": _first_non_empty(normalized_request.get("code"), input_payload.get("code")),
+        "price": _first_non_empty(normalized_request.get("price"), input_payload.get("price")),
+        "quantity": _first_non_empty(normalized_request.get("quantity"), input_payload.get("quantity")),
+        "trade_ok": _parse_boolish(result_data.get("ok")),
+        "contract_no": _first_non_empty(result_data.get("contract_no"), result_dialog.get("contract_no")),
+        "submission_key": payload.get("submission_key"),
+        "risk_gate_passed": _parse_boolish(payload.get("risk_gate_passed")),
+        "result_code": result_data.get("code"),
+        "message": result_data.get("message"),
+        "source_ledger": "pingan_submission",
+    }
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, Any]]:
@@ -324,6 +551,37 @@ def _resolve_task_ledger_paths(
     return resolved_jsonl_path, resolved_csv_path
 
 
+def _resolve_task_ledger_fallback_paths(profile_options: dict[str, Any]) -> tuple[Path | None, Path | None]:
+    return (
+        _resolve_optional_path(profile_options.get("fallback_ledger_jsonl_path")),
+        _resolve_optional_path(profile_options.get("fallback_ledger_csv_path")),
+    )
+
+
+def _build_task_ledger_path_input(
+    profile_options: dict[str, Any],
+    *,
+    ledger_jsonl_path: str | None = None,
+    ledger_csv_path: str | None = None,
+) -> dict[str, Any]:
+    resolved_jsonl_path, resolved_csv_path = _resolve_task_ledger_paths(
+        profile_options,
+        ledger_jsonl_path=ledger_jsonl_path,
+        ledger_csv_path=ledger_csv_path,
+    )
+    payload: dict[str, Any] = {
+        "ledger_jsonl_path": str(resolved_jsonl_path),
+        "ledger_csv_path": str(resolved_csv_path),
+    }
+    if ledger_jsonl_path is None and ledger_csv_path is None:
+        fallback_jsonl_path, fallback_csv_path = _resolve_task_ledger_fallback_paths(profile_options)
+        if fallback_jsonl_path is not None:
+            payload["fallback_ledger_jsonl_path"] = str(fallback_jsonl_path)
+        if fallback_csv_path is not None:
+            payload["fallback_ledger_csv_path"] = str(fallback_csv_path)
+    return payload
+
+
 def _load_task_ledger_source(
     profile_options: dict[str, Any],
     *,
@@ -351,6 +609,24 @@ def _load_task_ledger_source(
             "ledger_jsonl_path": resolved_jsonl_path,
             "ledger_csv_path": resolved_csv_path,
         }
+    if ledger_jsonl_path is None and ledger_csv_path is None:
+        fallback_jsonl_path, fallback_csv_path = _resolve_task_ledger_fallback_paths(profile_options)
+        if fallback_jsonl_path is not None and fallback_jsonl_path.exists():
+            return {
+                "entries": _load_jsonl_rows(fallback_jsonl_path),
+                "source_path": fallback_jsonl_path,
+                "source_format": "jsonl",
+                "ledger_jsonl_path": fallback_jsonl_path,
+                "ledger_csv_path": fallback_csv_path or resolved_csv_path,
+            }
+        if fallback_csv_path is not None and fallback_csv_path.exists():
+            return {
+                "entries": _load_csv_rows(fallback_csv_path),
+                "source_path": fallback_csv_path,
+                "source_format": "csv",
+                "ledger_jsonl_path": fallback_jsonl_path or resolved_jsonl_path,
+                "ledger_csv_path": fallback_csv_path,
+            }
     raise FileNotFoundError
 
 
@@ -2081,20 +2357,16 @@ class TdxTaskManager:
                     ledger_csv_path=ledger_csv_path,
                 )
             except FileNotFoundError:
-                resolved_jsonl_path, resolved_csv_path = _resolve_task_ledger_paths(
-                    self.profile_options,
-                    ledger_jsonl_path=ledger_jsonl_path,
-                    ledger_csv_path=ledger_csv_path,
-                )
                 return Result(
                     ok=False,
                     code=ErrorCode.PATH_NOT_FOUND,
                     message="ledger summary task could not find a ledger file",
                     data={
-                        "input": {
-                            "ledger_jsonl_path": str(resolved_jsonl_path),
-                            "ledger_csv_path": str(resolved_csv_path),
-                        }
+                        "input": _build_task_ledger_path_input(
+                            self.profile_options,
+                            ledger_jsonl_path=ledger_jsonl_path,
+                            ledger_csv_path=ledger_csv_path,
+                        )
                     },
                     next_action="Run guarded trade workflows first or provide an explicit ledger path.",
                 )
@@ -2219,20 +2491,16 @@ class TdxTaskManager:
                     ledger_csv_path=ledger_csv_path,
                 )
             except FileNotFoundError:
-                resolved_jsonl_path, resolved_csv_path = _resolve_task_ledger_paths(
-                    self.profile_options,
-                    ledger_jsonl_path=ledger_jsonl_path,
-                    ledger_csv_path=ledger_csv_path,
-                )
                 return Result(
                     ok=False,
                     code=ErrorCode.PATH_NOT_FOUND,
                     message="daily trade report task could not find a ledger file",
                     data={
-                        "input": {
-                            "ledger_jsonl_path": str(resolved_jsonl_path),
-                            "ledger_csv_path": str(resolved_csv_path),
-                        }
+                        "input": _build_task_ledger_path_input(
+                            self.profile_options,
+                            ledger_jsonl_path=ledger_jsonl_path,
+                            ledger_csv_path=ledger_csv_path,
+                        )
                     },
                     next_action="Run guarded trade workflows first or provide an explicit ledger path.",
                 )
@@ -2391,20 +2659,16 @@ class TdxTaskManager:
                     ledger_csv_path=ledger_csv_path,
                 )
             except FileNotFoundError:
-                resolved_jsonl_path, resolved_csv_path = _resolve_task_ledger_paths(
-                    self.profile_options,
-                    ledger_jsonl_path=ledger_jsonl_path,
-                    ledger_csv_path=ledger_csv_path,
-                )
                 return Result(
                     ok=False,
                     code=ErrorCode.PATH_NOT_FOUND,
                     message="trade report lookup task could not find a ledger file",
                     data={
-                        "input": {
-                            "ledger_jsonl_path": str(resolved_jsonl_path),
-                            "ledger_csv_path": str(resolved_csv_path),
-                        }
+                        "input": _build_task_ledger_path_input(
+                            self.profile_options,
+                            ledger_jsonl_path=ledger_jsonl_path,
+                            ledger_csv_path=ledger_csv_path,
+                        )
                     },
                     next_action="Run guarded trade workflows first or provide an explicit ledger path.",
                 )
@@ -3167,20 +3431,16 @@ class TdxTaskManager:
                     ledger_csv_path=ledger_csv_path,
                 )
             except FileNotFoundError:
-                resolved_jsonl_path, resolved_csv_path = _resolve_task_ledger_paths(
-                    self.profile_options,
-                    ledger_jsonl_path=ledger_jsonl_path,
-                    ledger_csv_path=ledger_csv_path,
-                )
                 return Result(
                     ok=False,
                     code=ErrorCode.PATH_NOT_FOUND,
                     message="trade period report task could not find a ledger file",
                     data={
-                        "input": {
-                            "ledger_jsonl_path": str(resolved_jsonl_path),
-                            "ledger_csv_path": str(resolved_csv_path),
-                        }
+                        "input": _build_task_ledger_path_input(
+                            self.profile_options,
+                            ledger_jsonl_path=ledger_jsonl_path,
+                            ledger_csv_path=ledger_csv_path,
+                        )
                     },
                     next_action="Run guarded trade workflows first or provide an explicit ledger path.",
                 )
