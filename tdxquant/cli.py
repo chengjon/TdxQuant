@@ -2810,6 +2810,7 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "step_entry_counts": summary.get("step_entry_counts"),
         "step_entry_key_count": summary.get("step_entry_key_count"),
         "step_source_name_key_count": summary.get("step_source_name_key_count"),
+        "step_source_entry_counts": summary.get("step_source_entry_counts"),
         "step_source_entry_key_count": summary.get("step_source_entry_key_count"),
         "step_resolved_arg_key_count": summary.get("step_resolved_arg_key_count"),
         "step_source_resolved_arg_key_count": summary.get("step_source_resolved_arg_key_count"),
@@ -2855,6 +2856,7 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
         "step_entry_counts": selected_steps.get("step_entry_counts"),
         "step_entry_key_count": selected_steps.get("step_entry_key_count"),
         "step_source_name_key_count": selected_steps.get("step_source_name_key_count"),
+        "step_source_entry_counts": selected_steps.get("step_source_entry_counts"),
         "step_source_entry_key_count": selected_steps.get("step_source_entry_key_count"),
         "step_resolved_arg_key_count": selected_steps.get("step_resolved_arg_key_count"),
         "step_source_resolved_arg_key_count": selected_steps.get(
