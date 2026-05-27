@@ -794,6 +794,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "outcome_summary": outcome_summary,
         "total_count": total_count,
         "requested_count": requested_count,
+        "has_requested_probe": bool(requested),
         "healthy_count": healthy_count,
         "has_healthy_probe": bool(healthy),
         "failed_count": failed_count,
