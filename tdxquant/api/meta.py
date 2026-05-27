@@ -5,6 +5,8 @@ from .bridge import (
     run_tdx_data_sector_stocks,
     run_tdx_divid_factors,
     run_tdx_gb_info,
+    run_tdx_gb_info_by_date,
+    run_tdx_get_relation,
     run_tdx_gp_one_data,
     run_tdx_ipo_info,
     run_tdx_stock_list,
@@ -59,5 +61,19 @@ class MetaApi:
         return run_tdx_gp_one_data(
             stock_list=stock_list,
             field_list=field_list,
+            strategy_path=self.strategy_path,
+        )
+
+    def get_relation(self, stock_code: str, relation_type: int) -> Result:
+        return run_tdx_get_relation(
+            stock_code=stock_code,
+            relation_type=relation_type,
+            strategy_path=self.strategy_path,
+        )
+
+    def gb_info_by_date(self, stock_code: str, date: str) -> Result:
+        return run_tdx_gb_info_by_date(
+            stock_code=stock_code,
+            date=date,
             strategy_path=self.strategy_path,
         )
