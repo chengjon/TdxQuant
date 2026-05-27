@@ -119,7 +119,7 @@ TdxQuant
 | --- | --- | --- | --- | --- |
 | D-01 | desktop UIA primitives | `[已实现]` | `tdxquant/desktop/uia.py`、`tdxquant/uia_inspector.py`；CLI parser 包含 `uia-*` 命令 | 依赖 Windows 桌面、目标窗口和控件树稳定性；WSL 侧只能通过 bridge/JSON 消费结果。 |
 | D-02 | desktop Win32 primitives | `[已实现]` | `tdxquant/desktop/win32.py`、`tdxquant/win32_api.py`；CLI parser 包含 `win32-*` 命令 | 仅适用于 Windows 客户端自动化；窗口标题、权限、焦点和消息投递策略会影响结果。 |
-| D-03 | HID bridge primitives | `[已实现]` | `tdxquant/desktop/hid.py`、`tdxquant/hid_bridge.py`；CLI parser 包含 `hid-ping`、`hid-send`、`tdx-trade-hid-*`；`tests/test_hid_bridge.py` | 依赖 HID/串口设备和本机端口；测试可覆盖契约，不代表硬件永远在线；TongDaXin 交易侧 HID 命令的完整下单边界单独按 D-12 登记。 |
+| D-03 | HID bridge primitives | `[已实现]` | `tdxquant/desktop/hid.py`、`tdxquant/hid_bridge.py`；Arduino 固件样例 `firmware/arduino/tdx_hid_keyboard/tdx_hid_keyboard.ino`；CLI parser 包含 `hid-ping`、`hid-send`、`tdx-trade-hid-*`；`tests/test_hid_bridge.py`、`tests/test_hid_firmware_asset.py` | 依赖 HID/串口设备和本机端口；测试可覆盖契约和固件资产路径，不代表硬件永远在线；TongDaXin 交易侧 HID 命令的完整下单边界单独按 D-12 登记。 |
 | D-04 | broker / gateway abstraction | `[已实现]` | `tdxquant/trader/gateway.py`、`tdxquant/trader/registry.py`、`tdxquant/trader/models.py`、`tdxquant/brokers/base.py` | 抽象已存在；实际可用 broker 以已接入 adapter 为准。 |
 | D-05 | PingAn desktop gateway | `[已实现]` | `tdxquant/trader/adapters/pingan_desktop.py`：`PingAnDesktopTraderGateway`；`tests/test_pingan_trader_gateway.py`、`tests/test_trader_gateway.py` | 当前主要服务平安证券桌面客户端；其他券商不能按此节点默认视为可用。 |
 | D-06 | PingAn health / preflight / readiness | `[已实现]` | `TdxTradeManager.pingan.health/preflight/submit_ready/dialog_readiness`；CLI parser 包含 `trade health`、`trade preflight`、`submit-ready`、`dialog-readiness` | 是交易前诊断与准备检查；通过检查不等于实际下单一定成功。 |
