@@ -788,6 +788,23 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "primary_error_sample_probe": primary_error_sample_probe,
         "primary_error_sample_status": primary_error_sample_status,
     }
+    advisory_summary = {
+        "status": summary_status,
+        "request_coverage_status": request_coverage_status,
+        "total_count": total_count,
+        "requested_count": requested_count,
+        "healthy_count": healthy_count,
+        "failed_count": failed_count,
+        "unhealthy_count": len(unhealthy),
+        "has_requested_probe": bool(requested),
+        "has_healthy_probe": bool(healthy),
+        "has_failed_probe": bool(failed_count),
+        "has_unhealthy_probe": bool(unhealthy),
+        "has_problem_probe": bool(primary_problem_probe),
+        "primary_problem_probe": primary_problem_probe,
+        "primary_error_sample_probe": primary_error_sample_probe,
+        "boundary": "read_only_probe_summary",
+    }
 
     return {
         "status": summary_status,
@@ -795,6 +812,7 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "request_summary": request_summary,
         "health_summary": health_summary,
         "outcome_summary": outcome_summary,
+        "advisory_summary": advisory_summary,
         "total_count": total_count,
         "requested_count": requested_count,
         "has_requested_probe": bool(requested),

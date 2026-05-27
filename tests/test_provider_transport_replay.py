@@ -120,6 +120,26 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 "primary_error_sample_status": None,
             },
         )
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["advisory_summary"],
+            {
+                "status": "not_requested",
+                "request_coverage_status": "none",
+                "total_count": 4,
+                "requested_count": 0,
+                "healthy_count": 0,
+                "failed_count": 0,
+                "unhealthy_count": 0,
+                "has_requested_probe": False,
+                "has_healthy_probe": False,
+                "has_failed_probe": False,
+                "has_unhealthy_probe": False,
+                "has_problem_probe": False,
+                "primary_problem_probe": None,
+                "primary_error_sample_probe": None,
+                "boundary": "read_only_probe_summary",
+            },
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["status_counts"], {"not_requested": 4})
         self.assertEqual(
             status["runtime"]["probe_summary"]["status_key_count"],
@@ -400,6 +420,26 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["runtime"]["probe_summary"]["primary_failed_probe"], "health_probe")
         self.assertEqual(status["runtime"]["probe_summary"]["primary_unhealthy_probe"], "health_probe")
         self.assertEqual(status["runtime"]["probe_summary"]["primary_problem_probe"], "health_probe")
+        self.assertEqual(
+            status["runtime"]["probe_summary"]["advisory_summary"],
+            {
+                "status": "degraded",
+                "request_coverage_status": "partial",
+                "total_count": 4,
+                "requested_count": 1,
+                "healthy_count": 0,
+                "failed_count": 1,
+                "unhealthy_count": 1,
+                "has_requested_probe": True,
+                "has_healthy_probe": False,
+                "has_failed_probe": True,
+                "has_unhealthy_probe": True,
+                "has_problem_probe": True,
+                "primary_problem_probe": "health_probe",
+                "primary_error_sample_probe": "health_probe",
+                "boundary": "read_only_probe_summary",
+            },
+        )
         self.assertEqual(status["runtime"]["probe_summary"]["error_code_counts"], {"connection_failed": 1})
         self.assertEqual(status["runtime"]["probe_summary"]["failed_error_code_counts"], {"connection_failed": 1})
         self.assertEqual(
