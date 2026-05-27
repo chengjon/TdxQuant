@@ -374,6 +374,7 @@ def _build_subscription_watch_governance_evaluation_summary(
         "primary_not_evaluated_component": not_evaluated_components[0]
         if not_evaluated_components
         else None,
+        "has_not_evaluated_component": bool(not_evaluated_components),
         "evaluated_count": len(evaluated_components),
         "stale_count": len(stale_components),
         "fresh_count": len(fresh_components),
