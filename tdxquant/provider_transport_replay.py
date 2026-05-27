@@ -768,12 +768,30 @@ def _build_provider_replay_probe_summary(probes: dict[str, dict[str, Any]]) -> d
         "primary_failed_probe": failed[0] if failed else None,
         "primary_unhealthy_probe": unhealthy[0] if unhealthy else None,
     }
+    primary_problem_probe = failed[0] if failed else unhealthy[0] if unhealthy else primary_error_sample_probe
+    outcome_summary = {
+        "status": summary_status,
+        "request_coverage_status": request_coverage_status,
+        "total_count": total_count,
+        "requested_count": requested_count,
+        "healthy_count": healthy_count,
+        "failed_count": failed_count,
+        "unhealthy_count": len(unhealthy),
+        "not_requested_count": total_count - requested_count,
+        "all_probes_requested": bool(total_count and requested_count == total_count),
+        "has_failed_probe": bool(failed_count),
+        "has_unhealthy_probe": bool(unhealthy),
+        "primary_problem_probe": primary_problem_probe,
+        "primary_error_sample_probe": primary_error_sample_probe,
+        "primary_error_sample_status": primary_error_sample_status,
+    }
 
     return {
         "status": summary_status,
         "request_coverage_status": request_coverage_status,
         "request_summary": request_summary,
         "health_summary": health_summary,
+        "outcome_summary": outcome_summary,
         "total_count": total_count,
         "requested_count": requested_count,
         "healthy_count": healthy_count,
