@@ -6018,6 +6018,54 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "has_steps": True,
             },
         )
+        self.assertEqual(
+            output_payload["plan_summary"],
+            {
+                "mode": "plan",
+                "target_type": "bundle",
+                "target_name": "confirm-complete-review",
+                "execution_mode": "non_executing",
+                "non_execution": True,
+                "dispatch_executed": False,
+                "ok": True,
+                "code": output_payload["code"],
+                "selected_from_step": "confirm",
+                "selected_to_step": "audit",
+                "selected_step_count": 3,
+                "step_source_key_count": 2,
+                "step_name_key_count": 3,
+                "step_entry_key_count": 3,
+                "step_resolved_arg_key_count": 5,
+                "step_source_resolved_arg_key_count": 6,
+                "has_steps": True,
+                "has_step_slice": True,
+            },
+        )
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_preview_task_report_combo_summary_exposes_plan_summary(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "preview", "--bundle", "confirm-complete-review", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(output_payload["plan_summary"]["mode"], "preview")
+        self.assertEqual(output_payload["plan_summary"]["target_type"], "bundle")
+        self.assertEqual(output_payload["plan_summary"]["target_name"], "confirm-complete-review")
+        self.assertEqual(output_payload["plan_summary"]["non_execution"], True)
+        self.assertEqual(output_payload["plan_summary"]["dispatch_executed"], False)
+        self.assertEqual(
+            output_payload["plan_summary"]["selected_step_count"],
+            output_payload["selected_step_summary"]["selected_step_count"],
+        )
+        self.assertEqual(
+            output_payload["plan_summary"]["step_source_key_count"],
+            output_payload["selected_step_summary"]["step_source_key_count"],
+        )
+        self.assertEqual(output_payload["plan_summary"]["has_steps"], True)
+        self.assertEqual(output_payload["plan_summary"]["has_step_slice"], True)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_confirm_current_pingan_bundle_without_execution(self) -> None:

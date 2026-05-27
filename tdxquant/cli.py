@@ -2814,6 +2814,39 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
     }
 
 
+def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]:
+    outcome = summary.get("plan_outcome")
+    outcome = outcome if isinstance(outcome, dict) else {}
+    selected_steps = summary.get("selected_step_summary")
+    selected_steps = selected_steps if isinstance(selected_steps, dict) else {}
+    return {
+        "mode": outcome.get("mode", summary.get("mode")),
+        "target_type": outcome.get("target_type"),
+        "target_name": outcome.get("target_name"),
+        "execution_mode": outcome.get("execution_mode"),
+        "non_execution": outcome.get("non_execution"),
+        "dispatch_executed": outcome.get("dispatch_executed"),
+        "ok": outcome.get("ok"),
+        "code": outcome.get("code"),
+        "selected_from_step": selected_steps.get("selected_from_step"),
+        "selected_to_step": selected_steps.get("selected_to_step"),
+        "selected_step_count": selected_steps.get(
+            "selected_step_count", outcome.get("selected_step_count")
+        ),
+        "step_source_key_count": selected_steps.get(
+            "step_source_key_count", outcome.get("step_source_key_count")
+        ),
+        "step_name_key_count": selected_steps.get("step_name_key_count"),
+        "step_entry_key_count": selected_steps.get("step_entry_key_count"),
+        "step_resolved_arg_key_count": selected_steps.get("step_resolved_arg_key_count"),
+        "step_source_resolved_arg_key_count": selected_steps.get(
+            "step_source_resolved_arg_key_count"
+        ),
+        "has_steps": selected_steps.get("has_steps", outcome.get("has_steps")),
+        "has_step_slice": selected_steps.get("has_step_slice", False),
+    }
+
+
 def _build_catalog_step_source_counts(steps: object) -> dict[str, int]:
     counts: dict[str, int] = {}
     if not isinstance(steps, list):
@@ -3482,6 +3515,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                 summary["trade_plan_boundary"] = trade_boundary
             _copy_catalog_non_execution_metadata(summary, result)
             summary["plan_outcome"] = _build_catalog_plan_outcome(summary)
+            summary["plan_summary"] = _build_catalog_plan_summary(summary)
         else:
             input_payload = result.data.get("input", {})
             if isinstance(input_payload, dict):
@@ -3556,6 +3590,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             summary["selected_step_summary"] = _build_catalog_selected_step_summary(summary)
             _copy_catalog_non_execution_metadata(summary, result)
             summary["plan_outcome"] = _build_catalog_plan_outcome(summary)
+            summary["plan_summary"] = _build_catalog_plan_summary(summary)
         else:
             run_steps: list[dict[str, object]] = []
             steps = bundle_meta.get("steps", [])
