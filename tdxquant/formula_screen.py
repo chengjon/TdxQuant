@@ -3,6 +3,19 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
+_FORMULA_METADATA_KEYS = {
+    "error",
+    "errorid",
+    "message",
+    "msg",
+    "run_id",
+    "success",
+}
+
+
+def _is_formula_metadata_key(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().lower() in _FORMULA_METADATA_KEYS
+
 
 def _is_matched_value(value: Any) -> bool:
     if isinstance(value, bool):
@@ -74,7 +87,7 @@ def build_formula_screen_payload(
     unmatched_symbols: list[str] = []
     all_symbols = list(stock_list)
     for symbol in raw_payload.keys():
-        if isinstance(symbol, str) and symbol not in all_symbols:
+        if isinstance(symbol, str) and not _is_formula_metadata_key(symbol) and symbol not in all_symbols:
             all_symbols.append(symbol)
 
     for symbol in all_symbols:

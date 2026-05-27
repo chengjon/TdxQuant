@@ -186,5 +186,13 @@
     "gp_one_fields": ["Now"],
     "refresh_market": "AG",
     "refresh_force": false
+  },
+  "tdx_quant_live": {
+    "api_profile": "tdx_quant_live",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume"],
+    "refresh_market": "AG",
+    "refresh_force": false,
+    "strategy_path": "D:\\mystocks\\tdx\\tdx-quant\\PYPlugins\\user\\tdxdata_test.py"
   }
 }

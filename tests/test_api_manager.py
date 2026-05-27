@@ -2688,6 +2688,16 @@ class _FakeTaskRuntimeSubscriptionSession:
 
 
 class TdxApiManagerTests(unittest.TestCase):
+    def test_manager_uses_strategy_path_from_api_profile_when_not_explicit(self) -> None:
+        with patch(
+            "tdxquant.api.manager.resolve_api_profile",
+            return_value={"strategy_path": "configured-strategy.py", "default_fields": {}},
+        ):
+            manager = TdxApiManager(profile="configured")
+
+        self.assertEqual(manager.strategy_path, "configured-strategy.py")
+        self.assertEqual(manager._market_api.strategy_path, "configured-strategy.py")
+
     def test_run_tdx_block_read_watchlist_snapshot_normalizes_custom_sector_members(self) -> None:
         bridge = import_module("tdxquant.api.bridge")
         sectors_result = Result(
@@ -3779,6 +3789,20 @@ class TdxTaskManagerTests(unittest.TestCase):
         manager = TdxTaskManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
 
+    def test_task_manager_uses_strategy_path_from_task_profile_when_not_explicit(self) -> None:
+        with patch(
+            "tdxquant.api.task.resolve_task_profile",
+            return_value={
+                "api_profile": "default",
+                "trade_profile": "balanced",
+                "strategy_path": "task-configured-strategy.py",
+            },
+        ):
+            manager = TdxTaskManager(profile="configured")
+
+        self.assertEqual(manager.strategy_path, "task-configured-strategy.py")
+        self.assertEqual(manager.api_manager.strategy_path, "task-configured-strategy.py")
+
     def test_task_block_sync_attaches_task_metadata_and_forwards_symbols(self) -> None:
         expected = Result(
             ok=True,
@@ -3842,6 +3866,24 @@ class TdxTaskManagerTests(unittest.TestCase):
         mocked_gp_one.assert_called_once_with(stock_list=["000001"], fields=["Now", "Volume", "Amount"])
         self.assertTrue(result.ok)
         self.assertEqual(result.data["task"]["name"], "sector_research")
+
+    def test_task_sector_research_extracts_codes_from_provider_result_shape(self) -> None:
+        sector_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": ["000001.SZ", "600519.SH"]},
+        )
+        metrics_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": []})
+        manager = TdxTaskManager(profile="sector_research", strategy_path="strategy.py")
+        with (
+            patch.object(type(manager.api_manager.meta), "sector_stocks", return_value=sector_result),
+            patch.object(type(manager.api_manager.meta), "gp_one_data", return_value=metrics_result) as mocked_gp_one,
+        ):
+            result = manager.sector_research(block_code="880001.SH")
+        mocked_gp_one.assert_called_once_with(stock_list=["000001.SZ", "600519.SH"], fields=["Now", "Volume", "Amount"])
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["stock_codes"], ["000001.SZ", "600519.SH"])
 
     def test_task_watchlist_overview_uses_profile_fields(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})

@@ -13,6 +13,7 @@ from .formula import FormulaApi
 from .market import MarketApi
 from .meta import MetaApi
 from .runtime import RuntimeApi
+from .trade_api import TradeApi
 from .transaction import TransactionApi
 
 
@@ -179,6 +180,53 @@ class _MarketManagerProxy:
             timing=timing,
         )
 
+    def get_pricevol(
+        self,
+        stock_code: str,
+        period: str = "1d",
+        start_time: str = "",
+        end_time: str = "",
+        count: int = -1,
+        dividend_type: str = "none",
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"stock_code": stock_code, "period": period, "dividend_type": dividend_type}
+        )
+        result, timing = capture_api_timing(
+            "market.get_pricevol",
+            lambda: self._manager._market_api.get_pricevol(
+                stock_code=stock_code,
+                period=period,
+                start_time=start_time,
+                end_time=end_time,
+                count=count,
+                dividend_type=dividend_type,
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="market",
+            method="get_pricevol",
+            timing=timing,
+        )
+
+    def get_trackzs_etf_info(self, stock_code: str) -> Result:
+        effective_profile = self._manager._build_effective_profile({"stock_code": stock_code})
+        result, timing = capture_api_timing(
+            "market.get_trackzs_etf_info",
+            lambda: self._manager._market_api.get_trackzs_etf_info(stock_code=stock_code),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="market",
+            method="get_trackzs_etf_info",
+            timing=timing,
+        )
+
 
 class _MetaManagerProxy:
     __slots__ = ("_manager",)
@@ -325,6 +373,46 @@ class _MetaManagerProxy:
             profile_options=effective_profile,
             domain="meta",
             method="gp_one_data",
+            timing=timing,
+        )
+
+    def get_relation(self, stock_code: str, relation_type: int) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"stock_code": stock_code, "relation_type": relation_type}
+        )
+        result, timing = capture_api_timing(
+            "meta.get_relation",
+            lambda: self._manager._dispatch_sync_capability(
+                "meta.get_relation",
+                lambda: self._manager._meta_api.get_relation(stock_code=stock_code, relation_type=relation_type),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="meta",
+            method="get_relation",
+            timing=timing,
+        )
+
+    def gb_info_by_date(self, stock_code: str, date: str) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"stock_code": stock_code, "date": date}
+        )
+        result, timing = capture_api_timing(
+            "meta.gb_info_by_date",
+            lambda: self._manager._dispatch_sync_capability(
+                "meta.gb_info_by_date",
+                lambda: self._manager._meta_api.gb_info_by_date(stock_code=stock_code, date=date),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="meta",
+            method="gb_info_by_date",
             timing=timing,
         )
 
@@ -617,6 +705,42 @@ class _FormulaManagerProxy:
             profile_options=effective_profile,
             domain="formula",
             method="process_mul_zb",
+            timing=timing,
+        )
+
+    def get_all(self) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+        result, timing = capture_api_timing(
+            "formula.get_all",
+            lambda: self._manager._dispatch_sync_capability(
+                "formula.get_all",
+                lambda: self._manager._formula_api.get_all(),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="formula",
+            method="get_all",
+            timing=timing,
+        )
+
+    def get_info(self, formula_name: str) -> Result:
+        effective_profile = self._manager._build_effective_profile({"formula_name": formula_name})
+        result, timing = capture_api_timing(
+            "formula.get_info",
+            lambda: self._manager._dispatch_sync_capability(
+                "formula.get_info",
+                lambda: self._manager._formula_api.get_info(formula_name=formula_name),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="formula",
+            method="get_info",
             timing=timing,
         )
 
@@ -1159,6 +1283,112 @@ class _RuntimeManagerProxy:
             timing=timing,
         )
 
+    def send_message(self, msg_str: str) -> Result:
+        effective_profile = self._manager._build_effective_profile({"msg_str": msg_str})
+        result, timing = capture_api_timing(
+            "runtime.send_message",
+            lambda: self._manager._runtime_api.send_message(msg_str=msg_str),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="send_message",
+            timing=timing,
+        )
+
+    def send_file(self, file: str) -> Result:
+        effective_profile = self._manager._build_effective_profile({"file": file})
+        result, timing = capture_api_timing(
+            "runtime.send_file",
+            lambda: self._manager._runtime_api.send_file(file=file),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="send_file",
+            timing=timing,
+        )
+
+    def send_bt_data(
+        self,
+        stock_code: str,
+        time_list: list[str],
+        data_list: list[list[str]],
+        count: int = 1,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"stock_code": stock_code, "count": count}
+        )
+        result, timing = capture_api_timing(
+            "runtime.send_bt_data",
+            lambda: self._manager._runtime_api.send_bt_data(
+                stock_code=stock_code, time_list=time_list, data_list=data_list, count=count
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="send_bt_data",
+            timing=timing,
+        )
+
+    def print_to_tdx(
+        self,
+        df_list: list,
+        sp_name: str = "",
+        xml_filename: str = "",
+        jsn_filenames: list[str] | None = None,
+        vertical: int | None = None,
+        horizontal: int | None = None,
+        height: list | None = None,
+        table_names: list[str] | None = None,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"sp_name": sp_name, "xml_filename": xml_filename}
+        )
+        result, timing = capture_api_timing(
+            "runtime.print_to_tdx",
+            lambda: self._manager._runtime_api.print_to_tdx(
+                df_list=df_list,
+                sp_name=sp_name,
+                xml_filename=xml_filename,
+                jsn_filenames=jsn_filenames,
+                vertical=vertical,
+                horizontal=horizontal,
+                height=height,
+                table_names=table_names,
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="print_to_tdx",
+            timing=timing,
+        )
+
+    def exec_to_tdx(self, url: str) -> Result:
+        effective_profile = self._manager._build_effective_profile({"url": url})
+        result, timing = capture_api_timing(
+            "runtime.exec_to_tdx",
+            lambda: self._manager._runtime_api.exec_to_tdx(url=url),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="runtime",
+            method="exec_to_tdx",
+            timing=timing,
+        )
+
 
 class _RuntimeManagerSubscriptionSession:
     __slots__ = ("_manager", "_raw_session", "session_id", "strategy_path")
@@ -1496,6 +1726,8 @@ class _BlockManagerProxy:
             }
         )
         options: dict[str, str] = {}
+        if write_policy is not None:
+            options["write_policy"] = write_policy
         if mutation_key is not None:
             options["mutation_key"] = mutation_key
         if audit_dir is not None:
@@ -1511,7 +1743,6 @@ class _BlockManagerProxy:
                     create_if_missing=create_if_missing,
                     dry_run=dry_run,
                     show=show,
-                    write_policy=write_policy,
                     **options,
                 ),
             ),
@@ -1522,6 +1753,152 @@ class _BlockManagerProxy:
             profile_options=effective_profile,
             domain="block",
             method="sync_watchlist",
+            timing=timing,
+        )
+
+
+class _TradeApiManagerProxy:
+    __slots__ = ("_manager",)
+
+    def __init__(self, manager: "TdxApiManager") -> None:
+        self._manager = manager
+
+    def stock_account(self, account: str = "", account_type: str = "stock") -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"account": account, "account_type": account_type}
+        )
+        result, timing = capture_api_timing(
+            "trade.stock_account",
+            lambda: self._manager._dispatch_sync_capability(
+                "trade.stock_account",
+                lambda: self._manager._trade_api.stock_account(account=account, account_type=account_type),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="trade",
+            method="stock_account",
+            timing=timing,
+        )
+
+    def order_stock(
+        self,
+        account_id: int,
+        stock_code: str,
+        order_type: int,
+        order_volume: int,
+        price_type: int,
+        price: float,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {
+                "account_id": account_id,
+                "stock_code": stock_code,
+                "order_type": order_type,
+                "order_volume": order_volume,
+                "price_type": price_type,
+            }
+        )
+        result, timing = capture_api_timing(
+            "trade.order_stock",
+            lambda: self._manager._dispatch_sync_capability(
+                "trade.order_stock",
+                lambda: self._manager._trade_api.order_stock(
+                    account_id=account_id,
+                    stock_code=stock_code,
+                    order_type=order_type,
+                    order_volume=order_volume,
+                    price_type=price_type,
+                    price=price,
+                ),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="trade",
+            method="order_stock",
+            timing=timing,
+        )
+
+    def query_stock_orders(self, account_id: int, stock_code: str = "") -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"account_id": account_id, "stock_code": stock_code}
+        )
+        result, timing = capture_api_timing(
+            "trade.query_stock_orders",
+            lambda: self._manager._dispatch_sync_capability(
+                "trade.query_stock_orders",
+                lambda: self._manager._trade_api.query_stock_orders(account_id=account_id, stock_code=stock_code),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="trade",
+            method="query_stock_orders",
+            timing=timing,
+        )
+
+    def query_stock_positions(self, account_id: int) -> Result:
+        effective_profile = self._manager._build_effective_profile({"account_id": account_id})
+        result, timing = capture_api_timing(
+            "trade.query_stock_positions",
+            lambda: self._manager._dispatch_sync_capability(
+                "trade.query_stock_positions",
+                lambda: self._manager._trade_api.query_stock_positions(account_id=account_id),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="trade",
+            method="query_stock_positions",
+            timing=timing,
+        )
+
+    def cancel_order_stock(self, account_id: int, stock_code: str, order_id: str) -> Result:
+        effective_profile = self._manager._build_effective_profile(
+            {"account_id": account_id, "stock_code": stock_code, "order_id": order_id}
+        )
+        result, timing = capture_api_timing(
+            "trade.cancel_order_stock",
+            lambda: self._manager._dispatch_sync_capability(
+                "trade.cancel_order_stock",
+                lambda: self._manager._trade_api.cancel_order_stock(
+                    account_id=account_id, stock_code=stock_code, order_id=order_id
+                ),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="trade",
+            method="cancel_order_stock",
+            timing=timing,
+        )
+
+    def query_stock_asset(self, account_id: int) -> Result:
+        effective_profile = self._manager._build_effective_profile({"account_id": account_id})
+        result, timing = capture_api_timing(
+            "trade.query_stock_asset",
+            lambda: self._manager._dispatch_sync_capability(
+                "trade.query_stock_asset",
+                lambda: self._manager._trade_api.query_stock_asset(account_id=account_id),
+            ),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            domain="trade",
+            method="query_stock_asset",
             timing=timing,
         )
 
@@ -1542,6 +1919,7 @@ class TdxApiManager:
         "_formula_api",
         "_runtime_api",
         "_block_api",
+        "_trade_api",
         "market",
         "meta",
         "financial",
@@ -1549,6 +1927,7 @@ class TdxApiManager:
         "formula",
         "runtime",
         "block",
+        "trade",
     )
 
     def __init__(
@@ -1564,18 +1943,24 @@ class TdxApiManager:
     ) -> None:
         self.profile_name = profile
         self.profile_options = resolve_api_profile(profile, overrides=profile_overrides)
-        self.strategy_path = strategy_path
+        resolved_strategy_path = strategy_path
+        if resolved_strategy_path is None:
+            profile_strategy_path = self.profile_options.get("strategy_path")
+            if isinstance(profile_strategy_path, str) and profile_strategy_path.strip():
+                resolved_strategy_path = profile_strategy_path
+        self.strategy_path = resolved_strategy_path
         self.provider_mode = normalize_provider_mode(provider_mode)
         self.replay_fixture = replay_fixture
         self.replay_fixture_path = replay_fixture_path
         self.replay_fixture_map = dict(replay_fixture_map or {})
-        self._market_api = MarketApi(strategy_path=strategy_path)
-        self._meta_api = MetaApi(strategy_path=strategy_path)
-        self._financial_api = FinancialApi(strategy_path=strategy_path)
-        self._transaction_api = TransactionApi(strategy_path=strategy_path)
-        self._formula_api = FormulaApi(strategy_path=strategy_path)
-        self._runtime_api = RuntimeApi(strategy_path=strategy_path)
-        self._block_api = BlockApi(strategy_path=strategy_path)
+        self._market_api = MarketApi(strategy_path=resolved_strategy_path)
+        self._meta_api = MetaApi(strategy_path=resolved_strategy_path)
+        self._financial_api = FinancialApi(strategy_path=resolved_strategy_path)
+        self._transaction_api = TransactionApi(strategy_path=resolved_strategy_path)
+        self._formula_api = FormulaApi(strategy_path=resolved_strategy_path)
+        self._runtime_api = RuntimeApi(strategy_path=resolved_strategy_path)
+        self._block_api = BlockApi(strategy_path=resolved_strategy_path)
+        self._trade_api = TradeApi(strategy_path=resolved_strategy_path)
         self.market = _MarketManagerProxy(self)
         self.meta = _MetaManagerProxy(self)
         self.financial = _FinancialManagerProxy(self)
@@ -1583,6 +1968,7 @@ class TdxApiManager:
         self.formula = _FormulaManagerProxy(self)
         self.runtime = _RuntimeManagerProxy(self)
         self.block = _BlockManagerProxy(self)
+        self.trade = _TradeApiManagerProxy(self)
 
     def _resolve_fields(self, field_key: str, explicit_fields: list[str] | None) -> list[str]:
         if explicit_fields is not None:

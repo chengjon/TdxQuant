@@ -121,6 +121,8 @@ class BlockApi:
         audit_dir: str | None = None,
     ) -> Result:
         options: dict[str, str] = {}
+        if write_policy is not None:
+            options["write_policy"] = write_policy
         if mutation_key is not None:
             options["mutation_key"] = mutation_key
         if audit_dir is not None:
@@ -132,7 +134,6 @@ class BlockApi:
             create_if_missing=create_if_missing,
             dry_run=dry_run,
             show=show,
-            write_policy=write_policy,
             **options,
             strategy_path=self.strategy_path,
         )

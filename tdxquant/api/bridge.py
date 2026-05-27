@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
+import os
 from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
@@ -31,6 +33,9 @@ try:
     from serial.tools import list_ports
 except ImportError:  # pragma: no cover
     list_ports = None
+
+_TQCENTER_MODULE_CACHE: dict[str, Any] = {}
+_TQCENTER_DLL_DIRECTORY_HANDLES: list[Any] = []
 
 
 def _unsupported_result(action: str) -> Result | None:
@@ -108,8 +113,8 @@ def _probe_platform() -> dict[str, Any]:
     )
 
 
-def _probe_tqcenter_module() -> dict[str, Any]:
-    tq_class, info = _load_tqcenter()
+def _probe_tqcenter_module(strategy_path: str | None = None) -> dict[str, Any]:
+    tq_class, info = _load_tqcenter(strategy_path)
     if tq_class is None:
         return _build_probe_check(
             "failed",
@@ -260,7 +265,7 @@ def _collect_provider_probe_snapshot(window_key: str, strategy_path: str | None 
     resolved_strategy_path = strategy_path or _default_strategy_path()
     checks = {
         "platform": _probe_platform(),
-        "tqcenter_module": _probe_tqcenter_module(),
+        "tqcenter_module": _probe_tqcenter_module(strategy_path),
         "query_runtime": _probe_query_runtime(strategy_path),
         "subscription_runtime": _probe_subscription_runtime(strategy_path),
         "desktop_window": _probe_desktop_window(window_key),
@@ -320,7 +325,112 @@ def _build_provider_doctor_findings(snapshot: dict[str, Any]) -> list[dict[str, 
     ]
 
 
-def _load_tqcenter() -> tuple[Any | None, dict[str, Any]]:
+def _candidate_tqcenter_files_from_path(raw_path: str | os.PathLike[str]) -> list[Path]:
+    path = Path(raw_path).expanduser()
+    candidates: list[Path] = []
+
+    if path.name.lower() == "tqcenter.py":
+        candidates.append(path)
+    if path.suffix.lower() == ".py":
+        candidates.append(path.parent / "tqcenter.py")
+        candidates.append(path.parent.parent / "sys" / "tqcenter.py")
+        candidates.append(path.parent.parent / "user" / "tqcenter.py")
+    else:
+        candidates.append(path / "tqcenter.py")
+        candidates.append(path / "sys" / "tqcenter.py")
+        candidates.append(path / "user" / "tqcenter.py")
+
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(candidate)
+    return deduped
+
+
+def _candidate_tqcenter_files(strategy_path: str | None = None) -> list[Path]:
+    candidates: list[Path] = []
+    for env_name in ("TDXQUANT_TQCENTER_PATH", "TDXQUANT_PYPLUGINS_DIR"):
+        env_value = os.environ.get(env_name)
+        if env_value:
+            candidates.extend(_candidate_tqcenter_files_from_path(env_value))
+    if strategy_path:
+        candidates.extend(_candidate_tqcenter_files_from_path(strategy_path))
+
+    resolved: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        try:
+            if not candidate.exists() or not candidate.is_file():
+                continue
+            key = str(candidate.resolve())
+        except OSError:
+            continue
+        if key not in seen:
+            seen.add(key)
+            resolved.append(candidate)
+    return resolved
+
+
+def _add_tqcenter_dll_directories(tqcenter_path: Path) -> None:
+    add_dll_directory = getattr(os, "add_dll_directory", None)
+    if add_dll_directory is None:
+        return
+    for directory in (tqcenter_path.parent, tqcenter_path.parent.parent):
+        try:
+            if directory.exists() and directory.is_dir():
+                _TQCENTER_DLL_DIRECTORY_HANDLES.append(add_dll_directory(str(directory)))
+        except OSError:
+            continue
+
+
+def _load_external_tqcenter(tqcenter_path: Path) -> Any:
+    resolved_path = tqcenter_path.resolve()
+    cache_key = str(resolved_path)
+    cached = _TQCENTER_MODULE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    _add_tqcenter_dll_directories(resolved_path)
+    module_name = f"_tdxquant_external_tqcenter_{len(_TQCENTER_MODULE_CACHE)}"
+    spec = importlib.util.spec_from_file_location(module_name, str(resolved_path))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"could not load tqcenter spec from {resolved_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _TQCENTER_MODULE_CACHE[cache_key] = module
+    return module
+
+
+def _load_tqcenter(strategy_path: str | None = None) -> tuple[Any | None, dict[str, Any]]:
+    external_errors: list[str] = []
+    for candidate in _candidate_tqcenter_files(strategy_path):
+        try:
+            module = _load_external_tqcenter(candidate)
+        except Exception as exc:
+            external_errors.append(f"{candidate}: {exc}")
+            continue
+        tq_class = getattr(module, "tq", None)
+        if tq_class is None:
+            external_errors.append(f"{candidate}: tqcenter.tq is unavailable")
+            continue
+        return tq_class, {
+            "available": True,
+            "module": "tqcenter",
+            "module_path": str(candidate.resolve()),
+            "module_source": "external",
+        }
+
+    if external_errors:
+        return None, {
+            "available": False,
+            "error": "; ".join(external_errors),
+            "module": "tqcenter",
+            "module_source": "external",
+        }
+
     try:
         module = importlib.import_module("tqcenter")
     except Exception as exc:
@@ -328,19 +438,27 @@ def _load_tqcenter() -> tuple[Any | None, dict[str, Any]]:
     tq_class = getattr(module, "tq", None)
     if tq_class is None:
         return None, {"available": False, "error": "tqcenter.tq is unavailable", "module": "tqcenter"}
-    return tq_class, {"available": True, "module": "tqcenter"}
+    info = {"available": True, "module": "tqcenter"}
+    module_path = getattr(module, "__file__", None)
+    if module_path:
+        info["module_path"] = str(module_path)
+    return tq_class, info
 
 
 def _init_tqcenter(strategy_path: str | None = None) -> tuple[Any | None, dict[str, Any]]:
-    tq_class, info = _load_tqcenter()
+    tq_class, info = _load_tqcenter(strategy_path)
     if tq_class is None:
         return None, info
     selected_path = strategy_path or _default_strategy_path()
     try:
         tq_class.initialize(selected_path)
     except Exception as exc:
-        return None, {"available": False, "error": str(exc), "strategy_path": selected_path, "module": "tqcenter"}
-    return tq_class, {"available": True, "strategy_path": selected_path, "module": "tqcenter"}
+        failed_info = dict(info)
+        failed_info.update({"available": False, "error": str(exc), "strategy_path": selected_path, "module": "tqcenter"})
+        return None, failed_info
+    ready_info = dict(info)
+    ready_info.update({"available": True, "strategy_path": selected_path, "module": "tqcenter"})
+    return tq_class, ready_info
 
 
 def _run_tq_call(action: str, callback, strategy_path: str | None = None) -> Result:
@@ -665,12 +783,29 @@ def run_tdx_bridge_health(
     )
 
 
+def _filter_payload_fields(payload: Any, field_list: list[str]) -> Any:
+    if not field_list or not isinstance(payload, dict):
+        return payload
+    requested = {str(field).lower() for field in field_list}
+    identity_fields = {"code", "stock", "stock_code", "symbol"}
+    return {
+        key: value
+        for key, value in payload.items()
+        if str(key).lower() in requested or str(key).lower() in identity_fields
+    }
+
+
 def run_tdx_full_tick(stock_code: str, field_list: list[str], strategy_path: str | None = None) -> Result:
     def callback(tq_class):
-        payload = tq_class.get_full_tick(stock_code=stock_code)
-        if field_list:
-            payload = tq_class.filter_dict_by_fields(payload, field_list)
-        return payload
+        full_tick = getattr(tq_class, "get_full_tick", None)
+        if callable(full_tick):
+            payload = full_tick(stock_code=stock_code)
+            filter_method = getattr(tq_class, "filter_dict_by_fields", None)
+            if field_list and callable(filter_method):
+                return filter_method(payload, field_list)
+            return _filter_payload_fields(payload, field_list)
+        market_snapshot = _require_tq_method(tq_class, "get_market_snapshot")
+        return _filter_payload_fields(market_snapshot(stock_code=stock_code, field_list=field_list), field_list)
 
     return _run_tq_call("fetched TongDaXin full tick data", callback, strategy_path=strategy_path)
 
@@ -852,8 +987,52 @@ def run_tdx_gb_info(stock_code: str, date_list: list[str], count: int, strategy_
     return _run_tq_call("fetched TongDaXin equity structure info", callback, strategy_path=strategy_path)
 
 
+_QUOTE_FIELD_NAMES = {
+    "amount",
+    "average",
+    "before5minnow",
+    "buyp",
+    "buyv",
+    "downhome",
+    "high",
+    "inside",
+    "inoutflag",
+    "itemnum",
+    "jjjz",
+    "lastclose",
+    "low",
+    "max",
+    "min",
+    "now",
+    "nowvol",
+    "open",
+    "outside",
+    "sellp",
+    "sellv",
+    "tickdiff",
+    "uphome",
+    "volume",
+    "xsflag",
+    "zafpre3",
+    "zangsu",
+}
+
+
+def _looks_like_quote_field_list(field_list: list[str]) -> bool:
+    normalized = [str(field).strip() for field in field_list if str(field).strip()]
+    if not normalized:
+        return False
+    return all(field.lower() in _QUOTE_FIELD_NAMES for field in normalized)
+
+
 def run_tdx_gp_one_data(stock_list: list[str], field_list: list[str], strategy_path: str | None = None) -> Result:
     def callback(tq_class):
+        if _looks_like_quote_field_list(field_list):
+            method = _require_tq_method(tq_class, "get_market_snapshot")
+            return {
+                stock_code: method(stock_code=stock_code, field_list=field_list)
+                for stock_code in stock_list
+            }
         method = _require_tq_method(tq_class, "get_gp_one_data")
         return method(stock_list=stock_list, field_list=field_list)
 
@@ -1110,6 +1289,36 @@ def run_tdx_send_warn(
         )
 
     return _run_tq_call("sent TongDaXin client warn payload", callback, strategy_path=strategy_path)
+
+
+def run_tdx_send_message(msg_str: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_message")
+        return method(msg_str)
+
+    return _run_tq_call("sent TongDaXin client message", callback, strategy_path=strategy_path)
+
+
+def run_tdx_send_file(file: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_file")
+        return method(file)
+
+    return _run_tq_call("sent TongDaXin client file", callback, strategy_path=strategy_path)
+
+
+def run_tdx_send_bt_data(
+    stock_code: str,
+    time_list: list[str],
+    data_list: list[list[str]],
+    count: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_bt_data")
+        return method(stock_code=stock_code, time_list=time_list, data_list=data_list, count=count)
+
+    return _run_tq_call("sent TongDaXin client backtest data", callback, strategy_path=strategy_path)
 
 
 def run_tdx_get_user_sector(strategy_path: str | None = None) -> Result:
@@ -1588,3 +1797,174 @@ def run_tdx_formula_process_mul_zb(
         )
 
     return _run_tq_call("executed TongDaXin batch indicator formula", callback, strategy_path=strategy_path)
+
+
+# ---------------------------------------------------------------------------
+# Group B: documented-only functions (forward-compatible via _require_tq_method)
+# ---------------------------------------------------------------------------
+
+
+def run_tdx_get_relation(stock_code: str, relation_type: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_relation")
+        return method(stock_code=stock_code, relation_type=relation_type)
+
+    return _run_tq_call("fetched TongDaXin stock relation data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_gb_info_by_date(stock_code: str, date: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "gb_info_by_date")
+        return method(stock_code=stock_code, date=date)
+
+    return _run_tq_call("fetched TongDaXin stock board info by date", callback, strategy_path=strategy_path)
+
+
+def run_tdx_get_pricevol(
+    stock_code: str,
+    period: str,
+    start_time: str,
+    end_time: str,
+    count: int,
+    dividend_type: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_pricevol")
+        return method(
+            stock_code=stock_code,
+            period=period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+        )
+
+    return _run_tq_call("fetched TongDaXin price-volume data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_get_trackzs_etf_info(stock_code: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_trackzs_etf_info")
+        return method(stock_code=stock_code)
+
+    return _run_tq_call("fetched TongDaXin ETF tracking index info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_get_all(strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_get_all")
+        return method()
+
+    return _run_tq_call("fetched TongDaXin all formula list", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_get_info(formula_name: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_get_info")
+        return method(formula_name=formula_name)
+
+    return _run_tq_call("fetched TongDaXin formula info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_print_to_tdx(
+    df_list: list,
+    sp_name: str = "",
+    xml_filename: str = "",
+    jsn_filenames: list[str] | None = None,
+    vertical: int | None = None,
+    horizontal: int | None = None,
+    height: list | None = None,
+    table_names: list[str] | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "print_to_tdx")
+        return method(
+            df_list=df_list,
+            sp_name=sp_name,
+            xml_filename=xml_filename,
+            jsn_filenames=jsn_filenames or [],
+            vertical=vertical,
+            horizontal=horizontal,
+            height=height or [],
+            table_names=table_names or [],
+        )
+
+    return _run_tq_call("exported data to TongDaXin client", callback, strategy_path=strategy_path)
+
+
+def run_tdx_exec_to_tdx(url: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "exec_to_tdx")
+        return method(url=url)
+
+    return _run_tq_call("executed TongDaXin client command", callback, strategy_path=strategy_path)
+
+
+# ---------------------------------------------------------------------------
+# Group C: trading domain functions
+# ---------------------------------------------------------------------------
+
+
+def run_tdx_stock_account(account: str, account_type: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "stock_account")
+        return method(account=account, account_type=account_type)
+
+    return _run_tq_call("acquired TongDaXin stock account handle", callback, strategy_path=strategy_path)
+
+
+def run_tdx_order_stock(
+    account_id: int,
+    stock_code: str,
+    order_type: int,
+    order_volume: int,
+    price_type: int,
+    price: float,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "order_stock")
+        return method(
+            account_id=account_id,
+            stock_code=stock_code,
+            order_type=order_type,
+            order_volume=order_volume,
+            price_type=price_type,
+            price=price,
+        )
+
+    return _run_tq_call("submitted TongDaXin stock order", callback, strategy_path=strategy_path)
+
+
+def run_tdx_query_stock_orders(account_id: int, stock_code: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "query_stock_orders")
+        return method(account_id=account_id, stock_code=stock_code)
+
+    return _run_tq_call("queried TongDaXin stock orders", callback, strategy_path=strategy_path)
+
+
+def run_tdx_query_stock_positions(account_id: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "query_stock_positions")
+        return method(account_id=account_id)
+
+    return _run_tq_call("queried TongDaXin stock positions", callback, strategy_path=strategy_path)
+
+
+def run_tdx_cancel_order_stock(account_id: int, stock_code: str, order_id: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "cancel_order_stock")
+        return method(account_id=account_id, stock_code=stock_code, order_id=order_id)
+
+    return _run_tq_call("cancelled TongDaXin stock order", callback, strategy_path=strategy_path)
+
+
+def run_tdx_query_stock_asset(account_id: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "query_stock_asset")
+        return method(account_id=account_id)
+
+    return _run_tq_call("queried TongDaXin stock asset", callback, strategy_path=strategy_path)

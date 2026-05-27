@@ -88,7 +88,7 @@ def _extract_stock_codes(payload: Any) -> list[str]:
                         break
         return codes
     if isinstance(payload, dict):
-        for key in ("stocks", "stock_list", "rows", "items", "data"):
+        for key in ("stocks", "stock_list", "rows", "items", "result", "data"):
             if key in payload:
                 codes = _extract_stock_codes(payload[key])
                 if codes:
@@ -104,7 +104,7 @@ def _extract_rows(payload: Any) -> list[dict[str, Any]]:
                 rows.append(dict(item))
         return rows
     if isinstance(payload, dict):
-        for key in ("rows", "items", "data", "stocks", "stock_list"):
+        for key in ("rows", "items", "result", "data", "stocks", "stock_list"):
             if key in payload:
                 rows = _extract_rows(payload[key])
                 if rows:
@@ -1086,12 +1086,17 @@ class TdxTaskManager:
     ) -> None:
         self.profile_name = profile
         self.profile_options = resolve_task_profile(profile, overrides=profile_overrides)
-        self.strategy_path = strategy_path
+        resolved_strategy_path = strategy_path
+        if resolved_strategy_path is None:
+            profile_strategy_path = self.profile_options.get("strategy_path")
+            if isinstance(profile_strategy_path, str) and profile_strategy_path.strip():
+                resolved_strategy_path = profile_strategy_path
+        self.strategy_path = resolved_strategy_path
         resolved_api_profile = api_profile or str(self.profile_options.get("api_profile", "default"))
         resolved_trade_profile = trade_profile or str(self.profile_options.get("trade_profile", "balanced"))
         self.api_manager = TdxApiManager(
             profile=resolved_api_profile,
-            strategy_path=strategy_path,
+            strategy_path=resolved_strategy_path,
             profile_overrides=api_profile_overrides,
             provider_mode=provider_mode,
             replay_fixture=replay_fixture,
@@ -1240,6 +1245,9 @@ class TdxTaskManager:
         mutation_key: str | None = None,
         audit_dir: str | None = None,
     ) -> Result:
+        options: dict[str, Any] = {}
+        if write_policy is not None:
+            options["write_policy"] = write_policy
         result, timing = _capture_task_timing(
             "task.block_sync",
             lambda: self.api_manager.block.sync_watchlist(
@@ -1249,7 +1257,7 @@ class TdxTaskManager:
                 create_if_missing=create_if_missing,
                 dry_run=dry_run,
                 show=show,
-                write_policy=write_policy,
+                **options,
                 mutation_key=mutation_key,
                 audit_dir=audit_dir,
             ),
@@ -1355,7 +1363,6 @@ class TdxTaskManager:
             if not result.ok:
                 return result
 
-            snapshot = result.data.get("snapshot")
             export_metadata = {"output_path": str(output)}
 
             def fail_result(
@@ -1372,14 +1379,6 @@ class TdxTaskManager:
                 result.data["export"] = {**export_metadata, "error": error}
                 return result
 
-            if not isinstance(snapshot, dict):
-                return fail_result(
-                    code=ErrorCode.EXECUTION_FAILED,
-                    message="block watchlist export requires a snapshot object from the upstream provider",
-                    error="snapshot payload missing or not an object",
-                    next_action="Inspect the upstream block snapshot payload and retry once it returns data.snapshot as an object.",
-                )
-
             try:
                 output_path = Path(output).expanduser().resolve()
             except (OSError, RuntimeError, ValueError) as exc:
@@ -1391,6 +1390,15 @@ class TdxTaskManager:
                 )
 
             export_metadata["output_path"] = str(output_path)
+
+            snapshot = result.data.get("snapshot")
+            if not isinstance(snapshot, dict):
+                return fail_result(
+                    code=ErrorCode.EXECUTION_FAILED,
+                    message="block watchlist export requires a snapshot object from the upstream provider",
+                    error="snapshot payload missing or not an object",
+                    next_action="Inspect the upstream block snapshot payload and retry once it returns data.snapshot as an object.",
+                )
 
             if output_path.exists() and output_path.is_dir():
                 return fail_result(
