@@ -1090,6 +1090,97 @@ def _build_api_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     api_formula_mul_zb_parser.add_argument("--dividend-type", default=0, type=int, choices=[0, 1, 2])
     _add_api_common_arguments(api_formula_mul_zb_parser)
 
+    # --- Group A: send_message, send_file, send_bt_data ---
+    api_send_message_parser = api_subparsers.add_parser("send-message")
+    api_send_message_parser.add_argument("--msg", required=True)
+    _add_api_common_arguments(api_send_message_parser)
+
+    api_send_file_parser = api_subparsers.add_parser("send-file")
+    api_send_file_parser.add_argument("--file", required=True)
+    _add_api_common_arguments(api_send_file_parser)
+
+    api_send_bt_data_parser = api_subparsers.add_parser("send-bt-data")
+    api_send_bt_data_parser.add_argument("--code", required=True)
+    api_send_bt_data_parser.add_argument("--time", action="append", required=True)
+    api_send_bt_data_parser.add_argument("--data", action="append", required=True)
+    api_send_bt_data_parser.add_argument("--count", type=int, default=1)
+    _add_api_common_arguments(api_send_bt_data_parser)
+
+    # --- Group B: documented-only functions ---
+    api_get_relation_parser = api_subparsers.add_parser("get-relation")
+    api_get_relation_parser.add_argument("--code", required=True)
+    api_get_relation_parser.add_argument("--relation-type", required=True, type=int)
+    _add_api_common_arguments(api_get_relation_parser)
+
+    api_gb_info_by_date_parser = api_subparsers.add_parser("gb-info-by-date")
+    api_gb_info_by_date_parser.add_argument("--code", required=True)
+    api_gb_info_by_date_parser.add_argument("--date", required=True)
+    _add_api_common_arguments(api_gb_info_by_date_parser)
+
+    api_get_pricevol_parser = api_subparsers.add_parser("get-pricevol")
+    api_get_pricevol_parser.add_argument("--code", required=True)
+    api_get_pricevol_parser.add_argument("--period", default="1d")
+    api_get_pricevol_parser.add_argument("--start-time", default="")
+    api_get_pricevol_parser.add_argument("--end-time", default="")
+    api_get_pricevol_parser.add_argument("--count", type=int, default=-1)
+    api_get_pricevol_parser.add_argument("--dividend-type", choices=["none", "front", "back"])
+    _add_api_common_arguments(api_get_pricevol_parser)
+
+    api_get_trackzs_etf_info_parser = api_subparsers.add_parser("get-trackzs-etf-info")
+    api_get_trackzs_etf_info_parser.add_argument("--code", required=True)
+    _add_api_common_arguments(api_get_trackzs_etf_info_parser)
+
+    api_formula_get_all_parser = api_subparsers.add_parser("formula-get-all")
+    _add_api_common_arguments(api_formula_get_all_parser)
+
+    api_formula_get_info_parser = api_subparsers.add_parser("formula-get-info")
+    api_formula_get_info_parser.add_argument("--formula-name", required=True)
+    _add_api_common_arguments(api_formula_get_info_parser)
+
+    api_print_to_tdx_parser = api_subparsers.add_parser("print-to-tdx")
+    api_print_to_tdx_parser.add_argument("--input-json-file", required=True)
+    api_print_to_tdx_parser.add_argument("--sp-name", default="")
+    api_print_to_tdx_parser.add_argument("--xml-filename", default="")
+    _add_api_common_arguments(api_print_to_tdx_parser)
+
+    api_exec_to_tdx_parser = api_subparsers.add_parser("exec-to-tdx")
+    api_exec_to_tdx_parser.add_argument("--url", required=True)
+    _add_api_common_arguments(api_exec_to_tdx_parser)
+
+    # --- Group C: trading domain ---
+    api_stock_account_parser = api_subparsers.add_parser("stock-account")
+    api_stock_account_parser.add_argument("--account", default="")
+    api_stock_account_parser.add_argument("--account-type", default="stock", choices=["stock", "credit", "future", "option"])
+    _add_api_common_arguments(api_stock_account_parser)
+
+    api_order_stock_parser = api_subparsers.add_parser("order-stock")
+    api_order_stock_parser.add_argument("--account-id", required=True, type=int)
+    api_order_stock_parser.add_argument("--code", required=True)
+    api_order_stock_parser.add_argument("--order-type", required=True, type=int)
+    api_order_stock_parser.add_argument("--order-volume", required=True, type=int)
+    api_order_stock_parser.add_argument("--price-type", required=True, type=int, choices=[0, 1, 2, 3])
+    api_order_stock_parser.add_argument("--price", required=True, type=float)
+    _add_api_common_arguments(api_order_stock_parser)
+
+    api_query_stock_orders_parser = api_subparsers.add_parser("query-stock-orders")
+    api_query_stock_orders_parser.add_argument("--account-id", required=True, type=int)
+    api_query_stock_orders_parser.add_argument("--code", default="")
+    _add_api_common_arguments(api_query_stock_orders_parser)
+
+    api_query_stock_positions_parser = api_subparsers.add_parser("query-stock-positions")
+    api_query_stock_positions_parser.add_argument("--account-id", required=True, type=int)
+    _add_api_common_arguments(api_query_stock_positions_parser)
+
+    api_cancel_order_stock_parser = api_subparsers.add_parser("cancel-order-stock")
+    api_cancel_order_stock_parser.add_argument("--account-id", required=True, type=int)
+    api_cancel_order_stock_parser.add_argument("--code", required=True)
+    api_cancel_order_stock_parser.add_argument("--order-id", required=True)
+    _add_api_common_arguments(api_cancel_order_stock_parser)
+
+    api_query_stock_asset_parser = api_subparsers.add_parser("query-stock-asset")
+    api_query_stock_asset_parser.add_argument("--account-id", required=True, type=int)
+    _add_api_common_arguments(api_query_stock_asset_parser)
+
     return api_parser
 
 
@@ -4696,6 +4787,64 @@ def _handle_api_subcommand(args: argparse.Namespace) -> Result:
             count=args.count,
             dividend_type=args.dividend_type,
         )
+    if args.api_command == "send-message":
+        return manager.runtime.send_message(msg_str=args.msg)
+    if args.api_command == "send-file":
+        return manager.runtime.send_file(file=args.file)
+    if args.api_command == "send-bt-data":
+        return manager.runtime.send_bt_data(
+            stock_code=args.code,
+            time_list=args.time,
+            data_list=[[v] for v in (args.data or [])],
+            count=args.count,
+        )
+    if args.api_command == "get-relation":
+        return manager.meta.get_relation(stock_code=args.code, relation_type=args.relation_type)
+    if args.api_command == "gb-info-by-date":
+        return manager.meta.gb_info_by_date(stock_code=args.code, date=args.date)
+    if args.api_command == "get-pricevol":
+        return manager.market.get_pricevol(
+            stock_code=args.code,
+            period=args.period,
+            start_time=args.start_time,
+            end_time=args.end_time,
+            count=args.count,
+            dividend_type=args.dividend_type or "none",
+        )
+    if args.api_command == "get-trackzs-etf-info":
+        return manager.market.get_trackzs_etf_info(stock_code=args.code)
+    if args.api_command == "formula-get-all":
+        return manager.formula.get_all()
+    if args.api_command == "formula-get-info":
+        return manager.formula.get_info(formula_name=args.formula_name)
+    if args.api_command == "print-to-tdx":
+        payload = json.loads(Path(args.input_json_file).read_text(encoding="utf-8"))
+        return manager.runtime.print_to_tdx(**payload)
+    if args.api_command == "exec-to-tdx":
+        return manager.runtime.exec_to_tdx(url=args.url)
+    if args.api_command == "stock-account":
+        return manager.trade.stock_account(account=args.account, account_type=args.account_type)
+    if args.api_command == "order-stock":
+        return manager.trade.order_stock(
+            account_id=args.account_id,
+            stock_code=args.code,
+            order_type=args.order_type,
+            order_volume=args.order_volume,
+            price_type=args.price_type,
+            price=args.price,
+        )
+    if args.api_command == "query-stock-orders":
+        return manager.trade.query_stock_orders(account_id=args.account_id, stock_code=args.code)
+    if args.api_command == "query-stock-positions":
+        return manager.trade.query_stock_positions(account_id=args.account_id)
+    if args.api_command == "cancel-order-stock":
+        return manager.trade.cancel_order_stock(
+            account_id=args.account_id,
+            stock_code=args.code,
+            order_id=args.order_id,
+        )
+    if args.api_command == "query-stock-asset":
+        return manager.trade.query_stock_asset(account_id=args.account_id)
     return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported api subcommand: {args.api_command}")
 
 
@@ -5631,6 +5780,7 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
 
     if governance:
         governance_view: dict[str, object] = {}
+        sample_summary: dict[str, object] = {}
         for key in (
             "decision",
             "requires_manual_review",
@@ -5648,6 +5798,7 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
         if isinstance(reasons, list):
             reason_count = len(reasons)
             governance_view["reason_count"] = reason_count
+            sample_summary["reason_count"] = reason_count
             reason_samples = [reason for reason in reasons if isinstance(reason, str)][
                 :WATCH_STATUS_REASON_SAMPLE_LIMIT
             ]
@@ -5657,10 +5808,15 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             governance_view["reason_sample_hidden_count"] = max(reason_count - reason_sample_count, 0)
             governance_view["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
             governance_view["reason_sample_truncated"] = reason_count > reason_sample_count
+            sample_summary["reason_sample_count"] = reason_sample_count
+            sample_summary["reason_sample_hidden_count"] = max(reason_count - reason_sample_count, 0)
+            sample_summary["reason_sample_limit"] = WATCH_STATUS_REASON_SAMPLE_LIMIT
+            sample_summary["reason_sample_truncated"] = reason_count > reason_sample_count
         actions = governance.get("actions")
         if isinstance(actions, list):
             action_count = len(actions)
             governance_view["action_count"] = action_count
+            sample_summary["action_count"] = action_count
             action_samples = _build_bridge_watch_status_action_samples(actions)
             action_sample_count = len(action_samples)
             governance_view["action_samples"] = action_samples
@@ -5668,6 +5824,12 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             governance_view["action_sample_hidden_count"] = max(action_count - action_sample_count, 0)
             governance_view["action_sample_limit"] = WATCH_STATUS_ACTION_SAMPLE_LIMIT
             governance_view["action_sample_truncated"] = action_count > action_sample_count
+            sample_summary["action_sample_count"] = action_sample_count
+            sample_summary["action_sample_hidden_count"] = max(action_count - action_sample_count, 0)
+            sample_summary["action_sample_limit"] = WATCH_STATUS_ACTION_SAMPLE_LIMIT
+            sample_summary["action_sample_truncated"] = action_count > action_sample_count
+        if sample_summary:
+            governance_view["sample_summary"] = sample_summary
         summary_view["governance"] = governance_view
 
     return {"ok": True, "result": summary_view}

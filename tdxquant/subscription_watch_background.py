@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import errno
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -14,6 +13,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .subscription_watch_run import build_subscription_watch_run_paths
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on native Windows
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - exercised on non-Windows platforms
+    msvcrt = None
 
 DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
 DEFAULT_START_TIMEOUT_SECONDS = 10
@@ -730,7 +739,7 @@ def _acquire_control_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None
     paths.root_dir.mkdir(parents=True, exist_ok=True)
     handle = paths.lock_path.open("a+", encoding="utf-8")
     try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _lock_control_file(handle)
     except OSError as exc:
         handle.close()
         if exc.errno in {errno.EACCES, errno.EAGAIN}:
@@ -741,9 +750,34 @@ def _acquire_control_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None
 
 def _release_control_lock(handle: Any) -> None:
     try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        _unlock_control_file(handle)
     finally:
         handle.close()
+
+
+def _lock_control_file(handle: Any) -> None:
+    if fcntl is not None:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return
+    if msvcrt is None:
+        raise RuntimeError("file locking is unavailable on this platform")
+    handle.seek(0)
+    if not handle.read(1):
+        handle.seek(0)
+        handle.write("0")
+        handle.flush()
+    handle.seek(0)
+    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+
+
+def _unlock_control_file(handle: Any) -> None:
+    if fcntl is not None:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return
+    if msvcrt is None:
+        return
+    handle.seek(0)
+    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def read_active_payload(paths: SubscriptionWatchBackgroundPaths) -> dict[str, Any] | None:

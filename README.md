@@ -27,6 +27,7 @@ python -m tdxquant.cli tdx-trade-buy-probe --window-key 通达信金融终端 --
 
 - 主要实现依据是 `tdx-docs/TdxQuant接口说明文档.md` 和真实客户端联调结果。
 - 转换质量较差的“红宝书”类文档只可作背景参考，当前不直接作为开发依据。
+- `D:\MyCode3\tdx` 功能面合并的状态口径记录在 `docs/TdxQuant_tdx_functional_surface_merge.md`；最终功能状态仍以 `FUNCTION_TREE.md` 为准。
 
 TdxQuant 简介
 https://help.tdx.com.cn/quant/docs/
@@ -108,10 +109,11 @@ TdxQuant是一款集金融数据与策略投研工具于一体的量化平台，
 
 说明：
 
-- 这一节保留的是平安证券与早期 Win32/UIA 试验记录。
-- 当前主线开发已转向通达信 bridge；平安证券不再作为本分支的主目标。
+- 这一节保留平安证券与 Win32/UIA/HID 真实机联调记录。
+- 平安证券仍属于隔离的桌面自动化交易能力；查询、数据、公式主线仍优先走通达信 bridge。
+- 当前采纳的平安证券可用结论是混合链路，不是纯后台 Win32 或纯 UIA 自动化。
 
-仓库中新增了一个面向平安证券客户端的 Win32 后台交易适配骨架，入口为 `python -m tdxquant.cli`。
+仓库中保留并维护面向平安证券客户端的桌面交易适配能力，入口为 `python -m tdxquant.cli`。
 
 ### 运行前提
 
@@ -169,8 +171,8 @@ python -m tdxquant.cli buy --code 000001 --quantity 100 --price 12.34 --dry-run
 - `uia-read`：读回指定 UIA 节点的当前状态，包括 `window_text`、`rich_text`、`legacy_value`、`handle`
 - `uia-combobox-items`：读取指定 UIA 下拉框的候选项
 - `uia-combobox-select`：按文本选择指定 UIA 下拉框项
-- `pingan-probe`：一键执行平安证券纯非物理买入探测链路，自动完成填值、依次尝试 `invoke/bm_click/wm_command/enter_key`、前后读回、窗口枚举、UIA 快照
-- `pingan-buy-submit-once`：自动完成平安证券买入下单、推进确认、关闭结果窗；执行完成后主界面恢复到可继续下一单的状态，并把合同号回填到命令 JSON、`runtime/pingan-last-order.json` 和 stderr 日志
+- `pingan-probe`：一键执行平安证券买入探测链路，自动完成填值、依次尝试 `invoke/bm_click/wm_command/enter_key`、前后读回、窗口枚举、UIA 快照
+- `pingan-buy-submit-once`：按 UIA 填单、HID 首次触发确认、Win32 `WM_COMMAND` 推进确认、HID 关闭结果窗的混合链路自动完成平安证券买入下单；执行完成后主界面恢复到可继续下一单的状态，并把合同号回填到命令 JSON、`runtime/pingan-last-order.json` 和 stderr 日志
 - `pingan-buy`：`pingan-buy-submit-once` 的高层封装命令，固定流程并提供 `stable|balanced|fast` 三档 profile；支持少量常用参数和高级延时覆盖，并在结果 JSON 中输出 `timing` 耗时信息
 - `hid-ping`：对 Arduino HID 桥接设备发送 `PING`，确认串口和协议正常
 - `hid-send`：向 HID 设备发送单条串口协议命令，例如 `KEY CTRL+A` 或 `TYPE 000001 TAB`
@@ -237,19 +239,20 @@ UIA 执行命令现在会先尝试恢复并前置主窗口，避免交易面板�
   - `9100` 预估金额
 - 已验证 `12015` 当前值为 `深A 0118727906`，`1129` 当前值为 `限价委托`，它们本身不是明显的阻塞点。
 
-纯非物理提交能力的最终结论：
+混合链路提交能力的最终结论：
 
 - 已测试 `invoke`
 - 已测试 `bm_click`
 - 已测试 `wm_command`
 - 已测试 `enter_key`
-- 以上非物理策略都能命中按钮链路，但都只能触发买入面板内部的局部状态清空/刷新，未进入确认框、委托确认或报单结果流程。
-- 因此，对当前这个平安证券客户端版本，`读值/填值/状态探测` 是可行的，`纯非物理最终提交` 目前不可确认可行，工程上应视为未打通。
+- 以上纯 Win32/UIA 非物理策略可以命中部分按钮链路，但不能单独稳定完成最终交易闭环。
+- 引入 HID 键盘桥后，已验证可用稳定混合链路：UIA 写入字段、HID `Tab + Enter` 触发首次确认、Win32 `WM_COMMAND` 推进买入确认、HID `Enter` 关闭结果提示窗。
+- 因此，对当前这个平安证券客户端版本，自动买入闭环应按“UIA + HID + Win32”混合链路登记为可用，而不是登记为纯后台消息链路。
 
 建议的工程结论：
 
-- 若要求“不能使用物理点击”，则平安证券当前线路应收口为“填单与状态探测工具”，不要宣称已支持最终下单。
-- 若后续目标是纯非物理实盘提交流程，建议切换到更接近标准 Win32 交易窗的客户端继续验证，例如通达信经典交易窗。
+- 若要求“不使用人工物理点击”，平安证券当前混合链路可以满足该约束，但运行时仍依赖 HID 设备、窗口状态、客户端登录状态和交易安全参数。
+- 若后续目标是纯 Win32/UIA 后台实盘提交流程，需要单独验证，不应由当前混合链路结论推导。
 
 推荐验证闭环：
 
@@ -266,5 +269,6 @@ UIA 执行命令现在会先尝试恢复并前置主窗口，避免交易面板�
 - 当前匹配器已经会结合相邻标签、同父控件顺序和矩形位置做推断，但仍需要拿真实客户端的 `inspect` 输出做最后收敛。
 - 对 WebView 版本客户端，已新增 UIA 探测与离线分析命令，用于判断 HTML 输入框和按钮是否暴露给 Windows 无障碍树。
 - 对通达信线路，已新增 HID 串口桥接和 `tdx-hid-buy-probe` 命令，用于只替换证券代码输入这一个阻塞环节。
-- 当前尚未处理买入后的确认弹窗、风控提示、委托回报查询、卖出和撤单。
+- 平安证券线路已经具备买入确认推进、结果提示关闭、合同号回填和连续下单前的主窗口恢复判定；卖出、submit-once、审计和 ledger 能力以 `FUNCTION_TREE.md` 当前登记为准。
+- 通达信线路当前仍是探测/诊断能力：可填值、读回、触发提示和切换主证券上下文，但完整自动下单仍受“证券代码输入未被交易业务层接受”阻塞。
 - `inspect`、`detect`、`buy` 在 WSL/Linux 下会返回 `unsupported_platform`，这是预期行为。

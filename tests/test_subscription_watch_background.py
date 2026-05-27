@@ -1339,11 +1339,12 @@ def test_start_rejects_when_control_lock_is_held_by_other_process(tmp_path: Path
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     tmp_path.mkdir(parents=True, exist_ok=True)
     lock_script = (
-        "import fcntl, pathlib, sys, time; "
+        "import pathlib, sys, time; "
+        "from tdxquant.subscription_watch_background import _lock_control_file; "
         "path = pathlib.Path(sys.argv[1]); "
         "path.parent.mkdir(parents=True, exist_ok=True); "
         "handle = path.open('a+', encoding='utf-8'); "
-        "fcntl.flock(handle.fileno(), fcntl.LOCK_EX); "
+        "_lock_control_file(handle); "
         "print('ready', flush=True); "
         "time.sleep(10)"
     )

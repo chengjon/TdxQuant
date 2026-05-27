@@ -9463,6 +9463,18 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "action_sample_hidden_count": 1,
                         "action_sample_limit": 3,
                         "action_sample_truncated": True,
+                        "sample_summary": {
+                            "reason_count": 4,
+                            "reason_sample_count": 3,
+                            "reason_sample_hidden_count": 1,
+                            "reason_sample_limit": 3,
+                            "reason_sample_truncated": True,
+                            "action_count": 4,
+                            "action_sample_count": 3,
+                            "action_sample_hidden_count": 1,
+                            "action_sample_limit": 3,
+                            "action_sample_truncated": True,
+                        },
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat"],
                             "stale_components": ["heartbeat"],
@@ -9491,6 +9503,21 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertEqual(summary_payload["governance"]["reason_sample_hidden_count"], 1)
         self.assertEqual(summary_payload["governance"]["action_sample_count"], 3)
         self.assertEqual(summary_payload["governance"]["action_sample_hidden_count"], 1)
+        self.assertEqual(
+            summary_payload["governance"]["sample_summary"],
+            {
+                "reason_count": 4,
+                "reason_sample_count": 3,
+                "reason_sample_hidden_count": 1,
+                "reason_sample_limit": 3,
+                "reason_sample_truncated": True,
+                "action_count": 4,
+                "action_sample_count": 3,
+                "action_sample_hidden_count": 1,
+                "action_sample_limit": 3,
+                "action_sample_truncated": True,
+            },
+        )
 
     def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(

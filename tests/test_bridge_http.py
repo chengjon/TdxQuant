@@ -671,6 +671,21 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["governance"]["action_sample_limit"], 3)
         self.assertEqual(payload["result"]["governance"]["action_sample_truncated"], True)
         self.assertEqual(
+            payload["result"]["governance"]["sample_summary"],
+            {
+                "reason_count": 4,
+                "reason_sample_count": 3,
+                "reason_sample_hidden_count": 1,
+                "reason_sample_limit": 3,
+                "reason_sample_truncated": True,
+                "action_count": 4,
+                "action_sample_count": 3,
+                "action_sample_hidden_count": 1,
+                "action_sample_limit": 3,
+                "action_sample_truncated": True,
+            },
+        )
+        self.assertEqual(
             payload["result"]["governance"]["evaluation_summary"],
             {
                 "evaluated_components": ["heartbeat", "watermark"],
