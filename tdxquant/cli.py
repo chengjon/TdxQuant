@@ -2797,6 +2797,8 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "last_step_name": last_step.get("name"),
         "first_step_source": first_dispatch.get("source"),
         "last_step_source": last_dispatch.get("source"),
+        "first_step_command_name": first_dispatch.get("command_name"),
+        "last_step_command_name": last_dispatch.get("command_name"),
         "first_step_entry": first_step.get("entry"),
         "last_step_entry": last_step.get("entry"),
         "step_source_key_count": summary.get("step_source_key_count"),
