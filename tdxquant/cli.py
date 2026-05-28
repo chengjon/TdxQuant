@@ -6754,6 +6754,8 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             "staleness_evaluated": governance_view.get("staleness_evaluated"),
             "reason_count": reason_count,
             "action_count": action_count,
+            "reason_source_key_count": reason_summary.get("source_key_count"),
+            "reason_code_key_count": reason_summary.get("reason_code_key_count"),
             "primary_reason": reason_summary.get("primary_reason"),
             "primary_reason_source": reason_summary.get("primary_reason_source"),
             "primary_severity": action_summary.get("primary_severity"),
