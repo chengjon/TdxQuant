@@ -700,7 +700,10 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "primary_not_evaluated_component": "reconnect",
                 "has_stale_component": True,
                 "has_fresh_component": True,
+                "has_not_evaluated_component": True,
                 "all_components_evaluated": False,
+                "component_status_key_count": 3,
+                "evaluated_status_key_count": 2,
             },
         )
         self.assertEqual(

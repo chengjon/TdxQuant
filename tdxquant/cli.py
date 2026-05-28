@@ -6781,8 +6781,16 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
                 ),
                 "has_stale_component": isinstance(stale_count, int) and stale_count > 0,
                 "has_fresh_component": isinstance(fresh_count, int) and fresh_count > 0,
+                "has_not_evaluated_component": isinstance(not_evaluated_count, int)
+                and not_evaluated_count > 0,
                 "all_components_evaluated": isinstance(not_evaluated_count, int)
                 and not_evaluated_count == 0,
+                "component_status_key_count": evaluation_summary.get(
+                    "component_status_key_count"
+                ),
+                "evaluated_status_key_count": evaluation_summary.get(
+                    "evaluated_status_key_count"
+                ),
             }
         summary_view["governance"] = governance_view
 
