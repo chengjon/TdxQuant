@@ -682,6 +682,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "staleness_evaluated": True,
                 "reason_count": 4,
                 "action_count": 4,
+                "primary_reason": "heartbeat:stale",
                 "primary_reason_source": "heartbeat",
                 "primary_severity": "review",
                 "primary_action": "inspect_worker",

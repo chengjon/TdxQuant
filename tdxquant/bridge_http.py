@@ -166,6 +166,7 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             "staleness_evaluated": governance_view.get("staleness_evaluated"),
             "reason_count": reason_count,
             "action_count": action_count,
+            "primary_reason": reason_summary.get("primary_reason"),
             "primary_reason_source": reason_summary.get("primary_reason_source"),
             "primary_severity": action_summary.get("primary_severity"),
             "primary_action": action_summary.get("primary_action"),
