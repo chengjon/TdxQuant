@@ -5994,6 +5994,11 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
         if isinstance(lifecycle.get("operation_summary"), dict)
         else {}
     )
+    supervision_summary = (
+        lifecycle.get("supervision_summary")
+        if isinstance(lifecycle.get("supervision_summary"), dict)
+        else {}
+    )
     operation_entries = (
         operation_summary.get("operations")
         if isinstance(operation_summary.get("operations"), list)
@@ -6061,6 +6066,11 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "lifecycle_available_operation_count": operation_summary.get("available_count"),
             "lifecycle_blocked_operation_count": operation_summary.get("blocked_count"),
             "lifecycle_primary_blocked_operation": primary_blocked_operation,
+            "lifecycle_supervision_status": supervision_summary.get("supervision_status"),
+            "lifecycle_supervisor_configured": supervision_summary.get("supervisor_configured"),
+            "lifecycle_desired_state": supervision_summary.get("desired_state"),
+            "lifecycle_observed_state": supervision_summary.get("observed_state"),
+            "lifecycle_process_identity_status": supervision_summary.get("process_identity_status"),
             "boundary_count": len(boundaries),
             "runtime_observed": runtime.get("runtime_observed"),
             "live_runtime_required": runtime.get("live_runtime_required"),
