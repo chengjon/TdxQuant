@@ -1422,6 +1422,21 @@ class ApiCliParserTests(unittest.TestCase):
                 "owner-token-a",
             ]
         )
+        supervise_args = parser.parse_args(
+            [
+                "provider-replay",
+                "daemon",
+                "supervise",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+                "--owner-token",
+                "owner-token-a",
+                "--generation",
+                "4",
+                "--poll-interval",
+                "0.25",
+            ]
+        )
 
         self.assertEqual(start_args.provider_replay_command, "daemon")
         self.assertEqual(start_args.provider_replay_daemon_command, "start")
@@ -1431,6 +1446,10 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(status_args.stale_after_seconds, 45.0)
         self.assertEqual(stop_args.provider_replay_daemon_command, "stop")
         self.assertEqual(stop_args.owner_token, "owner-token-a")
+        self.assertEqual(supervise_args.provider_replay_daemon_command, "supervise")
+        self.assertEqual(supervise_args.owner_token, "owner-token-a")
+        self.assertEqual(supervise_args.generation, 4)
+        self.assertEqual(supervise_args.poll_interval, 0.25)
 
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
@@ -2743,6 +2762,21 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "owner-token-a",
                 ]
             )
+            supervise_args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "daemon",
+                    "supervise",
+                    "--config",
+                    str(config_path),
+                    "--owner-token",
+                    "owner-token-a",
+                    "--generation",
+                    "4",
+                    "--poll-interval",
+                    "0.25",
+                ]
+            )
             with (
                 patch(
                     "tdxquant.cli.start_provider_replay_managed_daemon",
@@ -2756,10 +2790,15 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "tdxquant.cli.stop_provider_replay_managed_daemon",
                     return_value={"stop_status": "signal_sent", "pid": 4321},
                 ) as mocked_stop,
+                patch(
+                    "tdxquant.cli.run_provider_replay_managed_daemon_supervisor",
+                    return_value={"supervisor_status": "child_exited", "pid": 4321},
+                ) as mocked_supervise,
             ):
                 start_result = _handle_provider_replay_subcommand(start_args)
                 status_result = _handle_provider_replay_subcommand(status_args)
                 stop_result = _handle_provider_replay_subcommand(stop_args)
+                supervise_result = _handle_provider_replay_subcommand(supervise_args)
 
         self.assertTrue(start_result.ok)
         self.assertEqual(start_result.data["daemon"]["start_status"], "started")
@@ -2767,13 +2806,19 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(status_result.data["daemon"]["daemon_status"], "running")
         self.assertTrue(stop_result.ok)
         self.assertEqual(stop_result.data["daemon"]["stop_status"], "signal_sent")
+        self.assertTrue(supervise_result.ok)
+        self.assertEqual(supervise_result.data["daemon"]["supervisor_status"], "child_exited")
         mocked_start.assert_called_once()
         mocked_status.assert_called_once()
         mocked_stop.assert_called_once()
+        mocked_supervise.assert_called_once()
         self.assertEqual(mocked_start.call_args.kwargs["config_path"], config_path)
         self.assertEqual(mocked_start.call_args.kwargs["owner_token"], "owner-token-a")
         self.assertEqual(mocked_start.call_args.kwargs["generation"], 3)
         self.assertEqual(mocked_stop.call_args.kwargs["owner_token"], "owner-token-a")
+        self.assertEqual(mocked_supervise.call_args.kwargs["owner_token"], "owner-token-a")
+        self.assertEqual(mocked_supervise.call_args.kwargs["generation"], 4)
+        self.assertEqual(mocked_supervise.call_args.kwargs["poll_interval"], 0.25)
 
     def test_handle_provider_replay_lifecycle_plan_summary_reports_blocked_restart(self) -> None:
         parser = build_parser()

@@ -57,6 +57,7 @@ from .provider_transport_replay import (
     probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_stream,
     probe_provider_transport_replay_watch_status,
+    run_provider_replay_managed_daemon_supervisor,
     serve_provider_transport_replay,
     start_provider_replay_managed_daemon,
     stop_provider_replay_managed_daemon,
@@ -815,6 +816,14 @@ def _build_provider_replay_parser(
     provider_replay_daemon_stop_parser.add_argument("--owner-token", required=True)
     provider_replay_daemon_stop_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
     provider_replay_daemon_stop_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    provider_replay_daemon_supervise_parser = provider_replay_daemon_subparsers.add_parser("supervise")
+    provider_replay_daemon_supervise_parser.add_argument("--config", required=True)
+    provider_replay_daemon_supervise_parser.add_argument("--owner-token")
+    provider_replay_daemon_supervise_parser.add_argument("--generation", type=int, default=1)
+    provider_replay_daemon_supervise_parser.add_argument("--poll-interval", type=float, default=1.0)
+    provider_replay_daemon_supervise_parser.add_argument("--python-executable")
+    provider_replay_daemon_supervise_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     return provider_replay_parser
 
@@ -6352,6 +6361,25 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
                 message="stopped provider replay managed daemon"
                 if daemon.get("stop_status") == "signal_sent"
                 else "reported provider replay managed daemon stop status",
+                data={"daemon": daemon, "config": config_summary},
+            )
+        if args.provider_replay_daemon_command == "supervise":
+            daemon = run_provider_replay_managed_daemon_supervisor(
+                config,
+                config_path=Path(args.config),
+                owner_token=args.owner_token,
+                generation=args.generation,
+                poll_interval=args.poll_interval,
+                python_executable=args.python_executable,
+            )
+            return Result(
+                ok=daemon.get("supervisor_status")
+                in {"child_exited", "interrupted", "max_heartbeats_reached"},
+                code=ErrorCode.OK
+                if daemon.get("supervisor_status")
+                in {"child_exited", "interrupted", "max_heartbeats_reached"}
+                else ErrorCode.EXECUTION_FAILED,
+                message="supervised provider replay managed daemon",
                 data={"daemon": daemon, "config": config_summary},
             )
         return Result(

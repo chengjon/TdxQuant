@@ -409,6 +409,8 @@ TdxQuant
 
 > E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay daemon start|status|stop --config ...` 新增基于 statefile ownership 的 one-shot managed replay daemon 控制面，底层 `start_provider_replay_managed_daemon()` 可后台启动 `provider-replay serve --config <path>` 并写入 running statefile，`get_provider_replay_managed_daemon_status()` 只读检查 statefile 与 PID liveness，`stop_provider_replay_managed_daemon()` 要求 owner token 匹配后只对 statefile 记录的 owned PID 发送 terminate 并写入 stopping statefile，证据为 `tdxquant/provider_transport_replay.py`、`tdxquant/cli.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-managed-daemon-control`；该能力只覆盖 replay daemon 的显式 start/status/stop，不包含长期 supervisor loop、自动 restart/backoff、端口 ownership 推断、进程命令行校验、真实 provider 管理、broker readiness、workflow readiness 或 write readiness。
 
+> E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay daemon supervise --config ...` 新增显式前台 supervisor loop，底层 `run_provider_replay_managed_daemon_supervisor()` 启动一个 replay child、写入 `state=supervising` heartbeat statefile、轮询 child exit，并在 child exit 时写入 `state=exited`、interrupt 时尝试 terminate child 并写入 `state=stopping`，证据为 `tdxquant/provider_transport_replay.py`、`tdxquant/cli.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-daemon-supervisor-loop`；该能力只覆盖单 child 的前台观察和 heartbeat 刷新，不自动重启、不调度 backoff、不做端口 ownership 推断、不验证进程命令行、不管理真实 provider，也不证明 broker/workflow/write readiness。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
@@ -444,6 +446,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-28 | E-06 补充 `provider-replay daemon supervise` 登记：新增显式前台 supervisor loop、heartbeat statefile 刷新、child exit/stopping state 记录；不自动 restart/backoff、不推断端口 ownership、不管理真实 provider，也不证明 broker/workflow/write readiness。 |
 | 2026-05-28 | E-06 补充 `provider-replay daemon start|status|stop` 登记：新增基于 statefile owner token/config hash/PID 的 one-shot managed replay daemon 控制面；不代表长期 supervisor、restart/backoff、端口 ownership 推断、真实 provider lifecycle、broker/workflow/write readiness 已完成。 |
 | 2026-05-28 | E-06 补充 provider-replay lifecycle statefile ownership lock 登记：新增内部锁定原子写 statefile helper 和 ownership 诊断回显；只证明本地 statefile/lock 基础层可用，不执行 start/stop/restart、supervisor、restart/backoff、进程 ownership 或真实 provider lifecycle control。 |
 | 2026-05-28 | E-06 补充 `provider-replay lifecycle-readiness` 登记：只读汇总 lifecycle readiness 缺口，默认不读 statefile，opt-in statefile 诊断只满足 `valid_lifecycle_statefile` 一个先决条件；固定 blocked/不可控制，不执行 lifecycle control、不证明 daemon 生命周期或 broker/workflow/write readiness。 |

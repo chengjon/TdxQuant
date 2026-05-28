@@ -7,6 +7,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -738,6 +739,218 @@ def stop_provider_replay_managed_daemon(
             }
         )
     return base
+
+
+def run_provider_replay_managed_daemon_supervisor(
+    config: ProviderTransportReplayConfig,
+    *,
+    config_path: str | Path,
+    owner_token: str | None = None,
+    generation: int = 1,
+    poll_interval: float | int = 1.0,
+    python_executable: str | None = None,
+    popen_factory: Any | None = None,
+    sleep: Any | None = None,
+    updated_at_factory: Any | None = None,
+    max_heartbeats: int | None = None,
+) -> dict[str, Any]:
+    if not config.lifecycle_state_file:
+        return {
+            "supervisor_status": "blocked",
+            "pid": None,
+            "owner_token": None,
+            "generation": None,
+            "heartbeat_count": 0,
+            "exit_code": None,
+            "command": None,
+            "errors": ["lifecycle_state_file_required"],
+            "error_count": 1,
+            "restart_attempted": False,
+            "backoff_scheduled": False,
+            "terminate_attempted": False,
+            "control_allowed": False,
+            "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+        }
+
+    try:
+        resolved_poll_interval = float(poll_interval)
+    except (TypeError, ValueError):
+        resolved_poll_interval = 1.0
+    if resolved_poll_interval < 0:
+        resolved_poll_interval = 1.0
+
+    resolved_owner_token = (owner_token or uuid4().hex).strip()
+    command = build_provider_replay_managed_daemon_command(
+        config_path,
+        python_executable=python_executable,
+    )
+    launch = popen_factory or subprocess.Popen
+    popen_kwargs: dict[str, Any] = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        popen_kwargs["start_new_session"] = True
+    try:
+        process = launch(command, **popen_kwargs)
+    except OSError as exc:
+        return {
+            "supervisor_status": "launch_failed",
+            "pid": None,
+            "owner_token": resolved_owner_token,
+            "generation": generation,
+            "heartbeat_count": 0,
+            "exit_code": None,
+            "command": command,
+            "errors": [f"daemon_launch_failed:{exc.__class__.__name__}"],
+            "error_count": 1,
+            "restart_attempted": False,
+            "backoff_scheduled": False,
+            "terminate_attempted": False,
+            "control_allowed": False,
+            "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+        }
+
+    pid = getattr(process, "pid", None)
+    sleeper = sleep or time.sleep
+
+    def next_updated_at() -> str | None:
+        if updated_at_factory is None:
+            return None
+        return updated_at_factory()
+
+    def write_state(state: str, next_generation: int) -> dict[str, Any]:
+        return write_provider_replay_lifecycle_statefile(
+            config,
+            state=state,
+            pid=pid,
+            owner_token=resolved_owner_token,
+            generation=next_generation,
+            updated_at=next_updated_at(),
+        )
+
+    current_generation = generation
+    initial_write = write_state("supervising", current_generation)
+    if initial_write.get("write_status") != "written":
+        terminate = getattr(process, "terminate", None)
+        if callable(terminate):
+            try:
+                terminate()
+            except OSError:
+                pass
+        return {
+            "supervisor_status": "statefile_write_failed",
+            "pid": pid if isinstance(pid, int) else None,
+            "owner_token": resolved_owner_token,
+            "generation": current_generation,
+            "heartbeat_count": 0,
+            "exit_code": None,
+            "command": command,
+            "statefile_write": initial_write,
+            "errors": ["statefile_write_failed"],
+            "error_count": 1,
+            "restart_attempted": False,
+            "backoff_scheduled": False,
+            "terminate_attempted": True,
+            "control_allowed": False,
+            "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+        }
+
+    heartbeat_count = 1
+    try:
+        while True:
+            exit_code = process.poll()
+            if exit_code is not None:
+                current_generation += 1
+                exit_write = write_state("exited", current_generation)
+                return {
+                    "supervisor_status": "child_exited",
+                    "pid": pid if isinstance(pid, int) else None,
+                    "owner_token": resolved_owner_token,
+                    "generation": current_generation,
+                    "heartbeat_count": heartbeat_count,
+                    "exit_code": exit_code,
+                    "command": command,
+                    "statefile_write": exit_write,
+                    "errors": [],
+                    "error_count": 0,
+                    "restart_attempted": False,
+                    "backoff_scheduled": False,
+                    "terminate_attempted": False,
+                    "control_allowed": True,
+                    "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+                }
+            if max_heartbeats is not None and heartbeat_count >= max_heartbeats:
+                return {
+                    "supervisor_status": "max_heartbeats_reached",
+                    "pid": pid if isinstance(pid, int) else None,
+                    "owner_token": resolved_owner_token,
+                    "generation": current_generation,
+                    "heartbeat_count": heartbeat_count,
+                    "exit_code": None,
+                    "command": command,
+                    "statefile_write": initial_write,
+                    "errors": [],
+                    "error_count": 0,
+                    "restart_attempted": False,
+                    "backoff_scheduled": False,
+                    "terminate_attempted": False,
+                    "control_allowed": True,
+                    "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+                }
+            sleeper(resolved_poll_interval)
+            current_generation += 1
+            heartbeat_write = write_state("supervising", current_generation)
+            if heartbeat_write.get("write_status") != "written":
+                return {
+                    "supervisor_status": "statefile_write_failed",
+                    "pid": pid if isinstance(pid, int) else None,
+                    "owner_token": resolved_owner_token,
+                    "generation": current_generation,
+                    "heartbeat_count": heartbeat_count,
+                    "exit_code": None,
+                    "command": command,
+                    "statefile_write": heartbeat_write,
+                    "errors": ["statefile_write_failed"],
+                    "error_count": 1,
+                    "restart_attempted": False,
+                    "backoff_scheduled": False,
+                    "terminate_attempted": False,
+                    "control_allowed": False,
+                    "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+                }
+            heartbeat_count += 1
+    except KeyboardInterrupt:
+        terminate_attempted = False
+        terminate = getattr(process, "terminate", None)
+        if callable(terminate):
+            terminate_attempted = True
+            try:
+                terminate()
+            except OSError:
+                pass
+        current_generation += 1
+        stopping_write = write_state("stopping", current_generation)
+        return {
+            "supervisor_status": "interrupted",
+            "pid": pid if isinstance(pid, int) else None,
+            "owner_token": resolved_owner_token,
+            "generation": current_generation,
+            "heartbeat_count": heartbeat_count,
+            "exit_code": None,
+            "command": command,
+            "statefile_write": stopping_write,
+            "errors": [],
+            "error_count": 0,
+            "restart_attempted": False,
+            "backoff_scheduled": False,
+            "terminate_attempted": terminate_attempted,
+            "control_allowed": False,
+            "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+        }
 
 
 def check_provider_replay_lifecycle_statefile(

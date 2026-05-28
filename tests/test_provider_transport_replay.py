@@ -19,6 +19,7 @@ from tdxquant.provider_transport_replay import (
     probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_stream,
     probe_provider_transport_replay_watch_status,
+    run_provider_replay_managed_daemon_supervisor,
     start_provider_replay_managed_daemon,
     stop_provider_replay_managed_daemon,
     write_provider_replay_lifecycle_statefile,
@@ -796,6 +797,124 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(stopped["statefile_write"]["generation"], 4)
         self.assertEqual(payload["state"], "stopping")
         self.assertEqual(payload["generation"], 4)
+
+    def test_managed_daemon_supervisor_refreshes_heartbeat_and_records_child_exit(self) -> None:
+        launches: list[list[str]] = []
+        slept: list[float] = []
+        timestamps = iter(
+            [
+                "2999-01-01T00:00:00Z",
+                "2999-01-01T00:00:01Z",
+                "2999-01-01T00:00:02Z",
+                "2999-01-01T00:00:03Z",
+            ]
+        )
+
+        class FakeProcess:
+            pid = 4321
+
+            def __init__(self) -> None:
+                self.polls = [None, None, 7]
+
+            def poll(self) -> int | None:
+                return self.polls.pop(0)
+
+        def fake_popen(command: list[str], **_kwargs: object) -> FakeProcess:
+            launches.append(command)
+            return FakeProcess()
+
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = run_provider_replay_managed_daemon_supervisor(
+                config,
+                config_path=config_path,
+                owner_token="owner-token-a",
+                generation=5,
+                poll_interval=0.25,
+                popen_factory=fake_popen,
+                sleep=lambda seconds: slept.append(seconds),
+                updated_at_factory=lambda: next(timestamps),
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["supervisor_status"], "child_exited")
+        self.assertEqual(result["pid"], 4321)
+        self.assertEqual(result["owner_token"], "owner-token-a")
+        self.assertEqual(result["heartbeat_count"], 3)
+        self.assertEqual(result["exit_code"], 7)
+        self.assertEqual(result["restart_attempted"], False)
+        self.assertEqual(result["backoff_scheduled"], False)
+        self.assertEqual(result["boundary"], "foreground_supervisor_observation_only; no_restart_backoff")
+        self.assertEqual(slept, [0.25, 0.25])
+        self.assertEqual(launches[0][-4:], ["provider-replay", "serve", "--config", str(config_path)])
+        self.assertEqual(payload["state"], "exited")
+        self.assertEqual(payload["owner_token"], "owner-token-a")
+        self.assertEqual(payload["generation"], 8)
+        self.assertEqual(payload["pid"], 4321)
+
+    def test_managed_daemon_supervisor_interrupt_terminates_child_and_writes_stopping_state(self) -> None:
+        timestamps = iter(["2999-01-01T00:00:00Z", "2999-01-01T00:00:01Z"])
+
+        class FakeProcess:
+            pid = 4321
+
+            def __init__(self) -> None:
+                self.terminated = False
+
+            def poll(self) -> None:
+                return None
+
+            def terminate(self) -> None:
+                self.terminated = True
+
+        fake_process = FakeProcess()
+
+        def raise_interrupt(_seconds: float) -> None:
+            raise KeyboardInterrupt
+
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = run_provider_replay_managed_daemon_supervisor(
+                config,
+                config_path=config_path,
+                owner_token="owner-token-a",
+                generation=5,
+                poll_interval=0.25,
+                popen_factory=lambda *_args, **_kwargs: fake_process,
+                sleep=raise_interrupt,
+                updated_at_factory=lambda: next(timestamps),
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["supervisor_status"], "interrupted")
+        self.assertEqual(result["pid"], 4321)
+        self.assertEqual(result["heartbeat_count"], 1)
+        self.assertTrue(result["terminate_attempted"])
+        self.assertTrue(fake_process.terminated)
+        self.assertEqual(payload["state"], "stopping")
+        self.assertEqual(payload["generation"], 6)
 
     def test_status_can_include_explicit_replay_health_probe(self) -> None:
         server = ProviderTransportReplayHTTPServer(
