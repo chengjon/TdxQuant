@@ -775,6 +775,20 @@ def _build_provider_replay_parser(
         help="Optional path to write the JSON result",
     )
 
+    provider_replay_lifecycle_readiness_parser = provider_replay_subparsers.add_parser("lifecycle-readiness")
+    provider_replay_lifecycle_readiness_parser.add_argument("--config", required=True)
+    provider_replay_lifecycle_readiness_parser.add_argument("--include-statefile-check", action="store_true")
+    provider_replay_lifecycle_readiness_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    provider_replay_lifecycle_readiness_parser.add_argument(
+        "--view",
+        choices=["detailed", "summary"],
+        default="detailed",
+    )
+    provider_replay_lifecycle_readiness_parser.add_argument(
+        "--output",
+        help="Optional path to write the JSON result",
+    )
+
     return provider_replay_parser
 
 
@@ -6046,6 +6060,90 @@ def _build_provider_replay_lifecycle_statefile_check_summary_view(
     }
 
 
+def _build_provider_replay_lifecycle_readiness(
+    status: dict[str, object],
+    *,
+    statefile_check: dict[str, object] | None = None,
+) -> dict[str, object]:
+    lifecycle = status.get("lifecycle") if isinstance(status.get("lifecycle"), dict) else {}
+    control_summary = (
+        lifecycle.get("control_summary")
+        if isinstance(lifecycle.get("control_summary"), dict)
+        else {}
+    )
+    supervision_summary = (
+        lifecycle.get("supervision_summary")
+        if isinstance(lifecycle.get("supervision_summary"), dict)
+        else {}
+    )
+    statefile_check_included = isinstance(statefile_check, dict)
+    statefile_valid = (
+        statefile_check_included
+        and statefile_check.get("check_status") == "valid"
+        and statefile_check.get("schema_valid") is True
+        and statefile_check.get("provider_id_matches") is True
+        and statefile_check.get("stale") is False
+    )
+    missing_requirements = [
+        "lifecycle_controller",
+        "owned_process_identity",
+        "supervisor_loop",
+        "operator_opt_in_control",
+    ]
+    satisfied_requirements: list[str] = []
+    if statefile_valid:
+        satisfied_requirements.append("valid_lifecycle_statefile")
+    else:
+        missing_requirements.append("valid_lifecycle_statefile")
+    required_requirement_count = len(missing_requirements) + len(satisfied_requirements)
+    return {
+        "readiness_status": "blocked",
+        "ready": False,
+        "control_allowed": False,
+        "dispatch_executed": False,
+        "blocking_reason": control_summary.get("blocking_reason"),
+        "missing_requirements": missing_requirements,
+        "missing_requirement_count": len(missing_requirements),
+        "satisfied_requirements": satisfied_requirements,
+        "satisfied_requirement_count": len(satisfied_requirements),
+        "required_requirement_count": required_requirement_count,
+        "statefile_check_included": statefile_check_included,
+        "statefile_check_status": statefile_check.get("check_status") if statefile_check_included else None,
+        "statefile_schema_valid": statefile_check.get("schema_valid") if statefile_check_included else None,
+        "statefile_provider_id_matches": (
+            statefile_check.get("provider_id_matches") if statefile_check_included else None
+        ),
+        "statefile_stale": statefile_check.get("stale") if statefile_check_included else None,
+        "supervision_status": supervision_summary.get("supervision_status"),
+        "lifecycle_control_status": control_summary.get("control_status"),
+        "boundary": "read_only_lifecycle_readiness; no_control_dispatch",
+    }
+
+
+def _build_provider_replay_lifecycle_readiness_summary_view(
+    status: dict[str, object],
+    readiness: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "mode": "lifecycle-readiness",
+        "provider_id": status.get("provider_id"),
+        "readiness_status": readiness.get("readiness_status"),
+        "ready": readiness.get("ready"),
+        "control_allowed": readiness.get("control_allowed"),
+        "dispatch_executed": readiness.get("dispatch_executed"),
+        "missing_requirement_count": readiness.get("missing_requirement_count"),
+        "satisfied_requirement_count": readiness.get("satisfied_requirement_count"),
+        "statefile_check_included": readiness.get("statefile_check_included"),
+        "statefile_check_status": readiness.get("statefile_check_status"),
+        "statefile_schema_valid": readiness.get("statefile_schema_valid"),
+        "statefile_provider_id_matches": readiness.get("statefile_provider_id_matches"),
+        "statefile_stale": readiness.get("statefile_stale"),
+        "supervision_status": readiness.get("supervision_status"),
+        "lifecycle_control_status": readiness.get("lifecycle_control_status"),
+        "boundary": readiness.get("boundary"),
+    }
+
+
 def _build_provider_replay_endpoint_family_counts(endpoints: list[object]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for endpoint in endpoints:
@@ -6134,6 +6232,31 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             ok=True,
             code=ErrorCode.OK,
             message="planned provider replay lifecycle operation",
+            data=data,
+        )
+    if args.provider_replay_command == "lifecycle-readiness":
+        status = build_provider_transport_replay_status(config)
+        statefile_check = None
+        if args.include_statefile_check:
+            statefile_check = check_provider_replay_lifecycle_statefile(
+                config,
+                stale_after_seconds=args.stale_after_seconds,
+            )
+        readiness = _build_provider_replay_lifecycle_readiness(
+            status,
+            statefile_check=statefile_check,
+        )
+        data = {
+            "readiness": readiness,
+            "status": status,
+            "config": config_summary,
+        }
+        if args.view == "summary":
+            data["summary_view"] = _build_provider_replay_lifecycle_readiness_summary_view(status, readiness)
+        return Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="reported provider replay lifecycle readiness",
             data=data,
         )
     if args.provider_replay_command == "lifecycle-state-check":

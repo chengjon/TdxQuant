@@ -403,6 +403,8 @@ TdxQuant
 
 > E-11 补充登记（状态仍为 `[部分实现]`）：`catalog plan --bundle ... --view summary` 的只读 `selected_step_summary` 新增 `first_step_index` 与 `last_step_index`，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `catalog-plan-selected-step-index-hints`；这两个字段只从既有 selected plan step index metadata 派生 first/last index hint，用于只读定位 selected slice，不暴露完整 step manifest、完整 dispatch manifest、resolved arg value、完整 bundle manifest 或执行结果，不执行 catalog entry、bundle、task/report step、trade command、provider call 或 workflow action，也不代表 workflow builder、broker readiness、交易安全证明或执行覆盖。
 
+> E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay lifecycle-readiness --config --include-statefile-check --stale-after-seconds --view detailed/summary` 新增只读 lifecycle readiness 摘要，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-lifecycle-readiness-summary`；该命令默认不读取 statefile，显式 opt-in 时只把有效、未过期且 provider 匹配的 statefile 诊断计为 `valid_lifecycle_statefile` 单个先决条件，输出固定 `ready=false`、`control_allowed=false`、`dispatch_executed=false` 的 blocked 状态与缺口清单；不启动、停止、重启、daemonize、supervise、probe runtime、扫描进程、推断端口 ownership、写入/加锁 statefile、调度 retry，也不证明 broker/workflow/write readiness 或 daemon 生命周期控制已完成。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
@@ -438,6 +440,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-28 | E-06 补充 `provider-replay lifecycle-readiness` 登记：只读汇总 lifecycle readiness 缺口，默认不读 statefile，opt-in statefile 诊断只满足 `valid_lifecycle_statefile` 一个先决条件；固定 blocked/不可控制，不执行 lifecycle control、不证明 daemon 生命周期或 broker/workflow/write readiness。 |
 | 2026-05-26 | E-06 补充 provider-replay `probe_summary.error_sample_visible_count` 登记：只从既有有界 `error_samples` 列表长度派生当前响应可见样本数量；不改变 sample limit/truncated 语义、不暴露完整错误 payload、不证明健康/readiness/endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。 |
 | 2026-05-26 | E-06 补充 provider-replay `probe_summary.error_sample_hidden_count` 登记：只从既有 `error_sample_count` 与有界 `error_samples` 长度派生被 sample limit 隐藏的候选数量；不改变 sample limit/truncated 语义、不暴露完整错误 payload、不证明健康/readiness/endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。 |
 | 2026-05-26 | E-06 补充 provider-replay `probe_summary.primary_error_sample_error_code` / `primary_error_sample_http_status` 登记：只从既有有界 `error_samples` 列表首个样本派生 error_code/http_status 紧凑诊断；不请求额外 probe、不暴露完整错误 payload、不证明健康/readiness/endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。 |
