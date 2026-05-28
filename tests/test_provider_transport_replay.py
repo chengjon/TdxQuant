@@ -272,6 +272,19 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 "boundary": "no_lifecycle_ownership; read_only_status",
             },
         )
+        self.assertEqual(
+            status["lifecycle"]["control_summary"],
+            {
+                "control_status": "unsupported",
+                "control_allowed": False,
+                "available_operations": [],
+                "blocked_operations": ["start", "stop", "restart", "backoff"],
+                "blocking_reason": "lifecycle_control_not_implemented",
+                "ownership_required": True,
+                "operator_action_required": True,
+                "boundary": "read_only_lifecycle_status; no_control_operations",
+            },
+        )
         self.assertEqual(status["capabilities"]["read_only"], True)
         self.assertEqual(status["capabilities"]["writes_supported"], False)
         self.assertIn("/provider/v1/replay/watch/events/stream", status["capabilities"]["endpoints"])

@@ -138,6 +138,16 @@ def build_provider_transport_replay_status(
                 "status_source": "configured_boundary",
                 "boundary": "no_lifecycle_ownership; read_only_status",
             },
+            "control_summary": {
+                "control_status": "unsupported",
+                "control_allowed": False,
+                "available_operations": [],
+                "blocked_operations": ["start", "stop", "restart", "backoff"],
+                "blocking_reason": "lifecycle_control_not_implemented",
+                "ownership_required": True,
+                "operator_action_required": True,
+                "boundary": "read_only_lifecycle_status; no_control_operations",
+            },
         },
         "boundaries": [
             "fixture-backed replay only",
