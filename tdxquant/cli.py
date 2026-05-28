@@ -5989,6 +5989,24 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
         if isinstance(lifecycle.get("control_summary"), dict)
         else {}
     )
+    operation_summary = (
+        lifecycle.get("operation_summary")
+        if isinstance(lifecycle.get("operation_summary"), dict)
+        else {}
+    )
+    operation_entries = (
+        operation_summary.get("operations")
+        if isinstance(operation_summary.get("operations"), list)
+        else []
+    )
+    primary_blocked_operation = next(
+        (
+            entry.get("operation")
+            for entry in operation_entries
+            if isinstance(entry, dict) and entry.get("status") == "blocked"
+        ),
+        None,
+    )
     boundaries = status.get("boundaries") if isinstance(status.get("boundaries"), list) else []
     endpoints = capabilities.get("endpoints") if isinstance(capabilities.get("endpoints"), list) else []
     restart_policy = lifecycle.get("restart_policy")
@@ -6039,6 +6057,10 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "lifecycle_owned_process": ownership_summary.get("owned_process"),
             "lifecycle_control_status": control_summary.get("control_status"),
             "lifecycle_blocking_reason": control_summary.get("blocking_reason"),
+            "lifecycle_operation_count": operation_summary.get("operation_count"),
+            "lifecycle_available_operation_count": operation_summary.get("available_count"),
+            "lifecycle_blocked_operation_count": operation_summary.get("blocked_count"),
+            "lifecycle_primary_blocked_operation": primary_blocked_operation,
             "boundary_count": len(boundaries),
             "runtime_observed": runtime.get("runtime_observed"),
             "live_runtime_required": runtime.get("live_runtime_required"),
