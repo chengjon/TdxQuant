@@ -13,11 +13,14 @@ from tdxquant.provider_transport_replay import (
     ProviderTransportReplayHTTPServer,
     build_provider_transport_replay_status,
     check_provider_replay_lifecycle_statefile,
+    get_provider_replay_managed_daemon_status,
     load_provider_transport_replay_config,
     probe_provider_transport_replay_health,
     probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_stream,
     probe_provider_transport_replay_watch_status,
+    start_provider_replay_managed_daemon,
+    stop_provider_replay_managed_daemon,
     write_provider_replay_lifecycle_statefile,
 )
 from tdxquant.replay_fixtures import list_provider_replay_fixtures, load_provider_replay_fixture
@@ -622,6 +625,177 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(result["errors"], ["statefile_lock_held"])
         self.assertEqual(result["error_count"], 1)
         self.assertEqual(final_payload, original_payload)
+
+    def test_managed_daemon_start_launches_process_and_writes_statefile(self) -> None:
+        launches: list[tuple[list[str], dict[str, object]]] = []
+
+        class FakeProcess:
+            pid = 4321
+
+            def terminate(self) -> None:
+                raise AssertionError("start should not terminate successful fake process")
+
+        def fake_popen(command: list[str], **kwargs: object) -> FakeProcess:
+            launches.append((command, kwargs))
+            return FakeProcess()
+
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = start_provider_replay_managed_daemon(
+                config,
+                config_path=config_path,
+                owner_token="owner-token-a",
+                generation=3,
+                popen_factory=fake_popen,
+                process_running=lambda _pid: False,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["start_status"], "started")
+        self.assertEqual(result["pid"], 4321)
+        self.assertEqual(result["owner_token"], "owner-token-a")
+        self.assertEqual(result["generation"], 3)
+        self.assertEqual(result["statefile_write"]["write_status"], "written")
+        self.assertEqual(result["control_allowed"], True)
+        self.assertEqual(result["boundary"], "managed_daemon_start_stop_only; no_supervisor_loop")
+        self.assertEqual(launches[0][0][-4:], ["provider-replay", "serve", "--config", str(config_path)])
+        self.assertEqual(payload["pid"], 4321)
+        self.assertEqual(payload["state"], "running")
+        self.assertEqual(payload["owner_token"], "owner-token-a")
+        self.assertEqual(payload["generation"], 3)
+
+    def test_managed_daemon_start_reuses_running_owned_statefile(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+            write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=4321,
+                owner_token="owner-token-a",
+                generation=3,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+
+            result = start_provider_replay_managed_daemon(
+                config,
+                config_path=config_path,
+                popen_factory=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not launch")),
+                process_running=lambda pid: pid == 4321,
+            )
+
+        self.assertEqual(result["start_status"], "already_running")
+        self.assertEqual(result["pid"], 4321)
+        self.assertEqual(result["owner_token"], "owner-token-a")
+        self.assertEqual(result["control_allowed"], True)
+
+    def test_managed_daemon_status_reports_running_owned_pid_without_mutation(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+            write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=4321,
+                owner_token="owner-token-a",
+                generation=3,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            before_payload = state_path.read_text(encoding="utf-8")
+
+            result = get_provider_replay_managed_daemon_status(
+                config,
+                process_running=lambda pid: pid == 4321,
+                stale_after_seconds=60,
+            )
+            after_payload = state_path.read_text(encoding="utf-8")
+
+        self.assertEqual(result["daemon_status"], "running")
+        self.assertEqual(result["pid"], 4321)
+        self.assertEqual(result["process_running"], True)
+        self.assertEqual(result["statefile_check"]["config_hash_matches"], True)
+        self.assertEqual(result["write_attempted"], False)
+        self.assertEqual(result["control_allowed"], True)
+        self.assertEqual(result["boundary"], "managed_daemon_status_read_only; no_supervisor_loop")
+        self.assertEqual(after_payload, before_payload)
+
+    def test_managed_daemon_stop_requires_matching_owner_and_writes_stopping_state(self) -> None:
+        terminated: list[int] = []
+
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+            write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=4321,
+                owner_token="owner-token-a",
+                generation=3,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+
+            mismatch = stop_provider_replay_managed_daemon(
+                config,
+                owner_token="wrong-token",
+                process_running=lambda pid: pid == 4321,
+                terminate_process=lambda pid: terminated.append(pid),
+            )
+            stopped = stop_provider_replay_managed_daemon(
+                config,
+                owner_token="owner-token-a",
+                process_running=lambda pid: pid == 4321,
+                terminate_process=lambda pid: terminated.append(pid),
+                updated_at="2999-01-01T00:00:01Z",
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(mismatch["stop_status"], "blocked")
+        self.assertEqual(mismatch["errors"], ["owner_token_mismatch"])
+        self.assertEqual(terminated, [4321])
+        self.assertEqual(stopped["stop_status"], "signal_sent")
+        self.assertEqual(stopped["pid"], 4321)
+        self.assertEqual(stopped["statefile_write"]["write_status"], "written")
+        self.assertEqual(stopped["statefile_write"]["state"], "stopping")
+        self.assertEqual(stopped["statefile_write"]["generation"], 4)
+        self.assertEqual(payload["state"], "stopping")
+        self.assertEqual(payload["generation"], 4)
 
     def test_status_can_include_explicit_replay_health_probe(self) -> None:
         server = ProviderTransportReplayHTTPServer(

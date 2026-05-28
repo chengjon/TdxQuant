@@ -1385,6 +1385,53 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.stale_after_seconds, 300.0)
         self.assertEqual(args.view, "detailed")
 
+    def test_provider_replay_daemon_start_status_stop_commands_parse(self) -> None:
+        parser = build_parser()
+        start_args = parser.parse_args(
+            [
+                "provider-replay",
+                "daemon",
+                "start",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+                "--owner-token",
+                "owner-token-a",
+                "--generation",
+                "3",
+            ]
+        )
+        status_args = parser.parse_args(
+            [
+                "provider-replay",
+                "daemon",
+                "status",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+                "--stale-after-seconds",
+                "45",
+            ]
+        )
+        stop_args = parser.parse_args(
+            [
+                "provider-replay",
+                "daemon",
+                "stop",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+                "--owner-token",
+                "owner-token-a",
+            ]
+        )
+
+        self.assertEqual(start_args.provider_replay_command, "daemon")
+        self.assertEqual(start_args.provider_replay_daemon_command, "start")
+        self.assertEqual(start_args.owner_token, "owner-token-a")
+        self.assertEqual(start_args.generation, 3)
+        self.assertEqual(status_args.provider_replay_daemon_command, "status")
+        self.assertEqual(status_args.stale_after_seconds, 45.0)
+        self.assertEqual(stop_args.provider_replay_daemon_command, "stop")
+        self.assertEqual(stop_args.owner_token, "owner-token-a")
+
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "block-read-watchlist", "--block-code", "ZXG"])
@@ -2651,6 +2698,82 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             result.data["readiness"]["missing_requirement_count"],
         )
         self.assertEqual(result.data["summary_view"]["statefile_check_status"], "valid")
+
+    def test_handle_provider_replay_daemon_start_status_stop_dispatches_to_managed_helpers(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(state_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            start_args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "daemon",
+                    "start",
+                    "--config",
+                    str(config_path),
+                    "--owner-token",
+                    "owner-token-a",
+                    "--generation",
+                    "3",
+                ]
+            )
+            status_args = parser.parse_args(["provider-replay", "daemon", "status", "--config", str(config_path)])
+            stop_args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "daemon",
+                    "stop",
+                    "--config",
+                    str(config_path),
+                    "--owner-token",
+                    "owner-token-a",
+                ]
+            )
+            with (
+                patch(
+                    "tdxquant.cli.start_provider_replay_managed_daemon",
+                    return_value={"start_status": "started", "pid": 4321},
+                ) as mocked_start,
+                patch(
+                    "tdxquant.cli.get_provider_replay_managed_daemon_status",
+                    return_value={"daemon_status": "running", "pid": 4321},
+                ) as mocked_status,
+                patch(
+                    "tdxquant.cli.stop_provider_replay_managed_daemon",
+                    return_value={"stop_status": "signal_sent", "pid": 4321},
+                ) as mocked_stop,
+            ):
+                start_result = _handle_provider_replay_subcommand(start_args)
+                status_result = _handle_provider_replay_subcommand(status_args)
+                stop_result = _handle_provider_replay_subcommand(stop_args)
+
+        self.assertTrue(start_result.ok)
+        self.assertEqual(start_result.data["daemon"]["start_status"], "started")
+        self.assertTrue(status_result.ok)
+        self.assertEqual(status_result.data["daemon"]["daemon_status"], "running")
+        self.assertTrue(stop_result.ok)
+        self.assertEqual(stop_result.data["daemon"]["stop_status"], "signal_sent")
+        mocked_start.assert_called_once()
+        mocked_status.assert_called_once()
+        mocked_stop.assert_called_once()
+        self.assertEqual(mocked_start.call_args.kwargs["config_path"], config_path)
+        self.assertEqual(mocked_start.call_args.kwargs["owner_token"], "owner-token-a")
+        self.assertEqual(mocked_start.call_args.kwargs["generation"], 3)
+        self.assertEqual(mocked_stop.call_args.kwargs["owner_token"], "owner-token-a")
 
     def test_handle_provider_replay_lifecycle_plan_summary_reports_blocked_restart(self) -> None:
         parser = build_parser()

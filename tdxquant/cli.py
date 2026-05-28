@@ -51,12 +51,15 @@ from .bridge_http import serve_bridge_from_config
 from .provider_transport_replay import (
     build_provider_transport_replay_status,
     check_provider_replay_lifecycle_statefile,
+    get_provider_replay_managed_daemon_status,
     load_provider_transport_replay_config,
     probe_provider_transport_replay_health,
     probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_stream,
     probe_provider_transport_replay_watch_status,
     serve_provider_transport_replay,
+    start_provider_replay_managed_daemon,
+    stop_provider_replay_managed_daemon,
 )
 from .models import ErrorCode, OrderRequest, Result
 from .result_contract import DEFAULT_CAPABILITY_VERSION, DEFAULT_SCHEMA_VERSION, build_runtime_metadata, format_rfc3339, utc_now
@@ -788,6 +791,30 @@ def _build_provider_replay_parser(
         "--output",
         help="Optional path to write the JSON result",
     )
+
+    provider_replay_daemon_parser = provider_replay_subparsers.add_parser("daemon")
+    provider_replay_daemon_subparsers = provider_replay_daemon_parser.add_subparsers(
+        dest="provider_replay_daemon_command",
+        required=True,
+    )
+
+    provider_replay_daemon_start_parser = provider_replay_daemon_subparsers.add_parser("start")
+    provider_replay_daemon_start_parser.add_argument("--config", required=True)
+    provider_replay_daemon_start_parser.add_argument("--owner-token")
+    provider_replay_daemon_start_parser.add_argument("--generation", type=int, default=1)
+    provider_replay_daemon_start_parser.add_argument("--python-executable")
+    provider_replay_daemon_start_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    provider_replay_daemon_status_parser = provider_replay_daemon_subparsers.add_parser("status")
+    provider_replay_daemon_status_parser.add_argument("--config", required=True)
+    provider_replay_daemon_status_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    provider_replay_daemon_status_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    provider_replay_daemon_stop_parser = provider_replay_daemon_subparsers.add_parser("stop")
+    provider_replay_daemon_stop_parser.add_argument("--config", required=True)
+    provider_replay_daemon_stop_parser.add_argument("--owner-token", required=True)
+    provider_replay_daemon_stop_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    provider_replay_daemon_stop_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     return provider_replay_parser
 
@@ -6280,6 +6307,57 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             code=ErrorCode.OK,
             message="checked provider replay lifecycle statefile",
             data=data,
+        )
+    if args.provider_replay_command == "daemon":
+        if args.provider_replay_daemon_command == "start":
+            daemon = start_provider_replay_managed_daemon(
+                config,
+                config_path=Path(args.config),
+                owner_token=args.owner_token,
+                generation=args.generation,
+                python_executable=args.python_executable,
+            )
+            return Result(
+                ok=daemon.get("start_status") in {"started", "already_running"},
+                code=ErrorCode.OK
+                if daemon.get("start_status") in {"started", "already_running"}
+                else ErrorCode.EXECUTION_FAILED,
+                message="started provider replay managed daemon"
+                if daemon.get("start_status") == "started"
+                else "reported provider replay managed daemon start status",
+                data={"daemon": daemon, "config": config_summary},
+            )
+        if args.provider_replay_daemon_command == "status":
+            daemon = get_provider_replay_managed_daemon_status(
+                config,
+                stale_after_seconds=args.stale_after_seconds,
+            )
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="reported provider replay managed daemon status",
+                data={"daemon": daemon, "config": config_summary},
+            )
+        if args.provider_replay_daemon_command == "stop":
+            daemon = stop_provider_replay_managed_daemon(
+                config,
+                owner_token=args.owner_token,
+                stale_after_seconds=args.stale_after_seconds,
+            )
+            return Result(
+                ok=daemon.get("stop_status") in {"signal_sent", "not_running"},
+                code=ErrorCode.OK
+                if daemon.get("stop_status") in {"signal_sent", "not_running"}
+                else ErrorCode.EXECUTION_FAILED,
+                message="stopped provider replay managed daemon"
+                if daemon.get("stop_status") == "signal_sent"
+                else "reported provider replay managed daemon stop status",
+                data={"daemon": daemon, "config": config_summary},
+            )
+        return Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message=f"unsupported provider replay daemon command: {args.provider_replay_daemon_command}",
         )
     if args.provider_replay_command == "serve":
         exit_code = serve_provider_transport_replay(config)

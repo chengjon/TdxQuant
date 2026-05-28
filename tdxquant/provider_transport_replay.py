@@ -4,6 +4,9 @@ import copy
 import hashlib
 import json
 import os
+import signal
+import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -439,6 +442,302 @@ def write_provider_replay_lifecycle_statefile(
             base["lock_released"] = bool(base["lock_acquired"])
         except OSError:
             base["lock_released"] = False
+
+
+def build_provider_replay_managed_daemon_command(
+    config_path: str | Path,
+    *,
+    python_executable: str | None = None,
+) -> list[str]:
+    return [
+        python_executable or sys.executable,
+        "-m",
+        "tdxquant.cli",
+        "provider-replay",
+        "serve",
+        "--config",
+        str(config_path),
+    ]
+
+
+def _provider_replay_process_running(pid: int) -> bool:
+    if not isinstance(pid, int) or pid < 1:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _terminate_provider_replay_process(pid: int) -> None:
+    os.kill(pid, signal.SIGTERM)
+
+
+def get_provider_replay_managed_daemon_status(
+    config: ProviderTransportReplayConfig,
+    *,
+    stale_after_seconds: float | int = 300.0,
+    process_running: Any | None = None,
+) -> dict[str, Any]:
+    statefile_check = check_provider_replay_lifecycle_statefile(
+        config,
+        stale_after_seconds=stale_after_seconds,
+    )
+    running_probe = process_running or _provider_replay_process_running
+    pid = statefile_check.get("pid")
+    process_running_result = None
+    if isinstance(pid, int):
+        process_running_result = bool(running_probe(pid))
+
+    daemon_status = statefile_check.get("check_status")
+    if statefile_check.get("configured") is not True:
+        daemon_status = "not_configured"
+    elif statefile_check.get("check_status") == "missing":
+        daemon_status = "missing"
+    elif statefile_check.get("check_status") != "valid":
+        daemon_status = "invalid"
+    elif statefile_check.get("stale") is True:
+        daemon_status = "stale"
+    elif process_running_result is True:
+        daemon_status = "running"
+    else:
+        daemon_status = "not_running"
+
+    control_allowed = (
+        daemon_status == "running"
+        and statefile_check.get("config_hash_matches") is True
+        and statefile_check.get("provider_id_matches") is True
+    )
+    return {
+        "daemon_status": daemon_status,
+        "configured": statefile_check.get("configured"),
+        "statefile_check": statefile_check,
+        "pid": pid if isinstance(pid, int) else None,
+        "process_running": process_running_result,
+        "owner_token": statefile_check.get("owner_token"),
+        "generation": statefile_check.get("generation"),
+        "config_hash": statefile_check.get("config_hash"),
+        "config_hash_matches": statefile_check.get("config_hash_matches"),
+        "write_attempted": False,
+        "control_allowed": control_allowed,
+        "boundary": "managed_daemon_status_read_only; no_supervisor_loop",
+    }
+
+
+def start_provider_replay_managed_daemon(
+    config: ProviderTransportReplayConfig,
+    *,
+    config_path: str | Path,
+    owner_token: str | None = None,
+    generation: int = 1,
+    python_executable: str | None = None,
+    popen_factory: Any | None = None,
+    process_running: Any | None = None,
+    updated_at: str | None = None,
+) -> dict[str, Any]:
+    status = get_provider_replay_managed_daemon_status(config, process_running=process_running)
+    if status["daemon_status"] == "running":
+        return {
+            "start_status": "already_running",
+            "pid": status["pid"],
+            "owner_token": status["owner_token"],
+            "generation": status["generation"],
+            "statefile_check": status["statefile_check"],
+            "statefile_write": None,
+            "command": None,
+            "control_allowed": True,
+            "boundary": "managed_daemon_start_stop_only; no_supervisor_loop",
+        }
+    if not config.lifecycle_state_file:
+        return {
+            "start_status": "blocked",
+            "pid": None,
+            "owner_token": None,
+            "generation": None,
+            "statefile_check": status["statefile_check"],
+            "statefile_write": None,
+            "command": None,
+            "errors": ["lifecycle_state_file_required"],
+            "error_count": 1,
+            "control_allowed": False,
+            "boundary": "managed_daemon_start_stop_only; no_supervisor_loop",
+        }
+
+    resolved_owner_token = (owner_token or uuid4().hex).strip()
+    command = build_provider_replay_managed_daemon_command(
+        config_path,
+        python_executable=python_executable,
+    )
+    launch = popen_factory or subprocess.Popen
+    popen_kwargs: dict[str, Any] = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        popen_kwargs["start_new_session"] = True
+    try:
+        process = launch(command, **popen_kwargs)
+    except OSError as exc:
+        return {
+            "start_status": "launch_failed",
+            "pid": None,
+            "owner_token": resolved_owner_token,
+            "generation": generation,
+            "statefile_check": status["statefile_check"],
+            "statefile_write": None,
+            "command": command,
+            "errors": [f"daemon_launch_failed:{exc.__class__.__name__}"],
+            "error_count": 1,
+            "control_allowed": False,
+            "boundary": "managed_daemon_start_stop_only; no_supervisor_loop",
+        }
+
+    pid = getattr(process, "pid", None)
+    statefile_write = write_provider_replay_lifecycle_statefile(
+        config,
+        state="running",
+        pid=pid,
+        owner_token=resolved_owner_token,
+        generation=generation,
+        updated_at=updated_at,
+    )
+    if statefile_write.get("write_status") != "written":
+        terminate = getattr(process, "terminate", None)
+        if callable(terminate):
+            try:
+                terminate()
+            except OSError:
+                pass
+        return {
+            "start_status": "statefile_write_failed",
+            "pid": pid if isinstance(pid, int) else None,
+            "owner_token": resolved_owner_token,
+            "generation": generation,
+            "statefile_check": status["statefile_check"],
+            "statefile_write": statefile_write,
+            "command": command,
+            "errors": ["statefile_write_failed"],
+            "error_count": 1,
+            "control_allowed": False,
+            "boundary": "managed_daemon_start_stop_only; no_supervisor_loop",
+        }
+
+    return {
+        "start_status": "started",
+        "pid": pid if isinstance(pid, int) else None,
+        "owner_token": resolved_owner_token,
+        "generation": generation,
+        "statefile_check": status["statefile_check"],
+        "statefile_write": statefile_write,
+        "command": command,
+        "errors": [],
+        "error_count": 0,
+        "control_allowed": True,
+        "boundary": "managed_daemon_start_stop_only; no_supervisor_loop",
+    }
+
+
+def stop_provider_replay_managed_daemon(
+    config: ProviderTransportReplayConfig,
+    *,
+    owner_token: str | None,
+    stale_after_seconds: float | int = 300.0,
+    process_running: Any | None = None,
+    terminate_process: Any | None = None,
+    updated_at: str | None = None,
+) -> dict[str, Any]:
+    status = get_provider_replay_managed_daemon_status(
+        config,
+        stale_after_seconds=stale_after_seconds,
+        process_running=process_running,
+    )
+    statefile_check = status["statefile_check"]
+    pid = status["pid"]
+    base: dict[str, Any] = {
+        "stop_status": "blocked",
+        "pid": pid,
+        "owner_token": owner_token,
+        "statefile_check": statefile_check,
+        "statefile_write": None,
+        "signal_sent": False,
+        "errors": [],
+        "error_count": 0,
+        "control_allowed": False,
+        "boundary": "managed_daemon_start_stop_only; no_supervisor_loop",
+    }
+
+    errors: list[str] = []
+    if not owner_token:
+        errors.append("owner_token_required")
+    if statefile_check.get("check_status") != "valid":
+        errors.append("statefile_not_valid")
+    if statefile_check.get("provider_id_matches") is not True:
+        errors.append("provider_id_mismatch")
+    if statefile_check.get("config_hash_matches") is not True:
+        errors.append("config_hash_mismatch")
+    if statefile_check.get("stale") is True:
+        errors.append("statefile_stale")
+    if owner_token and statefile_check.get("owner_token") != owner_token:
+        errors.append("owner_token_mismatch")
+    if status.get("process_running") is not True:
+        errors.append("process_not_running")
+    if errors:
+        base.update({"errors": errors, "error_count": len(errors)})
+        if errors == ["process_not_running"]:
+            base["stop_status"] = "not_running"
+        return base
+
+    terminate = terminate_process or _terminate_provider_replay_process
+    try:
+        terminate(pid)
+    except OSError as exc:
+        base.update(
+            {
+                "stop_status": "terminate_failed",
+                "errors": [f"terminate_failed:{exc.__class__.__name__}"],
+                "error_count": 1,
+            }
+        )
+        return base
+
+    generation = statefile_check.get("generation")
+    next_generation = generation + 1 if isinstance(generation, int) else 1
+    statefile_write = write_provider_replay_lifecycle_statefile(
+        config,
+        state="stopping",
+        pid=pid,
+        owner_token=owner_token,
+        generation=next_generation,
+        updated_at=updated_at,
+    )
+    base.update(
+        {
+            "stop_status": "signal_sent",
+            "statefile_write": statefile_write,
+            "signal_sent": True,
+            "errors": [],
+            "error_count": 0,
+            "control_allowed": True,
+        }
+    )
+    if statefile_write.get("write_status") != "written":
+        base.update(
+            {
+                "stop_status": "statefile_write_failed",
+                "errors": ["statefile_write_failed"],
+                "error_count": 1,
+                "control_allowed": False,
+            }
+        )
+    return base
 
 
 def check_provider_replay_lifecycle_statefile(
