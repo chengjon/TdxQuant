@@ -2492,6 +2492,10 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["lifecycle"]["daemon_managed"], False)
         self.assertEqual(result.data["summary_view"]["lifecycle"]["control_supported"], False)
         self.assertEqual(result.data["summary_view"]["lifecycle"]["managed_operation_count"], 0)
+        self.assertEqual(
+            result.data["summary_view"]["lifecycle"]["ownership_summary"],
+            result.data["status"]["lifecycle"]["ownership_summary"],
+        )
         self.assertEqual(result.data["summary_view"]["runtime"]["runtime_observed"], True)
         self.assertEqual(result.data["summary_view"]["runtime"]["probe_requested"], True)
         self.assertEqual(

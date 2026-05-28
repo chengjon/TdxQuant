@@ -260,6 +260,18 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(status["lifecycle"]["start_stop_managed"], False)
         self.assertEqual(status["lifecycle"]["daemon_managed"], False)
         self.assertEqual(status["lifecycle"]["restart_policy"], "not_managed")
+        self.assertEqual(
+            status["lifecycle"]["ownership_summary"],
+            {
+                "ownership_status": "not_managed",
+                "owned_process": False,
+                "state_file_present": False,
+                "state_file_stale": False,
+                "control_allowed": False,
+                "status_source": "configured_boundary",
+                "boundary": "no_lifecycle_ownership; read_only_status",
+            },
+        )
         self.assertEqual(status["capabilities"]["read_only"], True)
         self.assertEqual(status["capabilities"]["writes_supported"], False)
         self.assertIn("/provider/v1/replay/watch/events/stream", status["capabilities"]["endpoints"])

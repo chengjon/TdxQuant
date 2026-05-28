@@ -129,6 +129,15 @@ def build_provider_transport_replay_status(
             "daemon_managed": False,
             "scheduler_managed": False,
             "restart_policy": "not_managed",
+            "ownership_summary": {
+                "ownership_status": "not_managed",
+                "owned_process": False,
+                "state_file_present": False,
+                "state_file_stale": False,
+                "control_allowed": False,
+                "status_source": "configured_boundary",
+                "boundary": "no_lifecycle_ownership; read_only_status",
+            },
         },
         "boundaries": [
             "fixture-backed replay only",

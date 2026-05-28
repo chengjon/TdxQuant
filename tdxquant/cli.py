@@ -6062,6 +6062,7 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "restart_policy": restart_policy,
             "control_supported": control_supported,
             "managed_operation_count": managed_operation_count,
+            "ownership_summary": copy.deepcopy(lifecycle.get("ownership_summary")),
         },
         "probe_summary": copy.deepcopy(probe_summary),
         "boundaries": copy.deepcopy(boundaries),
