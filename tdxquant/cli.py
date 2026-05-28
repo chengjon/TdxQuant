@@ -6033,16 +6033,31 @@ def _build_provider_replay_lifecycle_plan(
     )
     blocking_reason = operation_entry.get("blocking_reason") or control_summary.get("blocking_reason")
     statefile_check_included = isinstance(statefile_check, dict)
+    operation_status = operation_entry.get("status", "blocked")
+    ownership_required = bool(operation_entry.get("ownership_required"))
+    if (
+        operation_status == "available"
+        and ownership_required
+        and statefile_check_included
+        and not (
+            statefile_check.get("check_status") == "valid"
+            and statefile_check.get("schema_valid") is True
+            and statefile_check.get("provider_id_matches") is True
+            and statefile_check.get("stale") is False
+        )
+    ):
+        operation_status = "blocked"
+        blocking_reason = "lifecycle_statefile_not_current"
     return {
         "operation": operation,
         "execution_mode": "non_executing_lifecycle_plan",
-        "operation_status": operation_entry.get("status", "blocked"),
+        "operation_status": operation_status,
         "implemented": bool(operation_entry.get("implemented")),
         "dispatch_executed": False,
         "control_allowed": False,
         "lifecycle_control_status": control_summary.get("control_status"),
         "blocking_reason": blocking_reason,
-        "ownership_required": bool(operation_entry.get("ownership_required")),
+        "ownership_required": ownership_required,
         "operator_action_required": bool(operation_entry.get("operator_action_required")),
         "statefile_configured": bool(statefile_summary.get("configured")),
         "statefile_check_included": statefile_check_included,

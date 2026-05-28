@@ -415,6 +415,8 @@ TdxQuant
 
 > E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay daemon status --expected-owner-token --inspect-process-identity` 与 `provider-replay lifecycle-readiness --include-ownership-check` 新增只读 process ownership diagnostics，底层 `build_provider_replay_process_ownership_diagnostics()` 区分 statefile 配置/缺失/无效/过期、config hash、owner token、PID liveness 与可选 process identity match，并让 readiness 只在 statefile 有效且 ownership 证明为 `owned` 时把 `owned_process_identity` 计入 satisfied requirement，证据为 `tdxquant/provider_transport_replay.py`、`tdxquant/cli.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-process-ownership-diagnostics`；该检查不执行 start/stop/kill/restart，不改变默认 stop 行为，不推断端口 ownership，`--inspect-process-identity` 仅是 opt-in 的本地命令行身份诊断，不管理真实 provider 生命周期，也不证明 E-06、broker、workflow 或 write readiness 已完成。
 
+> E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay status --config ... --view detailed/summary` 在 `lifecycle_state_file` 已配置时不再把 lifecycle control 误报为 `unsupported`，而是只读报告 `managed_replay_daemon`、`start_stop_managed=true`、`daemon_managed=true`、`restart_policy=operator_opt_in`、`control_status=operator_opt_in_available`、可用 `start/status/stop/supervise/restart_backoff`、supervisor opt-in 可用，以及 `lifecycle-plan` 对 stale ownership statefile 的非执行 blocked 计划，证据为 `tdxquant/provider_transport_replay.py`、`tdxquant/cli.py`、`tests/test_provider_transport_replay.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-managed-lifecycle-status-summary`；这些字段只从配置和既有 lifecycle metadata 派生，不启动/停止/监督进程，不读取或写入 statefile，不检查进程表或端口 ownership，不代表真实 TongDaXin provider 生命周期、broker/workflow/write readiness 或 E-06 已全部完成。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
@@ -450,6 +452,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-28 | E-06 补充 provider-replay managed lifecycle status summary 登记：配置 `lifecycle_state_file` 时 status/summary 不再误报 lifecycle control unsupported，而是只读登记 operator opt-in managed replay daemon controls；不执行控制、不观察进程、不证明真实 provider 或 write readiness。 |
 | 2026-05-28 | E-06 补充 provider-replay process ownership diagnostics 登记：daemon status/readiness 新增只读 ownership 证明字段，区分 statefile/hash/token/PID/可选进程身份；不执行控制动作、不推断端口 ownership、不管理真实 provider，也不证明 E-06 完整完成。 |
 | 2026-05-28 | E-06 补充 `provider-replay daemon supervise --restart-policy on-failure` 登记：新增显式 opt-in、当前 supervisor invocation 内 bounded restart/backoff；默认不重启，预算耗尽写 `state=failed`，不跨进程持久化预算、不做指数退避/端口 ownership/真实 provider 恢复，也不证明 broker/workflow/write readiness。 |
 | 2026-05-28 | E-06 补充 `provider-replay daemon supervise` 登记：新增显式前台 supervisor loop、heartbeat statefile 刷新、child exit/stopping state 记录；不自动 restart/backoff、不推断端口 ownership、不管理真实 provider，也不证明 broker/workflow/write readiness。 |

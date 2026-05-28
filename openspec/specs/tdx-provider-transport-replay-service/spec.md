@@ -1703,75 +1703,60 @@ Provider replay lifecycle status SHALL include additive read-only `lifecycle.own
 
 ### Requirement: Provider replay lifecycle status SHALL expose control summary
 
-Provider replay lifecycle status SHALL include additive read-only `lifecycle.control_summary` metadata that identifies current lifecycle control operations as unavailable.
+Provider replay lifecycle status SHALL include additive read-only `lifecycle.control_summary` metadata that identifies current lifecycle control availability.
 
-#### Scenario: Detailed status reports lifecycle control is unsupported
+#### Scenario: Configured lifecycle statefile reports managed daemon control surface
 
-- **WHEN** provider replay status is built with the current non-lifecycle-managing implementation
-- **THEN** `lifecycle.control_summary.control_status` MUST be `unsupported`
+- **GIVEN** provider replay config includes `lifecycle_state_file`
+- **WHEN** provider replay status is built
+- **THEN** `lifecycle.start_stop_managed` MUST be `true`
+- **AND** `lifecycle.daemon_managed` MUST be `true`
+- **AND** `lifecycle.control_summary.control_status` MUST be `operator_opt_in_available`
 - **AND** `lifecycle.control_summary.control_allowed` MUST be `false`
-- **AND** `lifecycle.control_summary.available_operations` MUST be empty
-- **AND** `lifecycle.control_summary.blocked_operations` MUST include `start`, `stop`, `restart`, and `backoff`
-- **AND** `lifecycle.control_summary.blocking_reason` MUST identify lifecycle control as not implemented
-- **AND** the summary MUST state that ownership proof and operator action are required before future lifecycle control
+- **AND** `lifecycle.control_summary.available_operations` MUST include `start`, `status`, `stop`, `supervise`, and `restart_backoff`
+- **AND** `lifecycle.control_summary.blocked_operations` MUST be empty
+- **AND** the summary MUST state that explicit operator invocation remains required.
 
-#### Scenario: Summary view projects lifecycle control without adding control
+#### Scenario: Unconfigured lifecycle statefile remains unsupported
 
-- **WHEN** a caller requests `provider-replay status --view summary`
-- **THEN** `summary_view.lifecycle.control_summary` MUST match the detailed lifecycle control summary
-- **AND** the existing detailed `status` payload MUST remain available
-- **AND** the command MUST NOT start, stop, restart, daemonize, schedule, supervise, write state files, read process tables, infer ownership from ports, or enable write behavior
+- **GIVEN** provider replay config does not include `lifecycle_state_file`
+- **WHEN** provider replay status is built
+- **THEN** lifecycle control MUST remain unsupported and blocked.
 
-#### Scenario: Control summary remains a boundary declaration
+#### Scenario: Managed lifecycle status remains read-only
 
-- **WHEN** lifecycle control summary is present
-- **THEN** it MUST NOT be treated as readiness, broker availability, endpoint coverage, workflow readiness, or write-capability proof
-- **AND** future lifecycle control MUST still require explicit implementation and ownership proof before stop or restart operations can be allowed
+- **WHEN** managed lifecycle status is reported
+- **THEN** status building MUST NOT start, stop, restart, supervise, daemonize, write state files, read process tables, infer ownership from ports, or enable write behavior
+- **AND** it MUST NOT be treated as broker availability, workflow readiness, write-capability proof, or real TongDaXin provider lifecycle management.
 
 ### Requirement: Provider replay status summary SHALL expose lifecycle control fields
 
 The provider replay status summary view SHALL include read-only lifecycle ownership/control fields in `summary_view.status_summary` derived only from the already-built lifecycle summary metadata.
 
-#### Scenario: Summary view exposes compact lifecycle control posture
+#### Scenario: Summary view reports managed lifecycle availability
 
+- **GIVEN** provider replay config includes `lifecycle_state_file`
 - **WHEN** a caller requests `provider-replay status --view summary`
-- **THEN** `summary_view.status_summary.lifecycle_ownership_status` MUST match `summary_view.lifecycle.ownership_summary.ownership_status`
-- **AND** `summary_view.status_summary.lifecycle_owned_process` MUST match `summary_view.lifecycle.ownership_summary.owned_process`
+- **THEN** `summary_view.status_summary.control_supported` MUST be `true`
+- **AND** `summary_view.status_summary.managed_operation_count` MUST be greater than `0`
 - **AND** `summary_view.status_summary.lifecycle_control_status` MUST match `summary_view.lifecycle.control_summary.control_status`
-- **AND** `summary_view.status_summary.lifecycle_blocking_reason` MUST match `summary_view.lifecycle.control_summary.blocking_reason`
-
-#### Scenario: Summary lifecycle fields remain read-only
-
-- **WHEN** the summary view exposes lifecycle control fields
-- **THEN** the detailed `status` payload and `summary_view.lifecycle` MUST remain available
-- **AND** the command MUST NOT start, stop, restart, daemonize, schedule, supervise, write state files, read process tables, infer ownership from ports, or enable write behavior
-- **AND** the fields MUST NOT be treated as readiness, broker availability, endpoint coverage, workflow readiness, or write-capability proof
+- **AND** `summary_view.status_summary.lifecycle_supervision_status` MUST match `summary_view.lifecycle.supervision_summary.supervision_status`
+- **AND** the command MUST NOT execute lifecycle control or claim provider readiness.
 
 ### Requirement: Provider replay lifecycle status SHALL expose operation summary
 
 Provider replay lifecycle status SHALL include additive read-only `lifecycle.operation_summary` metadata that describes current lifecycle operation availability per operation.
 
-#### Scenario: Detailed status reports all lifecycle operations blocked
+#### Scenario: Configured lifecycle statefile reports available managed operations
 
-- **WHEN** provider replay status is built with the current non-lifecycle-managing implementation
-- **THEN** `lifecycle.operation_summary.operation_count` MUST be `4`
-- **AND** `lifecycle.operation_summary.available_count` MUST be `0`
-- **AND** `lifecycle.operation_summary.blocked_count` MUST be `4`
-- **AND** `lifecycle.operation_summary.operations` MUST include entries for `start`, `stop`, `restart`, and `backoff`
-- **AND** each current operation entry MUST report `status=blocked`, `implemented=false`, and `blocking_reason=lifecycle_control_not_implemented`
-
-#### Scenario: Summary view projects lifecycle operation summary without adding control
-
-- **WHEN** a caller requests `provider-replay status --view summary`
-- **THEN** `summary_view.lifecycle.operation_summary` MUST match the detailed lifecycle operation summary
-- **AND** the existing detailed `status` payload MUST remain available
-- **AND** the command MUST NOT start, stop, restart, daemonize, schedule, supervise, write state files, read process tables, infer ownership from ports, or enable write behavior
-
-#### Scenario: Operation summary remains a boundary declaration
-
-- **WHEN** lifecycle operation summary is present
-- **THEN** it MUST NOT be treated as readiness, broker availability, endpoint coverage, workflow readiness, or write-capability proof
-- **AND** future lifecycle control MUST still require explicit implementation and ownership proof where required before operations can be allowed
+- **GIVEN** provider replay config includes `lifecycle_state_file`
+- **WHEN** provider replay status is built
+- **THEN** `lifecycle.operation_summary.operation_count` MUST be `5`
+- **AND** `lifecycle.operation_summary.available_count` MUST be `5`
+- **AND** `lifecycle.operation_summary.blocked_count` MUST be `0`
+- **AND** operations MUST include `start`, `status`, `stop`, `supervise`, and `restart_backoff`
+- **AND** each operation MUST be marked `implemented=true` and `status=available`
+- **AND** stop and restart/backoff operations MUST continue to declare ownership requirements.
 
 ### Requirement: Provider replay status summary SHALL expose lifecycle operation counts
 
@@ -1822,35 +1807,17 @@ Provider replay lifecycle status SHALL include additive read-only `lifecycle.bac
 
 ### Requirement: Provider replay lifecycle status SHALL expose supervision summary
 
-Provider replay lifecycle status SHALL include additive read-only `lifecycle.supervision_summary` metadata that describes current supervisor and process tracking state as unavailable.
+Provider replay lifecycle status SHALL include additive read-only `lifecycle.supervision_summary` metadata that reports current supervision availability without starting or observing a supervisor.
 
-#### Scenario: Detailed status reports provider replay is not supervised
+#### Scenario: Configured lifecycle statefile reports supervisor availability
 
-- **WHEN** provider replay status is built with the current non-lifecycle-managing implementation
-- **THEN** `lifecycle.supervision_summary.supervision_status` MUST be `not_supervised`
-- **AND** `lifecycle.supervision_summary.supervisor_configured` MUST be `false`
-- **AND** `lifecycle.supervision_summary.supervisor_type` MUST be `none`
-- **AND** `lifecycle.supervision_summary.managed_process_count` MUST be `0`
-- **AND** `lifecycle.supervision_summary.active_process_count` MUST be `0`
-- **AND** `lifecycle.supervision_summary.desired_state` MUST be `unmanaged`
+- **GIVEN** provider replay config includes `lifecycle_state_file`
+- **WHEN** provider replay status is built
+- **THEN** `lifecycle.supervision_summary.supervision_status` MUST be `operator_opt_in_available`
+- **AND** `lifecycle.supervision_summary.supervisor_configured` MUST be `true`
+- **AND** `lifecycle.supervision_summary.supervisor_type` MUST be `foreground_cli_supervisor`
 - **AND** `lifecycle.supervision_summary.observed_state` MUST be `not_observed`
-- **AND** `lifecycle.supervision_summary.process_identity_status` MUST be `not_tracked`
-- **AND** `lifecycle.supervision_summary.state_file_status` MUST be `not_configured`
-- **AND** `lifecycle.supervision_summary.pid_status` MUST be `not_tracked`
-- **AND** the summary MUST identify lifecycle control as not implemented
-
-#### Scenario: Summary view projects lifecycle supervision without adding control
-
-- **WHEN** a caller requests `provider-replay status --view summary`
-- **THEN** `summary_view.lifecycle.supervision_summary` MUST match the detailed lifecycle supervision summary
-- **AND** the existing detailed `status` payload MUST remain available
-- **AND** the command MUST NOT start, stop, restart, daemonize, supervise, write or read state files, track pids, read process tables, infer ownership from ports, run timers, schedule retries, or enable write behavior
-
-#### Scenario: Supervision summary remains a boundary declaration
-
-- **WHEN** lifecycle supervision summary is present
-- **THEN** it MUST NOT be treated as process ownership proof, readiness, broker availability, endpoint coverage, workflow readiness, write-capability proof, automatic recovery, or a scheduled retry
-- **AND** future supervisor behavior MUST still require explicit implementation, process ownership proof, lifecycle state storage, and opt-in control semantics
+- **AND** `lifecycle.supervision_summary.control_allowed` MUST be `false`.
 
 ### Requirement: Provider replay status summary SHALL expose supervision rollup fields
 
@@ -1917,44 +1884,20 @@ Provider replay lifecycle status SHALL include additive read-only `lifecycle.sta
 
 ### Requirement: Provider replay CLI SHALL expose non-executing lifecycle control plans
 
-Provider replay CLI SHALL expose a read-only `lifecycle-plan` command that reports the current blocked plan for lifecycle operations without executing them.
+Provider replay CLI SHALL expose a read-only `lifecycle-plan` command that reports the current lifecycle operation plan without executing it.
 
-#### Scenario: Lifecycle plan command parses an operation
+#### Scenario: Managed lifecycle plan reports available implemented stop with stale ownership blocked
 
-- **WHEN** a caller parses `provider-replay lifecycle-plan --config <path> --operation stop`
-- **THEN** the command MUST be accepted as a provider replay subcommand
-- **AND** the parsed operation MUST be `stop`
-- **AND** the default view MUST be `detailed`
-
-#### Scenario: Detailed lifecycle plan reports blocked operation without dispatch
-
-- **WHEN** a caller requests `provider-replay lifecycle-plan --operation stop`
-- **THEN** the result MUST include `plan.execution_mode=non_executing_lifecycle_plan`
-- **AND** `plan.operation` MUST be `stop`
-- **AND** `plan.operation_status` MUST be `blocked`
+- **GIVEN** provider replay config includes `lifecycle_state_file`
+- **AND** the caller requests `provider-replay lifecycle-plan --operation stop --include-statefile-check`
+- **AND** the statefile check is valid but stale
+- **WHEN** the plan is built
+- **THEN** `plan.lifecycle_control_status` MUST be `operator_opt_in_available`
+- **AND** `plan.implemented` MUST be `true`
+- **AND** `plan.operation_status` MUST remain `blocked`
+- **AND** `plan.blocking_reason` MUST identify that the lifecycle statefile is not current
 - **AND** `plan.dispatch_executed` MUST be `false`
-- **AND** `plan.control_allowed` MUST be `false`
-- **AND** `plan.lifecycle_control_status` MUST be `unsupported`
-- **AND** `plan.blocking_reason` MUST identify lifecycle control as not implemented
-- **AND** `plan.statefile_configured` MUST reflect the config-derived statefile boundary
-- **AND** `plan.supervision_status` MUST reflect lifecycle supervision status
-
-#### Scenario: Summary lifecycle plan projects compact blocked state
-
-- **WHEN** a caller requests `provider-replay lifecycle-plan --operation restart --view summary`
-- **THEN** `summary_view.mode` MUST be `lifecycle-plan`
-- **AND** `summary_view.operation` MUST be `restart`
-- **AND** `summary_view.operation_status` MUST be `blocked`
-- **AND** `summary_view.dispatch_executed` MUST be `false`
-- **AND** `summary_view.control_allowed` MUST be `false`
-- **AND** `summary_view.lifecycle_control_status` MUST be `unsupported`
-- **AND** `summary_view.blocking_reason` MUST identify lifecycle control as not implemented
-
-#### Scenario: Lifecycle plan is non-executing
-
-- **WHEN** lifecycle plan output is produced
-- **THEN** the command MUST NOT start, stop, restart, daemonize, supervise, probe runtime, inspect process tables, infer ownership from ports, read or write statefiles, schedule retries, or enable write behavior
-- **AND** the plan MUST NOT be treated as process ownership proof, readiness, broker availability, endpoint coverage, workflow readiness, write-capability proof, automatic recovery, or a scheduled retry
+- **AND** the command MUST NOT execute lifecycle control.
 
 ### Requirement: Provider replay CLI SHALL expose read-only lifecycle statefile checks
 

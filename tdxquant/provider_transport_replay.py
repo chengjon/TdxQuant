@@ -133,7 +133,30 @@ def build_provider_transport_replay_status(
             "watch_stream_probe": resolved_watch_stream_probe,
             "probe_summary": _build_provider_replay_probe_summary(resolved_probes),
         },
-        "lifecycle": {
+        "lifecycle": _build_provider_replay_lifecycle_status(lifecycle_state_file_configured),
+        "boundaries": _build_provider_replay_status_boundaries(lifecycle_state_file_configured),
+    }
+
+
+def _build_provider_replay_lifecycle_status(lifecycle_state_file_configured: bool) -> dict[str, Any]:
+    statefile_summary = {
+        "statefile_status": "configured_not_inspected"
+        if lifecycle_state_file_configured
+        else "not_configured",
+        "configured": lifecycle_state_file_configured,
+        "path_provided": lifecycle_state_file_configured,
+        "read_attempted": False,
+        "write_attempted": False,
+        "present": None,
+        "stale": None,
+        "ownership_source": "not_available",
+        "control_allowed": False,
+        "blocked": True,
+        "blocking_reason": "lifecycle_control_not_implemented",
+        "boundary": "read_only_statefile_config_boundary; no_statefile_io",
+    }
+    if not lifecycle_state_file_configured:
+        return {
             "mode": "foreground_process",
             "start_stop_managed": False,
             "daemon_managed": False,
@@ -162,40 +185,7 @@ def build_provider_transport_replay_status(
                 "operation_count": 4,
                 "available_count": 0,
                 "blocked_count": 4,
-                "operations": [
-                    {
-                        "operation": "start",
-                        "status": "blocked",
-                        "blocking_reason": "lifecycle_control_not_implemented",
-                        "ownership_required": False,
-                        "operator_action_required": True,
-                        "implemented": False,
-                    },
-                    {
-                        "operation": "stop",
-                        "status": "blocked",
-                        "blocking_reason": "lifecycle_control_not_implemented",
-                        "ownership_required": True,
-                        "operator_action_required": True,
-                        "implemented": False,
-                    },
-                    {
-                        "operation": "restart",
-                        "status": "blocked",
-                        "blocking_reason": "lifecycle_control_not_implemented",
-                        "ownership_required": True,
-                        "operator_action_required": True,
-                        "implemented": False,
-                    },
-                    {
-                        "operation": "backoff",
-                        "status": "blocked",
-                        "blocking_reason": "lifecycle_control_not_implemented",
-                        "ownership_required": True,
-                        "operator_action_required": True,
-                        "implemented": False,
-                    },
-                ],
+                "operations": _build_provider_replay_lifecycle_operation_entries(available=False),
             },
             "backoff_summary": {
                 "backoff_status": "not_configured",
@@ -210,22 +200,7 @@ def build_provider_transport_replay_status(
                 "blocking_reason": "lifecycle_control_not_implemented",
                 "boundary": "read_only_backoff_status; no_supervised_restart",
             },
-            "statefile_summary": {
-                "statefile_status": (
-                    "configured_not_inspected" if lifecycle_state_file_configured else "not_configured"
-                ),
-                "configured": lifecycle_state_file_configured,
-                "path_provided": lifecycle_state_file_configured,
-                "read_attempted": False,
-                "write_attempted": False,
-                "present": None,
-                "stale": None,
-                "ownership_source": "not_available",
-                "control_allowed": False,
-                "blocked": True,
-                "blocking_reason": "lifecycle_control_not_implemented",
-                "boundary": "read_only_statefile_config_boundary; no_statefile_io",
-            },
+            "statefile_summary": statefile_summary,
             "supervision_summary": {
                 "supervision_status": "not_supervised",
                 "supervisor_configured": False,
@@ -242,15 +217,127 @@ def build_provider_transport_replay_status(
                 "blocking_reason": "lifecycle_control_not_implemented",
                 "boundary": "read_only_supervision_status; no_supervisor_loop",
             },
+        }
+
+    operations = _build_provider_replay_lifecycle_operation_entries(available=True)
+    return {
+        "mode": "managed_replay_daemon",
+        "start_stop_managed": True,
+        "daemon_managed": True,
+        "scheduler_managed": False,
+        "restart_policy": "operator_opt_in",
+        "ownership_summary": {
+            "ownership_status": "statefile_configured_not_inspected",
+            "owned_process": False,
+            "state_file_present": None,
+            "state_file_stale": None,
+            "control_allowed": False,
+            "status_source": "configured_boundary",
+            "boundary": "read_only_lifecycle_ownership; statefile_not_inspected",
         },
-        "boundaries": [
+        "control_summary": {
+            "control_status": "operator_opt_in_available",
+            "control_allowed": False,
+            "available_operations": ["start", "status", "stop", "supervise", "restart_backoff"],
+            "blocked_operations": [],
+            "blocking_reason": "operator_invocation_required",
+            "ownership_required": True,
+            "operator_action_required": True,
+            "boundary": "read_only_lifecycle_status; explicit_daemon_command_required",
+        },
+        "operation_summary": {
+            "operation_count": len(operations),
+            "available_count": len(operations),
+            "blocked_count": 0,
+            "operations": operations,
+        },
+        "backoff_summary": {
+            "backoff_status": "operator_opt_in_available",
+            "enabled": False,
+            "policy": "on_failure_opt_in",
+            "retry_count": 0,
+            "delay_window_seconds": None,
+            "last_failure_reason": None,
+            "next_retry_status": "not_scheduled",
+            "next_retry_pending": False,
+            "blocked": False,
+            "blocking_reason": "operator_invocation_required",
+            "boundary": "read_only_backoff_status; supervisor_restart_policy_opt_in",
+        },
+        "statefile_summary": statefile_summary,
+        "supervision_summary": {
+            "supervision_status": "operator_opt_in_available",
+            "supervisor_configured": True,
+            "supervisor_type": "foreground_cli_supervisor",
+            "managed_process_count": 0,
+            "active_process_count": 0,
+            "desired_state": "operator_controlled",
+            "observed_state": "not_observed",
+            "process_identity_status": "not_inspected",
+            "state_file_status": "configured_not_inspected",
+            "pid_status": "not_tracked",
+            "control_allowed": False,
+            "blocked": False,
+            "blocking_reason": "operator_invocation_required",
+            "boundary": "read_only_supervision_status; no_supervisor_started",
+        },
+    }
+
+
+def _build_provider_replay_lifecycle_operation_entries(*, available: bool) -> list[dict[str, Any]]:
+    operation_specs = [
+        ("start", False),
+        ("status", False),
+        ("stop", True),
+        ("supervise", False),
+        ("restart_backoff", True),
+    ]
+    if available:
+        return [
+            {
+                "operation": operation,
+                "status": "available",
+                "blocking_reason": "operator_invocation_required",
+                "ownership_required": ownership_required,
+                "operator_action_required": True,
+                "implemented": True,
+            }
+            for operation, ownership_required in operation_specs
+        ]
+    return [
+        {
+            "operation": operation,
+            "status": "blocked",
+            "blocking_reason": "lifecycle_control_not_implemented",
+            "ownership_required": ownership_required,
+            "operator_action_required": True,
+            "implemented": False,
+        }
+        for operation, ownership_required in [
+            ("start", False),
+            ("stop", True),
+            ("restart", True),
+            ("backoff", True),
+        ]
+    ]
+
+
+def _build_provider_replay_status_boundaries(lifecycle_state_file_configured: bool) -> list[str]:
+    if lifecycle_state_file_configured:
+        return [
             "fixture-backed replay only",
             "read-only provider surface",
-            "no daemon start/stop lifecycle management",
-            "no scheduler or restart governance",
+            "managed replay daemon lifecycle requires explicit provider-replay daemon commands",
+            "supervisor restart/backoff is operator opt-in and not scheduler-managed",
             "no live market session",
-        ],
-    }
+        ]
+    return [
+        "fixture-backed replay only",
+        "read-only provider surface",
+        "no daemon start/stop lifecycle management",
+        "no scheduler or restart governance",
+        "no live market session",
+    ]
 
 
 def build_provider_replay_lifecycle_config_hash(config: ProviderTransportReplayConfig) -> str:

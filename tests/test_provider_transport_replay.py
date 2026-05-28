@@ -435,6 +435,58 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             )
             self.assertFalse(Path(lifecycle_state_file).exists())
 
+    def test_configured_lifecycle_statefile_reports_managed_lifecycle_status_without_io(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            status = build_provider_transport_replay_status(config)
+
+        lifecycle = status["lifecycle"]
+        self.assertEqual(lifecycle["start_stop_managed"], True)
+        self.assertEqual(lifecycle["daemon_managed"], True)
+        self.assertEqual(lifecycle["restart_policy"], "operator_opt_in")
+        self.assertEqual(lifecycle["control_summary"]["control_status"], "operator_opt_in_available")
+        self.assertEqual(lifecycle["control_summary"]["control_allowed"], False)
+        self.assertEqual(
+            lifecycle["control_summary"]["available_operations"],
+            ["start", "status", "stop", "supervise", "restart_backoff"],
+        )
+        self.assertEqual(lifecycle["control_summary"]["blocked_operations"], [])
+        self.assertEqual(lifecycle["control_summary"]["blocking_reason"], "operator_invocation_required")
+        self.assertEqual(lifecycle["operation_summary"]["operation_count"], 5)
+        self.assertEqual(lifecycle["operation_summary"]["available_count"], 5)
+        self.assertEqual(lifecycle["operation_summary"]["blocked_count"], 0)
+        self.assertEqual(
+            [entry["operation"] for entry in lifecycle["operation_summary"]["operations"]],
+            ["start", "status", "stop", "supervise", "restart_backoff"],
+        )
+        self.assertTrue(all(entry["implemented"] for entry in lifecycle["operation_summary"]["operations"]))
+        self.assertTrue(
+            next(
+                entry
+                for entry in lifecycle["operation_summary"]["operations"]
+                if entry["operation"] == "stop"
+            )["ownership_required"]
+        )
+        self.assertEqual(lifecycle["backoff_summary"]["backoff_status"], "operator_opt_in_available")
+        self.assertEqual(lifecycle["backoff_summary"]["policy"], "on_failure_opt_in")
+        self.assertEqual(lifecycle["backoff_summary"]["blocked"], False)
+        self.assertEqual(lifecycle["supervision_summary"]["supervision_status"], "operator_opt_in_available")
+        self.assertEqual(lifecycle["supervision_summary"]["supervisor_configured"], True)
+        self.assertEqual(lifecycle["supervision_summary"]["supervisor_type"], "foreground_cli_supervisor")
+        self.assertEqual(lifecycle["supervision_summary"]["observed_state"], "not_observed")
+        self.assertEqual(lifecycle["supervision_summary"]["control_allowed"], False)
+        self.assertFalse(state_path.exists())
+
     def test_lifecycle_statefile_check_reports_valid_stale_state(self) -> None:
         with TemporaryDirectory() as temp_dir:
             state_path = Path(temp_dir) / "provider-replay.state.json"
