@@ -99,15 +99,16 @@ The FUNCTION_TREE registry validator SHALL expose an opt-in JSON report for mach
 
 ### Requirement: FUNCTION_TREE lifecycle material status SHALL be explicitly bounded
 
-The FUNCTION_TREE registry SHALL allow the OpenSpec lifecycle material node to be marked implemented when the registry validator, evidence checks, tests, and machine-readable report are present, provided the node boundary clearly states that the validator does not prove downstream feature runtime availability.
+The FUNCTION_TREE registry SHALL allow lifecycle-related feature nodes to be marked implemented when their evidence, tests, and boundaries describe the implemented lifecycle surface without implying downstream runtime availability.
 
-#### Scenario: Lifecycle material node is implemented with validation evidence
+#### Scenario: Provider replay daemon fake provider lifecycle node is implemented with bounded evidence
 
-- **WHEN** the lifecycle material node cites the validator script, validator tests, OpenSpec evidence checks, local evidence path checks, ROADMAP rejection, and JSON report output
-- **THEN** the node MAY be registered as `[已实现]`
-- **AND** the boundary MUST state that the validator does not execute evidence paths or prove cited feature availability
+- **WHEN** E-06 cites replay fake provider HTTP, probe, managed daemon control, statefile ownership, supervisor, restart/backoff, process ownership diagnostics, managed lifecycle status, managed lifecycle readiness, tests, and OpenSpec evidence
+- **THEN** E-06 MAY be registered as `[已实现]`
+- **AND** the node boundary MUST state that implementation is limited to replay fake provider lifecycle management
+- **AND** the node boundary MUST NOT imply live TongDaXin provider availability, broker readiness, workflow readiness, write support, or production trading readiness.
 
-#### Scenario: Lifecycle status does not affect downstream feature status
+#### Scenario: Provider replay implemented status does not affect trading or subscription nodes
 
-- **WHEN** the lifecycle material node is registered as `[已实现]`
-- **THEN** other feature nodes MUST retain their own explicit status, evidence, and boundary
+- **WHEN** E-06 is registered as `[已实现]`
+- **THEN** D-07, D-08, B-16, E-09, and other feature nodes MUST retain their own explicit statuses, evidence, and boundaries.
