@@ -528,6 +528,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                         },
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat", "watermark"],
+                            "primary_evaluated_component": "heartbeat",
                             "stale_components": ["heartbeat"],
                             "primary_stale_component": "heartbeat",
                             "has_stale_component": True,
@@ -695,9 +696,11 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "stale_count": 1,
                 "fresh_count": 1,
                 "not_evaluated_count": 1,
+                "primary_evaluated_component": "heartbeat",
                 "primary_stale_component": "heartbeat",
                 "primary_fresh_component": "watermark",
                 "primary_not_evaluated_component": "reconnect",
+                "has_evaluated_component": True,
                 "has_stale_component": True,
                 "has_fresh_component": True,
                 "has_not_evaluated_component": True,
@@ -737,6 +740,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             payload["result"]["governance"]["evaluation_summary"],
             {
                 "evaluated_components": ["heartbeat", "watermark"],
+                "primary_evaluated_component": "heartbeat",
                 "stale_components": ["heartbeat"],
                 "primary_stale_component": "heartbeat",
                 "has_stale_component": True,

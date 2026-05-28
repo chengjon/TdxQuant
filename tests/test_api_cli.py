@@ -10814,6 +10814,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         ],
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat"],
+                            "primary_evaluated_component": "heartbeat",
                             "stale_components": ["heartbeat"],
                             "primary_stale_component": "heartbeat",
                             "has_stale_component": True,
@@ -11000,6 +11001,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         },
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat"],
+                            "primary_evaluated_component": "heartbeat",
                             "stale_components": ["heartbeat"],
                             "primary_stale_component": "heartbeat",
                             "has_stale_component": True,
@@ -11024,9 +11026,11 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "stale_count": 1,
                             "fresh_count": 0,
                             "not_evaluated_count": 2,
+                            "primary_evaluated_component": "heartbeat",
                             "primary_stale_component": "heartbeat",
                             "primary_fresh_component": None,
                             "primary_not_evaluated_component": "watermark",
+                            "has_evaluated_component": True,
                             "has_stale_component": True,
                             "has_fresh_component": False,
                             "has_not_evaluated_component": True,
