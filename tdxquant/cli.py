@@ -5979,6 +5979,16 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
         if isinstance(probe_summary.get("advisory_summary"), dict)
         else {}
     )
+    ownership_summary = (
+        lifecycle.get("ownership_summary")
+        if isinstance(lifecycle.get("ownership_summary"), dict)
+        else {}
+    )
+    control_summary = (
+        lifecycle.get("control_summary")
+        if isinstance(lifecycle.get("control_summary"), dict)
+        else {}
+    )
     boundaries = status.get("boundaries") if isinstance(status.get("boundaries"), list) else []
     endpoints = capabilities.get("endpoints") if isinstance(capabilities.get("endpoints"), list) else []
     restart_policy = lifecycle.get("restart_policy")
@@ -6025,6 +6035,10 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             ),
             "control_supported": control_supported,
             "managed_operation_count": managed_operation_count,
+            "lifecycle_ownership_status": ownership_summary.get("ownership_status"),
+            "lifecycle_owned_process": ownership_summary.get("owned_process"),
+            "lifecycle_control_status": control_summary.get("control_status"),
+            "lifecycle_blocking_reason": control_summary.get("blocking_reason"),
             "boundary_count": len(boundaries),
             "runtime_observed": runtime.get("runtime_observed"),
             "live_runtime_required": runtime.get("live_runtime_required"),
