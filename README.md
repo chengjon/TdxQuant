@@ -1,4 +1,4 @@
-> 用户可用功能清单：如果你想先看“当前能直接使用哪些项目功能”，请从 [`USER_FEATURES.md`](USER_FEATURES.md) 开始；第 1-7 项测试结果见 [`USER_FEATURES_TEST_REPORT.md`](USER_FEATURES_TEST_REPORT.md)。
+> 用户可用功能清单：如果你想先看“当前能直接使用哪些项目功能”，请从 [`USER_FEATURES.md`](USER_FEATURES.md) 开始；第 1-10 项测试结果见 [`USER_FEATURES_TEST_REPORT.md`](USER_FEATURES_TEST_REPORT.md)。
 >
 > 工程状态入口：当前项目的唯一“功能全景图 + 状态注册表”仍是 [`FUNCTION_TREE.md`](FUNCTION_TREE.md)。
 >

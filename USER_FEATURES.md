@@ -4,7 +4,7 @@
 >
 > 工程级实现状态、证据和边界仍以 [`FUNCTION_TREE.md`](FUNCTION_TREE.md) 为准；本文件只做用户视角的功能导航。
 >
-> 第 1-7 项用户功能的第一轮测试结果见 [`USER_FEATURES_TEST_REPORT.md`](USER_FEATURES_TEST_REPORT.md)。
+> 第 1-10 项用户功能的测试结果见 [`USER_FEATURES_TEST_REPORT.md`](USER_FEATURES_TEST_REPORT.md)；其中 1-7 为第一轮全面验证，8-10 为安全边界验证。
 
 ## 1. 推荐入口
 
