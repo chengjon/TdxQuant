@@ -168,6 +168,8 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             "action_count": action_count,
             "primary_reason_source": reason_summary.get("primary_reason_source"),
             "primary_severity": action_summary.get("primary_severity"),
+            "primary_action": action_summary.get("primary_action"),
+            "primary_action_reason": action_summary.get("primary_reason"),
             "has_reasons": isinstance(reason_count, int)
             and not isinstance(reason_count, bool)
             and reason_count > 0,
