@@ -343,6 +343,25 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 "boundary": "read_only_backoff_status; no_supervised_restart",
             },
         )
+        self.assertEqual(
+            status["lifecycle"]["supervision_summary"],
+            {
+                "supervision_status": "not_supervised",
+                "supervisor_configured": False,
+                "supervisor_type": "none",
+                "managed_process_count": 0,
+                "active_process_count": 0,
+                "desired_state": "unmanaged",
+                "observed_state": "not_observed",
+                "process_identity_status": "not_tracked",
+                "state_file_status": "not_configured",
+                "pid_status": "not_tracked",
+                "control_allowed": False,
+                "blocked": True,
+                "blocking_reason": "lifecycle_control_not_implemented",
+                "boundary": "read_only_supervision_status; no_supervisor_loop",
+            },
+        )
         self.assertEqual(status["capabilities"]["read_only"], True)
         self.assertEqual(status["capabilities"]["writes_supported"], False)
         self.assertIn("/provider/v1/replay/watch/events/stream", status["capabilities"]["endpoints"])
