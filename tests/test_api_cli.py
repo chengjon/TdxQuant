@@ -10965,6 +10965,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                             "primary_severity": "review",
                             "primary_action": "review_subscription_watch_heartbeat",
                             "primary_action_reason": "heartbeat:stale",
+                            "primary_action_reason_source": "heartbeat",
                             "has_reasons": True,
                             "has_actions": True,
                         },

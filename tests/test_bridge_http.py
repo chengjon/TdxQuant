@@ -686,6 +686,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "primary_severity": "review",
                 "primary_action": "inspect_worker",
                 "primary_action_reason": "heartbeat_stale",
+                "primary_action_reason_source": "unknown",
                 "has_reasons": True,
                 "has_actions": True,
             },
