@@ -6101,6 +6101,7 @@ def _build_provider_replay_status_summary_view(status: dict[str, object]) -> dic
             "ownership_summary": copy.deepcopy(lifecycle.get("ownership_summary")),
             "control_summary": copy.deepcopy(lifecycle.get("control_summary")),
             "operation_summary": copy.deepcopy(lifecycle.get("operation_summary")),
+            "backoff_summary": copy.deepcopy(lifecycle.get("backoff_summary")),
         },
         "probe_summary": copy.deepcopy(probe_summary),
         "boundaries": copy.deepcopy(boundaries),

@@ -327,6 +327,22 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 ],
             },
         )
+        self.assertEqual(
+            status["lifecycle"]["backoff_summary"],
+            {
+                "backoff_status": "not_configured",
+                "enabled": False,
+                "policy": "not_managed",
+                "retry_count": 0,
+                "delay_window_seconds": None,
+                "last_failure_reason": None,
+                "next_retry_status": "not_scheduled",
+                "next_retry_pending": False,
+                "blocked": True,
+                "blocking_reason": "lifecycle_control_not_implemented",
+                "boundary": "read_only_backoff_status; no_supervised_restart",
+            },
+        )
         self.assertEqual(status["capabilities"]["read_only"], True)
         self.assertEqual(status["capabilities"]["writes_supported"], False)
         self.assertIn("/provider/v1/replay/watch/events/stream", status["capabilities"]["endpoints"])
