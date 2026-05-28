@@ -50,6 +50,7 @@ from .bridge_registry import (
 from .bridge_http import serve_bridge_from_config
 from .provider_transport_replay import (
     build_provider_transport_replay_status,
+    check_provider_replay_lifecycle_statefile,
     load_provider_transport_replay_config,
     probe_provider_transport_replay_health,
     probe_provider_transport_replay_watch_events,
@@ -758,6 +759,19 @@ def _build_provider_replay_parser(
         default="detailed",
     )
     provider_replay_lifecycle_plan_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    provider_replay_lifecycle_state_check_parser = provider_replay_subparsers.add_parser("lifecycle-state-check")
+    provider_replay_lifecycle_state_check_parser.add_argument("--config", required=True)
+    provider_replay_lifecycle_state_check_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    provider_replay_lifecycle_state_check_parser.add_argument(
+        "--view",
+        choices=["detailed", "summary"],
+        default="detailed",
+    )
+    provider_replay_lifecycle_state_check_parser.add_argument(
+        "--output",
+        help="Optional path to write the JSON result",
+    )
 
     return provider_replay_parser
 
@@ -5989,6 +6003,28 @@ def _build_provider_replay_lifecycle_plan_summary_view(
     }
 
 
+def _build_provider_replay_lifecycle_statefile_check_summary_view(
+    status: dict[str, object],
+    statefile_check: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "mode": "lifecycle-state-check",
+        "provider_id": status.get("provider_id"),
+        "check_status": statefile_check.get("check_status"),
+        "configured": statefile_check.get("configured"),
+        "read_attempted": statefile_check.get("read_attempted"),
+        "write_attempted": statefile_check.get("write_attempted"),
+        "exists": statefile_check.get("exists"),
+        "schema_valid": statefile_check.get("schema_valid"),
+        "provider_id_matches": statefile_check.get("provider_id_matches"),
+        "stale": statefile_check.get("stale"),
+        "stale_after_seconds": statefile_check.get("stale_after_seconds"),
+        "error_count": statefile_check.get("error_count"),
+        "control_allowed": statefile_check.get("control_allowed"),
+        "boundary": statefile_check.get("boundary"),
+    }
+
+
 def _build_provider_replay_endpoint_family_counts(endpoints: list[object]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for endpoint in endpoints:
@@ -6067,6 +6103,28 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             ok=True,
             code=ErrorCode.OK,
             message="planned provider replay lifecycle operation",
+            data=data,
+        )
+    if args.provider_replay_command == "lifecycle-state-check":
+        status = build_provider_transport_replay_status(config)
+        statefile_check = check_provider_replay_lifecycle_statefile(
+            config,
+            stale_after_seconds=args.stale_after_seconds,
+        )
+        data = {
+            "statefile_check": statefile_check,
+            "status": status,
+            "config": config_summary,
+        }
+        if args.view == "summary":
+            data["summary_view"] = _build_provider_replay_lifecycle_statefile_check_summary_view(
+                status,
+                statefile_check,
+            )
+        return Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="checked provider replay lifecycle statefile",
             data=data,
         )
     if args.provider_replay_command == "serve":

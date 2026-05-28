@@ -12,6 +12,7 @@ from tdxquant.provider_transport_replay import (
     ProviderTransportReplayConfig,
     ProviderTransportReplayHTTPServer,
     build_provider_transport_replay_status,
+    check_provider_replay_lifecycle_statefile,
     load_provider_transport_replay_config,
     probe_provider_transport_replay_health,
     probe_provider_transport_replay_watch_events,
@@ -426,6 +427,94 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 },
             )
             self.assertFalse(Path(lifecycle_state_file).exists())
+
+    def test_lifecycle_statefile_check_reports_valid_stale_state(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 12345,
+                        "state": "running",
+                        "updated_at": "2000-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = check_provider_replay_lifecycle_statefile(config, stale_after_seconds=60)
+
+        self.assertEqual(result["check_status"], "valid")
+        self.assertEqual(result["configured"], True)
+        self.assertEqual(result["read_attempted"], True)
+        self.assertEqual(result["write_attempted"], False)
+        self.assertEqual(result["exists"], True)
+        self.assertEqual(result["schema_version"], "tdx.provider_replay.lifecycle_state.v1")
+        self.assertEqual(result["schema_valid"], True)
+        self.assertEqual(result["provider_id"], "provider-replay-a")
+        self.assertEqual(result["provider_id_matches"], True)
+        self.assertEqual(result["pid"], 12345)
+        self.assertEqual(result["state"], "running")
+        self.assertEqual(result["updated_at"], "2000-01-01T00:00:00Z")
+        self.assertEqual(result["stale_after_seconds"], 60)
+        self.assertEqual(result["stale"], True)
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(result["error_count"], 0)
+        self.assertEqual(result["control_allowed"], False)
+        self.assertEqual(result["boundary"], "read_only_statefile_check; no_lifecycle_control")
+
+    def test_lifecycle_statefile_check_reports_missing_path(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "missing.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = check_provider_replay_lifecycle_statefile(config, stale_after_seconds=60)
+
+        self.assertEqual(result["check_status"], "missing")
+        self.assertEqual(result["configured"], True)
+        self.assertEqual(result["read_attempted"], True)
+        self.assertEqual(result["write_attempted"], False)
+        self.assertEqual(result["exists"], False)
+        self.assertEqual(result["schema_valid"], None)
+        self.assertEqual(result["control_allowed"], False)
+
+    def test_lifecycle_statefile_check_reports_not_configured_without_read(self) -> None:
+        config = ProviderTransportReplayConfig(
+            provider_id="provider-replay-a",
+            bind_host="127.0.0.1",
+            port=0,
+            token="secret-token",
+            master_allowlist=[],
+            replay_fixture="market-snapshot-default",
+        )
+
+        result = check_provider_replay_lifecycle_statefile(config, stale_after_seconds=60)
+
+        self.assertEqual(result["check_status"], "not_configured")
+        self.assertEqual(result["configured"], False)
+        self.assertEqual(result["read_attempted"], False)
+        self.assertEqual(result["write_attempted"], False)
+        self.assertIsNone(result["exists"])
+        self.assertEqual(result["control_allowed"], False)
 
     def test_status_can_include_explicit_replay_health_probe(self) -> None:
         server = ProviderTransportReplayHTTPServer(

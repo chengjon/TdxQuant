@@ -1349,6 +1349,22 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.operation, "stop")
         self.assertEqual(args.view, "detailed")
 
+    def test_provider_replay_lifecycle_state_check_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "provider-replay",
+                "lifecycle-state-check",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+            ]
+        )
+        self.assertEqual(args.command, "provider-replay")
+        self.assertEqual(args.provider_replay_command, "lifecycle-state-check")
+        self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
+        self.assertEqual(args.stale_after_seconds, 300.0)
+        self.assertEqual(args.view, "detailed")
+
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "block-read-watchlist", "--block-code", "ZXG"])
@@ -2468,6 +2484,102 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["statefile_configured"], False)
         self.assertEqual(result.data["summary_view"]["supervision_status"], "not_supervised")
         self.assertEqual(result.data["summary_view"]["boundary"], "read_only_lifecycle_plan; no_control_dispatch")
+
+    def test_handle_provider_replay_lifecycle_state_check_reports_valid_stale_statefile(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 12345,
+                        "state": "running",
+                        "updated_at": "2000-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(state_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "lifecycle-state-check",
+                    "--config",
+                    str(config_path),
+                    "--stale-after-seconds",
+                    "60",
+                ]
+            )
+            with patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve:
+                result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["statefile_check"]["check_status"], "valid")
+        self.assertEqual(result.data["statefile_check"]["read_attempted"], True)
+        self.assertEqual(result.data["statefile_check"]["write_attempted"], False)
+        self.assertEqual(result.data["statefile_check"]["schema_valid"], True)
+        self.assertEqual(result.data["statefile_check"]["provider_id_matches"], True)
+        self.assertEqual(result.data["statefile_check"]["stale_after_seconds"], 60.0)
+        self.assertEqual(result.data["statefile_check"]["stale"], True)
+        self.assertEqual(result.data["statefile_check"]["control_allowed"], False)
+        mocked_serve.assert_not_called()
+
+    def test_handle_provider_replay_lifecycle_state_check_summary_reports_missing_statefile(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "missing.state.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(state_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "lifecycle-state-check",
+                    "--config",
+                    str(config_path),
+                    "--view",
+                    "summary",
+                ]
+            )
+            result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary_view"]["mode"], "lifecycle-state-check")
+        self.assertEqual(result.data["summary_view"]["provider_id"], "provider-replay-a")
+        self.assertEqual(result.data["summary_view"]["check_status"], "missing")
+        self.assertEqual(result.data["summary_view"]["schema_valid"], None)
+        self.assertEqual(result.data["summary_view"]["provider_id_matches"], None)
+        self.assertEqual(result.data["summary_view"]["stale"], None)
+        self.assertEqual(result.data["summary_view"]["control_allowed"], False)
+        self.assertEqual(result.data["summary_view"]["boundary"], "read_only_statefile_check; no_lifecycle_control")
 
     def test_handle_provider_replay_status_returns_lifecycle_boundary_without_serving(self) -> None:
         parser = build_parser()

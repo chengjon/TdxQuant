@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from .replay_provider import (
 )
 
 REPLAY_TRANSPORT_VERSION = "provider-transport-replay.v1"
+LIFECYCLE_STATEFILE_SCHEMA_VERSION = "tdx.provider_replay.lifecycle_state.v1"
 WATCH_EVENT_STREAM_SCHEMA_VERSION = "tdx.bridge.watch.event_stream.v1"
 WATCH_TERMINAL_STATES = {"completed", "failed", "stopped", "stopping", "cancelled"}
 REPLAY_READ_ONLY_ENDPOINTS = [
@@ -243,6 +245,134 @@ def build_provider_transport_replay_status(
             "no live market session",
         ],
     }
+
+
+def check_provider_replay_lifecycle_statefile(
+    config: ProviderTransportReplayConfig,
+    *,
+    stale_after_seconds: float | int = 300.0,
+) -> dict[str, Any]:
+    try:
+        resolved_stale_after = float(stale_after_seconds)
+    except (TypeError, ValueError):
+        resolved_stale_after = 300.0
+    base: dict[str, Any] = {
+        "check_status": "not_configured",
+        "configured": bool(config.lifecycle_state_file),
+        "read_attempted": False,
+        "write_attempted": False,
+        "exists": None,
+        "schema_version": None,
+        "schema_valid": None,
+        "provider_id": None,
+        "provider_id_matches": None,
+        "pid": None,
+        "state": None,
+        "updated_at": None,
+        "age_seconds": None,
+        "stale_after_seconds": resolved_stale_after,
+        "stale": None,
+        "errors": [],
+        "error_count": 0,
+        "control_allowed": False,
+        "boundary": "read_only_statefile_check; no_lifecycle_control",
+    }
+    if not config.lifecycle_state_file:
+        return base
+
+    base["read_attempted"] = True
+    state_path = Path(config.lifecycle_state_file)
+    if not state_path.exists():
+        base.update(
+            {
+                "check_status": "missing",
+                "exists": False,
+                "errors": ["statefile_missing"],
+                "error_count": 1,
+            }
+        )
+        return base
+
+    base["exists"] = True
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        base.update(
+            {
+                "check_status": "invalid",
+                "errors": ["statefile_unreadable_or_invalid_json"],
+                "error_count": 1,
+            }
+        )
+        return base
+    if not isinstance(payload, dict):
+        base.update(
+            {
+                "check_status": "invalid",
+                "errors": ["statefile_payload_not_object"],
+                "error_count": 1,
+            }
+        )
+        return base
+
+    errors: list[str] = []
+    schema_version = payload.get("schema_version")
+    provider_id = payload.get("provider_id")
+    pid = payload.get("pid")
+    state = payload.get("state")
+    updated_at = payload.get("updated_at")
+    schema_valid = schema_version == LIFECYCLE_STATEFILE_SCHEMA_VERSION
+    provider_id_matches = provider_id == config.provider_id
+    if not schema_valid:
+        errors.append("schema_version_mismatch")
+    if not provider_id_matches:
+        errors.append("provider_id_mismatch")
+    if not isinstance(pid, int):
+        errors.append("pid_invalid")
+        pid = None
+    if not isinstance(state, str) or not state:
+        errors.append("state_missing")
+        state = None
+    parsed_updated_at = _parse_provider_replay_lifecycle_state_timestamp(updated_at)
+    age_seconds = None
+    stale = None
+    if parsed_updated_at is None:
+        errors.append("updated_at_invalid")
+        updated_at = None
+    else:
+        age_seconds = max(0.0, (datetime.now(UTC) - parsed_updated_at).total_seconds())
+        stale = age_seconds > resolved_stale_after
+
+    base.update(
+        {
+            "check_status": "invalid" if errors else "valid",
+            "schema_version": schema_version if isinstance(schema_version, str) else None,
+            "schema_valid": schema_valid,
+            "provider_id": provider_id if isinstance(provider_id, str) else None,
+            "provider_id_matches": provider_id_matches,
+            "pid": pid,
+            "state": state,
+            "updated_at": updated_at if isinstance(updated_at, str) else None,
+            "age_seconds": age_seconds,
+            "stale": stale,
+            "errors": errors,
+            "error_count": len(errors),
+        }
+    )
+    return base
+
+
+def _parse_provider_replay_lifecycle_state_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def probe_provider_transport_replay_health(
