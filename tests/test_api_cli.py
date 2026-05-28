@@ -1435,6 +1435,12 @@ class ApiCliParserTests(unittest.TestCase):
                 "4",
                 "--poll-interval",
                 "0.25",
+                "--restart-policy",
+                "on-failure",
+                "--max-restarts",
+                "2",
+                "--backoff-seconds",
+                "0.5",
             ]
         )
 
@@ -1450,6 +1456,9 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(supervise_args.owner_token, "owner-token-a")
         self.assertEqual(supervise_args.generation, 4)
         self.assertEqual(supervise_args.poll_interval, 0.25)
+        self.assertEqual(supervise_args.restart_policy, "on-failure")
+        self.assertEqual(supervise_args.max_restarts, 2)
+        self.assertEqual(supervise_args.backoff_seconds, 0.5)
 
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
@@ -2775,6 +2784,12 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "4",
                     "--poll-interval",
                     "0.25",
+                    "--restart-policy",
+                    "on-failure",
+                    "--max-restarts",
+                    "2",
+                    "--backoff-seconds",
+                    "0.5",
                 ]
             )
             with (
@@ -2819,6 +2834,9 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(mocked_supervise.call_args.kwargs["owner_token"], "owner-token-a")
         self.assertEqual(mocked_supervise.call_args.kwargs["generation"], 4)
         self.assertEqual(mocked_supervise.call_args.kwargs["poll_interval"], 0.25)
+        self.assertEqual(mocked_supervise.call_args.kwargs["restart_policy"], "on-failure")
+        self.assertEqual(mocked_supervise.call_args.kwargs["max_restarts"], 2)
+        self.assertEqual(mocked_supervise.call_args.kwargs["backoff_seconds"], 0.5)
 
     def test_handle_provider_replay_lifecycle_plan_summary_reports_blocked_restart(self) -> None:
         parser = build_parser()

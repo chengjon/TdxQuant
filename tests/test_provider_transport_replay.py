@@ -916,6 +916,138 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(payload["state"], "stopping")
         self.assertEqual(payload["generation"], 6)
 
+    def test_managed_daemon_supervisor_restarts_failed_child_after_backoff(self) -> None:
+        launches: list[list[str]] = []
+        slept: list[float] = []
+        timestamps = iter(
+            [
+                "2999-01-01T00:00:00Z",
+                "2999-01-01T00:00:01Z",
+                "2999-01-01T00:00:02Z",
+                "2999-01-01T00:00:03Z",
+                "2999-01-01T00:00:04Z",
+            ]
+        )
+
+        class FakeProcess:
+            def __init__(self, pid: int, polls: list[int | None]) -> None:
+                self.pid = pid
+                self.polls = polls
+
+            def poll(self) -> int | None:
+                return self.polls.pop(0)
+
+        processes = [FakeProcess(4321, [9]), FakeProcess(4322, [None, 0])]
+
+        def fake_popen(command: list[str], **_kwargs: object) -> FakeProcess:
+            launches.append(command)
+            return processes.pop(0)
+
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = run_provider_replay_managed_daemon_supervisor(
+                config,
+                config_path=config_path,
+                owner_token="owner-token-a",
+                generation=5,
+                poll_interval=0.25,
+                restart_policy="on-failure",
+                max_restarts=1,
+                backoff_seconds=0.5,
+                popen_factory=fake_popen,
+                sleep=lambda seconds: slept.append(seconds),
+                updated_at_factory=lambda: next(timestamps),
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["supervisor_status"], "child_exited")
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(result["restart_policy"], "on-failure")
+        self.assertEqual(result["restart_attempted"], True)
+        self.assertEqual(result["restart_count"], 1)
+        self.assertEqual(result["backoff_scheduled"], True)
+        self.assertEqual(result["backoff_count"], 1)
+        self.assertEqual(result["last_failure_exit_code"], 9)
+        self.assertEqual(len(launches), 2)
+        self.assertEqual(slept, [0.5, 0.25])
+        self.assertEqual(payload["state"], "exited")
+        self.assertEqual(payload["pid"], 4322)
+
+    def test_managed_daemon_supervisor_records_failed_state_when_restart_budget_exhausted(self) -> None:
+        launches: list[list[str]] = []
+        slept: list[float] = []
+        timestamps = iter(
+            [
+                "2999-01-01T00:00:00Z",
+                "2999-01-01T00:00:01Z",
+                "2999-01-01T00:00:02Z",
+                "2999-01-01T00:00:03Z",
+            ]
+        )
+
+        class FakeProcess:
+            def __init__(self, pid: int, exit_code: int) -> None:
+                self.pid = pid
+                self.exit_code = exit_code
+
+            def poll(self) -> int:
+                return self.exit_code
+
+        processes = [FakeProcess(4321, 9), FakeProcess(4322, 8)]
+
+        def fake_popen(command: list[str], **_kwargs: object) -> FakeProcess:
+            launches.append(command)
+            return processes.pop(0)
+
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = run_provider_replay_managed_daemon_supervisor(
+                config,
+                config_path=config_path,
+                owner_token="owner-token-a",
+                generation=5,
+                restart_policy="on-failure",
+                max_restarts=1,
+                backoff_seconds=0.5,
+                popen_factory=fake_popen,
+                sleep=lambda seconds: slept.append(seconds),
+                updated_at_factory=lambda: next(timestamps),
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["supervisor_status"], "restart_exhausted")
+        self.assertEqual(result["exit_code"], 8)
+        self.assertEqual(result["restart_attempted"], True)
+        self.assertEqual(result["restart_count"], 1)
+        self.assertEqual(result["backoff_scheduled"], True)
+        self.assertEqual(result["backoff_count"], 1)
+        self.assertEqual(len(launches), 2)
+        self.assertEqual(slept, [0.5])
+        self.assertEqual(payload["state"], "failed")
+        self.assertEqual(payload["pid"], 4322)
+
     def test_status_can_include_explicit_replay_health_probe(self) -> None:
         server = ProviderTransportReplayHTTPServer(
             ProviderTransportReplayConfig(

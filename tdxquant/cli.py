@@ -822,6 +822,13 @@ def _build_provider_replay_parser(
     provider_replay_daemon_supervise_parser.add_argument("--owner-token")
     provider_replay_daemon_supervise_parser.add_argument("--generation", type=int, default=1)
     provider_replay_daemon_supervise_parser.add_argument("--poll-interval", type=float, default=1.0)
+    provider_replay_daemon_supervise_parser.add_argument(
+        "--restart-policy",
+        choices=["never", "on-failure"],
+        default="never",
+    )
+    provider_replay_daemon_supervise_parser.add_argument("--max-restarts", type=int, default=0)
+    provider_replay_daemon_supervise_parser.add_argument("--backoff-seconds", type=float, default=0.0)
     provider_replay_daemon_supervise_parser.add_argument("--python-executable")
     provider_replay_daemon_supervise_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -6370,14 +6377,17 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
                 owner_token=args.owner_token,
                 generation=args.generation,
                 poll_interval=args.poll_interval,
+                restart_policy=args.restart_policy,
+                max_restarts=args.max_restarts,
+                backoff_seconds=args.backoff_seconds,
                 python_executable=args.python_executable,
             )
             return Result(
                 ok=daemon.get("supervisor_status")
-                in {"child_exited", "interrupted", "max_heartbeats_reached"},
+                in {"child_exited", "interrupted", "max_heartbeats_reached", "restart_exhausted"},
                 code=ErrorCode.OK
                 if daemon.get("supervisor_status")
-                in {"child_exited", "interrupted", "max_heartbeats_reached"}
+                in {"child_exited", "interrupted", "max_heartbeats_reached", "restart_exhausted"}
                 else ErrorCode.EXECUTION_FAILED,
                 message="supervised provider replay managed daemon",
                 data={"daemon": daemon, "config": config_summary},

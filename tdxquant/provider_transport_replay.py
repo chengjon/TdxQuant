@@ -748,6 +748,9 @@ def run_provider_replay_managed_daemon_supervisor(
     owner_token: str | None = None,
     generation: int = 1,
     poll_interval: float | int = 1.0,
+    restart_policy: str = "never",
+    max_restarts: int = 0,
+    backoff_seconds: float | int = 0.0,
     python_executable: str | None = None,
     popen_factory: Any | None = None,
     sleep: Any | None = None,
@@ -778,6 +781,22 @@ def run_provider_replay_managed_daemon_supervisor(
         resolved_poll_interval = 1.0
     if resolved_poll_interval < 0:
         resolved_poll_interval = 1.0
+    resolved_restart_policy = restart_policy if restart_policy in {"never", "on-failure"} else "never"
+    try:
+        resolved_max_restarts = int(max_restarts)
+    except (TypeError, ValueError):
+        resolved_max_restarts = 0
+    resolved_max_restarts = max(0, resolved_max_restarts)
+    try:
+        resolved_backoff_seconds = float(backoff_seconds)
+    except (TypeError, ValueError):
+        resolved_backoff_seconds = 0.0
+    resolved_backoff_seconds = max(0.0, resolved_backoff_seconds)
+    supervisor_boundary = (
+        "foreground_supervisor_restart_backoff_opt_in; no_real_provider_control"
+        if resolved_restart_policy != "never"
+        else "foreground_supervisor_observation_only; no_restart_backoff"
+    )
 
     resolved_owner_token = (owner_token or uuid4().hex).strip()
     command = build_provider_replay_managed_daemon_command(
@@ -808,14 +827,25 @@ def run_provider_replay_managed_daemon_supervisor(
             "errors": [f"daemon_launch_failed:{exc.__class__.__name__}"],
             "error_count": 1,
             "restart_attempted": False,
+            "restart_policy": resolved_restart_policy,
+            "restart_count": 0,
+            "max_restarts": resolved_max_restarts,
             "backoff_scheduled": False,
+            "backoff_count": 0,
+            "backoff_seconds": resolved_backoff_seconds,
+            "last_failure_exit_code": None,
             "terminate_attempted": False,
             "control_allowed": False,
-            "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+            "boundary": supervisor_boundary,
         }
 
     pid = getattr(process, "pid", None)
     sleeper = sleep or time.sleep
+    restart_count = 0
+    backoff_count = 0
+    restart_attempted = False
+    backoff_scheduled = False
+    last_failure_exit_code = None
 
     def next_updated_at() -> str | None:
         if updated_at_factory is None:
@@ -853,10 +883,16 @@ def run_provider_replay_managed_daemon_supervisor(
             "errors": ["statefile_write_failed"],
             "error_count": 1,
             "restart_attempted": False,
+            "restart_policy": resolved_restart_policy,
+            "restart_count": restart_count,
+            "max_restarts": resolved_max_restarts,
             "backoff_scheduled": False,
+            "backoff_count": backoff_count,
+            "backoff_seconds": resolved_backoff_seconds,
+            "last_failure_exit_code": last_failure_exit_code,
             "terminate_attempted": True,
             "control_allowed": False,
-            "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+            "boundary": supervisor_boundary,
         }
 
     heartbeat_count = 1
@@ -864,6 +900,120 @@ def run_provider_replay_managed_daemon_supervisor(
         while True:
             exit_code = process.poll()
             if exit_code is not None:
+                if exit_code != 0 and resolved_restart_policy == "on-failure":
+                    last_failure_exit_code = exit_code
+                    if restart_count < resolved_max_restarts:
+                        current_generation += 1
+                        backoff_write = write_state("backoff", current_generation)
+                        if backoff_write.get("write_status") != "written":
+                            return {
+                                "supervisor_status": "statefile_write_failed",
+                                "pid": pid if isinstance(pid, int) else None,
+                                "owner_token": resolved_owner_token,
+                                "generation": current_generation,
+                                "heartbeat_count": heartbeat_count,
+                                "exit_code": exit_code,
+                                "command": command,
+                                "statefile_write": backoff_write,
+                                "errors": ["statefile_write_failed"],
+                                "error_count": 1,
+                                "restart_attempted": restart_attempted,
+                                "restart_policy": resolved_restart_policy,
+                                "restart_count": restart_count,
+                                "max_restarts": resolved_max_restarts,
+                                "backoff_scheduled": backoff_scheduled,
+                                "backoff_count": backoff_count,
+                                "backoff_seconds": resolved_backoff_seconds,
+                                "last_failure_exit_code": last_failure_exit_code,
+                                "terminate_attempted": False,
+                                "control_allowed": False,
+                                "boundary": supervisor_boundary,
+                            }
+                        backoff_scheduled = True
+                        backoff_count += 1
+                        sleeper(resolved_backoff_seconds)
+                        try:
+                            process = launch(command, **popen_kwargs)
+                        except OSError as exc:
+                            return {
+                                "supervisor_status": "restart_launch_failed",
+                                "pid": pid if isinstance(pid, int) else None,
+                                "owner_token": resolved_owner_token,
+                                "generation": current_generation,
+                                "heartbeat_count": heartbeat_count,
+                                "exit_code": exit_code,
+                                "command": command,
+                                "statefile_write": backoff_write,
+                                "errors": [f"daemon_launch_failed:{exc.__class__.__name__}"],
+                                "error_count": 1,
+                                "restart_attempted": True,
+                                "restart_policy": resolved_restart_policy,
+                                "restart_count": restart_count,
+                                "max_restarts": resolved_max_restarts,
+                                "backoff_scheduled": backoff_scheduled,
+                                "backoff_count": backoff_count,
+                                "backoff_seconds": resolved_backoff_seconds,
+                                "last_failure_exit_code": last_failure_exit_code,
+                                "terminate_attempted": False,
+                                "control_allowed": False,
+                                "boundary": supervisor_boundary,
+                            }
+                        pid = getattr(process, "pid", None)
+                        restart_count += 1
+                        restart_attempted = True
+                        current_generation += 1
+                        restart_write = write_state("supervising", current_generation)
+                        if restart_write.get("write_status") != "written":
+                            return {
+                                "supervisor_status": "statefile_write_failed",
+                                "pid": pid if isinstance(pid, int) else None,
+                                "owner_token": resolved_owner_token,
+                                "generation": current_generation,
+                                "heartbeat_count": heartbeat_count,
+                                "exit_code": exit_code,
+                                "command": command,
+                                "statefile_write": restart_write,
+                                "errors": ["statefile_write_failed"],
+                                "error_count": 1,
+                                "restart_attempted": restart_attempted,
+                                "restart_policy": resolved_restart_policy,
+                                "restart_count": restart_count,
+                                "max_restarts": resolved_max_restarts,
+                                "backoff_scheduled": backoff_scheduled,
+                                "backoff_count": backoff_count,
+                                "backoff_seconds": resolved_backoff_seconds,
+                                "last_failure_exit_code": last_failure_exit_code,
+                                "terminate_attempted": False,
+                                "control_allowed": False,
+                                "boundary": supervisor_boundary,
+                            }
+                        heartbeat_count += 1
+                        continue
+                    current_generation += 1
+                    failed_write = write_state("failed", current_generation)
+                    return {
+                        "supervisor_status": "restart_exhausted",
+                        "pid": pid if isinstance(pid, int) else None,
+                        "owner_token": resolved_owner_token,
+                        "generation": current_generation,
+                        "heartbeat_count": heartbeat_count,
+                        "exit_code": exit_code,
+                        "command": command,
+                        "statefile_write": failed_write,
+                        "errors": [],
+                        "error_count": 0,
+                        "restart_attempted": restart_attempted,
+                        "restart_policy": resolved_restart_policy,
+                        "restart_count": restart_count,
+                        "max_restarts": resolved_max_restarts,
+                        "backoff_scheduled": backoff_scheduled,
+                        "backoff_count": backoff_count,
+                        "backoff_seconds": resolved_backoff_seconds,
+                        "last_failure_exit_code": last_failure_exit_code,
+                        "terminate_attempted": False,
+                        "control_allowed": False,
+                        "boundary": supervisor_boundary,
+                    }
                 current_generation += 1
                 exit_write = write_state("exited", current_generation)
                 return {
@@ -877,11 +1027,17 @@ def run_provider_replay_managed_daemon_supervisor(
                     "statefile_write": exit_write,
                     "errors": [],
                     "error_count": 0,
-                    "restart_attempted": False,
-                    "backoff_scheduled": False,
+                    "restart_attempted": restart_attempted,
+                    "restart_policy": resolved_restart_policy,
+                    "restart_count": restart_count,
+                    "max_restarts": resolved_max_restarts,
+                    "backoff_scheduled": backoff_scheduled,
+                    "backoff_count": backoff_count,
+                    "backoff_seconds": resolved_backoff_seconds,
+                    "last_failure_exit_code": last_failure_exit_code,
                     "terminate_attempted": False,
                     "control_allowed": True,
-                    "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+                    "boundary": supervisor_boundary,
                 }
             if max_heartbeats is not None and heartbeat_count >= max_heartbeats:
                 return {
@@ -895,11 +1051,17 @@ def run_provider_replay_managed_daemon_supervisor(
                     "statefile_write": initial_write,
                     "errors": [],
                     "error_count": 0,
-                    "restart_attempted": False,
-                    "backoff_scheduled": False,
+                    "restart_attempted": restart_attempted,
+                    "restart_policy": resolved_restart_policy,
+                    "restart_count": restart_count,
+                    "max_restarts": resolved_max_restarts,
+                    "backoff_scheduled": backoff_scheduled,
+                    "backoff_count": backoff_count,
+                    "backoff_seconds": resolved_backoff_seconds,
+                    "last_failure_exit_code": last_failure_exit_code,
                     "terminate_attempted": False,
                     "control_allowed": True,
-                    "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+                    "boundary": supervisor_boundary,
                 }
             sleeper(resolved_poll_interval)
             current_generation += 1
@@ -916,11 +1078,17 @@ def run_provider_replay_managed_daemon_supervisor(
                     "statefile_write": heartbeat_write,
                     "errors": ["statefile_write_failed"],
                     "error_count": 1,
-                    "restart_attempted": False,
-                    "backoff_scheduled": False,
+                    "restart_attempted": restart_attempted,
+                    "restart_policy": resolved_restart_policy,
+                    "restart_count": restart_count,
+                    "max_restarts": resolved_max_restarts,
+                    "backoff_scheduled": backoff_scheduled,
+                    "backoff_count": backoff_count,
+                    "backoff_seconds": resolved_backoff_seconds,
+                    "last_failure_exit_code": last_failure_exit_code,
                     "terminate_attempted": False,
                     "control_allowed": False,
-                    "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+                    "boundary": supervisor_boundary,
                 }
             heartbeat_count += 1
     except KeyboardInterrupt:
@@ -945,11 +1113,17 @@ def run_provider_replay_managed_daemon_supervisor(
             "statefile_write": stopping_write,
             "errors": [],
             "error_count": 0,
-            "restart_attempted": False,
-            "backoff_scheduled": False,
+            "restart_attempted": restart_attempted,
+            "restart_policy": resolved_restart_policy,
+            "restart_count": restart_count,
+            "max_restarts": resolved_max_restarts,
+            "backoff_scheduled": backoff_scheduled,
+            "backoff_count": backoff_count,
+            "backoff_seconds": resolved_backoff_seconds,
+            "last_failure_exit_code": last_failure_exit_code,
             "terminate_attempted": terminate_attempted,
             "control_allowed": False,
-            "boundary": "foreground_supervisor_observation_only; no_restart_backoff",
+            "boundary": supervisor_boundary,
         }
 
 
