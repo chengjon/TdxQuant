@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -247,6 +249,198 @@ def build_provider_transport_replay_status(
     }
 
 
+def build_provider_replay_lifecycle_config_hash(config: ProviderTransportReplayConfig) -> str:
+    token_hash = hashlib.sha256(config.token.encode("utf-8")).hexdigest() if config.token else None
+    payload = {
+        "bind_host": config.bind_host,
+        "lifecycle_state_file": config.lifecycle_state_file,
+        "master_allowlist": list(config.master_allowlist or []),
+        "port": config.port,
+        "provider_id": config.provider_id,
+        "replay_fixture": config.replay_fixture,
+        "replay_fixture_path": config.replay_fixture_path,
+        "token_sha256": token_hash,
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def build_provider_replay_lifecycle_state_payload(
+    config: ProviderTransportReplayConfig,
+    *,
+    state: str,
+    pid: int | None = None,
+    owner_token: str,
+    generation: int = 1,
+    updated_at: str | None = None,
+) -> dict[str, Any]:
+    resolved_state = str(state or "").strip()
+    resolved_owner_token = str(owner_token or "").strip()
+    if not resolved_state:
+        raise ValueError("state is required")
+    if not resolved_owner_token:
+        raise ValueError("owner_token is required")
+    if not isinstance(generation, int) or generation < 1:
+        raise ValueError("generation must be a positive integer")
+    resolved_pid = os.getpid() if pid is None else pid
+    if not isinstance(resolved_pid, int) or resolved_pid < 1:
+        raise ValueError("pid must be a positive integer")
+    return {
+        "schema_version": LIFECYCLE_STATEFILE_SCHEMA_VERSION,
+        "provider_id": config.provider_id,
+        "pid": resolved_pid,
+        "state": resolved_state,
+        "owner_token": resolved_owner_token,
+        "generation": generation,
+        "config_hash": build_provider_replay_lifecycle_config_hash(config),
+        "updated_at": updated_at or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def write_provider_replay_lifecycle_statefile(
+    config: ProviderTransportReplayConfig,
+    *,
+    state: str,
+    pid: int | None = None,
+    owner_token: str,
+    generation: int = 1,
+    updated_at: str | None = None,
+) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "write_status": "not_configured",
+        "configured": bool(config.lifecycle_state_file),
+        "write_attempted": False,
+        "lock_attempted": False,
+        "lock_acquired": False,
+        "lock_released": False,
+        "statefile_path": config.lifecycle_state_file,
+        "lock_path": None,
+        "schema_version": None,
+        "provider_id": None,
+        "pid": None,
+        "state": None,
+        "owner_token": None,
+        "generation": None,
+        "config_hash": None,
+        "updated_at": None,
+        "errors": [],
+        "error_count": 0,
+        "control_allowed": False,
+        "boundary": "statefile_write_lock_only; no_lifecycle_control",
+    }
+    if not config.lifecycle_state_file:
+        base.update({"errors": ["statefile_not_configured"], "error_count": 1})
+        return base
+
+    state_path = Path(config.lifecycle_state_file)
+    lock_path = Path(f"{state_path}.lock")
+    base.update({"lock_attempted": True, "lock_path": str(lock_path)})
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        base.update(
+            {
+                "write_status": "error",
+                "errors": [f"statefile_parent_unavailable:{exc.__class__.__name__}"],
+                "error_count": 1,
+            }
+        )
+        return base
+
+    try:
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        base.update(
+            {
+                "write_status": "locked",
+                "errors": ["statefile_lock_held"],
+                "error_count": 1,
+            }
+        )
+        return base
+    except OSError as exc:
+        base.update(
+            {
+                "write_status": "error",
+                "errors": [f"statefile_lock_unavailable:{exc.__class__.__name__}"],
+                "error_count": 1,
+            }
+        )
+        return base
+
+    base["lock_acquired"] = True
+    temp_path = state_path.with_name(f"{state_path.name}.{uuid4().hex}.tmp")
+    try:
+        payload = build_provider_replay_lifecycle_state_payload(
+            config,
+            state=state,
+            pid=pid,
+            owner_token=owner_token,
+            generation=generation,
+            updated_at=updated_at,
+        )
+        lock_payload = {
+            "schema_version": LIFECYCLE_STATEFILE_SCHEMA_VERSION,
+            "provider_id": config.provider_id,
+            "owner_token": payload["owner_token"],
+            "pid": payload["pid"],
+            "locked_at": payload["updated_at"],
+            "statefile_path": str(state_path),
+            "config_hash": payload["config_hash"],
+        }
+        with os.fdopen(lock_fd, "w", encoding="utf-8") as fh:
+            json.dump(lock_payload, fh, ensure_ascii=False, sort_keys=True)
+            fh.write("\n")
+        lock_fd = -1
+        temp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temp_path, state_path)
+        base.update(
+            {
+                "write_status": "written",
+                "write_attempted": True,
+                "schema_version": payload["schema_version"],
+                "provider_id": payload["provider_id"],
+                "pid": payload["pid"],
+                "state": payload["state"],
+                "owner_token": payload["owner_token"],
+                "generation": payload["generation"],
+                "config_hash": payload["config_hash"],
+                "updated_at": payload["updated_at"],
+            }
+        )
+        return base
+    except (OSError, ValueError) as exc:
+        base.update(
+            {
+                "write_status": "error",
+                "errors": [f"statefile_write_failed:{exc.__class__.__name__}"],
+                "error_count": 1,
+            }
+        )
+        return base
+    finally:
+        if lock_fd >= 0:
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+        except OSError:
+            pass
+        try:
+            lock_path.unlink()
+            base["lock_released"] = True
+        except FileNotFoundError:
+            base["lock_released"] = bool(base["lock_acquired"])
+        except OSError:
+            base["lock_released"] = False
+
+
 def check_provider_replay_lifecycle_statefile(
     config: ProviderTransportReplayConfig,
     *,
@@ -268,6 +462,10 @@ def check_provider_replay_lifecycle_statefile(
         "provider_id_matches": None,
         "pid": None,
         "state": None,
+        "owner_token": None,
+        "generation": None,
+        "config_hash": None,
+        "config_hash_matches": None,
         "updated_at": None,
         "age_seconds": None,
         "stale_after_seconds": resolved_stale_after,
@@ -320,9 +518,14 @@ def check_provider_replay_lifecycle_statefile(
     provider_id = payload.get("provider_id")
     pid = payload.get("pid")
     state = payload.get("state")
+    owner_token = payload.get("owner_token")
+    generation = payload.get("generation")
+    config_hash = payload.get("config_hash")
     updated_at = payload.get("updated_at")
     schema_valid = schema_version == LIFECYCLE_STATEFILE_SCHEMA_VERSION
     provider_id_matches = provider_id == config.provider_id
+    expected_config_hash = build_provider_replay_lifecycle_config_hash(config)
+    config_hash_matches = config_hash == expected_config_hash if isinstance(config_hash, str) else None
     if not schema_valid:
         errors.append("schema_version_mismatch")
     if not provider_id_matches:
@@ -333,6 +536,19 @@ def check_provider_replay_lifecycle_statefile(
     if not isinstance(state, str) or not state:
         errors.append("state_missing")
         state = None
+    if owner_token is not None and (not isinstance(owner_token, str) or not owner_token):
+        errors.append("owner_token_invalid")
+        owner_token = None
+    if generation is not None and (not isinstance(generation, int) or generation < 1):
+        errors.append("generation_invalid")
+        generation = None
+    if config_hash is not None:
+        if not isinstance(config_hash, str) or not config_hash:
+            errors.append("config_hash_invalid")
+            config_hash = None
+            config_hash_matches = None
+        elif not config_hash_matches:
+            errors.append("config_hash_mismatch")
     parsed_updated_at = _parse_provider_replay_lifecycle_state_timestamp(updated_at)
     age_seconds = None
     stale = None
@@ -352,6 +568,10 @@ def check_provider_replay_lifecycle_statefile(
             "provider_id_matches": provider_id_matches,
             "pid": pid,
             "state": state,
+            "owner_token": owner_token,
+            "generation": generation,
+            "config_hash": config_hash,
+            "config_hash_matches": config_hash_matches,
             "updated_at": updated_at if isinstance(updated_at, str) else None,
             "age_seconds": age_seconds,
             "stale": stale,

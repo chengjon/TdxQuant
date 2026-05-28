@@ -18,6 +18,7 @@ from tdxquant.provider_transport_replay import (
     probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_stream,
     probe_provider_transport_replay_watch_status,
+    write_provider_replay_lifecycle_statefile,
 )
 from tdxquant.replay_fixtures import list_provider_replay_fixtures, load_provider_replay_fixture
 
@@ -515,6 +516,112 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(result["write_attempted"], False)
         self.assertIsNone(result["exists"])
         self.assertEqual(result["control_allowed"], False)
+
+    def test_lifecycle_statefile_writer_records_ownership_payload_and_diagnostics(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            write_result = write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=12345,
+                owner_token="owner-token-a",
+                generation=7,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+            check_result = check_provider_replay_lifecycle_statefile(config, stale_after_seconds=60)
+
+        self.assertEqual(write_result["write_status"], "written")
+        self.assertEqual(write_result["configured"], True)
+        self.assertEqual(write_result["write_attempted"], True)
+        self.assertEqual(write_result["lock_attempted"], True)
+        self.assertEqual(write_result["lock_acquired"], True)
+        self.assertEqual(write_result["lock_released"], True)
+        self.assertEqual(write_result["statefile_path"], str(state_path))
+        self.assertEqual(write_result["schema_version"], "tdx.provider_replay.lifecycle_state.v1")
+        self.assertEqual(write_result["provider_id"], "provider-replay-a")
+        self.assertEqual(write_result["pid"], 12345)
+        self.assertEqual(write_result["state"], "running")
+        self.assertEqual(write_result["owner_token"], "owner-token-a")
+        self.assertEqual(write_result["generation"], 7)
+        self.assertIsInstance(write_result["config_hash"], str)
+        self.assertEqual(write_result["updated_at"], "2999-01-01T00:00:00Z")
+        self.assertEqual(write_result["control_allowed"], False)
+        self.assertEqual(write_result["boundary"], "statefile_write_lock_only; no_lifecycle_control")
+
+        self.assertEqual(payload["schema_version"], "tdx.provider_replay.lifecycle_state.v1")
+        self.assertEqual(payload["provider_id"], "provider-replay-a")
+        self.assertEqual(payload["pid"], 12345)
+        self.assertEqual(payload["state"], "running")
+        self.assertEqual(payload["owner_token"], "owner-token-a")
+        self.assertEqual(payload["generation"], 7)
+        self.assertEqual(payload["config_hash"], write_result["config_hash"])
+        self.assertNotIn("token", payload)
+
+        self.assertEqual(check_result["check_status"], "valid")
+        self.assertEqual(check_result["owner_token"], "owner-token-a")
+        self.assertEqual(check_result["generation"], 7)
+        self.assertEqual(check_result["config_hash"], write_result["config_hash"])
+        self.assertEqual(check_result["config_hash_matches"], True)
+        self.assertEqual(check_result["control_allowed"], False)
+
+    def test_lifecycle_statefile_writer_respects_existing_lock_without_replacing_file(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            lock_path = Path(f"{state_path}.lock")
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 111,
+                        "state": "running",
+                        "updated_at": "2999-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_payload = state_path.read_text(encoding="utf-8")
+            lock_path.write_text("held", encoding="utf-8")
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+
+            result = write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=222,
+                owner_token="owner-token-b",
+                generation=8,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            final_payload = state_path.read_text(encoding="utf-8")
+
+        self.assertEqual(result["write_status"], "locked")
+        self.assertEqual(result["configured"], True)
+        self.assertEqual(result["write_attempted"], False)
+        self.assertEqual(result["lock_attempted"], True)
+        self.assertEqual(result["lock_acquired"], False)
+        self.assertEqual(result["lock_released"], False)
+        self.assertEqual(result["errors"], ["statefile_lock_held"])
+        self.assertEqual(result["error_count"], 1)
+        self.assertEqual(final_payload, original_payload)
 
     def test_status_can_include_explicit_replay_health_probe(self) -> None:
         server = ProviderTransportReplayHTTPServer(

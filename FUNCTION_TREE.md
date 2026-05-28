@@ -405,6 +405,8 @@ TdxQuant
 
 > E-06 补充登记（状态仍为 `[部分实现]`）：`provider-replay lifecycle-readiness --config --include-statefile-check --stale-after-seconds --view detailed/summary` 新增只读 lifecycle readiness 摘要，证据为 `tdxquant/cli.py`、`tests/test_api_cli.py` 与 OpenSpec `provider-replay-lifecycle-readiness-summary`；该命令默认不读取 statefile，显式 opt-in 时只把有效、未过期且 provider 匹配的 statefile 诊断计为 `valid_lifecycle_statefile` 单个先决条件，输出固定 `ready=false`、`control_allowed=false`、`dispatch_executed=false` 的 blocked 状态与缺口清单；不启动、停止、重启、daemonize、supervise、probe runtime、扫描进程、推断端口 ownership、写入/加锁 statefile、调度 retry，也不证明 broker/workflow/write readiness 或 daemon 生命周期控制已完成。
 
+> E-06 补充登记（状态仍为 `[部分实现]`）：新增内部 `write_provider_replay_lifecycle_statefile()`、`build_provider_replay_lifecycle_state_payload()` 与 `build_provider_replay_lifecycle_config_hash()`，可在 `lifecycle_state_file` 配置存在时用 `<statefile>.lock` 独占锁和 `os.replace()` 原子写入 schema/provider/pid/state/owner_token/generation/config_hash/updated_at ownership payload，并让 `check_provider_replay_lifecycle_statefile()` 只读回显 owner token、generation、config hash 与 match 诊断，证据为 `tdxquant/provider_transport_replay.py`、`tests/test_provider_transport_replay.py` 与 OpenSpec `provider-replay-daemon-statefile-ownership-lock`；该层只是 daemon lifecycle 的 statefile/lock/ownership 基础，不暴露 start/stop/restart CLI，不启动、停止、重启、daemonize、supervise、probe runtime、扫描进程、推断端口 ownership、调度 retry，也不证明 PID liveness、supervisor health、broker/workflow/write readiness 或真实 provider 生命周期控制。
+
 ## 4. 非目标与边界
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
@@ -440,6 +442,7 @@ TdxQuant
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-05-28 | E-06 补充 provider-replay lifecycle statefile ownership lock 登记：新增内部锁定原子写 statefile helper 和 ownership 诊断回显；只证明本地 statefile/lock 基础层可用，不执行 start/stop/restart、supervisor、restart/backoff、进程 ownership 或真实 provider lifecycle control。 |
 | 2026-05-28 | E-06 补充 `provider-replay lifecycle-readiness` 登记：只读汇总 lifecycle readiness 缺口，默认不读 statefile，opt-in statefile 诊断只满足 `valid_lifecycle_statefile` 一个先决条件；固定 blocked/不可控制，不执行 lifecycle control、不证明 daemon 生命周期或 broker/workflow/write readiness。 |
 | 2026-05-26 | E-06 补充 provider-replay `probe_summary.error_sample_visible_count` 登记：只从既有有界 `error_samples` 列表长度派生当前响应可见样本数量；不改变 sample limit/truncated 语义、不暴露完整错误 payload、不证明健康/readiness/endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。 |
 | 2026-05-26 | E-06 补充 provider-replay `probe_summary.error_sample_hidden_count` 登记：只从既有 `error_sample_count` 与有界 `error_samples` 长度派生被 sample limit 隐藏的候选数量；不改变 sample limit/truncated 语义、不暴露完整错误 payload、不证明健康/readiness/endpoint 覆盖，也不新增 probe 端点、socket 启动、provider mutation、调度、restart/backoff 或 daemon 生命周期管理。 |
