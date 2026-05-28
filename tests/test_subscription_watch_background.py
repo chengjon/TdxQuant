@@ -711,6 +711,16 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         },
     )
 
+    assert summary["control_rollup"] == {
+        "control_state": "running",
+        "control_active": True,
+        "has_control_run_id": True,
+        "has_control_pid": False,
+        "control_reason": None,
+        "has_control_reason": False,
+        "stale_process_state": False,
+        "startup_persistence_failed": False,
+    }
     assert summary["governance"] == {
         "decision": "observe",
         "requires_manual_review": False,
@@ -781,6 +791,30 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         },
         "staleness_evaluated": False,
         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+    }
+
+
+def test_status_summary_control_rollup_marks_stale_process_state() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={
+            "state": "failed",
+            "active": False,
+            "run_id": "run-002",
+            "pid": None,
+            "reason": "stale_process_state",
+        },
+        watch_status=None,
+    )
+
+    assert summary["control_rollup"] == {
+        "control_state": "failed",
+        "control_active": False,
+        "has_control_run_id": True,
+        "has_control_pid": False,
+        "control_reason": "stale_process_state",
+        "has_control_reason": True,
+        "stale_process_state": True,
+        "startup_persistence_failed": False,
     }
 
 

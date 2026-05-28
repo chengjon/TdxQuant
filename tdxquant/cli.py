@@ -6685,7 +6685,14 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
 
     if status_summary:
         status_view: dict[str, object] = {}
-        for key in ("schema_version", "overall_status", "heartbeat", "watermark", "reconnect"):
+        for key in (
+            "schema_version",
+            "overall_status",
+            "control_rollup",
+            "heartbeat",
+            "watermark",
+            "reconnect",
+        ):
             if key in status_summary:
                 status_view[key] = copy.deepcopy(status_summary[key])
         summary_view["status_summary"] = status_view

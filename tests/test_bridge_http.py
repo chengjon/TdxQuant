@@ -434,6 +434,16 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "status_summary": {
                     "schema_version": "tdx.subscription_watch.status_summary.v1",
                     "overall_status": "degraded",
+                    "control_rollup": {
+                        "control_state": "running",
+                        "control_active": True,
+                        "has_control_run_id": True,
+                        "has_control_pid": True,
+                        "control_reason": None,
+                        "has_control_reason": False,
+                        "stale_process_state": False,
+                        "startup_persistence_failed": False,
+                    },
                     "heartbeat": {"status": "stale", "age_seconds": 180.0},
                     "watermark": {"status": "fresh", "age_seconds": 15.0},
                     "reconnect": {"status": "degraded", "reconnect_count": 2},
@@ -611,6 +621,19 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(
             payload["result"]["status_summary"]["schema_version"],
             "tdx.subscription_watch.status_summary.v1",
+        )
+        self.assertEqual(
+            payload["result"]["status_summary"]["control_rollup"],
+            {
+                "control_state": "running",
+                "control_active": True,
+                "has_control_run_id": True,
+                "has_control_pid": True,
+                "control_reason": None,
+                "has_control_reason": False,
+                "stale_process_state": False,
+                "startup_persistence_failed": False,
+            },
         )
         self.assertEqual(payload["result"]["status_summary"]["heartbeat"]["status"], "stale")
         self.assertEqual(payload["result"]["status_summary"]["watermark"]["status"], "fresh")

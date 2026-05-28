@@ -77,6 +77,7 @@ def build_subscription_watch_status_summary(
         "state": state,
         "active": active,
         "run_id": run_id,
+        "control_rollup": _build_subscription_watch_control_rollup(resolved_control),
         "heartbeat": heartbeat,
         "watermark": watermark,
         "reconnect": reconnect,
@@ -337,6 +338,23 @@ def _subscription_watch_governance_reason_source(reason: Any) -> str:
         if candidate:
             return candidate
     return "unknown"
+
+
+def _build_subscription_watch_control_rollup(control: dict[str, Any]) -> dict[str, Any]:
+    control_state = _optional_str(control.get("state")) or "unknown"
+    control_run_id = _optional_str(control.get("run_id"))
+    control_pid = _optional_int_or_none(control.get("pid"))
+    control_reason = _optional_str(control.get("reason"))
+    return {
+        "control_state": control_state,
+        "control_active": bool(control.get("active")),
+        "has_control_run_id": control_run_id is not None,
+        "has_control_pid": _positive_non_bool_int(control_pid),
+        "control_reason": control_reason,
+        "has_control_reason": control_reason is not None,
+        "stale_process_state": control_reason == "stale_process_state",
+        "startup_persistence_failed": control_reason == "startup_persistence_failed",
+    }
 
 
 def _positive_non_bool_int(value: Any) -> bool:
