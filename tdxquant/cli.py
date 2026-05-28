@@ -745,6 +745,20 @@ def _build_provider_replay_parser(
     provider_replay_status_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
     provider_replay_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
+    provider_replay_lifecycle_plan_parser = provider_replay_subparsers.add_parser("lifecycle-plan")
+    provider_replay_lifecycle_plan_parser.add_argument("--config", required=True)
+    provider_replay_lifecycle_plan_parser.add_argument(
+        "--operation",
+        required=True,
+        choices=["start", "stop", "restart", "backoff"],
+    )
+    provider_replay_lifecycle_plan_parser.add_argument(
+        "--view",
+        choices=["detailed", "summary"],
+        default="detailed",
+    )
+    provider_replay_lifecycle_plan_parser.add_argument("--output", help="Optional path to write the JSON result")
+
     return provider_replay_parser
 
 
@@ -5897,6 +5911,84 @@ def _build_provider_replay_config_check_summary_view(config_summary: dict[str, o
     }
 
 
+def _build_provider_replay_lifecycle_plan(status: dict[str, object], operation: str) -> dict[str, object]:
+    lifecycle = status.get("lifecycle") if isinstance(status.get("lifecycle"), dict) else {}
+    control_summary = (
+        lifecycle.get("control_summary")
+        if isinstance(lifecycle.get("control_summary"), dict)
+        else {}
+    )
+    operation_summary = (
+        lifecycle.get("operation_summary")
+        if isinstance(lifecycle.get("operation_summary"), dict)
+        else {}
+    )
+    statefile_summary = (
+        lifecycle.get("statefile_summary")
+        if isinstance(lifecycle.get("statefile_summary"), dict)
+        else {}
+    )
+    supervision_summary = (
+        lifecycle.get("supervision_summary")
+        if isinstance(lifecycle.get("supervision_summary"), dict)
+        else {}
+    )
+    operations = (
+        operation_summary.get("operations")
+        if isinstance(operation_summary.get("operations"), list)
+        else []
+    )
+    operation_entry = next(
+        (
+            entry
+            for entry in operations
+            if isinstance(entry, dict) and entry.get("operation") == operation
+        ),
+        {},
+    )
+    blocking_reason = operation_entry.get("blocking_reason") or control_summary.get("blocking_reason")
+    return {
+        "operation": operation,
+        "execution_mode": "non_executing_lifecycle_plan",
+        "operation_status": operation_entry.get("status", "blocked"),
+        "implemented": bool(operation_entry.get("implemented")),
+        "dispatch_executed": False,
+        "control_allowed": False,
+        "lifecycle_control_status": control_summary.get("control_status"),
+        "blocking_reason": blocking_reason,
+        "ownership_required": bool(operation_entry.get("ownership_required")),
+        "operator_action_required": bool(operation_entry.get("operator_action_required")),
+        "statefile_configured": bool(statefile_summary.get("configured")),
+        "supervision_status": supervision_summary.get("supervision_status"),
+        "required_capabilities": [
+            "lifecycle_controller",
+            "owned_process_identity",
+            "lifecycle_state_schema",
+            "operator_opt_in_control",
+        ],
+        "boundary": "read_only_lifecycle_plan; no_control_dispatch",
+    }
+
+
+def _build_provider_replay_lifecycle_plan_summary_view(
+    status: dict[str, object],
+    plan: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "mode": "lifecycle-plan",
+        "provider_id": status.get("provider_id"),
+        "operation": plan.get("operation"),
+        "operation_status": plan.get("operation_status"),
+        "dispatch_executed": plan.get("dispatch_executed"),
+        "control_allowed": plan.get("control_allowed"),
+        "lifecycle_control_status": plan.get("lifecycle_control_status"),
+        "blocking_reason": plan.get("blocking_reason"),
+        "statefile_configured": plan.get("statefile_configured"),
+        "supervision_status": plan.get("supervision_status"),
+        "boundary": plan.get("boundary"),
+    }
+
+
 def _build_provider_replay_endpoint_family_counts(endpoints: list[object]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for endpoint in endpoints:
@@ -5959,6 +6051,22 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
             ok=True,
             code=ErrorCode.OK,
             message="reported provider replay lifecycle status",
+            data=data,
+        )
+    if args.provider_replay_command == "lifecycle-plan":
+        status = build_provider_transport_replay_status(config)
+        plan = _build_provider_replay_lifecycle_plan(status, args.operation)
+        data = {
+            "plan": plan,
+            "status": status,
+            "config": config_summary,
+        }
+        if args.view == "summary":
+            data["summary_view"] = _build_provider_replay_lifecycle_plan_summary_view(status, plan)
+        return Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="planned provider replay lifecycle operation",
             data=data,
         )
     if args.provider_replay_command == "serve":

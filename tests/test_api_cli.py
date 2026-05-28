@@ -1331,6 +1331,24 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.probe_timeout, 1.5)
         self.assertEqual(args.view, "summary")
 
+    def test_provider_replay_lifecycle_plan_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "provider-replay",
+                "lifecycle-plan",
+                "--config",
+                "runtime/provider-transport-replay.example.json",
+                "--operation",
+                "stop",
+            ]
+        )
+        self.assertEqual(args.command, "provider-replay")
+        self.assertEqual(args.provider_replay_command, "lifecycle-plan")
+        self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
+        self.assertEqual(args.operation, "stop")
+        self.assertEqual(args.view, "detailed")
+
     def test_task_block_read_watchlist_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "block-read-watchlist", "--block-code", "ZXG"])
@@ -2353,6 +2371,103 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         mocked_watch_status_probe.assert_not_called()
         mocked_watch_events_probe.assert_not_called()
         mocked_watch_stream_probe.assert_not_called()
+
+    def test_handle_provider_replay_lifecycle_plan_reports_blocked_stop_without_dispatch(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            lifecycle_state_file = Path(temp_dir) / "provider-replay.state.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(lifecycle_state_file),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(
+                ["provider-replay", "lifecycle-plan", "--config", str(config_path), "--operation", "stop"]
+            )
+            with (
+                patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
+                patch("tdxquant.cli.probe_provider_transport_replay_health") as mocked_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_status") as mocked_watch_status_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_events") as mocked_watch_events_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_stream") as mocked_watch_stream_probe,
+            ):
+                result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["plan"]["execution_mode"], "non_executing_lifecycle_plan")
+        self.assertEqual(result.data["plan"]["operation"], "stop")
+        self.assertEqual(result.data["plan"]["operation_status"], "blocked")
+        self.assertEqual(result.data["plan"]["implemented"], False)
+        self.assertEqual(result.data["plan"]["dispatch_executed"], False)
+        self.assertEqual(result.data["plan"]["control_allowed"], False)
+        self.assertEqual(result.data["plan"]["lifecycle_control_status"], "unsupported")
+        self.assertEqual(result.data["plan"]["blocking_reason"], "lifecycle_control_not_implemented")
+        self.assertEqual(result.data["plan"]["ownership_required"], True)
+        self.assertEqual(result.data["plan"]["operator_action_required"], True)
+        self.assertEqual(result.data["plan"]["statefile_configured"], True)
+        self.assertEqual(result.data["plan"]["supervision_status"], "not_supervised")
+        self.assertIn("lifecycle_controller", result.data["plan"]["required_capabilities"])
+        self.assertEqual(result.data["plan"]["boundary"], "read_only_lifecycle_plan; no_control_dispatch")
+        self.assertFalse(lifecycle_state_file.exists())
+        mocked_serve.assert_not_called()
+        mocked_probe.assert_not_called()
+        mocked_watch_status_probe.assert_not_called()
+        mocked_watch_events_probe.assert_not_called()
+        mocked_watch_stream_probe.assert_not_called()
+
+    def test_handle_provider_replay_lifecycle_plan_summary_reports_blocked_restart(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "lifecycle-plan",
+                    "--config",
+                    str(config_path),
+                    "--operation",
+                    "restart",
+                    "--view",
+                    "summary",
+                ]
+            )
+            result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary_view"]["mode"], "lifecycle-plan")
+        self.assertEqual(result.data["summary_view"]["provider_id"], "provider-replay-a")
+        self.assertEqual(result.data["summary_view"]["operation"], "restart")
+        self.assertEqual(result.data["summary_view"]["operation_status"], "blocked")
+        self.assertEqual(result.data["summary_view"]["dispatch_executed"], False)
+        self.assertEqual(result.data["summary_view"]["control_allowed"], False)
+        self.assertEqual(result.data["summary_view"]["lifecycle_control_status"], "unsupported")
+        self.assertEqual(result.data["summary_view"]["blocking_reason"], "lifecycle_control_not_implemented")
+        self.assertEqual(result.data["summary_view"]["statefile_configured"], False)
+        self.assertEqual(result.data["summary_view"]["supervision_status"], "not_supervised")
+        self.assertEqual(result.data["summary_view"]["boundary"], "read_only_lifecycle_plan; no_control_dispatch")
 
     def test_handle_provider_replay_status_returns_lifecycle_boundary_without_serving(self) -> None:
         parser = build_parser()
