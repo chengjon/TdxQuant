@@ -49,6 +49,7 @@ from .bridge_registry import (
 )
 from .bridge_http import serve_bridge_from_config
 from .provider_transport_replay import (
+    build_provider_replay_managed_daemon_command,
     build_provider_transport_replay_status,
     check_provider_replay_lifecycle_statefile,
     get_provider_replay_managed_daemon_status,
@@ -57,6 +58,7 @@ from .provider_transport_replay import (
     probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_stream,
     probe_provider_transport_replay_watch_status,
+    provider_replay_process_identity_matches,
     run_provider_replay_managed_daemon_supervisor,
     serve_provider_transport_replay,
     start_provider_replay_managed_daemon,
@@ -782,6 +784,9 @@ def _build_provider_replay_parser(
     provider_replay_lifecycle_readiness_parser = provider_replay_subparsers.add_parser("lifecycle-readiness")
     provider_replay_lifecycle_readiness_parser.add_argument("--config", required=True)
     provider_replay_lifecycle_readiness_parser.add_argument("--include-statefile-check", action="store_true")
+    provider_replay_lifecycle_readiness_parser.add_argument("--include-ownership-check", action="store_true")
+    provider_replay_lifecycle_readiness_parser.add_argument("--expected-owner-token")
+    provider_replay_lifecycle_readiness_parser.add_argument("--inspect-process-identity", action="store_true")
     provider_replay_lifecycle_readiness_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
     provider_replay_lifecycle_readiness_parser.add_argument(
         "--view",
@@ -809,6 +814,8 @@ def _build_provider_replay_parser(
     provider_replay_daemon_status_parser = provider_replay_daemon_subparsers.add_parser("status")
     provider_replay_daemon_status_parser.add_argument("--config", required=True)
     provider_replay_daemon_status_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    provider_replay_daemon_status_parser.add_argument("--expected-owner-token")
+    provider_replay_daemon_status_parser.add_argument("--inspect-process-identity", action="store_true")
     provider_replay_daemon_status_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     provider_replay_daemon_stop_parser = provider_replay_daemon_subparsers.add_parser("stop")
@@ -6107,6 +6114,7 @@ def _build_provider_replay_lifecycle_readiness(
     status: dict[str, object],
     *,
     statefile_check: dict[str, object] | None = None,
+    ownership_diagnostics: dict[str, object] | None = None,
 ) -> dict[str, object]:
     lifecycle = status.get("lifecycle") if isinstance(status.get("lifecycle"), dict) else {}
     control_summary = (
@@ -6120,6 +6128,7 @@ def _build_provider_replay_lifecycle_readiness(
         else {}
     )
     statefile_check_included = isinstance(statefile_check, dict)
+    ownership_check_included = isinstance(ownership_diagnostics, dict)
     statefile_valid = (
         statefile_check_included
         and statefile_check.get("check_status") == "valid"
@@ -6127,13 +6136,22 @@ def _build_provider_replay_lifecycle_readiness(
         and statefile_check.get("provider_id_matches") is True
         and statefile_check.get("stale") is False
     )
+    owned_process_identity = (
+        statefile_valid
+        and ownership_check_included
+        and ownership_diagnostics.get("ownership_status") == "owned"
+        and ownership_diagnostics.get("owned_process") is True
+    )
     missing_requirements = [
         "lifecycle_controller",
-        "owned_process_identity",
         "supervisor_loop",
         "operator_opt_in_control",
     ]
     satisfied_requirements: list[str] = []
+    if owned_process_identity:
+        satisfied_requirements.append("owned_process_identity")
+    else:
+        missing_requirements.append("owned_process_identity")
     if statefile_valid:
         satisfied_requirements.append("valid_lifecycle_statefile")
     else:
@@ -6157,6 +6175,13 @@ def _build_provider_replay_lifecycle_readiness(
             statefile_check.get("provider_id_matches") if statefile_check_included else None
         ),
         "statefile_stale": statefile_check.get("stale") if statefile_check_included else None,
+        "ownership_check_included": ownership_check_included,
+        "ownership_status": ownership_diagnostics.get("ownership_status") if ownership_check_included else None,
+        "owned_process": ownership_diagnostics.get("owned_process") if ownership_check_included else None,
+        "ownership_pid_live": ownership_diagnostics.get("pid_live") if ownership_check_included else None,
+        "ownership_process_identity_checked": (
+            ownership_diagnostics.get("process_identity_checked") if ownership_check_included else None
+        ),
         "supervision_status": supervision_summary.get("supervision_status"),
         "lifecycle_control_status": control_summary.get("control_status"),
         "boundary": "read_only_lifecycle_readiness; no_control_dispatch",
@@ -6181,6 +6206,10 @@ def _build_provider_replay_lifecycle_readiness_summary_view(
         "statefile_schema_valid": readiness.get("statefile_schema_valid"),
         "statefile_provider_id_matches": readiness.get("statefile_provider_id_matches"),
         "statefile_stale": readiness.get("statefile_stale"),
+        "ownership_check_included": readiness.get("ownership_check_included"),
+        "ownership_status": readiness.get("ownership_status"),
+        "owned_process": readiness.get("owned_process"),
+        "ownership_pid_live": readiness.get("ownership_pid_live"),
         "supervision_status": readiness.get("supervision_status"),
         "lifecycle_control_status": readiness.get("lifecycle_control_status"),
         "boundary": readiness.get("boundary"),
@@ -6285,14 +6314,34 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
                 config,
                 stale_after_seconds=args.stale_after_seconds,
             )
+        ownership_diagnostics = None
+        if args.include_ownership_check:
+            expected_command = (
+                build_provider_replay_managed_daemon_command(Path(args.config))
+                if args.inspect_process_identity
+                else None
+            )
+            daemon = get_provider_replay_managed_daemon_status(
+                config,
+                stale_after_seconds=args.stale_after_seconds,
+                expected_owner_token=args.expected_owner_token,
+                expected_command=expected_command,
+                process_identity_matches=provider_replay_process_identity_matches
+                if args.inspect_process_identity
+                else None,
+            )
+            ownership = daemon.get("ownership") if isinstance(daemon, dict) else None
+            ownership_diagnostics = ownership if isinstance(ownership, dict) else None
         readiness = _build_provider_replay_lifecycle_readiness(
             status,
             statefile_check=statefile_check,
+            ownership_diagnostics=ownership_diagnostics,
         )
         data = {
             "readiness": readiness,
             "status": status,
             "config": config_summary,
+            "ownership": ownership_diagnostics,
         }
         if args.view == "summary":
             data["summary_view"] = _build_provider_replay_lifecycle_readiness_summary_view(status, readiness)
@@ -6344,9 +6393,19 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
                 data={"daemon": daemon, "config": config_summary},
             )
         if args.provider_replay_daemon_command == "status":
+            expected_command = (
+                build_provider_replay_managed_daemon_command(Path(args.config))
+                if args.inspect_process_identity
+                else None
+            )
             daemon = get_provider_replay_managed_daemon_status(
                 config,
                 stale_after_seconds=args.stale_after_seconds,
+                expected_owner_token=args.expected_owner_token,
+                expected_command=expected_command,
+                process_identity_matches=provider_replay_process_identity_matches
+                if args.inspect_process_identity
+                else None,
             )
             return Result(
                 ok=True,

@@ -475,6 +475,118 @@ def _provider_replay_process_running(pid: int) -> bool:
     return True
 
 
+def read_provider_replay_process_command(pid: int) -> list[str] | None:
+    if not isinstance(pid, int) or pid < 1:
+        return None
+    cmdline_path = Path("/proc") / str(pid) / "cmdline"
+    try:
+        raw = cmdline_path.read_bytes()
+    except OSError:
+        return None
+    parts = [part.decode("utf-8", errors="replace") for part in raw.split(b"\0") if part]
+    return parts or None
+
+
+def provider_replay_process_identity_matches(pid: int, expected_command: list[str]) -> bool | None:
+    observed_command = read_provider_replay_process_command(pid)
+    if not observed_command or not expected_command:
+        return None
+    return observed_command == expected_command
+
+
+def build_provider_replay_process_ownership_diagnostics(
+    statefile_check: dict[str, Any],
+    *,
+    expected_owner_token: str | None = None,
+    process_running: Any | None = None,
+    expected_command: list[str] | None = None,
+    process_identity_matches: Any | None = None,
+) -> dict[str, Any]:
+    pid = statefile_check.get("pid") if isinstance(statefile_check, dict) else None
+    owner_token = statefile_check.get("owner_token") if isinstance(statefile_check, dict) else None
+    owner_token_present = isinstance(owner_token, str) and bool(owner_token)
+    expected_owner_token_present = isinstance(expected_owner_token, str) and bool(expected_owner_token)
+    owner_token_matches = None
+    if expected_owner_token_present:
+        owner_token_matches = owner_token == expected_owner_token
+
+    diagnostics: dict[str, Any] = {
+        "ownership_status": "unknown_process_identity",
+        "owned_process": False,
+        "pid": pid if isinstance(pid, int) else None,
+        "pid_live": None,
+        "owner_token_present": owner_token_present,
+        "owner_token_matches": owner_token_matches,
+        "config_hash_matches": statefile_check.get("config_hash_matches")
+        if isinstance(statefile_check, dict)
+        else None,
+        "process_identity_checked": False,
+        "process_identity_matches": None,
+        "control_allowed": False,
+        "boundary": "read_only_process_ownership_diagnostics; no_process_control",
+    }
+
+    if not isinstance(statefile_check, dict):
+        diagnostics["ownership_status"] = "invalid_statefile"
+        return diagnostics
+    if statefile_check.get("configured") is not True:
+        diagnostics["ownership_status"] = "not_configured"
+        return diagnostics
+    if statefile_check.get("check_status") == "missing":
+        diagnostics["ownership_status"] = "missing_statefile"
+        return diagnostics
+    if statefile_check.get("check_status") != "valid":
+        diagnostics["ownership_status"] = "invalid_statefile"
+        return diagnostics
+    if statefile_check.get("stale") is True:
+        diagnostics["ownership_status"] = "stale_statefile"
+        return diagnostics
+    if statefile_check.get("config_hash_matches") is not True:
+        diagnostics["ownership_status"] = "config_hash_mismatch"
+        return diagnostics
+    if expected_owner_token_present and owner_token_matches is not True:
+        diagnostics["ownership_status"] = "owner_token_mismatch"
+        return diagnostics
+    if not isinstance(pid, int):
+        diagnostics["ownership_status"] = "invalid_statefile"
+        return diagnostics
+
+    if callable(process_running):
+        try:
+            diagnostics["pid_live"] = bool(process_running(pid))
+        except OSError:
+            diagnostics["pid_live"] = None
+    if diagnostics["pid_live"] is False:
+        diagnostics["ownership_status"] = "process_not_running"
+        return diagnostics
+    if diagnostics["pid_live"] is not True:
+        diagnostics["ownership_status"] = "unknown_process_identity"
+        return diagnostics
+
+    if callable(process_identity_matches):
+        diagnostics["process_identity_checked"] = True
+        command = expected_command or []
+        try:
+            identity_matches = process_identity_matches(pid, command)
+        except OSError:
+            identity_matches = None
+        if identity_matches is True:
+            diagnostics["process_identity_matches"] = True
+        elif identity_matches is False:
+            diagnostics["process_identity_matches"] = False
+            diagnostics["ownership_status"] = "process_identity_mismatch"
+            return diagnostics
+        else:
+            diagnostics["process_identity_matches"] = None
+            diagnostics["ownership_status"] = "unknown_process_identity"
+            return diagnostics
+
+    diagnostics["ownership_status"] = "owned"
+    diagnostics["owned_process"] = True
+    diagnostics["control_allowed"] = True
+    return diagnostics
+
+
 def _terminate_provider_replay_process(pid: int) -> None:
     os.kill(pid, signal.SIGTERM)
 
@@ -484,16 +596,24 @@ def get_provider_replay_managed_daemon_status(
     *,
     stale_after_seconds: float | int = 300.0,
     process_running: Any | None = None,
+    expected_owner_token: str | None = None,
+    expected_command: list[str] | None = None,
+    process_identity_matches: Any | None = None,
 ) -> dict[str, Any]:
     statefile_check = check_provider_replay_lifecycle_statefile(
         config,
         stale_after_seconds=stale_after_seconds,
     )
     running_probe = process_running or _provider_replay_process_running
-    pid = statefile_check.get("pid")
-    process_running_result = None
-    if isinstance(pid, int):
-        process_running_result = bool(running_probe(pid))
+    ownership = build_provider_replay_process_ownership_diagnostics(
+        statefile_check,
+        expected_owner_token=expected_owner_token,
+        process_running=running_probe,
+        expected_command=expected_command,
+        process_identity_matches=process_identity_matches,
+    )
+    pid = ownership.get("pid")
+    process_running_result = ownership.get("pid_live")
 
     daemon_status = statefile_check.get("check_status")
     if statefile_check.get("configured") is not True:
@@ -509,11 +629,7 @@ def get_provider_replay_managed_daemon_status(
     else:
         daemon_status = "not_running"
 
-    control_allowed = (
-        daemon_status == "running"
-        and statefile_check.get("config_hash_matches") is True
-        and statefile_check.get("provider_id_matches") is True
-    )
+    control_allowed = daemon_status == "running" and ownership.get("control_allowed") is True
     return {
         "daemon_status": daemon_status,
         "configured": statefile_check.get("configured"),
@@ -524,6 +640,7 @@ def get_provider_replay_managed_daemon_status(
         "generation": statefile_check.get("generation"),
         "config_hash": statefile_check.get("config_hash"),
         "config_hash_matches": statefile_check.get("config_hash_matches"),
+        "ownership": ownership,
         "write_attempted": False,
         "control_allowed": control_allowed,
         "boundary": "managed_daemon_status_read_only; no_supervisor_loop",

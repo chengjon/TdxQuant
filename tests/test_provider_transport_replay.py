@@ -11,6 +11,8 @@ from urllib.request import Request, urlopen
 from tdxquant.provider_transport_replay import (
     ProviderTransportReplayConfig,
     ProviderTransportReplayHTTPServer,
+    build_provider_replay_managed_daemon_command,
+    build_provider_replay_process_ownership_diagnostics,
     build_provider_transport_replay_status,
     check_provider_replay_lifecycle_statefile,
     get_provider_replay_managed_daemon_status,
@@ -748,6 +750,166 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(result["control_allowed"], True)
         self.assertEqual(result["boundary"], "managed_daemon_status_read_only; no_supervisor_loop")
         self.assertEqual(after_payload, before_payload)
+
+    def test_process_ownership_diagnostics_reports_owned_identity(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+            write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=4321,
+                owner_token="owner-token-a",
+                generation=3,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            statefile_check = check_provider_replay_lifecycle_statefile(config, stale_after_seconds=60)
+            expected_command = build_provider_replay_managed_daemon_command(config_path)
+
+            diagnostics = build_provider_replay_process_ownership_diagnostics(
+                statefile_check,
+                expected_owner_token="owner-token-a",
+                process_running=lambda pid: pid == 4321,
+                expected_command=expected_command,
+                process_identity_matches=lambda pid, command: pid == 4321 and command == expected_command,
+            )
+
+        self.assertEqual(diagnostics["ownership_status"], "owned")
+        self.assertEqual(diagnostics["owned_process"], True)
+        self.assertEqual(diagnostics["pid"], 4321)
+        self.assertEqual(diagnostics["pid_live"], True)
+        self.assertEqual(diagnostics["owner_token_present"], True)
+        self.assertEqual(diagnostics["owner_token_matches"], True)
+        self.assertEqual(diagnostics["config_hash_matches"], True)
+        self.assertEqual(diagnostics["process_identity_checked"], True)
+        self.assertEqual(diagnostics["process_identity_matches"], True)
+        self.assertEqual(diagnostics["control_allowed"], True)
+        self.assertEqual(
+            diagnostics["boundary"],
+            "read_only_process_ownership_diagnostics; no_process_control",
+        )
+
+    def test_process_ownership_diagnostics_rejects_non_running_pid(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+            write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=4321,
+                owner_token="owner-token-a",
+                generation=3,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            statefile_check = check_provider_replay_lifecycle_statefile(config, stale_after_seconds=60)
+
+            diagnostics = build_provider_replay_process_ownership_diagnostics(
+                statefile_check,
+                expected_owner_token="owner-token-a",
+                process_running=lambda _pid: False,
+                expected_command=["python", "-m", "tdxquant.cli", "provider-replay", "serve"],
+                process_identity_matches=lambda _pid, _command: True,
+            )
+
+        self.assertEqual(diagnostics["ownership_status"], "process_not_running")
+        self.assertEqual(diagnostics["owned_process"], False)
+        self.assertEqual(diagnostics["pid_live"], False)
+        self.assertEqual(diagnostics["process_identity_checked"], False)
+        self.assertEqual(diagnostics["control_allowed"], False)
+
+    def test_process_ownership_diagnostics_rejects_identity_mismatch(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+            write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=4321,
+                owner_token="owner-token-a",
+                generation=3,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            statefile_check = check_provider_replay_lifecycle_statefile(config, stale_after_seconds=60)
+
+            diagnostics = build_provider_replay_process_ownership_diagnostics(
+                statefile_check,
+                expected_owner_token="owner-token-a",
+                process_running=lambda pid: pid == 4321,
+                expected_command=build_provider_replay_managed_daemon_command(config_path),
+                process_identity_matches=lambda _pid, _command: False,
+            )
+
+        self.assertEqual(diagnostics["ownership_status"], "process_identity_mismatch")
+        self.assertEqual(diagnostics["owned_process"], False)
+        self.assertEqual(diagnostics["pid_live"], True)
+        self.assertEqual(diagnostics["process_identity_checked"], True)
+        self.assertEqual(diagnostics["process_identity_matches"], False)
+        self.assertEqual(diagnostics["control_allowed"], False)
+
+    def test_managed_daemon_status_surfaces_process_ownership_diagnostics(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            config = ProviderTransportReplayConfig(
+                provider_id="provider-replay-a",
+                bind_host="127.0.0.1",
+                port=9010,
+                token="secret-token",
+                master_allowlist=[],
+                replay_fixture="market-snapshot-default",
+                lifecycle_state_file=str(state_path),
+            )
+            write_provider_replay_lifecycle_statefile(
+                config,
+                state="running",
+                pid=4321,
+                owner_token="owner-token-a",
+                generation=3,
+                updated_at="2999-01-01T00:00:00Z",
+            )
+            expected_command = build_provider_replay_managed_daemon_command(config_path)
+
+            result = get_provider_replay_managed_daemon_status(
+                config,
+                process_running=lambda pid: pid == 4321,
+                expected_owner_token="owner-token-a",
+                expected_command=expected_command,
+                process_identity_matches=lambda pid, command: pid == 4321 and command == expected_command,
+                stale_after_seconds=60,
+            )
+
+        self.assertEqual(result["daemon_status"], "running")
+        self.assertEqual(result["ownership"]["ownership_status"], "owned")
+        self.assertEqual(result["ownership"]["owned_process"], True)
+        self.assertEqual(result["ownership"]["process_identity_checked"], True)
+        self.assertEqual(result["ownership"]["process_identity_matches"], True)
+        self.assertEqual(result["control_allowed"], True)
 
     def test_managed_daemon_stop_requires_matching_owner_and_writes_stopping_state(self) -> None:
         terminated: list[int] = []

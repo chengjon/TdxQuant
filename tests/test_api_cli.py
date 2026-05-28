@@ -1382,6 +1382,9 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.provider_replay_command, "lifecycle-readiness")
         self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
         self.assertEqual(args.include_statefile_check, False)
+        self.assertEqual(args.include_ownership_check, False)
+        self.assertEqual(args.expected_owner_token, None)
+        self.assertEqual(args.inspect_process_identity, False)
         self.assertEqual(args.stale_after_seconds, 300.0)
         self.assertEqual(args.view, "detailed")
 
@@ -1409,6 +1412,9 @@ class ApiCliParserTests(unittest.TestCase):
                 "runtime/provider-transport-replay.example.json",
                 "--stale-after-seconds",
                 "45",
+                "--expected-owner-token",
+                "owner-token-a",
+                "--inspect-process-identity",
             ]
         )
         stop_args = parser.parse_args(
@@ -1450,6 +1456,8 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(start_args.generation, 3)
         self.assertEqual(status_args.provider_replay_daemon_command, "status")
         self.assertEqual(status_args.stale_after_seconds, 45.0)
+        self.assertEqual(status_args.expected_owner_token, "owner-token-a")
+        self.assertEqual(status_args.inspect_process_identity, True)
         self.assertEqual(stop_args.provider_replay_daemon_command, "stop")
         self.assertEqual(stop_args.owner_token, "owner-token-a")
         self.assertEqual(supervise_args.provider_replay_daemon_command, "supervise")
@@ -2727,6 +2735,85 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(result.data["summary_view"]["statefile_check_status"], "valid")
 
+    def test_handle_provider_replay_lifecycle_readiness_counts_owned_process_identity_when_proven(
+        self,
+    ) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 4321,
+                        "state": "running",
+                        "updated_at": "2999-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(state_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "lifecycle-readiness",
+                    "--config",
+                    str(config_path),
+                    "--include-statefile-check",
+                    "--include-ownership-check",
+                    "--expected-owner-token",
+                    "owner-token-a",
+                    "--view",
+                    "summary",
+                ]
+            )
+            with patch(
+                "tdxquant.cli.get_provider_replay_managed_daemon_status",
+                return_value={
+                    "daemon_status": "running",
+                    "pid": 4321,
+                    "ownership": {
+                        "ownership_status": "owned",
+                        "owned_process": True,
+                        "pid_live": True,
+                        "owner_token_matches": True,
+                        "config_hash_matches": True,
+                        "process_identity_checked": False,
+                        "process_identity_matches": None,
+                        "control_allowed": True,
+                    },
+                },
+            ) as mocked_status:
+                result = _handle_provider_replay_subcommand(args)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["readiness"]["ownership_check_included"], True)
+        self.assertEqual(result.data["readiness"]["ownership_status"], "owned")
+        self.assertEqual(result.data["readiness"]["owned_process"], True)
+        self.assertIn("owned_process_identity", result.data["readiness"]["satisfied_requirements"])
+        self.assertNotIn("owned_process_identity", result.data["readiness"]["missing_requirements"])
+        self.assertEqual(result.data["readiness"]["missing_requirement_count"], 3)
+        self.assertEqual(result.data["ownership"]["ownership_status"], "owned")
+        self.assertEqual(result.data["summary_view"]["ownership_status"], "owned")
+        self.assertEqual(result.data["summary_view"]["owned_process"], True)
+        mocked_status.assert_called_once()
+        self.assertEqual(mocked_status.call_args.kwargs["expected_owner_token"], "owner-token-a")
+
     def test_handle_provider_replay_daemon_start_status_stop_dispatches_to_managed_helpers(self) -> None:
         parser = build_parser()
         with TemporaryDirectory() as temp_dir:
@@ -2759,7 +2846,17 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     "3",
                 ]
             )
-            status_args = parser.parse_args(["provider-replay", "daemon", "status", "--config", str(config_path)])
+            status_args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "daemon",
+                    "status",
+                    "--config",
+                    str(config_path),
+                    "--expected-owner-token",
+                    "owner-token-a",
+                ]
+            )
             stop_args = parser.parse_args(
                 [
                     "provider-replay",
@@ -2830,6 +2927,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(mocked_start.call_args.kwargs["config_path"], config_path)
         self.assertEqual(mocked_start.call_args.kwargs["owner_token"], "owner-token-a")
         self.assertEqual(mocked_start.call_args.kwargs["generation"], 3)
+        self.assertEqual(mocked_status.call_args.kwargs["expected_owner_token"], "owner-token-a")
         self.assertEqual(mocked_stop.call_args.kwargs["owner_token"], "owner-token-a")
         self.assertEqual(mocked_supervise.call_args.kwargs["owner_token"], "owner-token-a")
         self.assertEqual(mocked_supervise.call_args.kwargs["generation"], 4)
