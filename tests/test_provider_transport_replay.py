@@ -285,6 +285,48 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 "boundary": "read_only_lifecycle_status; no_control_operations",
             },
         )
+        self.assertEqual(
+            status["lifecycle"]["operation_summary"],
+            {
+                "operation_count": 4,
+                "available_count": 0,
+                "blocked_count": 4,
+                "operations": [
+                    {
+                        "operation": "start",
+                        "status": "blocked",
+                        "blocking_reason": "lifecycle_control_not_implemented",
+                        "ownership_required": False,
+                        "operator_action_required": True,
+                        "implemented": False,
+                    },
+                    {
+                        "operation": "stop",
+                        "status": "blocked",
+                        "blocking_reason": "lifecycle_control_not_implemented",
+                        "ownership_required": True,
+                        "operator_action_required": True,
+                        "implemented": False,
+                    },
+                    {
+                        "operation": "restart",
+                        "status": "blocked",
+                        "blocking_reason": "lifecycle_control_not_implemented",
+                        "ownership_required": True,
+                        "operator_action_required": True,
+                        "implemented": False,
+                    },
+                    {
+                        "operation": "backoff",
+                        "status": "blocked",
+                        "blocking_reason": "lifecycle_control_not_implemented",
+                        "ownership_required": True,
+                        "operator_action_required": True,
+                        "implemented": False,
+                    },
+                ],
+            },
+        )
         self.assertEqual(status["capabilities"]["read_only"], True)
         self.assertEqual(status["capabilities"]["writes_supported"], False)
         self.assertIn("/provider/v1/replay/watch/events/stream", status["capabilities"]["endpoints"])
