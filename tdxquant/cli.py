@@ -6151,33 +6151,54 @@ def _build_provider_replay_lifecycle_readiness(
         and statefile_check.get("provider_id_matches") is True
         and statefile_check.get("stale") is False
     )
+    lifecycle_controller_available = control_summary.get("control_status") == "operator_opt_in_available"
+    supervisor_loop_available = (
+        supervision_summary.get("supervision_status") == "operator_opt_in_available"
+        and supervision_summary.get("supervisor_configured") is True
+    )
+    operator_opt_in_control_available = (
+        lifecycle_controller_available
+        and control_summary.get("operator_action_required") is True
+        and bool(control_summary.get("available_operations"))
+    )
     owned_process_identity = (
         statefile_valid
         and ownership_check_included
         and ownership_diagnostics.get("ownership_status") == "owned"
         and ownership_diagnostics.get("owned_process") is True
+        and ownership_diagnostics.get("control_allowed") is True
     )
-    missing_requirements = [
-        "lifecycle_controller",
-        "supervisor_loop",
-        "operator_opt_in_control",
-    ]
+    missing_requirements: list[str] = []
     satisfied_requirements: list[str] = []
+    if lifecycle_controller_available:
+        satisfied_requirements.append("lifecycle_controller")
+    else:
+        missing_requirements.append("lifecycle_controller")
     if owned_process_identity:
         satisfied_requirements.append("owned_process_identity")
     else:
         missing_requirements.append("owned_process_identity")
+    if supervisor_loop_available:
+        satisfied_requirements.append("supervisor_loop")
+    else:
+        missing_requirements.append("supervisor_loop")
+    if operator_opt_in_control_available:
+        satisfied_requirements.append("operator_opt_in_control")
+    else:
+        missing_requirements.append("operator_opt_in_control")
     if statefile_valid:
         satisfied_requirements.append("valid_lifecycle_statefile")
     else:
         missing_requirements.append("valid_lifecycle_statefile")
     required_requirement_count = len(missing_requirements) + len(satisfied_requirements)
+    ready = not missing_requirements
+    control_allowed = ready and ownership_check_included and ownership_diagnostics.get("control_allowed") is True
     return {
-        "readiness_status": "blocked",
-        "ready": False,
-        "control_allowed": False,
+        "readiness_status": "ready" if ready else "blocked",
+        "ready": ready,
+        "control_allowed": control_allowed,
         "dispatch_executed": False,
-        "blocking_reason": control_summary.get("blocking_reason"),
+        "blocking_reason": None if ready else control_summary.get("blocking_reason"),
         "missing_requirements": missing_requirements,
         "missing_requirement_count": len(missing_requirements),
         "satisfied_requirements": satisfied_requirements,

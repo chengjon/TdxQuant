@@ -2002,54 +2002,34 @@ Provider replay lifecycle plans SHALL optionally include compact read-only lifec
 
 ### Requirement: Provider replay CLI SHALL expose read-only lifecycle readiness summaries
 
-Provider replay CLI SHALL expose a read-only `lifecycle-readiness` command that summarizes current lifecycle control readiness without executing lifecycle control.
+Provider replay CLI SHALL expose a read-only `lifecycle-readiness` command that summarizes lifecycle control prerequisites without executing lifecycle control.
 
-#### Scenario: Lifecycle readiness command parses
+#### Scenario: Managed lifecycle readiness counts available lifecycle surfaces
 
-- **WHEN** a caller parses `provider-replay lifecycle-readiness --config <path>`
-- **THEN** the command MUST be accepted as a provider replay subcommand
-- **AND** the default view MUST be `detailed`
-- **AND** statefile diagnostics MUST be opt-in
-- **AND** the default stale threshold MUST be present
+- **GIVEN** provider replay config includes `lifecycle_state_file`
+- **AND** detailed lifecycle status reports `control_status=operator_opt_in_available`
+- **AND** detailed lifecycle supervision reports `supervision_status=operator_opt_in_available`
+- **WHEN** lifecycle readiness is built
+- **THEN** `lifecycle_controller`, `supervisor_loop`, and `operator_opt_in_control` MUST be counted as satisfied requirements
+- **AND** the readiness output MUST remain non-executing.
 
-#### Scenario: Detailed readiness reports blocked control by default
+#### Scenario: Managed lifecycle readiness is ready only when ownership is proven
 
-- **WHEN** a caller requests `provider-replay lifecycle-readiness` without statefile diagnostics
-- **THEN** `readiness.ready` MUST be `false`
-- **AND** `readiness.readiness_status` MUST be `blocked`
-- **AND** `readiness.control_allowed` MUST be `false`
-- **AND** `readiness.dispatch_executed` MUST be `false`
-- **AND** `readiness.statefile_check_included` MUST be `false`
-- **AND** `readiness.missing_requirements` MUST include lifecycle controller, owned process identity, supervisor loop, operator opt-in control, and valid lifecycle statefile requirements
-- **AND** the command MUST NOT read the configured lifecycle statefile by default
+- **GIVEN** provider replay config includes `lifecycle_state_file`
+- **AND** lifecycle readiness includes a valid, non-stale statefile check
+- **AND** lifecycle readiness includes ownership diagnostics with `ownership_status=owned`
+- **WHEN** lifecycle readiness is built
+- **THEN** `ready` MUST be `true`
+- **AND** `readiness_status` MUST be `ready`
+- **AND** `missing_requirement_count` MUST be `0`
+- **AND** `dispatch_executed` MUST remain `false`
+- **AND** the command MUST NOT start, stop, restart, supervise, daemonize, write state files, infer ownership from ports, or enable write behavior.
 
-#### Scenario: Detailed readiness can count valid statefile diagnostic prerequisite
+#### Scenario: Unconfigured lifecycle readiness remains blocked
 
-- **WHEN** a caller requests `provider-replay lifecycle-readiness --include-statefile-check` for a valid, non-stale, provider-matched statefile
-- **THEN** `readiness.statefile_check_included` MUST be `true`
-- **AND** `readiness.statefile_check_status` MUST be `valid`
-- **AND** `readiness.statefile_schema_valid` MUST be `true`
-- **AND** `readiness.statefile_provider_id_matches` MUST be `true`
-- **AND** `readiness.statefile_stale` MUST be `false`
-- **AND** `readiness.satisfied_requirements` MUST include `valid_lifecycle_statefile`
-- **AND** `readiness.ready` MUST still be `false`
-- **AND** `readiness.control_allowed` MUST still be `false`
-
-#### Scenario: Summary readiness projects compact blocked state
-
-- **WHEN** a caller requests `provider-replay lifecycle-readiness --include-statefile-check --view summary`
-- **THEN** `summary_view.mode` MUST be `lifecycle-readiness`
-- **AND** `summary_view.ready` MUST be `false`
-- **AND** `summary_view.readiness_status` MUST be `blocked`
-- **AND** `summary_view.control_allowed` MUST be `false`
-- **AND** `summary_view.missing_requirement_count` MUST match the detailed readiness
-- **AND** `summary_view.statefile_check_status` MUST match the detailed readiness
-
-#### Scenario: Readiness summary is non-authoritative
-
-- **WHEN** lifecycle readiness output is produced
-- **THEN** the command MUST NOT start, stop, restart, daemonize, supervise, probe runtime, inspect process tables, infer ownership from ports, write or lock statefiles, schedule retries, or enable write behavior
-- **AND** valid diagnostics MUST NOT be treated as process ownership proof, readiness, broker availability, endpoint coverage, workflow readiness, write-capability proof, automatic recovery, or a scheduled retry
+- **GIVEN** provider replay config does not include `lifecycle_state_file`
+- **WHEN** lifecycle readiness is built
+- **THEN** lifecycle controller, supervisor loop, operator opt-in control, valid statefile, and owned process identity MUST remain missing.
 
 ### Requirement: Provider replay lifecycle SHALL write ownership statefiles under lock
 
