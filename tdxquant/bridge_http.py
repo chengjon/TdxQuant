@@ -114,6 +114,7 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             "reason_source_key_count",
             "reason_summary",
             "action_summary",
+            "reconnect_rollup",
             "evaluation_summary",
         ):
             if key in governance:

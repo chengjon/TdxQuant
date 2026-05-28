@@ -526,6 +526,17 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                             },
                             "reason_code_key_count": 4,
                         },
+                        "reconnect_rollup": {
+                            "staleness": "stale",
+                            "reconnect_count": 2,
+                            "consecutive_reconnect_failures": 1,
+                            "has_reconnects": True,
+                            "has_reconnect_failures": True,
+                            "has_last_error": True,
+                            "has_next_reconnect_at": True,
+                            "age_source": "last_disconnect_at",
+                            "stale_after_seconds": 60.0,
+                        },
                         "evaluation_summary": {
                             "evaluated_components": ["heartbeat", "watermark"],
                             "primary_evaluated_component": "heartbeat",
@@ -674,6 +685,20 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             },
         )
         self.assertEqual(payload["result"]["governance"]["action_summary"]["reason_code_key_count"], 4)
+        self.assertEqual(
+            payload["result"]["governance"]["reconnect_rollup"],
+            {
+                "staleness": "stale",
+                "reconnect_count": 2,
+                "consecutive_reconnect_failures": 1,
+                "has_reconnects": True,
+                "has_reconnect_failures": True,
+                "has_last_error": True,
+                "has_next_reconnect_at": True,
+                "age_source": "last_disconnect_at",
+                "stale_after_seconds": 60.0,
+            },
+        )
         self.assertEqual(
             payload["result"]["governance"]["decision_summary"],
             {

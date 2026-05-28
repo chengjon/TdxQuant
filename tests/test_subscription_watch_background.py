@@ -746,6 +746,17 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
             "reason_code_counts": {},
             "reason_code_key_count": 0,
         },
+        "reconnect_rollup": {
+            "staleness": "not_evaluated",
+            "reconnect_count": 0,
+            "consecutive_reconnect_failures": 0,
+            "has_reconnects": False,
+            "has_reconnect_failures": False,
+            "has_last_error": False,
+            "has_next_reconnect_at": False,
+            "age_source": None,
+            "stale_after_seconds": None,
+        },
         "evaluation_summary": {
             "evaluated_components": [],
             "primary_evaluated_component": None,
@@ -947,7 +958,11 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
         watch_status={
             "run_id": "run-001",
             "state": "reconnecting",
+            "reconnect_count": 3,
             "last_disconnect_at": "2026-05-17T09:30:00+00:00",
+            "next_reconnect_at": "2026-05-17T09:32:00+00:00",
+            "consecutive_reconnect_failures": 2,
+            "last_error": {"code": "timeout"},
         },
         reconnect_stale_after_seconds=60,
         now_utc="2026-05-17T09:31:30+00:00",
@@ -969,6 +984,17 @@ def test_status_summary_governance_requests_manual_review_for_stale_reconnect() 
         "source_key_count": 2,
         "reason_code_counts": {"overall_status:reconnecting": 1, "reconnect:stale": 1},
         "reason_code_key_count": 2,
+    }
+    assert summary["governance"]["reconnect_rollup"] == {
+        "staleness": "stale",
+        "reconnect_count": 3,
+        "consecutive_reconnect_failures": 2,
+        "has_reconnects": True,
+        "has_reconnect_failures": True,
+        "has_last_error": True,
+        "has_next_reconnect_at": True,
+        "age_source": "last_disconnect_at",
+        "stale_after_seconds": 60.0,
     }
     assert summary["governance"]["actions"] == [
         {

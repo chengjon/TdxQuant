@@ -282,6 +282,9 @@ def _build_subscription_watch_governance_summary(
         "actions": actions,
         "action_count": len(actions),
         "action_summary": _build_subscription_watch_governance_action_summary(actions),
+        "reconnect_rollup": _build_subscription_watch_governance_reconnect_rollup(
+            reconnect
+        ),
         "evaluation_summary": _build_subscription_watch_governance_evaluation_summary(
             heartbeat=heartbeat,
             watermark=watermark,
@@ -334,6 +337,33 @@ def _subscription_watch_governance_reason_source(reason: Any) -> str:
         if candidate:
             return candidate
     return "unknown"
+
+
+def _positive_non_bool_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _build_subscription_watch_governance_reconnect_rollup(
+    reconnect: dict[str, Any],
+) -> dict[str, Any]:
+    reconnect_count = reconnect.get("reconnect_count")
+    consecutive_reconnect_failures = reconnect.get("consecutive_reconnect_failures")
+    last_error = reconnect.get("last_error")
+    next_reconnect_at = reconnect.get("next_reconnect_at")
+    return {
+        "staleness": reconnect.get("staleness"),
+        "reconnect_count": reconnect_count,
+        "consecutive_reconnect_failures": consecutive_reconnect_failures,
+        "has_reconnects": _positive_non_bool_int(reconnect_count),
+        "has_reconnect_failures": _positive_non_bool_int(
+            consecutive_reconnect_failures
+        ),
+        "has_last_error": isinstance(last_error, dict) and bool(last_error),
+        "has_next_reconnect_at": isinstance(next_reconnect_at, str)
+        and bool(next_reconnect_at),
+        "age_source": reconnect.get("age_source"),
+        "stale_after_seconds": reconnect.get("stale_after_seconds"),
+    }
 
 
 def _build_subscription_watch_governance_evaluation_summary(

@@ -10785,6 +10785,17 @@ class ReportCliDispatchTests(unittest.TestCase):
                             },
                             "reason_code_key_count": 4,
                         },
+                        "reconnect_rollup": {
+                            "staleness": "stale",
+                            "reconnect_count": 2,
+                            "consecutive_reconnect_failures": 1,
+                            "has_reconnects": True,
+                            "has_reconnect_failures": True,
+                            "has_last_error": True,
+                            "has_next_reconnect_at": True,
+                            "age_source": "last_disconnect_at",
+                            "stale_after_seconds": 60.0,
+                        },
                         "action_count": 4,
                         "actions": [
                             {
@@ -10954,6 +10965,17 @@ class ReportCliDispatchTests(unittest.TestCase):
                                 "watermark:stale": 1,
                             },
                             "reason_code_key_count": 4,
+                        },
+                        "reconnect_rollup": {
+                            "staleness": "stale",
+                            "reconnect_count": 2,
+                            "consecutive_reconnect_failures": 1,
+                            "has_reconnects": True,
+                            "has_reconnect_failures": True,
+                            "has_last_error": True,
+                            "has_next_reconnect_at": True,
+                            "age_source": "last_disconnect_at",
+                            "stale_after_seconds": 60.0,
                         },
                         "decision_summary": {
                             "decision": "manual_review",
