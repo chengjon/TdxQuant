@@ -758,6 +758,8 @@ def _build_provider_replay_parser(
         choices=["detailed", "summary"],
         default="detailed",
     )
+    provider_replay_lifecycle_plan_parser.add_argument("--include-statefile-check", action="store_true")
+    provider_replay_lifecycle_plan_parser.add_argument("--stale-after-seconds", type=float, default=300.0)
     provider_replay_lifecycle_plan_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     provider_replay_lifecycle_state_check_parser = provider_replay_subparsers.add_parser("lifecycle-state-check")
@@ -5925,7 +5927,12 @@ def _build_provider_replay_config_check_summary_view(config_summary: dict[str, o
     }
 
 
-def _build_provider_replay_lifecycle_plan(status: dict[str, object], operation: str) -> dict[str, object]:
+def _build_provider_replay_lifecycle_plan(
+    status: dict[str, object],
+    operation: str,
+    *,
+    statefile_check: dict[str, object] | None = None,
+) -> dict[str, object]:
     lifecycle = status.get("lifecycle") if isinstance(status.get("lifecycle"), dict) else {}
     control_summary = (
         lifecycle.get("control_summary")
@@ -5961,6 +5968,7 @@ def _build_provider_replay_lifecycle_plan(status: dict[str, object], operation: 
         {},
     )
     blocking_reason = operation_entry.get("blocking_reason") or control_summary.get("blocking_reason")
+    statefile_check_included = isinstance(statefile_check, dict)
     return {
         "operation": operation,
         "execution_mode": "non_executing_lifecycle_plan",
@@ -5973,6 +5981,14 @@ def _build_provider_replay_lifecycle_plan(status: dict[str, object], operation: 
         "ownership_required": bool(operation_entry.get("ownership_required")),
         "operator_action_required": bool(operation_entry.get("operator_action_required")),
         "statefile_configured": bool(statefile_summary.get("configured")),
+        "statefile_check_included": statefile_check_included,
+        "statefile_check_status": statefile_check.get("check_status") if statefile_check_included else None,
+        "statefile_schema_valid": statefile_check.get("schema_valid") if statefile_check_included else None,
+        "statefile_provider_id_matches": (
+            statefile_check.get("provider_id_matches") if statefile_check_included else None
+        ),
+        "statefile_stale": statefile_check.get("stale") if statefile_check_included else None,
+        "statefile_diagnostics": copy.deepcopy(statefile_check) if statefile_check_included else None,
         "supervision_status": supervision_summary.get("supervision_status"),
         "required_capabilities": [
             "lifecycle_controller",
@@ -5998,6 +6014,11 @@ def _build_provider_replay_lifecycle_plan_summary_view(
         "lifecycle_control_status": plan.get("lifecycle_control_status"),
         "blocking_reason": plan.get("blocking_reason"),
         "statefile_configured": plan.get("statefile_configured"),
+        "statefile_check_included": plan.get("statefile_check_included"),
+        "statefile_check_status": plan.get("statefile_check_status"),
+        "statefile_schema_valid": plan.get("statefile_schema_valid"),
+        "statefile_provider_id_matches": plan.get("statefile_provider_id_matches"),
+        "statefile_stale": plan.get("statefile_stale"),
         "supervision_status": plan.get("supervision_status"),
         "boundary": plan.get("boundary"),
     }
@@ -6091,7 +6112,17 @@ def _handle_provider_replay_subcommand(args: argparse.Namespace) -> Result:
         )
     if args.provider_replay_command == "lifecycle-plan":
         status = build_provider_transport_replay_status(config)
-        plan = _build_provider_replay_lifecycle_plan(status, args.operation)
+        statefile_check = None
+        if args.include_statefile_check:
+            statefile_check = check_provider_replay_lifecycle_statefile(
+                config,
+                stale_after_seconds=args.stale_after_seconds,
+            )
+        plan = _build_provider_replay_lifecycle_plan(
+            status,
+            args.operation,
+            statefile_check=statefile_check,
+        )
         data = {
             "plan": plan,
             "status": status,

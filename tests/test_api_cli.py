@@ -1341,12 +1341,15 @@ class ApiCliParserTests(unittest.TestCase):
                 "runtime/provider-transport-replay.example.json",
                 "--operation",
                 "stop",
+                "--include-statefile-check",
             ]
         )
         self.assertEqual(args.command, "provider-replay")
         self.assertEqual(args.provider_replay_command, "lifecycle-plan")
         self.assertEqual(args.config, "runtime/provider-transport-replay.example.json")
         self.assertEqual(args.operation, "stop")
+        self.assertEqual(args.include_statefile_check, True)
+        self.assertEqual(args.stale_after_seconds, 300.0)
         self.assertEqual(args.view, "detailed")
 
     def test_provider_replay_lifecycle_state_check_command_parses(self) -> None:
@@ -2303,6 +2306,18 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "provider-replay.json"
             lifecycle_state_file = Path(temp_dir) / "provider-replay.state.json"
+            lifecycle_state_file.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 12345,
+                        "state": "running",
+                        "updated_at": "2000-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
             config_path.write_text(
                 json.dumps(
                     {
@@ -2334,6 +2349,18 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "provider-replay.json"
             lifecycle_state_file = Path(temp_dir) / "provider-replay.state.json"
+            lifecycle_state_file.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 12345,
+                        "state": "running",
+                        "updated_at": "2000-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
             config_path.write_text(
                 json.dumps(
                     {
@@ -2393,6 +2420,91 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "provider-replay.json"
             lifecycle_state_file = Path(temp_dir) / "provider-replay.state.json"
+            lifecycle_state_file.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 12345,
+                        "state": "running",
+                        "updated_at": "2000-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(lifecycle_state_file),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = parser.parse_args(
+                [
+                    "provider-replay",
+                    "lifecycle-plan",
+                    "--config",
+                    str(config_path),
+                    "--operation",
+                    "stop",
+                    "--include-statefile-check",
+                    "--stale-after-seconds",
+                    "60",
+                ]
+            )
+            with (
+                patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
+                patch("tdxquant.cli.probe_provider_transport_replay_health") as mocked_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_status") as mocked_watch_status_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_events") as mocked_watch_events_probe,
+                patch("tdxquant.cli.probe_provider_transport_replay_watch_stream") as mocked_watch_stream_probe,
+            ):
+                result = _handle_provider_replay_subcommand(args)
+                lifecycle_state_file_exists_after_call = lifecycle_state_file.exists()
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["plan"]["execution_mode"], "non_executing_lifecycle_plan")
+        self.assertEqual(result.data["plan"]["operation"], "stop")
+        self.assertEqual(result.data["plan"]["operation_status"], "blocked")
+        self.assertEqual(result.data["plan"]["implemented"], False)
+        self.assertEqual(result.data["plan"]["dispatch_executed"], False)
+        self.assertEqual(result.data["plan"]["control_allowed"], False)
+        self.assertEqual(result.data["plan"]["lifecycle_control_status"], "unsupported")
+        self.assertEqual(result.data["plan"]["blocking_reason"], "lifecycle_control_not_implemented")
+        self.assertEqual(result.data["plan"]["ownership_required"], True)
+        self.assertEqual(result.data["plan"]["operator_action_required"], True)
+        self.assertEqual(result.data["plan"]["statefile_configured"], True)
+        self.assertEqual(result.data["plan"]["statefile_check_included"], True)
+        self.assertEqual(result.data["plan"]["statefile_check_status"], "valid")
+        self.assertEqual(result.data["plan"]["statefile_schema_valid"], True)
+        self.assertEqual(result.data["plan"]["statefile_provider_id_matches"], True)
+        self.assertEqual(result.data["plan"]["statefile_stale"], True)
+        self.assertEqual(result.data["plan"]["statefile_diagnostics"]["check_status"], "valid")
+        self.assertEqual(result.data["plan"]["statefile_diagnostics"]["control_allowed"], False)
+        self.assertEqual(result.data["plan"]["dispatch_executed"], False)
+        self.assertEqual(result.data["plan"]["control_allowed"], False)
+        self.assertEqual(result.data["plan"]["supervision_status"], "not_supervised")
+        self.assertIn("lifecycle_controller", result.data["plan"]["required_capabilities"])
+        self.assertEqual(result.data["plan"]["boundary"], "read_only_lifecycle_plan; no_control_dispatch")
+        self.assertTrue(lifecycle_state_file_exists_after_call)
+        mocked_serve.assert_not_called()
+        mocked_probe.assert_not_called()
+        mocked_watch_status_probe.assert_not_called()
+        mocked_watch_events_probe.assert_not_called()
+        mocked_watch_stream_probe.assert_not_called()
+
+    def test_handle_provider_replay_lifecycle_plan_excludes_statefile_check_by_default(self) -> None:
+        parser = build_parser()
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "provider-replay.json"
+            lifecycle_state_file = Path(temp_dir) / "provider-replay.state.json"
             config_path.write_text(
                 json.dumps(
                     {
@@ -2410,41 +2522,33 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
             args = parser.parse_args(
                 ["provider-replay", "lifecycle-plan", "--config", str(config_path), "--operation", "stop"]
             )
-            with (
-                patch("tdxquant.cli.serve_provider_transport_replay") as mocked_serve,
-                patch("tdxquant.cli.probe_provider_transport_replay_health") as mocked_probe,
-                patch("tdxquant.cli.probe_provider_transport_replay_watch_status") as mocked_watch_status_probe,
-                patch("tdxquant.cli.probe_provider_transport_replay_watch_events") as mocked_watch_events_probe,
-                patch("tdxquant.cli.probe_provider_transport_replay_watch_stream") as mocked_watch_stream_probe,
-            ):
+            with patch("tdxquant.cli.check_provider_replay_lifecycle_statefile") as mocked_statefile_check:
                 result = _handle_provider_replay_subcommand(args)
 
         self.assertTrue(result.ok)
-        self.assertEqual(result.data["plan"]["execution_mode"], "non_executing_lifecycle_plan")
-        self.assertEqual(result.data["plan"]["operation"], "stop")
-        self.assertEqual(result.data["plan"]["operation_status"], "blocked")
-        self.assertEqual(result.data["plan"]["implemented"], False)
-        self.assertEqual(result.data["plan"]["dispatch_executed"], False)
-        self.assertEqual(result.data["plan"]["control_allowed"], False)
-        self.assertEqual(result.data["plan"]["lifecycle_control_status"], "unsupported")
-        self.assertEqual(result.data["plan"]["blocking_reason"], "lifecycle_control_not_implemented")
-        self.assertEqual(result.data["plan"]["ownership_required"], True)
-        self.assertEqual(result.data["plan"]["operator_action_required"], True)
         self.assertEqual(result.data["plan"]["statefile_configured"], True)
-        self.assertEqual(result.data["plan"]["supervision_status"], "not_supervised")
-        self.assertIn("lifecycle_controller", result.data["plan"]["required_capabilities"])
-        self.assertEqual(result.data["plan"]["boundary"], "read_only_lifecycle_plan; no_control_dispatch")
-        self.assertFalse(lifecycle_state_file.exists())
-        mocked_serve.assert_not_called()
-        mocked_probe.assert_not_called()
-        mocked_watch_status_probe.assert_not_called()
-        mocked_watch_events_probe.assert_not_called()
-        mocked_watch_stream_probe.assert_not_called()
+        self.assertEqual(result.data["plan"]["statefile_check_included"], False)
+        self.assertIsNone(result.data["plan"]["statefile_check_status"])
+        self.assertIsNone(result.data["plan"]["statefile_diagnostics"])
+        mocked_statefile_check.assert_not_called()
 
     def test_handle_provider_replay_lifecycle_plan_summary_reports_blocked_restart(self) -> None:
         parser = build_parser()
         with TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "provider-replay.json"
+            state_path = Path(temp_dir) / "provider-replay.state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.provider_replay.lifecycle_state.v1",
+                        "provider_id": "provider-replay-a",
+                        "pid": 12345,
+                        "state": "running",
+                        "updated_at": "2000-01-01T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
             config_path.write_text(
                 json.dumps(
                     {
@@ -2454,6 +2558,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                         "token": "secret",
                         "master_allowlist": ["127.0.0.1"],
                         "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(state_path),
                     }
                 ),
                 encoding="utf-8",
@@ -2466,6 +2571,9 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                     str(config_path),
                     "--operation",
                     "restart",
+                    "--include-statefile-check",
+                    "--stale-after-seconds",
+                    "60",
                     "--view",
                     "summary",
                 ]
@@ -2481,7 +2589,12 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["summary_view"]["control_allowed"], False)
         self.assertEqual(result.data["summary_view"]["lifecycle_control_status"], "unsupported")
         self.assertEqual(result.data["summary_view"]["blocking_reason"], "lifecycle_control_not_implemented")
-        self.assertEqual(result.data["summary_view"]["statefile_configured"], False)
+        self.assertEqual(result.data["summary_view"]["statefile_configured"], True)
+        self.assertEqual(result.data["summary_view"]["statefile_check_included"], True)
+        self.assertEqual(result.data["summary_view"]["statefile_check_status"], "valid")
+        self.assertEqual(result.data["summary_view"]["statefile_schema_valid"], True)
+        self.assertEqual(result.data["summary_view"]["statefile_provider_id_matches"], True)
+        self.assertEqual(result.data["summary_view"]["statefile_stale"], True)
         self.assertEqual(result.data["summary_view"]["supervision_status"], "not_supervised")
         self.assertEqual(result.data["summary_view"]["boundary"], "read_only_lifecycle_plan; no_control_dispatch")
 
