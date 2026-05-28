@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import unittest
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -11,6 +12,7 @@ from tdxquant.provider_transport_replay import (
     ProviderTransportReplayConfig,
     ProviderTransportReplayHTTPServer,
     build_provider_transport_replay_status,
+    load_provider_transport_replay_config,
     probe_provider_transport_replay_health,
     probe_provider_transport_replay_watch_events,
     probe_provider_transport_replay_watch_stream,
@@ -362,10 +364,68 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
                 "boundary": "read_only_supervision_status; no_supervisor_loop",
             },
         )
+        self.assertEqual(
+            status["lifecycle"]["statefile_summary"],
+            {
+                "statefile_status": "not_configured",
+                "configured": False,
+                "path_provided": False,
+                "read_attempted": False,
+                "write_attempted": False,
+                "present": None,
+                "stale": None,
+                "ownership_source": "not_available",
+                "control_allowed": False,
+                "blocked": True,
+                "blocking_reason": "lifecycle_control_not_implemented",
+                "boundary": "read_only_statefile_config_boundary; no_statefile_io",
+            },
+        )
         self.assertEqual(status["capabilities"]["read_only"], True)
         self.assertEqual(status["capabilities"]["writes_supported"], False)
         self.assertIn("/provider/v1/replay/watch/events/stream", status["capabilities"]["endpoints"])
         self.assertIn("no daemon start/stop lifecycle management", status["boundaries"])
+
+    def test_configured_lifecycle_statefile_is_reported_without_filesystem_io(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = f"{temp_dir}/provider-replay.json"
+            lifecycle_state_file = f"{temp_dir}/provider-replay.state.json"
+            with open(config_path, "w", encoding="utf-8") as fh:
+                json.dump(
+                    {
+                        "provider_id": "provider-replay-a",
+                        "bind_host": "127.0.0.1",
+                        "port": 0,
+                        "token": "secret-token",
+                        "master_allowlist": ["127.0.0.1"],
+                        "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": lifecycle_state_file,
+                    },
+                    fh,
+                )
+
+            config = load_provider_transport_replay_config(config_path)
+            status = build_provider_transport_replay_status(config)
+
+            self.assertEqual(config.lifecycle_state_file, lifecycle_state_file)
+            self.assertEqual(
+                status["lifecycle"]["statefile_summary"],
+                {
+                    "statefile_status": "configured_not_inspected",
+                    "configured": True,
+                    "path_provided": True,
+                    "read_attempted": False,
+                    "write_attempted": False,
+                    "present": None,
+                    "stale": None,
+                    "ownership_source": "not_available",
+                    "control_allowed": False,
+                    "blocked": True,
+                    "blocking_reason": "lifecycle_control_not_implemented",
+                    "boundary": "read_only_statefile_config_boundary; no_statefile_io",
+                },
+            )
+            self.assertFalse(Path(lifecycle_state_file).exists())
 
     def test_status_can_include_explicit_replay_health_probe(self) -> None:
         server = ProviderTransportReplayHTTPServer(

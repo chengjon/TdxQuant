@@ -2268,6 +2268,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         parser = build_parser()
         with TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "provider-replay.json"
+            lifecycle_state_file = Path(temp_dir) / "provider-replay.state.json"
             config_path.write_text(
                 json.dumps(
                     {
@@ -2277,6 +2278,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                         "token": "secret",
                         "master_allowlist": ["127.0.0.1"],
                         "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(lifecycle_state_file),
                     }
                 ),
                 encoding="utf-8",
@@ -2297,6 +2299,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         parser = build_parser()
         with TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "provider-replay.json"
+            lifecycle_state_file = Path(temp_dir) / "provider-replay.state.json"
             config_path.write_text(
                 json.dumps(
                     {
@@ -2306,6 +2309,7 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
                         "token": "secret",
                         "master_allowlist": ["127.0.0.1"],
                         "replay_fixture": "market-snapshot-default",
+                        "lifecycle_state_file": str(lifecycle_state_file),
                     }
                 ),
                 encoding="utf-8",
@@ -2325,19 +2329,25 @@ class ProviderReplayCliDispatchTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.data["config"]["provider_id"], "provider-replay-a")
         self.assertNotIn("token", result.data["config"])
+        self.assertEqual(result.data["config"]["lifecycle_state_file_provided"], True)
         self.assertEqual(result.data["summary_view"]["mode"], "config-check")
         self.assertEqual(result.data["summary_view"]["provider_id"], "provider-replay-a")
         self.assertEqual(result.data["summary_view"]["bind_host"], "127.0.0.1")
         self.assertEqual(result.data["summary_view"]["port"], 0)
         self.assertEqual(result.data["summary_view"]["master_allowlist_count"], 1)
         self.assertEqual(result.data["summary_view"]["replay_fixture"], "market-snapshot-default")
+        self.assertEqual(result.data["summary_view"]["lifecycle_state_file_provided"], True)
+        self.assertEqual(result.data["summary_view"]["statefile_inspected"], False)
+        self.assertEqual(result.data["summary_view"]["statefile_written"], False)
         self.assertEqual(result.data["summary_view"]["serve_started"], False)
         self.assertEqual(result.data["summary_view"]["probe_requested"], False)
         self.assertEqual(result.data["summary_view"]["daemon_lifecycle_managed"], False)
         self.assertIn("config_validation_only", result.data["summary_view"]["boundaries"])
         self.assertIn("server_not_started", result.data["summary_view"]["boundaries"])
         self.assertIn("probe_not_requested", result.data["summary_view"]["boundaries"])
+        self.assertIn("statefile_not_inspected", result.data["summary_view"]["boundaries"])
         self.assertIn("daemon_lifecycle_not_managed", result.data["summary_view"]["boundaries"])
+        self.assertFalse(lifecycle_state_file.exists())
         mocked_serve.assert_not_called()
         mocked_probe.assert_not_called()
         mocked_watch_status_probe.assert_not_called()

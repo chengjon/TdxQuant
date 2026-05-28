@@ -47,6 +47,7 @@ class ProviderTransportReplayConfig:
     master_allowlist: list[str]
     replay_fixture: str | None = None
     replay_fixture_path: str | None = None
+    lifecycle_state_file: str | None = None
 
     def __post_init__(self) -> None:
         if not self.provider_id.strip():
@@ -72,6 +73,7 @@ def build_provider_transport_replay_status(
         source_kind = "built_in_fixture"
 
     master_allowlist = list(config.master_allowlist or [])
+    lifecycle_state_file_configured = bool(config.lifecycle_state_file)
     resolved_health_probe = _normalize_provider_replay_health_probe(health_probe)
     resolved_watch_status_probe = _normalize_provider_replay_watch_status_probe(watch_status_probe)
     resolved_watch_events_probe = _normalize_provider_replay_watch_events_probe(watch_events_probe)
@@ -199,6 +201,22 @@ def build_provider_transport_replay_status(
                 "blocked": True,
                 "blocking_reason": "lifecycle_control_not_implemented",
                 "boundary": "read_only_backoff_status; no_supervised_restart",
+            },
+            "statefile_summary": {
+                "statefile_status": (
+                    "configured_not_inspected" if lifecycle_state_file_configured else "not_configured"
+                ),
+                "configured": lifecycle_state_file_configured,
+                "path_provided": lifecycle_state_file_configured,
+                "read_attempted": False,
+                "write_attempted": False,
+                "present": None,
+                "stale": None,
+                "ownership_source": "not_available",
+                "control_allowed": False,
+                "blocked": True,
+                "blocking_reason": "lifecycle_control_not_implemented",
+                "boundary": "read_only_statefile_config_boundary; no_statefile_io",
             },
             "supervision_summary": {
                 "supervision_status": "not_supervised",
@@ -1556,4 +1574,7 @@ def load_provider_transport_replay_config(config_path: str | Path) -> ProviderTr
         master_allowlist=[str(item) for item in payload.get("master_allowlist") or []],
         replay_fixture=str(payload["replay_fixture"]) if payload.get("replay_fixture") is not None else None,
         replay_fixture_path=str(payload["replay_fixture_path"]) if payload.get("replay_fixture_path") is not None else None,
+        lifecycle_state_file=(
+            str(payload["lifecycle_state_file"]) if payload.get("lifecycle_state_file") is not None else None
+        ),
     )

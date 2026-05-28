@@ -5868,6 +5868,7 @@ def _provider_replay_config_summary(config: object) -> dict[str, object]:
         "master_allowlist_count": len(master_allowlist),
         "replay_fixture": getattr(config, "replay_fixture", None),
         "replay_fixture_path": getattr(config, "replay_fixture_path", None),
+        "lifecycle_state_file_provided": bool(getattr(config, "lifecycle_state_file", None)),
     }
 
 
@@ -5880,6 +5881,9 @@ def _build_provider_replay_config_check_summary_view(config_summary: dict[str, o
         "master_allowlist_count": config_summary.get("master_allowlist_count"),
         "replay_fixture": config_summary.get("replay_fixture"),
         "replay_fixture_path": config_summary.get("replay_fixture_path"),
+        "lifecycle_state_file_provided": config_summary.get("lifecycle_state_file_provided"),
+        "statefile_inspected": False,
+        "statefile_written": False,
         "serve_started": False,
         "probe_requested": False,
         "daemon_lifecycle_managed": False,
@@ -5887,6 +5891,7 @@ def _build_provider_replay_config_check_summary_view(config_summary: dict[str, o
             "config_validation_only",
             "server_not_started",
             "probe_not_requested",
+            "statefile_not_inspected",
             "daemon_lifecycle_not_managed",
         ],
     }
