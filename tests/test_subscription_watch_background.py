@@ -1560,6 +1560,65 @@ def test_supervisor_daemon_status_reports_running_owned_pid_read_only(
     restart.assert_not_called()
 
 
+def test_status_includes_compact_supervisor_daemon_read_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller.paths.root_dir.mkdir(parents=True, exist_ok=True)
+    controller.paths.supervisor_pid_path.write_text("4321\n", encoding="utf-8")
+    controller.paths.supervisor_state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                "state": "running",
+                "pid": 4321,
+                "owner_token": "owner-1",
+                "generation": 1,
+                "settings": {"max_ticks": 2, "interval_seconds": 0.5, "loop_sleep_seconds": 3.0},
+                "boundary": "explicit_supervisor_daemon_lifecycle;does_not_enable_default_policy",
+            }
+        ),
+        encoding="utf-8",
+    )
+    before = controller.paths.supervisor_state_path.read_text(encoding="utf-8")
+    tick = Mock()
+    run = Mock()
+    start = Mock()
+    stop = Mock()
+    restart = Mock()
+    monkeypatch.setattr(controller, "_pid_is_alive", lambda pid: pid == 4321)
+    monkeypatch.setattr(controller, "supervisor_tick", tick)
+    monkeypatch.setattr(controller, "supervisor_run", run)
+    monkeypatch.setattr(controller, "start", start)
+    monkeypatch.setattr(controller, "stop", stop)
+    monkeypatch.setattr(controller, "restart", restart)
+
+    result = controller.status()
+
+    assert result["supervisor_daemon"] == {
+        "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+        "daemon_status": "running",
+        "state": "running",
+        "statefile_exists": True,
+        "statefile_valid": True,
+        "pidfile_exists": True,
+        "pid": 4321,
+        "process_running": True,
+        "has_owner_token": True,
+        "generation": 1,
+        "control_allowed": True,
+        "boundary": "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+    }
+    assert "owner_token" not in result["supervisor_daemon"]
+    assert "settings" not in result["supervisor_daemon"]
+    assert controller.paths.supervisor_state_path.read_text(encoding="utf-8") == before
+    tick.assert_not_called()
+    run.assert_not_called()
+    start.assert_not_called()
+    stop.assert_not_called()
+    restart.assert_not_called()
+
+
 def test_supervisor_daemon_stop_requires_owner_and_writes_stopping_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

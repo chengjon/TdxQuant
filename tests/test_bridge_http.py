@@ -1489,6 +1489,144 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertNotIn("control", payload["result"])
         self.assertNotIn("watch_status", payload["result"])
 
+    def test_watch_status_summary_view_projects_supervisor_daemon_status(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {"state": "running", "run_id": "run-001"},
+                "supervisor_daemon": {
+                    "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                    "daemon_status": "running",
+                    "state": "running",
+                    "statefile_exists": True,
+                    "statefile_valid": True,
+                    "pidfile_exists": True,
+                    "pid": 4321,
+                    "process_running": True,
+                    "owner_token": "owner-1",
+                    "generation": 1,
+                    "settings": {"max_ticks": 2, "interval_seconds": 0.5, "loop_sleep_seconds": 3.0},
+                    "control_allowed": True,
+                    "boundary": "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+                },
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "overall_status": "running",
+                    "control_rollup": {"control_state": "running", "control_active": True},
+                    "consistency_rollup": {"has_mismatch": False},
+                    "governance": {
+                        "requires_manual_review": False,
+                        "staleness_evaluated": False,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=summary", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(
+            payload["result"]["supervisor_daemon"],
+            {
+                "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                "daemon_status": "running",
+                "state": "running",
+                "statefile_exists": True,
+                "statefile_valid": True,
+                "pidfile_exists": True,
+                "pid": 4321,
+                "process_running": True,
+                "has_owner_token": True,
+                "generation": 1,
+                "control_allowed": True,
+                "boundary": "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+            },
+        )
+        self.assertNotIn("owner_token", payload["result"]["supervisor_daemon"])
+        self.assertNotIn("settings", payload["result"]["supervisor_daemon"])
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+
+    def test_watch_status_diagnostics_view_projects_supervisor_daemon_status(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {"state": "running", "run_id": "run-001"},
+                "supervisor_daemon": {
+                    "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                    "daemon_status": "not_running",
+                    "state": "running",
+                    "statefile_exists": True,
+                    "statefile_valid": True,
+                    "pidfile_exists": True,
+                    "pid": 4321,
+                    "process_running": False,
+                    "owner_token": "owner-1",
+                    "generation": 2,
+                    "settings": {"max_ticks": 2},
+                    "control_allowed": False,
+                    "boundary": "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+                },
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "control_rollup": {"control_state": "running", "control_active": True},
+                    "consistency_rollup": {"has_mismatch": False},
+                    "governance": {
+                        "requires_manual_review": False,
+                        "staleness_evaluated": False,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=diagnostics", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        expected = {
+            "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+            "daemon_status": "not_running",
+            "state": "running",
+            "statefile_exists": True,
+            "statefile_valid": True,
+            "pidfile_exists": True,
+            "pid": 4321,
+            "process_running": False,
+            "has_owner_token": True,
+            "generation": 2,
+            "control_allowed": False,
+            "boundary": "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+        }
+        self.assertEqual(payload["result"]["supervisor_daemon"], expected)
+        self.assertEqual(payload["result"]["diagnostics"]["supervisor_daemon"], expected)
+        self.assertNotIn("owner_token", payload["result"]["diagnostics"]["supervisor_daemon"])
+        self.assertNotIn("settings", payload["result"]["diagnostics"]["supervisor_daemon"])
+
     def test_watch_status_diagnostics_view_projects_supervisor_run_observation(self) -> None:
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()

@@ -59,6 +59,34 @@ SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
 )
 
 
+def build_supervisor_daemon_status_projection(payload: dict[str, Any] | None) -> dict[str, Any]:
+    resolved = payload if isinstance(payload, dict) else {}
+    if not resolved:
+        return {}
+    projected: dict[str, Any] = {}
+    for key in (
+        "schema_version",
+        "daemon_status",
+        "state",
+        "statefile_exists",
+        "statefile_valid",
+        "pidfile_exists",
+        "pid",
+        "process_running",
+        "generation",
+        "control_allowed",
+        "boundary",
+    ):
+        if key in resolved:
+            projected[key] = copy.deepcopy(resolved[key])
+    if "has_owner_token" in resolved:
+        projected["has_owner_token"] = bool(resolved.get("has_owner_token"))
+    elif "owner_token" in resolved:
+        owner_token = resolved.get("owner_token")
+        projected["has_owner_token"] = bool(owner_token)
+    return projected
+
+
 def build_subscription_watch_status_summary(
     *,
     control: dict[str, Any] | None,
@@ -2494,6 +2522,9 @@ class SubscriptionWatchBackgroundController:
         if resolved_run_id is not None:
             run_paths = build_subscription_watch_run_paths(self.paths.root_dir, run_id=resolved_run_id)
             watch_status = _read_json_file(run_paths.status_path)
+        supervisor_daemon = build_supervisor_daemon_status_projection(
+            dict(self.supervisor_daemon_status().get("result") or {})
+        )
         return {
             "control": control,
             "watch_status": watch_status,
@@ -2506,6 +2537,7 @@ class SubscriptionWatchBackgroundController:
                 now_utc=now_utc,
             ),
             "statefile_ownership": statefile_ownership,
+            "supervisor_daemon": supervisor_daemon,
         }
 
     def list_runs(self) -> dict[str, Any]:

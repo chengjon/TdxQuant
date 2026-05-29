@@ -30,6 +30,8 @@ def build_subscription_watch_status_diagnostics(
     supervisor_tick_observation = _build_supervisor_tick_observation_diagnostics(status_payload)
     restart_backoff = _build_restart_backoff_diagnostics(status_payload)
     statefile_ownership = _build_statefile_ownership_diagnostics(status_payload)
+    supervisor_daemon = summary_view.get("supervisor_daemon")
+    supervisor_daemon = supervisor_daemon if isinstance(supervisor_daemon, dict) else None
 
     diagnostics = {
         "has_control_rollup": bool(control_rollup),
@@ -55,6 +57,8 @@ def build_subscription_watch_status_diagnostics(
         diagnostics["supervisor_tick_observation"] = supervisor_tick_observation
     if statefile_ownership is not None:
         diagnostics["statefile_ownership"] = statefile_ownership
+    if supervisor_daemon is not None:
+        diagnostics["supervisor_daemon"] = dict(supervisor_daemon)
     return diagnostics
 
 

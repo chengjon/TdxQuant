@@ -14,6 +14,7 @@ from uuid import uuid4
 from .subscription_watch_background import (
     SubscriptionWatchBackgroundController,
     build_background_paths,
+    build_supervisor_daemon_status_projection,
 )
 from .subscription_watch_status_diagnostics import build_subscription_watch_status_diagnostics
 
@@ -95,6 +96,10 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
     runtime_view = build_bridge_watch_status_runtime_view(result)
     if runtime_view:
         summary_view["runtime"] = runtime_view
+
+    supervisor_daemon_view = build_supervisor_daemon_status_projection(result.get("supervisor_daemon"))
+    if supervisor_daemon_view:
+        summary_view["supervisor_daemon"] = supervisor_daemon_view
 
     if status_summary:
         status_view: dict[str, Any] = {}
