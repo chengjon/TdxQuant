@@ -514,7 +514,18 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()
             controller.status_result = {
-                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "control": {
+                    "state": "running",
+                    "active": True,
+                    "run_id": "run-001",
+                    "pid": 1234,
+                    "start_request": {
+                        "stock_list": ["600519.SH", "000001.SZ"],
+                        "max_events": 10,
+                        "max_seconds": 30.0,
+                        "poll_interval": 0.5,
+                    },
+                },
                 "watch_status": {"state": "running", "run_id": "run-001", "event_count": 3},
                 "status_summary": {
                     "schema_version": "tdx.subscription_watch.status_summary.v1",
@@ -943,7 +954,18 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()
             controller.status_result = {
-                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "control": {
+                    "state": "running",
+                    "active": True,
+                    "run_id": "run-001",
+                    "pid": 1234,
+                    "start_request": {
+                        "stock_list": ["600519.SH", "000001.SZ"],
+                        "max_events": 10,
+                        "max_seconds": 30.0,
+                        "poll_interval": 0.5,
+                    },
+                },
                 "watch_status": {"state": "degraded", "run_id": "run-002", "event_count": 3},
                 "status_summary": {
                     "schema_version": "tdx.subscription_watch.status_summary.v1",
@@ -1033,6 +1055,19 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "has_stale_component": True,
                 "has_not_evaluated_component": True,
                 "all_components_evaluated": False,
+                "restartability": {
+                    "ready": True,
+                    "decision": "ready",
+                    "reason_codes": [],
+                    "has_start_request": True,
+                    "start_request_summary": {
+                        "stock_count": 2,
+                        "has_max_events": True,
+                        "has_max_seconds": True,
+                        "has_poll_interval": True,
+                    },
+                    "boundary": "read_only;does_not_stop_start_or_schedule_restart",
+                },
                 "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
             },
         )
@@ -1049,6 +1084,51 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                     "reconnect_stale_after_seconds": None,
                 }
             ],
+        )
+
+    def test_watch_status_diagnostics_view_projects_blocked_restartability_reason(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {"state": "running", "run_id": "run-001"},
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "control_rollup": {"control_state": "running", "control_active": True},
+                    "consistency_rollup": {"has_mismatch": False},
+                    "governance": {
+                        "requires_manual_review": False,
+                        "staleness_evaluated": False,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=diagnostics", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(
+            payload["result"]["diagnostics"]["restartability"],
+            {
+                "ready": False,
+                "decision": "blocked",
+                "reason_codes": ["MISSING_START_REQUEST"],
+                "has_start_request": False,
+                "start_request_summary": None,
+                "boundary": "read_only;does_not_stop_start_or_schedule_restart",
+            },
         )
 
     def test_watch_status_summary_view_rejects_unknown_view(self) -> None:

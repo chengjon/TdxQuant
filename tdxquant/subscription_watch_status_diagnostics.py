@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 
-def build_subscription_watch_status_diagnostics(summary_view: dict[str, Any]) -> dict[str, Any]:
+RESTARTABILITY_BOUNDARY = "read_only;does_not_stop_start_or_schedule_restart"
+
+
+def build_subscription_watch_status_diagnostics(
+    summary_view: dict[str, Any], *, status_payload: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Build compact diagnostics flags from the existing watch-status summary view."""
     status_summary = summary_view.get("status_summary")
     status_summary = status_summary if isinstance(status_summary, dict) else {}
@@ -18,6 +23,7 @@ def build_subscription_watch_status_diagnostics(summary_view: dict[str, Any]) ->
     reconnect_rollup = reconnect_rollup if isinstance(reconnect_rollup, dict) else {}
     evaluation_rollup = governance.get("evaluation_summary")
     evaluation_rollup = evaluation_rollup if isinstance(evaluation_rollup, dict) else {}
+    restartability = _build_restartability_diagnostics(status_payload)
 
     return {
         "has_control_rollup": bool(control_rollup),
@@ -32,5 +38,63 @@ def build_subscription_watch_status_diagnostics(summary_view: dict[str, Any]) ->
         "has_stale_component": bool(evaluation_rollup.get("has_stale_component")),
         "has_not_evaluated_component": bool(evaluation_rollup.get("has_not_evaluated_component")),
         "all_components_evaluated": bool(evaluation_rollup.get("all_components_evaluated")),
+        "restartability": restartability,
         "boundary": governance.get("boundary"),
     }
+
+
+def _build_restartability_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any]:
+    payload = status_payload if isinstance(status_payload, dict) else {}
+    control = payload.get("control")
+    control = control if isinstance(control, dict) else {}
+    state = control.get("state")
+    active = bool(control.get("active")) and state in {"starting", "running", "reconnecting", "degraded", "stopping"}
+    start_request = control.get("start_request")
+    reason_codes: list[str] = []
+    if not active:
+        reason_codes.append("NO_ACTIVE_RUN")
+    elif not isinstance(start_request, dict):
+        reason_codes.append("MISSING_START_REQUEST")
+    elif not _restartability_start_request_valid(start_request):
+        reason_codes.append("INVALID_START_REQUEST")
+    ready = not reason_codes
+    return {
+        "ready": ready,
+        "decision": "ready" if ready else "blocked",
+        "reason_codes": reason_codes,
+        "has_start_request": isinstance(start_request, dict),
+        "start_request_summary": _restartability_start_request_summary(start_request),
+        "boundary": RESTARTABILITY_BOUNDARY,
+    }
+
+
+def _restartability_start_request_summary(start_request: Any) -> dict[str, Any] | None:
+    if not isinstance(start_request, dict):
+        return None
+    stock_list = start_request.get("stock_list")
+    return {
+        "stock_count": len(stock_list) if isinstance(stock_list, list) else 0,
+        "has_max_events": start_request.get("max_events") is not None,
+        "has_max_seconds": start_request.get("max_seconds") is not None,
+        "has_poll_interval": start_request.get("poll_interval") is not None,
+    }
+
+
+def _restartability_start_request_valid(start_request: dict[str, Any]) -> bool:
+    stock_list = start_request.get("stock_list")
+    max_events = start_request.get("max_events")
+    max_seconds = start_request.get("max_seconds")
+    poll_interval = start_request.get("poll_interval")
+    if not isinstance(stock_list, list) or not stock_list or not all(isinstance(item, str) for item in stock_list):
+        return False
+    if max_events is not None and (isinstance(max_events, bool) or not isinstance(max_events, int) or max_events <= 0):
+        return False
+    if max_seconds is not None and (
+        isinstance(max_seconds, bool) or not isinstance(max_seconds, (int, float)) or max_seconds <= 0
+    ):
+        return False
+    if poll_interval is not None and (
+        isinstance(poll_interval, bool) or not isinstance(poll_interval, (int, float)) or poll_interval < 0
+    ):
+        return False
+    return True

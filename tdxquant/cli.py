@@ -6854,12 +6854,16 @@ def _build_bridge_watch_status_diagnostics_payload(payload: dict[str, object], *
     if not diagnostics_payload.get("ok"):
         return diagnostics_payload
     result = diagnostics_payload.get("result")
+    detailed_result = payload.get("result")
     if not isinstance(result, dict):
         return diagnostics_payload
 
     result = copy.deepcopy(result)
     result["mode"] = "diagnostics"
-    result["diagnostics"] = build_subscription_watch_status_diagnostics(result)
+    result["diagnostics"] = build_subscription_watch_status_diagnostics(
+        result,
+        status_payload=detailed_result if isinstance(detailed_result, dict) else None,
+    )
     return {"ok": True, "result": result}
 
 

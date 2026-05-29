@@ -235,7 +235,10 @@ def build_bridge_watch_status_diagnostics_result(result: dict[str, Any], *, work
     diagnostics_view = build_bridge_watch_status_summary_result(result, worker_id=worker_id)
     diagnostics_view = copy.deepcopy(diagnostics_view)
     diagnostics_view["mode"] = "diagnostics"
-    diagnostics_view["diagnostics"] = build_subscription_watch_status_diagnostics(diagnostics_view)
+    diagnostics_view["diagnostics"] = build_subscription_watch_status_diagnostics(
+        diagnostics_view,
+        status_payload=result,
+    )
     return diagnostics_view
 
 

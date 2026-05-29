@@ -11270,7 +11270,18 @@ class ReportCliDispatchTests(unittest.TestCase):
             "ok": True,
             "result": {
                 "status": "running",
-                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "control": {
+                    "state": "running",
+                    "active": True,
+                    "run_id": "run-001",
+                    "pid": 1234,
+                    "start_request": {
+                        "stock_list": ["600519.SH", "000001.SZ"],
+                        "max_events": 10,
+                        "max_seconds": 30.0,
+                        "poll_interval": 0.5,
+                    },
+                },
                 "watch_status": {"state": "degraded", "run_id": "run-002"},
                 "status_summary": {
                     "schema_version": "tdx.subscription_watch.status_summary.v1",
@@ -11358,6 +11369,19 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "has_stale_component": True,
                 "has_not_evaluated_component": True,
                 "all_components_evaluated": False,
+                "restartability": {
+                    "ready": True,
+                    "decision": "ready",
+                    "reason_codes": [],
+                    "has_start_request": True,
+                    "start_request_summary": {
+                        "stock_count": 2,
+                        "has_max_events": True,
+                        "has_max_seconds": True,
+                        "has_poll_interval": True,
+                    },
+                    "boundary": "read_only;does_not_stop_start_or_schedule_restart",
+                },
                 "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
             },
         )
