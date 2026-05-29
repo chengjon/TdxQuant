@@ -2520,6 +2520,11 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.entry, "turbo-buy")
         self.assertEqual(args.code, "000001")
 
+    def test_catalog_run_rejects_side_override(self) -> None:
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["catalog", "run", "--entry", "submit-once", "--side", "sell"])
+
     def test_catalog_bundle_run_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "run", "--bundle", "guarded-review-buy", "--code", "000001"])
@@ -7511,6 +7516,70 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(boundary["missing_input_count"], 3)
         self.assertEqual(boundary["input_coverage_status"], "missing_required_inputs")
         self.assertEqual(boundary["dispatch_executed"], False)
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_direct_submit_once_summary_accepts_side_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--entry",
+                "submit-once",
+                "--side",
+                "sell",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--view",
+                "summary",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        boundary = output_payload["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "submit-once")
+        self.assertEqual(boundary["side"], "sell")
+        self.assertEqual(boundary["provided_input_fields"], ["side", "port", "code", "price", "quantity"])
+        self.assertEqual(boundary["missing_input_fields"], [])
+        self.assertEqual(output_payload["constraints"]["dispatch_executed"], False)
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_preview_task_submit_once_summary_accepts_side_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "preview",
+                "--entry",
+                "task-submit-once",
+                "--side",
+                "sell",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--view",
+                "summary",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        boundary = output_payload["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "trade-submit-once")
+        self.assertEqual(boundary["side"], "sell")
+        self.assertEqual(boundary["provided_input_fields"], ["side", "port", "code", "price", "quantity"])
+        self.assertEqual(boundary["missing_input_fields"], [])
+        self.assertEqual(output_payload["constraints"]["dispatch_executed"], False)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_trade_health_summary_exposes_readiness_boundary(self) -> None:

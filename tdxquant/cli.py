@@ -587,7 +587,7 @@ def _add_trade_period_report_arguments(subparser: argparse.ArgumentParser) -> No
     subparser.add_argument("--csv-output-path")
 
 
-def _add_catalog_run_arguments(subparser: argparse.ArgumentParser) -> None:
+def _add_catalog_run_arguments(subparser: argparse.ArgumentParser, *, include_side: bool = False) -> None:
     subparser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
     subparser.add_argument("--from-step")
     subparser.add_argument("--to-step")
@@ -599,6 +599,8 @@ def _add_catalog_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--port")
     subparser.add_argument("--baudrate", type=int)
     subparser.add_argument("--timeout", type=float)
+    if include_side:
+        subparser.add_argument("--side", choices=["buy", "sell"])
     subparser.add_argument("--block-code")
     subparser.add_argument("--code")
     subparser.add_argument("--price")
@@ -681,13 +683,13 @@ def _build_catalog_parser(subparsers: argparse._SubParsersAction[argparse.Argume
     catalog_plan_filter_group = catalog_plan_parser.add_mutually_exclusive_group(required=True)
     catalog_plan_filter_group.add_argument("--entry")
     catalog_plan_filter_group.add_argument("--bundle")
-    _add_catalog_run_arguments(catalog_plan_parser)
+    _add_catalog_run_arguments(catalog_plan_parser, include_side=True)
 
     catalog_preview_parser = catalog_subparsers.add_parser("preview")
     catalog_preview_filter_group = catalog_preview_parser.add_mutually_exclusive_group(required=True)
     catalog_preview_filter_group.add_argument("--entry")
     catalog_preview_filter_group.add_argument("--bundle")
-    _add_catalog_run_arguments(catalog_preview_parser)
+    _add_catalog_run_arguments(catalog_preview_parser, include_side=True)
 
     return catalog_parser
 
