@@ -7,11 +7,11 @@ TBD - created by archiving change function-tree-registry-validator. Update Purpo
 
 The repository SHALL maintain `FUNCTION_TREE.md` as a single feature registry whose rows explicitly separate status, evidence, and boundary.
 
-#### Scenario: D-07 read-only catalog plan and preview evidence stays bounded
+#### Scenario: D-08 read-only submit-once task plan and preview evidence stays bounded
 
-- **WHEN** D-07 cites PingAn task buy/sell/confirm-current catalog plan and preview boundary evidence
-- **THEN** D-07 MUST remain explicitly bounded as read-only, non-executing catalog planning evidence
-- **AND** the row MUST NOT imply catalog run execution, direct trade catalog execution, broker readiness, safety approval, or complete desktop exception coverage.
+- **WHEN** D-08 cites submit-once buy/sell task catalog plan and preview boundary evidence
+- **THEN** D-08 MUST remain explicitly bounded as read-only, non-executing catalog planning evidence
+- **AND** the row MUST NOT imply catalog run execution, new desktop primitives, broker readiness, safety approval, or complete desktop exception coverage.
 
 ### Requirement: FUNCTION_TREE registry SHALL validate cited OpenSpec evidence
 
