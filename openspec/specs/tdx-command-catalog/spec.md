@@ -624,19 +624,19 @@ The command catalog SHALL include a compact `step_source_counts` object in bundl
 
 ### Requirement: Command catalog trade plan summary SHALL expose non-execution trade input boundaries
 
-The command catalog plan summary view SHALL expose a non-executing trade boundary for supported trading task entries without dispatching the underlying task, trade, report, or bundle execution.
+The command catalog plan and preview summary views SHALL expose non-executing trade boundaries for supported trading task entries without dispatching the underlying task, trade, report, or bundle execution.
 
-#### Scenario: PingAn task buy plan exposes order input boundary
+#### Scenario: PingAn task buy preview exposes order input boundary
 
-- **WHEN** a maintainer runs `catalog plan --entry task-buy --view summary`
+- **WHEN** a maintainer runs `catalog preview --entry task-buy --view summary`
 - **THEN** the result MUST include `trade_plan_boundary.trade_command` set to `trade-buy`
 - **AND** `execution_mode` MUST be `non_executing_catalog_plan`
 - **AND** `dispatch_executed` MUST be `false`
 - **AND** required/provided/missing input fields and input coverage counts MUST be derived without executing the task.
 
-#### Scenario: PingAn task confirm-current plan exposes confirmation boundary
+#### Scenario: PingAn task confirm-current preview exposes confirmation boundary
 
-- **WHEN** a maintainer runs `catalog plan --entry task-confirm-current --view summary`
+- **WHEN** a maintainer runs `catalog preview --entry task-confirm-current --view summary`
 - **THEN** the result MUST include `trade_plan_boundary.trade_command` set to `trade-confirm-current`
 - **AND** `input_kind` MUST be `confirmation`
 - **AND** `execution_mode` MUST be `non_executing_catalog_plan`
@@ -2381,7 +2381,6 @@ Command catalog bundle plan and preview summaries SHALL prevent top-level submit
 - **WHEN** a caller runs `catalog plan --bundle sell-submit-once-pingan-complete-review --side buy --view summary`
 - **THEN** the first step `trade_plan_boundary.side` MUST remain `sell`
 - **AND** planning MUST NOT execute the submit-once workflow
-
 #### Scenario: Entry side override remains available
 - **WHEN** a caller runs `catalog plan --entry submit-once --side sell --view summary`
 - **THEN** the entry `trade_plan_boundary.side` MUST be `sell`
