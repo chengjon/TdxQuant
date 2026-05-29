@@ -106,6 +106,7 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
         for key in (
             "schema_version",
             "overall_status",
+            "boundary",
             "control_rollup",
             "consistency_rollup",
             "statefile_ownership",

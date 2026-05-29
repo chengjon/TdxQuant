@@ -751,6 +751,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "status_summary": {
                     "schema_version": "tdx.subscription_watch.status_summary.v1",
                     "overall_status": "degraded",
+                    "boundary": "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
                     "control_rollup": {
                         "control_state": "running",
                         "control_active": True,
@@ -978,6 +979,10 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(
             payload["result"]["status_summary"]["schema_version"],
             "tdx.subscription_watch.status_summary.v1",
+        )
+        self.assertEqual(
+            payload["result"]["status_summary"]["boundary"],
+            "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
         )
         self.assertEqual(
             payload["result"]["status_summary"]["control_rollup"],

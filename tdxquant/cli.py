@@ -6801,6 +6801,7 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
         for key in (
             "schema_version",
             "overall_status",
+            "boundary",
             "control_rollup",
             "consistency_rollup",
             "statefile_ownership",

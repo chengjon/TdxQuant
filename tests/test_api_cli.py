@@ -11122,12 +11122,13 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "watch_status": None,
                 "statefile_ownership": ownership,
                 "status_summary": {
-                    "schema_version": "tdx.subscription_watch.status_summary.v1",
-                    "overall_status": "starting",
-                    "statefile_ownership": ownership,
+                        "schema_version": "tdx.subscription_watch.status_summary.v1",
+                        "overall_status": "starting",
+                        "boundary": "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
+                        "statefile_ownership": ownership,
+                    },
                 },
-            },
-        }
+            }
         with (
             patch("tdxquant.cli.run_bridge_watch_status", return_value=detailed_payload) as mocked_run,
             patch("sys.stdout", new_callable=io.StringIO) as stdout,
@@ -11144,6 +11145,10 @@ class ReportCliDispatchTests(unittest.TestCase):
         )
         output = json.loads(stdout.getvalue())
         self.assertEqual(output["result"]["status_summary"]["statefile_ownership"], ownership)
+        self.assertEqual(
+            output["result"]["status_summary"]["boundary"],
+            "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
+        )
         self.assertNotIn("statefile_ownership", output["result"]["runtime"])
 
     def test_handle_bridge_watch_status_summary_view_projects_governance_rollup(self) -> None:
