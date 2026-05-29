@@ -30,6 +30,12 @@ SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION = "tdx.subscription_watch.supe
 SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY = "single_step_only;does_not_run_loop_or_schedule_retry"
 SUBSCRIPTION_WATCH_SUPERVISOR_RUN_SCHEMA_VERSION = "tdx.subscription_watch.supervisor_run.v1"
 SUBSCRIPTION_WATCH_SUPERVISOR_RUN_BOUNDARY = "foreground_bounded_only;does_not_daemonize_or_schedule_background_retry"
+SUBSCRIPTION_WATCH_SUPERVISOR_RUN_OBSERVATION_SCHEMA_VERSION = (
+    "tdx.subscription_watch.supervisor_run_observation.v1"
+)
+SUBSCRIPTION_WATCH_SUPERVISOR_RUN_OBSERVATION_BOUNDARY = (
+    "observation_only;does_not_schedule_supervisor_or_background_retry"
+)
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_SCHEMA_VERSION = "tdx.subscription_watch.statefile_ownership.v1"
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY = (
     "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control"
@@ -1957,22 +1963,21 @@ class SubscriptionWatchBackgroundController:
                 time.sleep(resolved_interval_seconds)
 
         final_tick = tick_summaries[-1]
-        return {
-            "ok": True,
-            "result": {
-                "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_SCHEMA_VERSION,
-                "status": final_tick.get("status"),
-                "final_status": final_tick.get("status"),
-                "final_decision": final_tick.get("decision"),
-                "tick_count": len(tick_summaries),
-                "max_ticks": resolved_max_ticks,
-                "interval_seconds": resolved_interval_seconds,
-                "reason": reason,
-                "action_taken": any(bool(item.get("action_taken")) for item in tick_summaries),
-                "tick_summaries": tick_summaries,
-                "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_BOUNDARY,
-            },
+        result = {
+            "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_SCHEMA_VERSION,
+            "status": final_tick.get("status"),
+            "final_status": final_tick.get("status"),
+            "final_decision": final_tick.get("decision"),
+            "tick_count": len(tick_summaries),
+            "max_ticks": resolved_max_ticks,
+            "interval_seconds": resolved_interval_seconds,
+            "reason": reason,
+            "action_taken": any(bool(item.get("action_taken")) for item in tick_summaries),
+            "tick_summaries": tick_summaries,
+            "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_BOUNDARY,
         }
+        self._persist_supervisor_run_observation(self._build_supervisor_run_observation(result))
+        return {"ok": True, "result": result}
 
     def _build_supervisor_run_tick_summary(
         self,
@@ -2007,6 +2012,55 @@ class SubscriptionWatchBackgroundController:
         summary["error_code"] = error.get("code")
         summary["reason_codes"] = list(details.get("reason_codes") or [])
         return summary
+
+    def _build_supervisor_run_observation(self, result: dict[str, Any]) -> dict[str, Any]:
+        tick_summaries = result.get("tick_summaries")
+        tick_summaries = tick_summaries if isinstance(tick_summaries, list) else []
+        observation: dict[str, Any] = {
+            "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_OBSERVATION_SCHEMA_VERSION,
+            "status": result.get("status"),
+            "final_status": result.get("final_status"),
+            "final_decision": result.get("final_decision"),
+            "tick_count": result.get("tick_count"),
+            "max_ticks": result.get("max_ticks"),
+            "interval_seconds": result.get("interval_seconds"),
+            "reason": result.get("reason"),
+            "action_taken": bool(result.get("action_taken")),
+            "tick_status_counts": self._count_supervisor_run_tick_values(tick_summaries, key="status"),
+            "tick_decision_counts": self._count_supervisor_run_tick_values(tick_summaries, key="decision"),
+            "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_OBSERVATION_BOUNDARY,
+        }
+        for key in ("previous_run_id", "new_run_id"):
+            value = self._last_supervisor_run_tick_value(tick_summaries, key=key)
+            if value is not None:
+                observation[key] = value
+        return observation
+
+    def _count_supervisor_run_tick_values(self, tick_summaries: list[object], *, key: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in tick_summaries:
+            item = item if isinstance(item, dict) else {}
+            value = item.get(key)
+            if not isinstance(value, str) or not value:
+                continue
+            counts[value] = counts.get(value, 0) + 1
+        return counts
+
+    def _last_supervisor_run_tick_value(self, tick_summaries: list[object], *, key: str) -> Any | None:
+        for item in reversed(tick_summaries):
+            item = item if isinstance(item, dict) else {}
+            value = item.get(key)
+            if value is not None:
+                return value
+        return None
+
+    def _persist_supervisor_run_observation(self, observation: dict[str, Any]) -> None:
+        active_payload = read_active_payload(self.paths)
+        if not isinstance(active_payload, dict):
+            return
+        active_payload = dict(active_payload)
+        active_payload["last_supervisor_run_observation"] = copy.deepcopy(observation)
+        self._write_active_state(active_payload)
 
     def status(
         self,

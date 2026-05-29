@@ -1351,6 +1351,79 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertNotIn("control", payload["result"])
         self.assertNotIn("watch_status", payload["result"])
 
+    def test_watch_status_diagnostics_view_projects_supervisor_run_observation(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {
+                    "state": "restart_backoff",
+                    "active": False,
+                    "run_id": "run-001",
+                    "pid": None,
+                    "last_supervisor_run_observation": {
+                        "schema_version": "tdx.subscription_watch.supervisor_run_observation.v1",
+                        "status": "waiting",
+                        "final_status": "waiting",
+                        "final_decision": "wait",
+                        "tick_count": 2,
+                        "max_ticks": 2,
+                        "interval_seconds": 0.0,
+                        "reason": "manual_supervise",
+                        "action_taken": False,
+                        "tick_status_counts": {"waiting": 2},
+                        "tick_decision_counts": {"wait": 2},
+                        "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+                    },
+                },
+                "watch_status": None,
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "control_rollup": {"control_state": "restart_backoff", "control_active": False},
+                    "consistency_rollup": {"has_mismatch": False},
+                    "governance": {
+                        "requires_manual_review": False,
+                        "staleness_evaluated": False,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=diagnostics", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(
+            payload["result"]["diagnostics"]["supervisor_run_observation"],
+            {
+                "schema_version": "tdx.subscription_watch.supervisor_run_observation.v1",
+                "status": "waiting",
+                "final_status": "waiting",
+                "final_decision": "wait",
+                "tick_count": 2,
+                "max_ticks": 2,
+                "interval_seconds": 0.0,
+                "reason": "manual_supervise",
+                "action_taken": False,
+                "tick_status_counts": {"waiting": 2},
+                "tick_decision_counts": {"wait": 2},
+                "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+            },
+        )
+        self.assertNotIn("tick_summaries", payload["result"]["diagnostics"]["supervisor_run_observation"])
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+
     def test_watch_status_summary_view_rejects_unknown_view(self) -> None:
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()

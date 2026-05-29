@@ -26,6 +26,7 @@ def build_subscription_watch_status_diagnostics(
     evaluation_rollup = evaluation_rollup if isinstance(evaluation_rollup, dict) else {}
     restartability = _build_restartability_diagnostics(status_payload)
     restart_observation = _build_restart_observation_diagnostics(status_payload)
+    supervisor_run_observation = _build_supervisor_run_observation_diagnostics(status_payload)
     restart_backoff = _build_restart_backoff_diagnostics(status_payload)
     statefile_ownership = _build_statefile_ownership_diagnostics(status_payload)
 
@@ -47,9 +48,40 @@ def build_subscription_watch_status_diagnostics(
         "restart_backoff": restart_backoff,
         "boundary": governance.get("boundary"),
     }
+    if supervisor_run_observation is not None:
+        diagnostics["supervisor_run_observation"] = supervisor_run_observation
     if statefile_ownership is not None:
         diagnostics["statefile_ownership"] = statefile_ownership
     return diagnostics
+
+
+def _build_supervisor_run_observation_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    payload = status_payload if isinstance(status_payload, dict) else {}
+    control = payload.get("control")
+    control = control if isinstance(control, dict) else {}
+    observation = control.get("last_supervisor_run_observation")
+    if not isinstance(observation, dict):
+        return None
+    compact: dict[str, Any] = {}
+    for key in (
+        "schema_version",
+        "status",
+        "final_status",
+        "final_decision",
+        "tick_count",
+        "max_ticks",
+        "interval_seconds",
+        "reason",
+        "action_taken",
+        "tick_status_counts",
+        "tick_decision_counts",
+        "previous_run_id",
+        "new_run_id",
+        "boundary",
+    ):
+        if key in observation:
+            compact[key] = observation[key]
+    return compact
 
 
 def _build_statefile_ownership_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any] | None:

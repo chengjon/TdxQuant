@@ -1124,6 +1124,148 @@ def test_supervisor_run_rejects_invalid_limits(
     tick.assert_not_called()
 
 
+def test_supervisor_run_persists_compact_wait_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "restart_backoff": {
+                "schema_version": "tdx.subscription_watch.restart_backoff.v1",
+                "status": "active",
+                "reason_codes": ["BACKOFF_ACTIVE"],
+                "previous_run_id": "run-001",
+                "reason": "operator_restart",
+                "created_at": "2026-05-29T00:00:00+00:00",
+                "retry_after_at": "2999-01-01T00:00:00+00:00",
+                "backoff_seconds": 30.0,
+                "start_error_code": "START_FAILED",
+                "start_request_summary": {
+                    "stock_count": 2,
+                    "has_max_events": True,
+                    "has_max_seconds": True,
+                    "has_poll_interval": True,
+                },
+                "boundary": "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor",
+            },
+        }
+    )
+
+    def fake_tick(**kwargs: object) -> dict[str, object]:
+        return {
+            "ok": True,
+            "result": {
+                "status": "waiting",
+                "decision": "wait",
+                "action_taken": False,
+                "reason_codes": ["BACKOFF_ACTIVE"],
+            },
+        }
+
+    monkeypatch.setattr(controller, "supervisor_tick", fake_tick)
+
+    result = controller.supervisor_run(max_ticks=2, interval_seconds=0.0, reason="manual_supervise")
+    persisted = read_active_payload(controller.paths)
+
+    assert result["ok"] is True
+    assert persisted is not None
+    assert persisted["last_supervisor_run_observation"] == {
+        "schema_version": "tdx.subscription_watch.supervisor_run_observation.v1",
+        "status": "waiting",
+        "final_status": "waiting",
+        "final_decision": "wait",
+        "tick_count": 2,
+        "max_ticks": 2,
+        "interval_seconds": 0.0,
+        "reason": "manual_supervise",
+        "action_taken": False,
+        "tick_status_counts": {"waiting": 2},
+        "tick_decision_counts": {"wait": 2},
+        "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+    }
+    assert "tick_summaries" not in persisted["last_supervisor_run_observation"]
+
+
+def test_supervisor_run_persists_recovery_observation_with_handoff_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "restart_backoff": {},
+        }
+    )
+
+    def fake_tick(**kwargs: object) -> dict[str, object]:
+        controller._write_active_state(
+            {
+                "state": "running",
+                "active": True,
+                "run_id": "run-002",
+                "pid": os.getpid(),
+                "reason": None,
+            }
+        )
+        return {
+            "ok": True,
+            "result": {
+                "status": "recovered",
+                "decision": "recovered",
+                "action_taken": True,
+                "reason_codes": [],
+                "previous_run_id": "run-001",
+                "new_run_id": "run-002",
+            },
+        }
+
+    monkeypatch.setattr(controller, "supervisor_tick", fake_tick)
+
+    result = controller.supervisor_run(max_ticks=3, interval_seconds=0.0, reason="manual_supervise")
+    persisted = read_active_payload(controller.paths)
+
+    assert result["ok"] is True
+    assert persisted is not None
+    assert persisted["run_id"] == "run-002"
+    assert persisted["last_supervisor_run_observation"]["status"] == "recovered"
+    assert persisted["last_supervisor_run_observation"]["previous_run_id"] == "run-001"
+    assert persisted["last_supervisor_run_observation"]["new_run_id"] == "run-002"
+    assert persisted["last_supervisor_run_observation"]["tick_status_counts"] == {"recovered": 1}
+    assert persisted["last_supervisor_run_observation"]["tick_decision_counts"] == {"recovered": 1}
+
+
+def test_supervisor_run_noop_without_statefile_does_not_create_observation_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    tick = Mock(
+        return_value={
+            "ok": True,
+            "result": {
+                "status": "noop",
+                "decision": "no_action",
+                "action_taken": False,
+                "reason_codes": ["NO_RESTART_BACKOFF"],
+            },
+        }
+    )
+    monkeypatch.setattr(controller, "supervisor_tick", tick)
+
+    result = controller.supervisor_run(max_ticks=3, interval_seconds=0.0, reason="manual_supervise")
+
+    assert result["ok"] is True
+    assert not controller.paths.active_path.exists()
+
+
 def test_restart_rejects_active_backoff_without_stop_or_start(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
