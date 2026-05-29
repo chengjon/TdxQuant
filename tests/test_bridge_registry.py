@@ -305,6 +305,43 @@ class BridgeRegistryTests(unittest.TestCase):
         self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/supervisor-tick")
         self.assertEqual(mocked_call.call_args.kwargs["body"], {"reason": "manual_tick"})
 
+    def test_run_bridge_watch_supervisor_run_uses_control_route(self) -> None:
+        from tdxquant import bridge_registry
+
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch(
+                "tdxquant.bridge_registry.call_worker",
+                return_value={"ok": True, "result": {"status": "waiting", "tick_count": 3}},
+            ) as mocked_call,
+        ):
+            payload = bridge_registry.run_bridge_watch_supervisor_run(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                max_ticks=3,
+                interval_seconds=0.25,
+                reason="manual_supervise",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"status": "waiting", "tick_count": 3}})
+        self.assertEqual(mocked_call.call_args.kwargs["method"], "POST")
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/supervisor-run")
+        self.assertEqual(
+            mocked_call.call_args.kwargs["body"],
+            {"max_ticks": 3, "interval_seconds": 0.25, "reason": "manual_supervise"},
+        )
+
     def test_run_bridge_health_uses_health_route(self) -> None:
         worker = BridgeWorker(
             worker_id="worker-a",

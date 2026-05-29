@@ -951,6 +951,179 @@ def test_supervisor_tick_noops_without_restart_backoff(
     stop.assert_not_called()
 
 
+def test_supervisor_run_waits_until_max_ticks_without_background_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    tick_calls: list[dict[str, object]] = []
+
+    def fake_tick(**kwargs: object) -> dict[str, object]:
+        tick_calls.append(dict(kwargs))
+        return {
+            "ok": True,
+            "result": {
+                "schema_version": "tdx.subscription_watch.supervisor_tick.v1",
+                "status": "waiting",
+                "decision": "wait",
+                "action_taken": False,
+                "reason_codes": ["BACKOFF_ACTIVE"],
+                "boundary": "single_step_only;does_not_run_loop_or_schedule_retry",
+            },
+        }
+
+    monkeypatch.setattr(controller, "supervisor_tick", fake_tick)
+
+    result = controller.supervisor_run(max_ticks=3, interval_seconds=0.0, reason="manual_supervise")
+
+    assert result == {
+        "ok": True,
+        "result": {
+            "schema_version": "tdx.subscription_watch.supervisor_run.v1",
+            "status": "waiting",
+            "final_status": "waiting",
+            "final_decision": "wait",
+            "tick_count": 3,
+            "max_ticks": 3,
+            "interval_seconds": 0.0,
+            "reason": "manual_supervise",
+            "action_taken": False,
+            "tick_summaries": [
+                {
+                    "index": 1,
+                    "ok": True,
+                    "status": "waiting",
+                    "decision": "wait",
+                    "action_taken": False,
+                    "reason_codes": ["BACKOFF_ACTIVE"],
+                },
+                {
+                    "index": 2,
+                    "ok": True,
+                    "status": "waiting",
+                    "decision": "wait",
+                    "action_taken": False,
+                    "reason_codes": ["BACKOFF_ACTIVE"],
+                },
+                {
+                    "index": 3,
+                    "ok": True,
+                    "status": "waiting",
+                    "decision": "wait",
+                    "action_taken": False,
+                    "reason_codes": ["BACKOFF_ACTIVE"],
+                },
+            ],
+            "boundary": "foreground_bounded_only;does_not_daemonize_or_schedule_background_retry",
+        },
+    }
+    assert tick_calls == [
+        {"reason": "manual_supervise"},
+        {"reason": "manual_supervise"},
+        {"reason": "manual_supervise"},
+    ]
+
+
+def test_supervisor_run_stops_early_after_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    tick_results = [
+        {
+            "ok": True,
+            "result": {
+                "status": "waiting",
+                "decision": "wait",
+                "action_taken": False,
+                "reason_codes": ["BACKOFF_ACTIVE"],
+            },
+        },
+        {
+            "ok": True,
+            "result": {
+                "status": "recovered",
+                "decision": "recovered",
+                "action_taken": True,
+                "reason_codes": [],
+                "previous_run_id": "run-001",
+                "new_run_id": "run-002",
+            },
+        },
+    ]
+    tick_calls: list[dict[str, object]] = []
+
+    def fake_tick(**kwargs: object) -> dict[str, object]:
+        tick_calls.append(dict(kwargs))
+        return tick_results.pop(0)
+
+    monkeypatch.setattr(controller, "supervisor_tick", fake_tick)
+
+    result = controller.supervisor_run(max_ticks=5, interval_seconds=0.0, reason="manual_supervise")
+
+    assert result["ok"] is True
+    assert result["result"]["status"] == "recovered"
+    assert result["result"]["final_status"] == "recovered"
+    assert result["result"]["final_decision"] == "recovered"
+    assert result["result"]["tick_count"] == 2
+    assert result["result"]["action_taken"] is True
+    assert result["result"]["tick_summaries"][-1] == {
+        "index": 2,
+        "ok": True,
+        "status": "recovered",
+        "decision": "recovered",
+        "action_taken": True,
+        "reason_codes": [],
+        "previous_run_id": "run-001",
+        "new_run_id": "run-002",
+    }
+    assert tick_calls == [{"reason": "manual_supervise"}, {"reason": "manual_supervise"}]
+
+
+def test_supervisor_run_stops_early_without_actionable_backoff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    tick = Mock(
+        return_value={
+            "ok": True,
+            "result": {
+                "status": "noop",
+                "decision": "no_action",
+                "action_taken": False,
+                "reason_codes": ["NO_RESTART_BACKOFF"],
+            },
+        }
+    )
+    monkeypatch.setattr(controller, "supervisor_tick", tick)
+
+    result = controller.supervisor_run(max_ticks=5, interval_seconds=0.0, reason="manual_supervise")
+
+    assert result["ok"] is True
+    assert result["result"]["status"] == "noop"
+    assert result["result"]["final_decision"] == "no_action"
+    assert result["result"]["tick_count"] == 1
+    tick.assert_called_once_with(reason="manual_supervise")
+
+
+def test_supervisor_run_rejects_invalid_limits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    tick = Mock()
+    monkeypatch.setattr(controller, "supervisor_tick", tick)
+
+    result = controller.supervisor_run(max_ticks=0, interval_seconds=0.0, reason="manual_supervise")
+
+    assert result == {
+        "ok": False,
+        "error": {
+            "code": "INVALID_REQUEST",
+            "message": "supervisor run requires max_ticks >= 1",
+            "details": {"max_ticks": 0},
+        },
+    }
+    tick.assert_not_called()
+
+
 def test_restart_rejects_active_backoff_without_stop_or_start(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -48,6 +48,7 @@ from .bridge_registry import (
     run_bridge_watch_start,
     run_bridge_watch_status,
     run_bridge_watch_stop,
+    run_bridge_watch_supervisor_run,
     run_bridge_watch_supervisor_tick,
 )
 from .bridge_http import serve_bridge_from_config
@@ -741,6 +742,13 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_supervisor_tick_parser.add_argument("--registry", required=True)
     bridge_watch_supervisor_tick_parser.add_argument("--worker", required=True)
     bridge_watch_supervisor_tick_parser.add_argument("--reason")
+
+    bridge_watch_supervisor_run_parser = bridge_subparsers.add_parser("watch-supervisor-run")
+    bridge_watch_supervisor_run_parser.add_argument("--registry", required=True)
+    bridge_watch_supervisor_run_parser.add_argument("--worker", required=True)
+    bridge_watch_supervisor_run_parser.add_argument("--max-ticks", type=int, required=True)
+    bridge_watch_supervisor_run_parser.add_argument("--interval-seconds", type=float, default=0.0)
+    bridge_watch_supervisor_run_parser.add_argument("--reason")
 
     return bridge_parser
 
@@ -5990,6 +5998,16 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                 run_bridge_watch_supervisor_tick(
                     registry_path=args.registry,
                     worker_id=args.worker,
+                    reason=args.reason,
+                )
+            )
+        if args.bridge_command == "watch-supervisor-run":
+            return _emit_bridge_payload(
+                run_bridge_watch_supervisor_run(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    max_ticks=args.max_ticks,
+                    interval_seconds=args.interval_seconds,
                     reason=args.reason,
                 )
             )

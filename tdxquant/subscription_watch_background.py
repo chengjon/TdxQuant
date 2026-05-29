@@ -28,6 +28,8 @@ SUBSCRIPTION_WATCH_RESTART_BACKOFF_SCHEMA_VERSION = "tdx.subscription_watch.rest
 SUBSCRIPTION_WATCH_RESTART_BACKOFF_BOUNDARY = "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor"
 SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION = "tdx.subscription_watch.supervisor_tick.v1"
 SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY = "single_step_only;does_not_run_loop_or_schedule_retry"
+SUBSCRIPTION_WATCH_SUPERVISOR_RUN_SCHEMA_VERSION = "tdx.subscription_watch.supervisor_run.v1"
+SUBSCRIPTION_WATCH_SUPERVISOR_RUN_BOUNDARY = "foreground_bounded_only;does_not_daemonize_or_schedule_background_retry"
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_SCHEMA_VERSION = "tdx.subscription_watch.statefile_ownership.v1"
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY = (
     "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control"
@@ -1907,6 +1909,104 @@ class SubscriptionWatchBackgroundController:
                 "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY,
             },
         }
+
+    def supervisor_run(
+        self,
+        *,
+        max_ticks: int,
+        interval_seconds: float = 0.0,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            resolved_max_ticks = int(max_ticks)
+        except (TypeError, ValueError):
+            resolved_max_ticks = 0
+        if resolved_max_ticks < 1:
+            return {
+                "ok": False,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "supervisor run requires max_ticks >= 1",
+                    "details": {"max_ticks": max_ticks},
+                },
+            }
+        try:
+            resolved_interval_seconds = float(interval_seconds)
+        except (TypeError, ValueError):
+            resolved_interval_seconds = -1.0
+        if resolved_interval_seconds < 0:
+            return {
+                "ok": False,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "supervisor run requires interval_seconds >= 0",
+                    "details": {"interval_seconds": interval_seconds},
+                },
+            }
+
+        tick_summaries: list[dict[str, Any]] = []
+        for index in range(1, resolved_max_ticks + 1):
+            tick_result = self.supervisor_tick(reason=reason)
+            tick_summary = self._build_supervisor_run_tick_summary(index=index, tick_result=tick_result)
+            tick_summaries.append(tick_summary)
+            if not tick_summary.get("ok"):
+                break
+            if tick_summary.get("status") != "waiting" or tick_summary.get("decision") != "wait":
+                break
+            if index < resolved_max_ticks and resolved_interval_seconds > 0:
+                time.sleep(resolved_interval_seconds)
+
+        final_tick = tick_summaries[-1]
+        return {
+            "ok": True,
+            "result": {
+                "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_SCHEMA_VERSION,
+                "status": final_tick.get("status"),
+                "final_status": final_tick.get("status"),
+                "final_decision": final_tick.get("decision"),
+                "tick_count": len(tick_summaries),
+                "max_ticks": resolved_max_ticks,
+                "interval_seconds": resolved_interval_seconds,
+                "reason": reason,
+                "action_taken": any(bool(item.get("action_taken")) for item in tick_summaries),
+                "tick_summaries": tick_summaries,
+                "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_BOUNDARY,
+            },
+        }
+
+    def _build_supervisor_run_tick_summary(
+        self,
+        *,
+        index: int,
+        tick_result: dict[str, Any],
+    ) -> dict[str, Any]:
+        ok = bool(tick_result.get("ok"))
+        summary: dict[str, Any] = {
+            "index": index,
+            "ok": ok,
+        }
+        if ok:
+            result = tick_result.get("result")
+            result = result if isinstance(result, dict) else {}
+            summary["status"] = result.get("status")
+            summary["decision"] = result.get("decision")
+            summary["action_taken"] = bool(result.get("action_taken"))
+            summary["reason_codes"] = list(result.get("reason_codes") or [])
+            for key in ("previous_run_id", "new_run_id"):
+                if key in result:
+                    summary[key] = result[key]
+            return summary
+
+        error = tick_result.get("error")
+        error = error if isinstance(error, dict) else {}
+        details = error.get("details")
+        details = details if isinstance(details, dict) else {}
+        summary["status"] = "failed"
+        summary["decision"] = "failed"
+        summary["action_taken"] = False
+        summary["error_code"] = error.get("code")
+        summary["reason_codes"] = list(details.get("reason_codes") or [])
+        return summary
 
     def status(
         self,

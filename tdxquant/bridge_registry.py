@@ -318,6 +318,30 @@ def run_bridge_watch_supervisor_tick(
     )
 
 
+def run_bridge_watch_supervisor_run(
+    *,
+    registry_path: str | Path,
+    worker_id: str,
+    max_ticks: int,
+    interval_seconds: float = 0.0,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    body: dict[str, Any] = {
+        "max_ticks": max_ticks,
+        "interval_seconds": interval_seconds,
+    }
+    if reason is not None:
+        body["reason"] = reason
+    return call_worker(
+        worker,
+        method="POST",
+        route="/bridge/v1/watch/supervisor-run",
+        token=resolve_worker_token(worker),
+        body=body,
+    )
+
+
 def _resolve_worker(*, registry_path: str | Path, worker_id: str) -> BridgeWorker:
     return select_worker(load_worker_registry(registry_path), worker_id=worker_id)
 

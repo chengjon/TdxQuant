@@ -463,6 +463,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if method == "POST" and parsed.path == "/bridge/v1/watch/supervisor-tick":
                 self._handle_watch_supervisor_tick(request_id)
                 return
+            if method == "POST" and parsed.path == "/bridge/v1/watch/supervisor-run":
+                self._handle_watch_supervisor_run(request_id)
+                return
             if method == "GET" and parsed.path == "/bridge/v1/watch/restart-preflight":
                 self._handle_watch_restart_preflight(request_id)
                 return
@@ -558,6 +561,22 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
     def _handle_watch_supervisor_tick(self, request_id: str) -> None:
         body = self._read_json_body()
         result = self.server.bridge_controller.supervisor_tick(reason=self._optional_str(body.get("reason")))
+        self._write_control_result(result, request_id=request_id)
+
+    def _handle_watch_supervisor_run(self, request_id: str) -> None:
+        body = self._read_json_body()
+        max_ticks = self._optional_int(body.get("max_ticks"))
+        if max_ticks is None:
+            raise ValueError("watch supervisor run requires max_ticks")
+        interval_seconds = 0.0
+        if "interval_seconds" in body:
+            resolved_interval_seconds = self._optional_float(body.get("interval_seconds"))
+            interval_seconds = 0.0 if resolved_interval_seconds is None else resolved_interval_seconds
+        result = self.server.bridge_controller.supervisor_run(
+            max_ticks=max_ticks,
+            interval_seconds=interval_seconds,
+            reason=self._optional_str(body.get("reason")),
+        )
         self._write_control_result(result, request_id=request_id)
 
     def _handle_watch_status(self, request_id: str) -> None:
