@@ -342,6 +342,65 @@ def run_bridge_watch_supervisor_run(
     )
 
 
+def run_bridge_watch_supervisor_daemon_status(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker(
+        worker,
+        method="GET",
+        route="/bridge/v1/watch/supervisor-daemon/status",
+        token=resolve_worker_token(worker),
+    )
+
+
+def run_bridge_watch_supervisor_daemon_start(
+    *,
+    registry_path: str | Path,
+    worker_id: str,
+    max_ticks: int,
+    interval_seconds: float = 0.0,
+    loop_sleep_seconds: float = 30.0,
+    reason: str | None = None,
+    owner_token: str | None = None,
+) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    body: dict[str, Any] = {
+        "max_ticks": max_ticks,
+        "interval_seconds": interval_seconds,
+        "loop_sleep_seconds": loop_sleep_seconds,
+    }
+    if reason is not None:
+        body["reason"] = reason
+    if owner_token is not None:
+        body["owner_token"] = owner_token
+    return call_worker(
+        worker,
+        method="POST",
+        route="/bridge/v1/watch/supervisor-daemon/start",
+        token=resolve_worker_token(worker),
+        body=body,
+    )
+
+
+def run_bridge_watch_supervisor_daemon_stop(
+    *,
+    registry_path: str | Path,
+    worker_id: str,
+    owner_token: str,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    body: dict[str, Any] = {"owner_token": owner_token}
+    if reason is not None:
+        body["reason"] = reason
+    return call_worker(
+        worker,
+        method="POST",
+        route="/bridge/v1/watch/supervisor-daemon/stop",
+        token=resolve_worker_token(worker),
+        body=body,
+    )
+
+
 def _resolve_worker(*, registry_path: str | Path, worker_id: str) -> BridgeWorker:
     return select_worker(load_worker_registry(registry_path), worker_id=worker_id)
 

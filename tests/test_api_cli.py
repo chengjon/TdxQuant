@@ -308,6 +308,75 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.interval_seconds, 0.25)
         self.assertEqual(args.reason, "manual_supervise")
 
+    def test_bridge_watch_supervisor_daemon_status_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-supervisor-daemon-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+            ]
+        )
+        self.assertEqual(args.bridge_command, "watch-supervisor-daemon-status")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+
+    def test_bridge_watch_supervisor_daemon_start_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-supervisor-daemon-start",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--max-ticks",
+                "3",
+                "--interval-seconds",
+                "0.25",
+                "--loop-sleep-seconds",
+                "1.5",
+                "--reason",
+                "manual_daemon_start",
+                "--owner-token",
+                "owner-1",
+            ]
+        )
+        self.assertEqual(args.bridge_command, "watch-supervisor-daemon-start")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+        self.assertEqual(args.max_ticks, 3)
+        self.assertEqual(args.interval_seconds, 0.25)
+        self.assertEqual(args.loop_sleep_seconds, 1.5)
+        self.assertEqual(args.reason, "manual_daemon_start")
+        self.assertEqual(args.owner_token, "owner-1")
+
+    def test_bridge_watch_supervisor_daemon_stop_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-supervisor-daemon-stop",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--owner-token",
+                "owner-1",
+                "--reason",
+                "manual_daemon_stop",
+            ]
+        )
+        self.assertEqual(args.bridge_command, "watch-supervisor-daemon-stop")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+        self.assertEqual(args.owner_token, "owner-1")
+        self.assertEqual(args.reason, "manual_daemon_stop")
+
     def test_api_capabilities_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "capabilities"])
@@ -10914,6 +10983,108 @@ class ReportCliDispatchTests(unittest.TestCase):
             reason="manual_supervise",
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "waiting", "tick_count": 3}})
+
+    def test_handle_bridge_watch_supervisor_daemon_status_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-supervisor-daemon-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+            ]
+        )
+        with (
+            patch(
+                "tdxquant.cli.run_bridge_watch_supervisor_daemon_status",
+                return_value={"ok": True, "result": {"state": "running"}},
+            ) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"state": "running"}})
+
+    def test_handle_bridge_watch_supervisor_daemon_start_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-supervisor-daemon-start",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--max-ticks",
+                "3",
+                "--interval-seconds",
+                "0.25",
+                "--loop-sleep-seconds",
+                "1.5",
+                "--reason",
+                "manual_daemon_start",
+                "--owner-token",
+                "owner-1",
+            ]
+        )
+        with (
+            patch(
+                "tdxquant.cli.run_bridge_watch_supervisor_daemon_start",
+                return_value={"ok": True, "result": {"state": "starting"}},
+            ) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            max_ticks=3,
+            interval_seconds=0.25,
+            loop_sleep_seconds=1.5,
+            reason="manual_daemon_start",
+            owner_token="owner-1",
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"state": "starting"}})
+
+    def test_handle_bridge_watch_supervisor_daemon_stop_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-supervisor-daemon-stop",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--owner-token",
+                "owner-1",
+                "--reason",
+                "manual_daemon_stop",
+            ]
+        )
+        with (
+            patch(
+                "tdxquant.cli.run_bridge_watch_supervisor_daemon_stop",
+                return_value={"ok": True, "result": {"state": "stopping"}},
+            ) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            owner_token="owner-1",
+            reason="manual_daemon_stop",
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"state": "stopping"}})
 
     def test_handle_bridge_watch_status_summary_view_projects_governance_rollup(self) -> None:
         args = build_parser().parse_args(

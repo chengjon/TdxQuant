@@ -48,6 +48,9 @@ from .bridge_registry import (
     run_bridge_watch_start,
     run_bridge_watch_status,
     run_bridge_watch_stop,
+    run_bridge_watch_supervisor_daemon_start,
+    run_bridge_watch_supervisor_daemon_status,
+    run_bridge_watch_supervisor_daemon_stop,
     run_bridge_watch_supervisor_run,
     run_bridge_watch_supervisor_tick,
 )
@@ -749,6 +752,25 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_supervisor_run_parser.add_argument("--max-ticks", type=int, required=True)
     bridge_watch_supervisor_run_parser.add_argument("--interval-seconds", type=float, default=0.0)
     bridge_watch_supervisor_run_parser.add_argument("--reason")
+
+    bridge_watch_supervisor_daemon_status_parser = bridge_subparsers.add_parser("watch-supervisor-daemon-status")
+    bridge_watch_supervisor_daemon_status_parser.add_argument("--registry", required=True)
+    bridge_watch_supervisor_daemon_status_parser.add_argument("--worker", required=True)
+
+    bridge_watch_supervisor_daemon_start_parser = bridge_subparsers.add_parser("watch-supervisor-daemon-start")
+    bridge_watch_supervisor_daemon_start_parser.add_argument("--registry", required=True)
+    bridge_watch_supervisor_daemon_start_parser.add_argument("--worker", required=True)
+    bridge_watch_supervisor_daemon_start_parser.add_argument("--max-ticks", type=int, required=True)
+    bridge_watch_supervisor_daemon_start_parser.add_argument("--interval-seconds", type=float, default=0.0)
+    bridge_watch_supervisor_daemon_start_parser.add_argument("--loop-sleep-seconds", type=float, default=30.0)
+    bridge_watch_supervisor_daemon_start_parser.add_argument("--reason")
+    bridge_watch_supervisor_daemon_start_parser.add_argument("--owner-token")
+
+    bridge_watch_supervisor_daemon_stop_parser = bridge_subparsers.add_parser("watch-supervisor-daemon-stop")
+    bridge_watch_supervisor_daemon_stop_parser.add_argument("--registry", required=True)
+    bridge_watch_supervisor_daemon_stop_parser.add_argument("--worker", required=True)
+    bridge_watch_supervisor_daemon_stop_parser.add_argument("--owner-token", required=True)
+    bridge_watch_supervisor_daemon_stop_parser.add_argument("--reason")
 
     return bridge_parser
 
@@ -6008,6 +6030,34 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                     worker_id=args.worker,
                     max_ticks=args.max_ticks,
                     interval_seconds=args.interval_seconds,
+                    reason=args.reason,
+                )
+            )
+        if args.bridge_command == "watch-supervisor-daemon-status":
+            return _emit_bridge_payload(
+                run_bridge_watch_supervisor_daemon_status(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                )
+            )
+        if args.bridge_command == "watch-supervisor-daemon-start":
+            return _emit_bridge_payload(
+                run_bridge_watch_supervisor_daemon_start(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    max_ticks=args.max_ticks,
+                    interval_seconds=args.interval_seconds,
+                    loop_sleep_seconds=args.loop_sleep_seconds,
+                    reason=args.reason,
+                    owner_token=args.owner_token,
+                )
+            )
+        if args.bridge_command == "watch-supervisor-daemon-stop":
+            return _emit_bridge_payload(
+                run_bridge_watch_supervisor_daemon_stop(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    owner_token=args.owner_token,
                     reason=args.reason,
                 )
             )

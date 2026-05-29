@@ -19,6 +19,9 @@ class _FakeController:
         self.restart_calls: list[dict[str, object]] = []
         self.supervisor_tick_calls: list[dict[str, object]] = []
         self.supervisor_run_calls: list[dict[str, object]] = []
+        self.supervisor_daemon_start_calls: list[dict[str, object]] = []
+        self.supervisor_daemon_stop_calls: list[dict[str, object]] = []
+        self.supervisor_daemon_status_calls = 0
         self.restart_preflight_calls = 0
         self.status_calls: list[dict[str, object]] = []
         self.control_status_calls = 0
@@ -62,6 +65,30 @@ class _FakeController:
                 "tick_count": 3,
             },
         }
+        self.supervisor_daemon_status_result: dict[str, object] = {
+            "ok": True,
+            "result": {
+                "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                "state": "running",
+                "pid": 1234,
+            },
+        }
+        self.supervisor_daemon_start_result: dict[str, object] = {
+            "ok": True,
+            "result": {
+                "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                "state": "starting",
+                "pid": 1234,
+            },
+        }
+        self.supervisor_daemon_stop_result: dict[str, object] = {
+            "ok": True,
+            "result": {
+                "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                "state": "stopping",
+                "pid": 1234,
+            },
+        }
         self.status_result: dict[str, object] = {
             "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234, "reason": None},
             "watch_status": {"run_id": "run-001", "event_count": 3},
@@ -94,6 +121,18 @@ class _FakeController:
     def supervisor_run(self, **kwargs: object) -> dict[str, object]:
         self.supervisor_run_calls.append(dict(kwargs))
         return dict(self.supervisor_run_result)
+
+    def supervisor_daemon_status(self) -> dict[str, object]:
+        self.supervisor_daemon_status_calls += 1
+        return dict(self.supervisor_daemon_status_result)
+
+    def start_supervisor_daemon(self, **kwargs: object) -> dict[str, object]:
+        self.supervisor_daemon_start_calls.append(dict(kwargs))
+        return dict(self.supervisor_daemon_start_result)
+
+    def stop_supervisor_daemon(self, **kwargs: object) -> dict[str, object]:
+        self.supervisor_daemon_stop_calls.append(dict(kwargs))
+        return dict(self.supervisor_daemon_stop_result)
 
     def status(self, **kwargs: object) -> dict[str, object]:
         self.status_calls.append(dict(kwargs))
@@ -467,6 +506,105 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 self.assertEqual(
                     controller.supervisor_run_calls,
                     [{"max_ticks": 3, "interval_seconds": 0.25, "reason": "manual_supervise"}],
+                )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_supervisor_daemon_status_dispatches_to_controller(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(
+                    f"{base_url}/bridge/v1/watch/supervisor-daemon/status",
+                    token="secret-token",
+                )
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["schema_version"], "tdx.subscription_watch.supervisor_daemon.v1")
+                self.assertEqual(controller.supervisor_daemon_status_calls, 1)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_supervisor_daemon_start_dispatches_to_controller(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(
+                    f"{base_url}/bridge/v1/watch/supervisor-daemon/start",
+                    method="POST",
+                    token="secret-token",
+                    payload={
+                        "max_ticks": 3,
+                        "interval_seconds": 0.25,
+                        "loop_sleep_seconds": 1.5,
+                        "reason": "manual_daemon_start",
+                        "owner_token": "owner-1",
+                    },
+                )
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["schema_version"], "tdx.subscription_watch.supervisor_daemon.v1")
+                self.assertEqual(
+                    controller.supervisor_daemon_start_calls,
+                    [
+                        {
+                            "max_ticks": 3,
+                            "interval_seconds": 0.25,
+                            "loop_sleep_seconds": 1.5,
+                            "reason": "manual_daemon_start",
+                            "owner_token": "owner-1",
+                        }
+                    ],
+                )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_supervisor_daemon_stop_dispatches_to_controller(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(
+                    f"{base_url}/bridge/v1/watch/supervisor-daemon/stop",
+                    method="POST",
+                    token="secret-token",
+                    payload={"owner_token": "owner-1", "reason": "manual_daemon_stop"},
+                )
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["schema_version"], "tdx.subscription_watch.supervisor_daemon.v1")
+                self.assertEqual(
+                    controller.supervisor_daemon_stop_calls,
+                    [{"owner_token": "owner-1", "reason": "manual_daemon_stop"}],
                 )
             finally:
                 server.shutdown()

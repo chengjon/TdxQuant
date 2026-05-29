@@ -342,6 +342,118 @@ class BridgeRegistryTests(unittest.TestCase):
             {"max_ticks": 3, "interval_seconds": 0.25, "reason": "manual_supervise"},
         )
 
+    def test_run_bridge_watch_supervisor_daemon_status_uses_control_route(self) -> None:
+        from tdxquant import bridge_registry
+
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch(
+                "tdxquant.bridge_registry.call_worker",
+                return_value={"ok": True, "result": {"state": "running"}},
+            ) as mocked_call,
+        ):
+            payload = bridge_registry.run_bridge_watch_supervisor_daemon_status(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"state": "running"}})
+        self.assertEqual(mocked_call.call_args.kwargs["method"], "GET")
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/supervisor-daemon/status")
+        self.assertNotIn("body", mocked_call.call_args.kwargs)
+
+    def test_run_bridge_watch_supervisor_daemon_start_uses_control_route(self) -> None:
+        from tdxquant import bridge_registry
+
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch(
+                "tdxquant.bridge_registry.call_worker",
+                return_value={"ok": True, "result": {"state": "starting"}},
+            ) as mocked_call,
+        ):
+            payload = bridge_registry.run_bridge_watch_supervisor_daemon_start(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                max_ticks=3,
+                interval_seconds=0.25,
+                loop_sleep_seconds=1.5,
+                reason="manual_daemon_start",
+                owner_token="owner-1",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"state": "starting"}})
+        self.assertEqual(mocked_call.call_args.kwargs["method"], "POST")
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/supervisor-daemon/start")
+        self.assertEqual(
+            mocked_call.call_args.kwargs["body"],
+            {
+                "max_ticks": 3,
+                "interval_seconds": 0.25,
+                "loop_sleep_seconds": 1.5,
+                "reason": "manual_daemon_start",
+                "owner_token": "owner-1",
+            },
+        )
+
+    def test_run_bridge_watch_supervisor_daemon_stop_uses_control_route(self) -> None:
+        from tdxquant import bridge_registry
+
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch(
+                "tdxquant.bridge_registry.call_worker",
+                return_value={"ok": True, "result": {"state": "stopping"}},
+            ) as mocked_call,
+        ):
+            payload = bridge_registry.run_bridge_watch_supervisor_daemon_stop(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                owner_token="owner-1",
+                reason="manual_daemon_stop",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"state": "stopping"}})
+        self.assertEqual(mocked_call.call_args.kwargs["method"], "POST")
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/supervisor-daemon/stop")
+        self.assertEqual(
+            mocked_call.call_args.kwargs["body"],
+            {"owner_token": "owner-1", "reason": "manual_daemon_stop"},
+        )
+
     def test_run_bridge_health_uses_health_route(self) -> None:
         worker = BridgeWorker(
             worker_id="worker-a",

@@ -466,6 +466,15 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if method == "POST" and parsed.path == "/bridge/v1/watch/supervisor-run":
                 self._handle_watch_supervisor_run(request_id)
                 return
+            if method == "GET" and parsed.path == "/bridge/v1/watch/supervisor-daemon/status":
+                self._handle_watch_supervisor_daemon_status(request_id)
+                return
+            if method == "POST" and parsed.path == "/bridge/v1/watch/supervisor-daemon/start":
+                self._handle_watch_supervisor_daemon_start(request_id)
+                return
+            if method == "POST" and parsed.path == "/bridge/v1/watch/supervisor-daemon/stop":
+                self._handle_watch_supervisor_daemon_stop(request_id)
+                return
             if method == "GET" and parsed.path == "/bridge/v1/watch/restart-preflight":
                 self._handle_watch_restart_preflight(request_id)
                 return
@@ -575,6 +584,43 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         result = self.server.bridge_controller.supervisor_run(
             max_ticks=max_ticks,
             interval_seconds=interval_seconds,
+            reason=self._optional_str(body.get("reason")),
+        )
+        self._write_control_result(result, request_id=request_id)
+
+    def _handle_watch_supervisor_daemon_status(self, request_id: str) -> None:
+        result = self.server.bridge_controller.supervisor_daemon_status()
+        self._write_control_result(result, request_id=request_id)
+
+    def _handle_watch_supervisor_daemon_start(self, request_id: str) -> None:
+        body = self._read_json_body()
+        max_ticks = self._optional_int(body.get("max_ticks"))
+        if max_ticks is None:
+            raise ValueError("watch supervisor daemon start requires max_ticks")
+        interval_seconds = 0.0
+        if "interval_seconds" in body:
+            resolved_interval_seconds = self._optional_float(body.get("interval_seconds"))
+            interval_seconds = 0.0 if resolved_interval_seconds is None else resolved_interval_seconds
+        loop_sleep_seconds = 30.0
+        if "loop_sleep_seconds" in body:
+            resolved_loop_sleep_seconds = self._optional_float(body.get("loop_sleep_seconds"))
+            loop_sleep_seconds = 30.0 if resolved_loop_sleep_seconds is None else resolved_loop_sleep_seconds
+        result = self.server.bridge_controller.start_supervisor_daemon(
+            max_ticks=max_ticks,
+            interval_seconds=interval_seconds,
+            loop_sleep_seconds=loop_sleep_seconds,
+            reason=self._optional_str(body.get("reason")),
+            owner_token=self._optional_str(body.get("owner_token")),
+        )
+        self._write_control_result(result, request_id=request_id)
+
+    def _handle_watch_supervisor_daemon_stop(self, request_id: str) -> None:
+        body = self._read_json_body()
+        owner_token = self._optional_str(body.get("owner_token"))
+        if owner_token is None:
+            raise ValueError("watch supervisor daemon stop requires owner_token")
+        result = self.server.bridge_controller.stop_supervisor_daemon(
+            owner_token=owner_token,
             reason=self._optional_str(body.get("reason")),
         )
         self._write_control_result(result, request_id=request_id)
