@@ -772,6 +772,35 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                         "has_control_pid": True,
                         "has_mismatch": False,
                     },
+                    "statefile_ownership": {
+                        "schema_version": "tdx.subscription_watch.statefile_ownership.v1",
+                        "status": "owned_active",
+                        "reason_codes": ["OWNED_ACTIVE"],
+                        "statefile_exists": True,
+                        "pidfile_exists": True,
+                        "lockfile_exists": True,
+                        "active": True,
+                        "control_state": "running",
+                        "payload_pid": 1234,
+                        "owned_pid": 1234,
+                        "pid_matches_owned_state": True,
+                        "process_alive": True,
+                        "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
+                    },
+                    "supervisor_daemon": {
+                        "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                        "daemon_status": "running",
+                        "state": "running",
+                        "statefile_exists": True,
+                        "statefile_valid": True,
+                        "pidfile_exists": True,
+                        "pid": 5678,
+                        "process_running": True,
+                        "has_owner_token": True,
+                        "generation": 2,
+                        "control_allowed": True,
+                        "boundary": "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+                    },
                     "heartbeat": {"status": "stale", "age_seconds": 180.0},
                     "watermark": {"status": "fresh", "age_seconds": 15.0},
                     "reconnect": {"status": "degraded", "reconnect_count": 2},
@@ -980,6 +1009,16 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(payload["result"]["status_summary"]["heartbeat"]["status"], "stale")
         self.assertEqual(payload["result"]["status_summary"]["watermark"]["status"], "fresh")
         self.assertEqual(payload["result"]["status_summary"]["reconnect"]["reconnect_count"], 2)
+        self.assertEqual(payload["result"]["status_summary"]["statefile_ownership"]["status"], "owned_active")
+        self.assertEqual(
+            payload["result"]["status_summary"]["statefile_ownership"]["boundary"],
+            "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
+        )
+        self.assertEqual(payload["result"]["status_summary"]["supervisor_daemon"]["daemon_status"], "running")
+        self.assertEqual(
+            payload["result"]["status_summary"]["supervisor_daemon"]["boundary"],
+            "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+        )
         self.assertEqual(payload["result"]["governance"]["decision"], "manual_review")
         self.assertEqual(payload["result"]["governance"]["requires_manual_review"], True)
         self.assertEqual(payload["result"]["governance"]["staleness_evaluated"], True)
