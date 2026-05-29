@@ -26,6 +26,8 @@ SUBSCRIPTION_WATCH_RESTART_OBSERVATION_SCHEMA_VERSION = "tdx.subscription_watch.
 SUBSCRIPTION_WATCH_RESTART_OBSERVATION_BOUNDARY = "observation_only;does_not_schedule_restart_backoff_or_supervisor"
 SUBSCRIPTION_WATCH_RESTART_BACKOFF_SCHEMA_VERSION = "tdx.subscription_watch.restart_backoff.v1"
 SUBSCRIPTION_WATCH_RESTART_BACKOFF_BOUNDARY = "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor"
+SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION = "tdx.subscription_watch.supervisor_tick.v1"
+SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY = "single_step_only;does_not_run_loop_or_schedule_retry"
 SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
     "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes"
 )
@@ -1207,7 +1209,13 @@ class SubscriptionWatchBackgroundController:
             "boundary": SUBSCRIPTION_WATCH_RESTART_BACKOFF_BOUNDARY,
         }
 
-    def _persist_restart_backoff(self, *, previous_run_id: Any, restart_backoff: dict[str, Any]) -> dict[str, Any]:
+    def _persist_restart_backoff(
+        self,
+        *,
+        previous_run_id: Any,
+        restart_backoff: dict[str, Any],
+        start_request: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         _cleanup_owned_state(self.paths)
         payload = {
             "state": "restart_backoff",
@@ -1217,6 +1225,8 @@ class SubscriptionWatchBackgroundController:
             "reason": "restart_start_failed",
             "restart_backoff": copy.deepcopy(restart_backoff),
         }
+        if isinstance(start_request, dict):
+            payload["start_request"] = copy.deepcopy(start_request)
         return self._write_active_state(payload)
 
     def _active_restart_backoff(self, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -1657,7 +1667,11 @@ class SubscriptionWatchBackgroundController:
                 start_result=start_result,
                 start_request=start_request,
             )
-            self._persist_restart_backoff(previous_run_id=previous_run_id, restart_backoff=restart_backoff)
+            self._persist_restart_backoff(
+                previous_run_id=previous_run_id,
+                restart_backoff=restart_backoff,
+                start_request=start_request,
+            )
             return {
                 "ok": False,
                 "error": {
@@ -1727,6 +1741,107 @@ class SubscriptionWatchBackgroundController:
                 "start_request_summary": self._restart_preflight_start_request_summary(start_request),
                 "restart_backoff": active_backoff,
                 "boundary": "read_only;does_not_stop_start_or_schedule_restart",
+            },
+        }
+
+    def supervisor_tick(self, *, reason: str | None = None) -> dict[str, Any]:
+        current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+        active_backoff = self._active_restart_backoff(current)
+        if active_backoff is not None:
+            return {
+                "ok": True,
+                "result": {
+                    "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION,
+                    "status": "waiting",
+                    "decision": "wait",
+                    "action_taken": False,
+                    "reason_codes": ["BACKOFF_ACTIVE"],
+                    "restart_backoff": active_backoff,
+                    "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY,
+                },
+            }
+
+        restart_backoff = current.get("restart_backoff")
+        if not isinstance(restart_backoff, dict):
+            return {
+                "ok": True,
+                "result": {
+                    "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION,
+                    "status": "noop",
+                    "decision": "no_action",
+                    "action_taken": False,
+                    "reason_codes": ["NO_RESTART_BACKOFF"],
+                    "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY,
+                },
+            }
+
+        start_request = current.get("start_request")
+        if not self._restart_preflight_start_request_valid(start_request):
+            return {
+                "ok": False,
+                "error": {
+                    "code": "SUPERVISOR_TICK_MISSING_START_REQUEST",
+                    "message": "subscription-watch supervisor tick requires a valid persisted start_request",
+                    "details": {
+                        "run_id": current.get("run_id"),
+                        "state": current.get("state"),
+                        "restart_backoff": copy.deepcopy(restart_backoff),
+                    },
+                },
+            }
+
+        start_request = copy.deepcopy(start_request)
+        stock_list = start_request.get("stock_list")
+        max_events = start_request.get("max_events")
+        max_seconds = start_request.get("max_seconds")
+        poll_interval = start_request.get("poll_interval")
+        tick_reason = reason if reason is not None else "supervisor_tick"
+        previous_run_id = restart_backoff.get("previous_run_id", current.get("run_id"))
+        start_result = self.start(
+            stock_list=list(stock_list),
+            max_events=max_events,
+            max_seconds=float(max_seconds) if max_seconds is not None else None,
+            poll_interval=float(poll_interval) if poll_interval is not None else None,
+        )
+        start_payload = dict(start_result.get("result") or {})
+        if start_result.get("ok") is not True:
+            next_backoff = self._build_restart_backoff(
+                previous_run_id=previous_run_id,
+                reason=tick_reason,
+                start_result=start_result,
+                start_request=start_request,
+            )
+            self._persist_restart_backoff(
+                previous_run_id=previous_run_id,
+                restart_backoff=next_backoff,
+                start_request=start_request,
+            )
+            return {
+                "ok": False,
+                "error": {
+                    "code": "SUPERVISOR_TICK_START_FAILED",
+                    "message": "subscription-watch supervisor tick failed to start replacement run",
+                    "details": {
+                        "previous_run_id": previous_run_id,
+                        "start_result": start_result,
+                        "restart_backoff": next_backoff,
+                    },
+                },
+            }
+
+        return {
+            "ok": True,
+            "result": {
+                "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION,
+                "status": "recovered",
+                "decision": "recovered",
+                "action_taken": True,
+                "previous_run_id": previous_run_id,
+                "new_run_id": start_payload.get("run_id"),
+                "reason": tick_reason,
+                "start_result": start_payload,
+                "start_request_summary": self._restart_preflight_start_request_summary(start_request),
+                "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY,
             },
         }
 

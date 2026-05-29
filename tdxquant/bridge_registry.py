@@ -299,6 +299,25 @@ def run_bridge_watch_restart_preflight(*, registry_path: str | Path, worker_id: 
     )
 
 
+def run_bridge_watch_supervisor_tick(
+    *,
+    registry_path: str | Path,
+    worker_id: str,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    body: dict[str, Any] = {}
+    if reason is not None:
+        body["reason"] = reason
+    return call_worker(
+        worker,
+        method="POST",
+        route="/bridge/v1/watch/supervisor-tick",
+        token=resolve_worker_token(worker),
+        body=body,
+    )
+
+
 def _resolve_worker(*, registry_path: str | Path, worker_id: str) -> BridgeWorker:
     return select_worker(load_worker_registry(registry_path), worker_id=worker_id)
 

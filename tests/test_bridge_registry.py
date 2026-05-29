@@ -273,6 +273,38 @@ class BridgeRegistryTests(unittest.TestCase):
         self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/restart-preflight")
         self.assertNotIn("body", mocked_call.call_args.kwargs)
 
+    def test_run_bridge_watch_supervisor_tick_uses_control_route(self) -> None:
+        from tdxquant import bridge_registry
+
+        worker = BridgeWorker(
+            worker_id="worker-a",
+            label="A",
+            host="127.0.0.1",
+            port=8787,
+            token_env="BRIDGE_TOKEN_A",
+            role_tags=["watch"],
+            enabled=True,
+        )
+
+        with (
+            patch("tdxquant.bridge_registry.load_worker_registry", return_value=[worker]),
+            patch("tdxquant.bridge_registry.resolve_worker_token", return_value="secret-token"),
+            patch(
+                "tdxquant.bridge_registry.call_worker",
+                return_value={"ok": True, "result": {"status": "noop"}},
+            ) as mocked_call,
+        ):
+            payload = bridge_registry.run_bridge_watch_supervisor_tick(
+                registry_path="runtime/bridge/master-workers.json",
+                worker_id="worker-a",
+                reason="manual_tick",
+            )
+
+        self.assertEqual(payload, {"ok": True, "result": {"status": "noop"}})
+        self.assertEqual(mocked_call.call_args.kwargs["method"], "POST")
+        self.assertEqual(mocked_call.call_args.kwargs["route"], "/bridge/v1/watch/supervisor-tick")
+        self.assertEqual(mocked_call.call_args.kwargs["body"], {"reason": "manual_tick"})
+
     def test_run_bridge_health_uses_health_route(self) -> None:
         worker = BridgeWorker(
             worker_id="worker-a",

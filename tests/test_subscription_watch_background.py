@@ -718,6 +718,7 @@ def test_restart_records_backoff_when_replacement_start_fails(
     assert persisted["state"] == "restart_backoff"
     assert persisted["active"] is False
     assert persisted["reason"] == "restart_start_failed"
+    assert persisted["start_request"] == start_request
     assert persisted["restart_backoff"] == backoff
     assert stop_calls == [{"reason": "operator_restart", "grace_period_seconds": 2}]
     assert start_calls == [
@@ -728,6 +729,226 @@ def test_restart_records_backoff_when_replacement_start_fails(
             "poll_interval": 0.5,
         }
     ]
+
+
+def test_supervisor_tick_waits_during_active_restart_backoff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    restart_backoff = {
+        "schema_version": "tdx.subscription_watch.restart_backoff.v1",
+        "status": "active",
+        "reason_codes": ["BACKOFF_ACTIVE"],
+        "previous_run_id": "run-001",
+        "reason": "operator_restart",
+        "created_at": "2026-05-29T00:00:00+00:00",
+        "retry_after_at": "2999-01-01T00:00:00+00:00",
+        "backoff_seconds": 30.0,
+        "start_error_code": "START_FAILED",
+        "start_request_summary": {
+            "stock_count": 2,
+            "has_max_events": True,
+            "has_max_seconds": True,
+            "has_poll_interval": True,
+        },
+        "boundary": "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor",
+    }
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "start_request": {
+                "stock_list": ["600519.SH", "000001.SZ"],
+                "max_events": 10,
+                "max_seconds": 30.0,
+                "poll_interval": 0.5,
+            },
+            "restart_backoff": restart_backoff,
+        }
+    )
+    start = Mock()
+    stop = Mock()
+    monkeypatch.setattr(controller, "start", start)
+    monkeypatch.setattr(controller, "stop", stop)
+
+    result = controller.supervisor_tick(reason="manual_tick")
+
+    assert result == {
+        "ok": True,
+        "result": {
+            "schema_version": "tdx.subscription_watch.supervisor_tick.v1",
+            "status": "waiting",
+            "decision": "wait",
+            "action_taken": False,
+            "reason_codes": ["BACKOFF_ACTIVE"],
+            "restart_backoff": restart_backoff,
+            "boundary": "single_step_only;does_not_run_loop_or_schedule_retry",
+        },
+    }
+    start.assert_not_called()
+    stop.assert_not_called()
+
+
+def test_supervisor_tick_recovers_once_after_restart_backoff_expires(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    start_request = {
+        "stock_list": ["600519.SH", "000001.SZ"],
+        "max_events": 10,
+        "max_seconds": 30.0,
+        "poll_interval": 0.5,
+    }
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "start_request": start_request,
+            "restart_backoff": {
+                "schema_version": "tdx.subscription_watch.restart_backoff.v1",
+                "status": "active",
+                "reason_codes": ["BACKOFF_ACTIVE"],
+                "previous_run_id": "run-001",
+                "reason": "operator_restart",
+                "created_at": "2000-01-01T00:00:00+00:00",
+                "retry_after_at": "2000-01-01T00:00:30+00:00",
+                "backoff_seconds": 30.0,
+                "start_error_code": "START_FAILED",
+                "start_request_summary": {
+                    "stock_count": 2,
+                    "has_max_events": True,
+                    "has_max_seconds": True,
+                    "has_poll_interval": True,
+                },
+                "boundary": "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor",
+            },
+        }
+    )
+    start_calls: list[dict[str, object]] = []
+    stop = Mock()
+
+    def fake_start(**kwargs: object) -> dict[str, object]:
+        start_calls.append(dict(kwargs))
+        return {"ok": True, "result": {"run_id": "run-002", "state": "running", "start_request": start_request}}
+
+    monkeypatch.setattr(controller, "start", fake_start)
+    monkeypatch.setattr(controller, "stop", stop)
+
+    result = controller.supervisor_tick(reason="manual_tick")
+
+    assert result["ok"] is True
+    assert result["result"]["schema_version"] == "tdx.subscription_watch.supervisor_tick.v1"
+    assert result["result"]["status"] == "recovered"
+    assert result["result"]["decision"] == "recovered"
+    assert result["result"]["action_taken"] is True
+    assert result["result"]["previous_run_id"] == "run-001"
+    assert result["result"]["new_run_id"] == "run-002"
+    assert result["result"]["reason"] == "manual_tick"
+    assert result["result"]["start_request_summary"] == {
+        "stock_count": 2,
+        "has_max_events": True,
+        "has_max_seconds": True,
+        "has_poll_interval": True,
+    }
+    assert start_calls == [
+        {
+            "stock_list": ["600519.SH", "000001.SZ"],
+            "max_events": 10,
+            "max_seconds": 30.0,
+            "poll_interval": 0.5,
+        }
+    ]
+    stop.assert_not_called()
+
+
+def test_supervisor_tick_records_new_backoff_when_recovery_start_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    start_request = {
+        "stock_list": ["600519.SH", "000001.SZ"],
+        "max_events": 10,
+        "max_seconds": 30.0,
+        "poll_interval": 0.5,
+    }
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "start_request": start_request,
+            "restart_backoff": {
+                "schema_version": "tdx.subscription_watch.restart_backoff.v1",
+                "status": "active",
+                "reason_codes": ["BACKOFF_ACTIVE"],
+                "previous_run_id": "run-001",
+                "reason": "operator_restart",
+                "created_at": "2000-01-01T00:00:00+00:00",
+                "retry_after_at": "2000-01-01T00:00:30+00:00",
+                "backoff_seconds": 30.0,
+                "start_error_code": "START_FAILED",
+                "start_request_summary": {
+                    "stock_count": 2,
+                    "has_max_events": True,
+                    "has_max_seconds": True,
+                    "has_poll_interval": True,
+                },
+                "boundary": "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor",
+            },
+        }
+    )
+    monkeypatch.setattr(
+        controller,
+        "start",
+        lambda **kwargs: {"ok": False, "error": {"code": "START_FAILED", "message": "startup failed"}},
+    )
+
+    result = controller.supervisor_tick(reason="manual_tick")
+    persisted = read_active_payload(controller.paths)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "SUPERVISOR_TICK_START_FAILED"
+    backoff = result["error"]["details"]["restart_backoff"]
+    assert backoff["reason"] == "manual_tick"
+    assert backoff["previous_run_id"] == "run-001"
+    assert backoff["reason_codes"] == ["BACKOFF_ACTIVE"]
+    assert persisted["state"] == "restart_backoff"
+    assert persisted["start_request"] == start_request
+    assert persisted["restart_backoff"] == backoff
+
+
+def test_supervisor_tick_noops_without_restart_backoff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    start = Mock()
+    stop = Mock()
+    monkeypatch.setattr(controller, "start", start)
+    monkeypatch.setattr(controller, "stop", stop)
+
+    result = controller.supervisor_tick(reason="manual_tick")
+
+    assert result == {
+        "ok": True,
+        "result": {
+            "schema_version": "tdx.subscription_watch.supervisor_tick.v1",
+            "status": "noop",
+            "decision": "no_action",
+            "action_taken": False,
+            "reason_codes": ["NO_RESTART_BACKOFF"],
+            "boundary": "single_step_only;does_not_run_loop_or_schedule_retry",
+        },
+    }
+    start.assert_not_called()
+    stop.assert_not_called()
 
 
 def test_restart_rejects_active_backoff_without_stop_or_start(

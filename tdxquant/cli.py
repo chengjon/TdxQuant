@@ -48,6 +48,7 @@ from .bridge_registry import (
     run_bridge_watch_start,
     run_bridge_watch_status,
     run_bridge_watch_stop,
+    run_bridge_watch_supervisor_tick,
 )
 from .bridge_http import serve_bridge_from_config
 from .subscription_watch_status_diagnostics import build_subscription_watch_status_diagnostics
@@ -735,6 +736,11 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_restart_preflight_parser = bridge_subparsers.add_parser("watch-restart-preflight")
     bridge_watch_restart_preflight_parser.add_argument("--registry", required=True)
     bridge_watch_restart_preflight_parser.add_argument("--worker", required=True)
+
+    bridge_watch_supervisor_tick_parser = bridge_subparsers.add_parser("watch-supervisor-tick")
+    bridge_watch_supervisor_tick_parser.add_argument("--registry", required=True)
+    bridge_watch_supervisor_tick_parser.add_argument("--worker", required=True)
+    bridge_watch_supervisor_tick_parser.add_argument("--reason")
 
     return bridge_parser
 
@@ -5977,6 +5983,14 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                 run_bridge_watch_restart_preflight(
                     registry_path=args.registry,
                     worker_id=args.worker,
+                )
+            )
+        if args.bridge_command == "watch-supervisor-tick":
+            return _emit_bridge_payload(
+                run_bridge_watch_supervisor_tick(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    reason=args.reason,
                 )
             )
         return 2

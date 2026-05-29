@@ -264,6 +264,25 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
         self.assertEqual(args.worker, "worker-a")
 
+    def test_bridge_watch_supervisor_tick_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-supervisor-tick",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--reason",
+                "manual_tick",
+            ]
+        )
+        self.assertEqual(args.bridge_command, "watch-supervisor-tick")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+        self.assertEqual(args.reason, "manual_tick")
+
     def test_api_capabilities_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "capabilities"])
@@ -10804,6 +10823,36 @@ class ReportCliDispatchTests(unittest.TestCase):
             worker_id="worker-a",
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"ready": True}})
+
+    def test_handle_bridge_watch_supervisor_tick_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-supervisor-tick",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--reason",
+                "manual_tick",
+            ]
+        )
+        with (
+            patch(
+                "tdxquant.cli.run_bridge_watch_supervisor_tick",
+                return_value={"ok": True, "result": {"status": "noop"}},
+            ) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            reason="manual_tick",
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "noop"}})
 
     def test_handle_bridge_watch_status_summary_view_projects_governance_rollup(self) -> None:
         args = build_parser().parse_args(
