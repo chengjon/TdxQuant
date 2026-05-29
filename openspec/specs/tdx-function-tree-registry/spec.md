@@ -101,14 +101,14 @@ The FUNCTION_TREE registry validator SHALL expose an opt-in JSON report for mach
 
 The FUNCTION_TREE registry SHALL allow lifecycle-related feature nodes to be marked implemented when their evidence, tests, and boundaries describe the implemented lifecycle surface without implying downstream runtime availability.
 
-#### Scenario: Provider replay daemon fake provider lifecycle node is implemented with bounded evidence
+#### Scenario: Subscription long-run control nodes are implemented with bounded evidence
 
-- **WHEN** E-06 cites replay fake provider HTTP, probe, managed daemon control, statefile ownership, supervisor, restart/backoff, process ownership diagnostics, managed lifecycle status, managed lifecycle readiness, tests, and OpenSpec evidence
-- **THEN** E-06 MAY be registered as `[已实现]`
-- **AND** the node boundary MUST state that implementation is limited to replay fake provider lifecycle management
-- **AND** the node boundary MUST NOT imply live TongDaXin provider availability, broker readiness, workflow readiness, write support, or production trading readiness.
+- **WHEN** B-16 and E-09 cite persisted start requests, explicit restart, restart preflight, restart observation, bounded restart backoff, supervisor tick/run, supervisor daemon controls, statefile ownership diagnostics, lifecycle readiness, diagnostics/runbook projections, tests, and OpenSpec evidence
+- **THEN** B-16 and E-09 MAY be registered as `[已实现]`
+- **AND** their boundaries MUST state that the implemented surface is explicit operator-managed subscription watch lifecycle control and diagnostics
+- **AND** their boundaries MUST NOT imply automatic production recovery, live TongDaXin provider availability, broker readiness, trading readiness, workflow execution, or a complete provider lifecycle guarantee.
 
-#### Scenario: Provider replay implemented status does not affect trading or subscription nodes
+#### Scenario: Subscription long-run implemented status remains isolated
 
-- **WHEN** E-06 is registered as `[已实现]`
-- **THEN** D-07, D-08, B-16, E-09, and other feature nodes MUST retain their own explicit statuses, evidence, and boundaries.
+- **WHEN** B-16 and E-09 are registered as `[已实现]`
+- **THEN** D-07, D-08, E-11, and other feature nodes MUST retain their own explicit statuses, evidence, and boundaries.

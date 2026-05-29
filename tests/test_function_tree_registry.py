@@ -35,6 +35,23 @@ def _write_openspec_change(root: Path, change_id: str, *, archived: bool) -> Non
     (change_dir / ".openspec.yaml").write_text("id: test\n", encoding="utf-8")
 
 
+def _current_function_tree_rows() -> dict[str, dict[str, str]]:
+    rows: dict[str, dict[str, str]] = {}
+    for line in (REPO_ROOT / "FUNCTION_TREE.md").read_text(encoding="utf-8").splitlines():
+        if not line.startswith("|"):
+            continue
+        columns = [column.strip() for column in line.strip().strip("|").split("|")]
+        if len(columns) < 5 or columns[0] in {"ID", "---"}:
+            continue
+        rows[columns[0]] = {
+            "feature": columns[1],
+            "status": columns[2],
+            "evidence": columns[3],
+            "boundary": columns[4],
+        }
+    return rows
+
+
 class FunctionTreeRegistryValidatorTests(unittest.TestCase):
     def test_current_function_tree_passes_validation(self) -> None:
         result = _run_validator(REPO_ROOT)
@@ -55,6 +72,23 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertEqual(payload["errors"], [])
         self.assertIn("[已实现]", payload["status_counts"])
         self.assertEqual(result.stderr, "")
+
+    def test_subscription_long_run_control_nodes_are_registered_as_implemented(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("B-16", "E-09"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[已实现]`")
+                self.assertIn("SubscriptionWatchBackgroundController.restart", combined)
+                self.assertIn("supervisor_tick", combined)
+                self.assertIn("supervisor_run", combined)
+                self.assertIn("statefile ownership", combined)
+                self.assertIn("operator", combined)
+                self.assertIn("不代表 live provider availability", combined)
+                self.assertIn("不代表 broker readiness", combined)
+                self.assertIn("不代表交易 readiness", combined)
 
     def test_validator_json_report_returns_errors_without_stderr(self) -> None:
         with TemporaryDirectory() as temp_dir:
