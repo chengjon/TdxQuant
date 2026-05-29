@@ -11086,6 +11086,66 @@ class ReportCliDispatchTests(unittest.TestCase):
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"state": "stopping"}})
 
+    def test_handle_bridge_watch_status_summary_view_projects_statefile_ownership(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--view",
+                "summary",
+            ]
+        )
+        ownership = {
+            "schema_version": "tdx.subscription_watch.statefile_ownership.v1",
+            "status": "mismatch",
+            "reason_codes": ["PIDFILE_MISSING", "PID_MISMATCH"],
+            "statefile_exists": True,
+            "pidfile_exists": False,
+            "lockfile_exists": False,
+            "active": True,
+            "control_state": "starting",
+            "payload_pid": 4321,
+            "owned_pid": None,
+            "pid_matches_owned_state": False,
+            "process_alive": False,
+            "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
+        }
+        detailed_payload = {
+            "ok": True,
+            "result": {
+                "status": "starting",
+                "control": {"state": "starting", "active": True, "run_id": "run-001", "pid": 4321},
+                "watch_status": None,
+                "statefile_ownership": ownership,
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "overall_status": "starting",
+                    "statefile_ownership": ownership,
+                },
+            },
+        }
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", return_value=detailed_payload) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            heartbeat_stale_after_seconds=None,
+            watermark_stale_after_seconds=None,
+            reconnect_stale_after_seconds=None,
+        )
+        output = json.loads(stdout.getvalue())
+        self.assertEqual(output["result"]["status_summary"]["statefile_ownership"], ownership)
+        self.assertNotIn("statefile_ownership", output["result"]["runtime"])
+
     def test_handle_bridge_watch_status_summary_view_projects_governance_rollup(self) -> None:
         args = build_parser().parse_args(
             [

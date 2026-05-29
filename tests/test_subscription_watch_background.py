@@ -1987,6 +1987,7 @@ def test_status_view_returns_explicit_empty_watch_status_when_no_run_is_active(t
         "process_alive": False,
         "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
     }
+    assert status_view["status_summary"]["statefile_ownership"] == status_view["statefile_ownership"]
 
 
 def test_status_summary_keeps_heartbeat_staleness_not_evaluated_without_threshold() -> None:

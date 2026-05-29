@@ -87,10 +87,36 @@ def build_supervisor_daemon_status_projection(payload: dict[str, Any] | None) ->
     return projected
 
 
+def build_statefile_ownership_projection(payload: dict[str, Any] | None) -> dict[str, Any]:
+    resolved = payload if isinstance(payload, dict) else {}
+    if not resolved:
+        return {}
+    projected: dict[str, Any] = {}
+    for key in (
+        "schema_version",
+        "status",
+        "reason_codes",
+        "statefile_exists",
+        "pidfile_exists",
+        "lockfile_exists",
+        "active",
+        "control_state",
+        "payload_pid",
+        "owned_pid",
+        "pid_matches_owned_state",
+        "process_alive",
+        "boundary",
+    ):
+        if key in resolved:
+            projected[key] = copy.deepcopy(resolved[key])
+    return projected
+
+
 def build_subscription_watch_status_summary(
     *,
     control: dict[str, Any] | None,
     watch_status: dict[str, Any] | None,
+    statefile_ownership: dict[str, Any] | None = None,
     supervisor_daemon: dict[str, Any] | None = None,
     heartbeat_stale_after_seconds: float | int | None = None,
     watermark_stale_after_seconds: float | int | None = None,
@@ -156,6 +182,9 @@ def build_subscription_watch_status_summary(
         ),
         "boundary": "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
     }
+    statefile_ownership_projection = build_statefile_ownership_projection(statefile_ownership)
+    if statefile_ownership_projection:
+        summary["statefile_ownership"] = statefile_ownership_projection
     supervisor_daemon_projection = build_supervisor_daemon_status_projection(supervisor_daemon)
     if supervisor_daemon_projection:
         summary["supervisor_daemon"] = supervisor_daemon_projection
@@ -2536,6 +2565,7 @@ class SubscriptionWatchBackgroundController:
             "status_summary": build_subscription_watch_status_summary(
                 control=control,
                 watch_status=watch_status,
+                statefile_ownership=statefile_ownership,
                 supervisor_daemon=supervisor_daemon,
                 heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
                 watermark_stale_after_seconds=watermark_stale_after_seconds,
