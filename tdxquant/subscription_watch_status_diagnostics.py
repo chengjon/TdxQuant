@@ -27,8 +27,9 @@ def build_subscription_watch_status_diagnostics(
     restartability = _build_restartability_diagnostics(status_payload)
     restart_observation = _build_restart_observation_diagnostics(status_payload)
     restart_backoff = _build_restart_backoff_diagnostics(status_payload)
+    statefile_ownership = _build_statefile_ownership_diagnostics(status_payload)
 
-    return {
+    diagnostics = {
         "has_control_rollup": bool(control_rollup),
         "has_consistency_rollup": bool(consistency_rollup),
         "has_reconnect_rollup": bool(reconnect_rollup),
@@ -46,6 +47,35 @@ def build_subscription_watch_status_diagnostics(
         "restart_backoff": restart_backoff,
         "boundary": governance.get("boundary"),
     }
+    if statefile_ownership is not None:
+        diagnostics["statefile_ownership"] = statefile_ownership
+    return diagnostics
+
+
+def _build_statefile_ownership_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    payload = status_payload if isinstance(status_payload, dict) else {}
+    statefile_ownership = payload.get("statefile_ownership")
+    if not isinstance(statefile_ownership, dict):
+        return None
+    compact: dict[str, Any] = {}
+    for key in (
+        "schema_version",
+        "status",
+        "reason_codes",
+        "statefile_exists",
+        "pidfile_exists",
+        "lockfile_exists",
+        "active",
+        "control_state",
+        "payload_pid",
+        "owned_pid",
+        "pid_matches_owned_state",
+        "process_alive",
+        "boundary",
+    ):
+        if key in statefile_ownership:
+            compact[key] = statefile_ownership[key]
+    return compact
 
 
 def _build_restartability_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any]:

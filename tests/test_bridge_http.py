@@ -1239,6 +1239,75 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             },
         )
 
+    def test_watch_status_diagnostics_view_projects_statefile_ownership(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {"state": "running", "run_id": "run-001"},
+                "statefile_ownership": {
+                    "schema_version": "tdx.subscription_watch.statefile_ownership.v1",
+                    "status": "owned_active",
+                    "reason_codes": ["OWNED_ACTIVE"],
+                    "statefile_exists": True,
+                    "pidfile_exists": True,
+                    "lockfile_exists": True,
+                    "active": True,
+                    "control_state": "running",
+                    "payload_pid": 1234,
+                    "owned_pid": 1234,
+                    "pid_matches_owned_state": True,
+                    "process_alive": True,
+                    "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
+                },
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "control_rollup": {"control_state": "running", "control_active": True},
+                    "consistency_rollup": {"has_mismatch": False},
+                    "governance": {
+                        "requires_manual_review": False,
+                        "staleness_evaluated": False,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=diagnostics", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(
+            payload["result"]["diagnostics"]["statefile_ownership"],
+            {
+                "schema_version": "tdx.subscription_watch.statefile_ownership.v1",
+                "status": "owned_active",
+                "reason_codes": ["OWNED_ACTIVE"],
+                "statefile_exists": True,
+                "pidfile_exists": True,
+                "lockfile_exists": True,
+                "active": True,
+                "control_state": "running",
+                "payload_pid": 1234,
+                "owned_pid": 1234,
+                "pid_matches_owned_state": True,
+                "process_alive": True,
+                "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
+            },
+        )
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+
     def test_watch_status_summary_view_rejects_unknown_view(self) -> None:
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()

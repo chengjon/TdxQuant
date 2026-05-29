@@ -28,6 +28,10 @@ SUBSCRIPTION_WATCH_RESTART_BACKOFF_SCHEMA_VERSION = "tdx.subscription_watch.rest
 SUBSCRIPTION_WATCH_RESTART_BACKOFF_BOUNDARY = "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor"
 SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION = "tdx.subscription_watch.supervisor_tick.v1"
 SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY = "single_step_only;does_not_run_loop_or_schedule_retry"
+SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_SCHEMA_VERSION = "tdx.subscription_watch.statefile_ownership.v1"
+SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY = (
+    "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control"
+)
 SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
     "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes"
 )
@@ -711,6 +715,65 @@ def _read_owned_pid(paths: SubscriptionWatchBackgroundPaths) -> int:
     if not paths.pid_path.exists():
         return 0
     return _parse_pid(paths.pid_path.read_text(encoding="utf-8").strip())
+
+
+def build_background_statefile_ownership(
+    paths: SubscriptionWatchBackgroundPaths,
+    *,
+    control: dict[str, Any] | None = None,
+    pid_is_alive: Any = _pid_is_alive,
+) -> dict[str, Any]:
+    resolved_control = control if isinstance(control, dict) else {}
+    state = str(resolved_control.get("state") or ("stopped" if not paths.active_path.exists() else "unknown"))
+    active = bool(resolved_control.get("active")) and state in ACTIVE_PROCESS_STATES
+    payload_pid_value = _parse_pid(resolved_control.get("pid"))
+    owned_pid_value = _read_owned_pid(paths)
+    payload_pid = payload_pid_value if payload_pid_value > 0 else None
+    owned_pid = owned_pid_value if owned_pid_value > 0 else None
+    pid_matches_owned_state = payload_pid_value > 0 and owned_pid_value == payload_pid_value
+    process_alive = bool(payload_pid_value > 0 and pid_is_alive(payload_pid_value))
+
+    statefile_exists = paths.active_path.exists()
+    pidfile_exists = paths.pid_path.exists()
+    reason_codes: list[str]
+    if not statefile_exists:
+        status = "not_present"
+        reason_codes = ["STATEFILE_MISSING"]
+    elif active and pid_matches_owned_state and process_alive:
+        status = "owned_active"
+        reason_codes = ["OWNED_ACTIVE"]
+    elif active:
+        status = "mismatch"
+        reason_codes = []
+        if not pidfile_exists:
+            reason_codes.append("PIDFILE_MISSING")
+        if payload_pid_value <= 0:
+            reason_codes.append("PAYLOAD_PID_MISSING")
+        if not pid_matches_owned_state:
+            reason_codes.append("PID_MISMATCH")
+        if payload_pid_value > 0 and not process_alive:
+            reason_codes.append("PROCESS_NOT_ALIVE")
+        if not reason_codes:
+            reason_codes.append("ACTIVE_OWNERSHIP_UNKNOWN")
+    else:
+        status = "terminal"
+        reason_codes = ["TERMINAL_STATE"]
+
+    return {
+        "schema_version": SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_SCHEMA_VERSION,
+        "status": status,
+        "reason_codes": reason_codes,
+        "statefile_exists": statefile_exists,
+        "pidfile_exists": pidfile_exists,
+        "lockfile_exists": paths.lock_path.exists(),
+        "active": active,
+        "control_state": state,
+        "payload_pid": payload_pid,
+        "owned_pid": owned_pid,
+        "pid_matches_owned_state": pid_matches_owned_state,
+        "process_alive": process_alive,
+        "boundary": SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY,
+    }
 
 
 def _write_active_payload(paths: SubscriptionWatchBackgroundPaths, payload: dict[str, Any]) -> None:
@@ -1855,6 +1918,11 @@ class SubscriptionWatchBackgroundController:
         now_utc: datetime | str | None = None,
     ) -> dict[str, Any]:
         control = self._background_state()
+        statefile_ownership = build_background_statefile_ownership(
+            self.paths,
+            control=control,
+            pid_is_alive=self._pid_is_alive,
+        )
         resolved_run_id = self._resolve_run_id(run_id=run_id)
         watch_status = None
         if resolved_run_id is not None:
@@ -1871,6 +1939,7 @@ class SubscriptionWatchBackgroundController:
                 reconnect_stale_after_seconds=reconnect_stale_after_seconds,
                 now_utc=now_utc,
             ),
+            "statefile_ownership": statefile_ownership,
         }
 
     def list_runs(self) -> dict[str, Any]:

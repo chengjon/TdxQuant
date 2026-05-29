@@ -1259,6 +1259,21 @@ def test_status_view_returns_explicit_empty_watch_status_when_no_run_is_active(t
     assert status_view["status_summary"]["heartbeat"]["status"] == "missing"
     assert status_view["status_summary"]["watermark"]["event_count"] == 0
     assert status_view["status_summary"]["reconnect"]["reconnect_count"] == 0
+    assert status_view["statefile_ownership"] == {
+        "schema_version": "tdx.subscription_watch.statefile_ownership.v1",
+        "status": "not_present",
+        "reason_codes": ["STATEFILE_MISSING"],
+        "statefile_exists": False,
+        "pidfile_exists": False,
+        "lockfile_exists": False,
+        "active": False,
+        "control_state": "stopped",
+        "payload_pid": None,
+        "owned_pid": None,
+        "pid_matches_owned_state": False,
+        "process_alive": False,
+        "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
+    }
 
 
 def test_status_summary_keeps_heartbeat_staleness_not_evaluated_without_threshold() -> None:
@@ -1904,6 +1919,21 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
 
     assert status_view["control"]["run_id"] == "run-001"
     assert status_view["watch_status"]["event_count"] == 3
+    assert status_view["statefile_ownership"] == {
+        "schema_version": "tdx.subscription_watch.statefile_ownership.v1",
+        "status": "owned_active",
+        "reason_codes": ["OWNED_ACTIVE"],
+        "statefile_exists": True,
+        "pidfile_exists": True,
+        "lockfile_exists": True,
+        "active": True,
+        "control_state": "running",
+        "payload_pid": pid,
+        "owned_pid": pid,
+        "pid_matches_owned_state": True,
+        "process_alive": True,
+        "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
+    }
     assert status_view["status_summary"]["state"] == "running"
     assert status_view["status_summary"]["overall_status"] == "active"
     assert status_view["status_summary"]["run_id"] == "run-001"
@@ -1917,6 +1947,39 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
         "last_symbol": "688318.SH",
         "last_source_ts": None,
         "staleness": "not_evaluated",
+    }
+
+
+def test_status_view_reports_statefile_ownership_mismatch_for_unowned_startup_state(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": "starting",
+            "run_id": "run-001",
+            "pid": pid,
+            "reason": "startup_persistence_failed",
+            "active": True,
+        }
+    )
+
+    status_view = controller.status()
+
+    assert status_view["control"]["state"] == "starting"
+    assert status_view["statefile_ownership"] == {
+        "schema_version": "tdx.subscription_watch.statefile_ownership.v1",
+        "status": "mismatch",
+        "reason_codes": ["PIDFILE_MISSING", "PID_MISMATCH"],
+        "statefile_exists": True,
+        "pidfile_exists": False,
+        "lockfile_exists": False,
+        "active": True,
+        "control_state": "starting",
+        "payload_pid": pid,
+        "owned_pid": None,
+        "pid_matches_owned_state": False,
+        "process_alive": True,
+        "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
     }
     assert status_view["status_summary"]["governance"]["decision"] == "observe"
     assert status_view["status_summary"]["governance"]["staleness_evaluated"] is False
