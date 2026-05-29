@@ -31,6 +31,7 @@
     "profile": "submit_once",
     "title_key": "平安证券",
     "options": {
+      "side": "buy",
       "port": "COM3",
       "baudrate": 115200,
       "timeout": 2.0,

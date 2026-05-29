@@ -3150,6 +3150,7 @@ def _build_catalog_step_source_resolved_arg_key_counts(steps: object) -> dict[st
 CATALOG_TRADE_PLAN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
     "trade-buy": ("port", "code", "price", "quantity"),
     "trade-sell": ("port", "code", "price", "quantity"),
+    "submit-once": ("side", "port", "code", "price", "quantity"),
     "trade-submit-once": ("side", "port", "code", "price", "quantity"),
     "trade-submit-ready": ("port", "code", "price", "quantity"),
     "guarded-trade-buy": ("port", "code", "price", "quantity"),
@@ -3160,6 +3161,7 @@ CATALOG_TRADE_PLAN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
 CATALOG_TRADE_PLAN_INPUT_KIND: dict[str, str] = {
     "trade-buy": "order",
     "trade-sell": "order",
+    "submit-once": "submit_once_order",
     "trade-submit-once": "submit_once_order",
     "trade-submit-ready": "submit_ready_order",
     "guarded-trade-buy": "guarded_order",
@@ -3210,7 +3212,7 @@ def _build_catalog_trade_plan_boundary(
         "input_coverage_status": _derive_catalog_input_coverage_status(required_fields, missing_fields),
     }
     side = args.get("side")
-    if command_name == "trade-submit-once" and isinstance(side, str):
+    if command_name in {"submit-once", "trade-submit-once"} and isinstance(side, str):
         boundary["side"] = side
     return boundary
 

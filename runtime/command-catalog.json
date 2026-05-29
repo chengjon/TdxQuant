@@ -657,7 +657,7 @@
     "source": "trade",
     "preset": "submit-once-default",
     "description": "统一入口下的完整提交流程模板。",
-    "labels": ["trade", "submit", "full-flow"]
+    "labels": ["trade", "submit", "submit-once", "full-flow"]
   },
   "broker-capabilities": {
     "source": "trade",
