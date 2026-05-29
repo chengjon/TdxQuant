@@ -24,6 +24,7 @@ def build_subscription_watch_status_diagnostics(
     evaluation_rollup = governance.get("evaluation_summary")
     evaluation_rollup = evaluation_rollup if isinstance(evaluation_rollup, dict) else {}
     restartability = _build_restartability_diagnostics(status_payload)
+    restart_observation = _build_restart_observation_diagnostics(status_payload)
 
     return {
         "has_control_rollup": bool(control_rollup),
@@ -39,6 +40,7 @@ def build_subscription_watch_status_diagnostics(
         "has_not_evaluated_component": bool(evaluation_rollup.get("has_not_evaluated_component")),
         "all_components_evaluated": bool(evaluation_rollup.get("all_components_evaluated")),
         "restartability": restartability,
+        "restart_observation": restart_observation,
         "boundary": governance.get("boundary"),
     }
 
@@ -98,3 +100,30 @@ def _restartability_start_request_valid(start_request: dict[str, Any]) -> bool:
     ):
         return False
     return True
+
+
+def _build_restart_observation_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any]:
+    payload = status_payload if isinstance(status_payload, dict) else {}
+    control = payload.get("control")
+    control = control if isinstance(control, dict) else {}
+    observation = control.get("last_restart_observation")
+    if not isinstance(observation, dict):
+        return {"has_observation": False}
+
+    start_request_summary = observation.get("start_request_summary")
+    if isinstance(start_request_summary, dict):
+        start_request_summary = dict(start_request_summary)
+    else:
+        start_request_summary = None
+
+    return {
+        "has_observation": True,
+        "status": observation.get("status"),
+        "previous_run_id": observation.get("previous_run_id"),
+        "new_run_id": observation.get("new_run_id"),
+        "reason": observation.get("reason"),
+        "stop_state": observation.get("stop_state"),
+        "start_state": observation.get("start_state"),
+        "start_request_summary": start_request_summary,
+        "boundary": observation.get("boundary"),
+    }

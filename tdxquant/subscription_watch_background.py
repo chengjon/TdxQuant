@@ -21,6 +21,8 @@ DEFAULT_START_TIMEOUT_SECONDS = 10
 DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
 ACTIVE_PROCESS_STATES = {"starting", "running", "reconnecting", "degraded", "stopping"}
 SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION = "tdx.subscription_watch.status_summary.v1"
+SUBSCRIPTION_WATCH_RESTART_OBSERVATION_SCHEMA_VERSION = "tdx.subscription_watch.restart_observation.v1"
+SUBSCRIPTION_WATCH_RESTART_OBSERVATION_BOUNDARY = "observation_only;does_not_schedule_restart_backoff_or_supervisor"
 SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
     "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes"
 )
@@ -1140,6 +1142,41 @@ class SubscriptionWatchBackgroundController:
             is None
         )
 
+    def _build_restart_observation(
+        self,
+        *,
+        previous_run_id: Any,
+        new_run_id: Any,
+        reason: str,
+        stop_payload: dict[str, Any],
+        start_payload: dict[str, Any],
+        start_request: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "schema_version": SUBSCRIPTION_WATCH_RESTART_OBSERVATION_SCHEMA_VERSION,
+            "status": "succeeded",
+            "previous_run_id": previous_run_id,
+            "new_run_id": new_run_id,
+            "reason": reason,
+            "stop_state": stop_payload.get("state"),
+            "start_state": start_payload.get("state"),
+            "start_request_summary": self._restart_preflight_start_request_summary(start_request),
+            "boundary": SUBSCRIPTION_WATCH_RESTART_OBSERVATION_BOUNDARY,
+        }
+
+    def _persist_restart_observation(self, observation: dict[str, Any]) -> None:
+        new_run_id = observation.get("new_run_id")
+        if new_run_id is None:
+            return
+        active_payload = read_active_payload(self.paths)
+        if not isinstance(active_payload, dict):
+            return
+        if str(active_payload.get("run_id") or "") != str(new_run_id):
+            return
+        active_payload = dict(active_payload)
+        active_payload["last_restart_observation"] = copy.deepcopy(observation)
+        self._write_active_state(active_payload)
+
     def _background_state(self) -> dict[str, Any]:
         payload = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
         if isinstance(payload, dict):
@@ -1561,6 +1598,15 @@ class SubscriptionWatchBackgroundController:
                 },
             }
 
+        restart_observation = self._build_restart_observation(
+            previous_run_id=previous_run_id,
+            new_run_id=start_payload.get("run_id"),
+            reason=restart_reason,
+            stop_payload=stop_payload,
+            start_payload=start_payload,
+            start_request=start_request,
+        )
+        self._persist_restart_observation(restart_observation)
         return {
             "ok": True,
             "result": {
@@ -1571,6 +1617,7 @@ class SubscriptionWatchBackgroundController:
                 "stop_result": stop_payload,
                 "start_result": start_payload,
                 "start_request": copy.deepcopy(start_request),
+                "last_restart_observation": restart_observation,
             },
         }
 

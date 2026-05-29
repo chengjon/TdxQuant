@@ -597,6 +597,16 @@ def test_restart_uses_persisted_start_request_for_replacement_run(
 
     def fake_start(**kwargs: object) -> dict[str, object]:
         start_calls.append(dict(kwargs))
+        controller._write_active_state(
+            {
+                "state": "running",
+                "run_id": "run-002",
+                "pid": os.getpid(),
+                "reason": None,
+                "active": True,
+                "start_request": start_request,
+            }
+        )
         return {
             "ok": True,
             "result": {
@@ -619,6 +629,24 @@ def test_restart_uses_persisted_start_request_for_replacement_run(
     assert result["result"]["start_request"] == start_request
     assert result["result"]["stop_result"] == {"run_id": "run-001", "state": "stopped"}
     assert result["result"]["start_result"]["run_id"] == "run-002"
+    expected_observation = {
+        "schema_version": "tdx.subscription_watch.restart_observation.v1",
+        "status": "succeeded",
+        "previous_run_id": "run-001",
+        "new_run_id": "run-002",
+        "reason": "operator_restart",
+        "stop_state": "stopped",
+        "start_state": "running",
+        "start_request_summary": {
+            "stock_count": 2,
+            "has_max_events": True,
+            "has_max_seconds": True,
+            "has_poll_interval": True,
+        },
+        "boundary": "observation_only;does_not_schedule_restart_backoff_or_supervisor",
+    }
+    assert result["result"]["last_restart_observation"] == expected_observation
+    assert read_active_payload(controller.paths)["last_restart_observation"] == expected_observation
     assert stop_calls == [{"reason": "operator_restart", "grace_period_seconds": 2}]
     assert start_calls == [
         {
