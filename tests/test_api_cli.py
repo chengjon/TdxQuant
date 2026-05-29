@@ -248,6 +248,22 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.reason, "operator_restart")
         self.assertEqual(args.grace_period_seconds, 2)
 
+    def test_bridge_watch_restart_preflight_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-restart-preflight",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+            ]
+        )
+        self.assertEqual(args.bridge_command, "watch-restart-preflight")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+
     def test_api_capabilities_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "capabilities"])
@@ -10761,6 +10777,33 @@ class ReportCliDispatchTests(unittest.TestCase):
             grace_period_seconds=2,
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "restarted"}})
+
+    def test_handle_bridge_watch_restart_preflight_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-restart-preflight",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+            ]
+        )
+        with (
+            patch(
+                "tdxquant.cli.run_bridge_watch_restart_preflight",
+                return_value={"ok": True, "result": {"ready": True}},
+            ) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"ready": True}})
 
     def test_handle_bridge_watch_status_summary_view_projects_governance_rollup(self) -> None:
         args = build_parser().parse_args(

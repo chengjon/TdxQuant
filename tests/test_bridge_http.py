@@ -17,6 +17,7 @@ class _FakeController:
         self.start_calls: list[dict[str, object]] = []
         self.stop_calls: list[dict[str, object]] = []
         self.restart_calls: list[dict[str, object]] = []
+        self.restart_preflight_calls = 0
         self.status_calls: list[dict[str, object]] = []
         self.control_status_calls = 0
         self.status_handler = None
@@ -32,6 +33,15 @@ class _FakeController:
                 "status": "restarted",
                 "previous_run_id": "run-001",
                 "new_run_id": "run-002",
+            },
+        }
+        self.restart_preflight_result: dict[str, object] = {
+            "ok": True,
+            "result": {
+                "schema_version": "tdx.subscription_watch.restart_preflight.v1",
+                "ready": True,
+                "decision": "ready",
+                "reason_codes": [],
             },
         }
         self.status_result: dict[str, object] = {
@@ -54,6 +64,10 @@ class _FakeController:
     def restart(self, **kwargs: object) -> dict[str, object]:
         self.restart_calls.append(dict(kwargs))
         return dict(self.restart_result)
+
+    def restart_preflight(self) -> dict[str, object]:
+        self.restart_preflight_calls += 1
+        return dict(self.restart_preflight_result)
 
     def status(self, **kwargs: object) -> dict[str, object]:
         self.status_calls.append(dict(kwargs))
@@ -345,6 +359,32 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                     controller.restart_calls[0],
                     {"reason": "operator_restart", "grace_period_seconds": 2},
                 )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_restart_preflight_dispatches_to_controller(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(
+                    f"{base_url}/bridge/v1/watch/restart-preflight",
+                    token="secret-token",
+                )
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["schema_version"], "tdx.subscription_watch.restart_preflight.v1")
+                self.assertTrue(payload["result"]["ready"])
+                self.assertEqual(controller.restart_preflight_calls, 1)
             finally:
                 server.shutdown()
                 server.server_close()

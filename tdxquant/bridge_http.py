@@ -457,6 +457,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if method == "POST" and parsed.path == "/bridge/v1/watch/restart":
                 self._handle_watch_restart(request_id)
                 return
+            if method == "GET" and parsed.path == "/bridge/v1/watch/restart-preflight":
+                self._handle_watch_restart_preflight(request_id)
+                return
             if method == "GET" and parsed.path == "/bridge/v1/watch/status":
                 self._handle_watch_status(request_id)
                 return
@@ -540,6 +543,10 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             reason=self._optional_str(body.get("reason")),
             grace_period_seconds=grace_period,
         )
+        self._write_control_result(result, request_id=request_id)
+
+    def _handle_watch_restart_preflight(self, request_id: str) -> None:
+        result = self.server.bridge_controller.restart_preflight()
         self._write_control_result(result, request_id=request_id)
 
     def _handle_watch_status(self, request_id: str) -> None:

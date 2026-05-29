@@ -289,6 +289,16 @@ def run_bridge_watch_restart(
     )
 
 
+def run_bridge_watch_restart_preflight(*, registry_path: str | Path, worker_id: str) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    return call_worker(
+        worker,
+        method="GET",
+        route="/bridge/v1/watch/restart-preflight",
+        token=resolve_worker_token(worker),
+    )
+
+
 def _resolve_worker(*, registry_path: str | Path, worker_id: str) -> BridgeWorker:
     return select_worker(load_worker_registry(registry_path), worker_id=worker_id)
 

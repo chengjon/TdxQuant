@@ -43,6 +43,7 @@ from .desktop.inspect import enumerate_controls, find_main_window
 from .bridge_registry import (
     run_bridge_watch_event_stream,
     run_bridge_watch_events,
+    run_bridge_watch_restart_preflight,
     run_bridge_watch_restart,
     run_bridge_watch_start,
     run_bridge_watch_status,
@@ -730,6 +731,10 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_restart_parser.add_argument("--worker", required=True)
     bridge_watch_restart_parser.add_argument("--reason")
     bridge_watch_restart_parser.add_argument("--grace-period-seconds", type=int)
+
+    bridge_watch_restart_preflight_parser = bridge_subparsers.add_parser("watch-restart-preflight")
+    bridge_watch_restart_preflight_parser.add_argument("--registry", required=True)
+    bridge_watch_restart_preflight_parser.add_argument("--worker", required=True)
 
     return bridge_parser
 
@@ -5965,6 +5970,13 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                     worker_id=args.worker,
                     reason=args.reason,
                     grace_period_seconds=args.grace_period_seconds,
+                )
+            )
+        if args.bridge_command == "watch-restart-preflight":
+            return _emit_bridge_payload(
+                run_bridge_watch_restart_preflight(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
                 )
             )
         return 2

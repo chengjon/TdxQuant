@@ -658,6 +658,106 @@ def test_restart_rejects_active_run_without_persisted_start_request(
     start.assert_not_called()
 
 
+def test_restart_preflight_reports_ready_for_active_run_with_start_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": os.getpid(),
+            "reason": None,
+            "active": True,
+            "start_request": {
+                "stock_list": ["600519.SH", "000001.SZ"],
+                "max_events": 10,
+                "max_seconds": 30.0,
+                "poll_interval": 0.5,
+            },
+        }
+    )
+    controller.paths.pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    stop = Mock()
+    start = Mock()
+    monkeypatch.setattr(controller, "stop", stop)
+    monkeypatch.setattr(controller, "start", start)
+
+    result = controller.restart_preflight()
+
+    assert result["ok"] is True
+    assert result["result"]["schema_version"] == "tdx.subscription_watch.restart_preflight.v1"
+    assert result["result"]["ready"] is True
+    assert result["result"]["decision"] == "ready"
+    assert result["result"]["reason_codes"] == []
+    assert result["result"]["run_id"] == "run-001"
+    assert result["result"]["state"] == "running"
+    assert result["result"]["active"] is True
+    assert result["result"]["has_start_request"] is True
+    assert result["result"]["start_request_summary"] == {
+        "stock_count": 2,
+        "has_max_events": True,
+        "has_max_seconds": True,
+        "has_poll_interval": True,
+    }
+    assert result["result"]["boundary"] == "read_only;does_not_stop_start_or_schedule_restart"
+    stop.assert_not_called()
+    start.assert_not_called()
+
+
+def test_restart_preflight_reports_missing_active_run(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+
+    result = controller.restart_preflight()
+
+    assert result["ok"] is True
+    assert result["result"]["ready"] is False
+    assert result["result"]["decision"] == "blocked"
+    assert result["result"]["reason_codes"] == ["NO_ACTIVE_RUN"]
+    assert result["result"]["has_start_request"] is False
+    assert result["result"]["start_request_summary"] is None
+
+
+def test_restart_preflight_reports_missing_or_invalid_start_request(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    pid = os.getpid()
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
+
+    missing = controller.restart_preflight()
+    assert missing["result"]["ready"] is False
+    assert missing["result"]["reason_codes"] == ["MISSING_START_REQUEST"]
+
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": pid,
+            "reason": None,
+            "active": True,
+            "start_request": {"stock_list": [], "max_events": 10, "max_seconds": 30.0, "poll_interval": 0.5},
+        }
+    )
+
+    invalid = controller.restart_preflight()
+    assert invalid["result"]["ready"] is False
+    assert invalid["result"]["reason_codes"] == ["INVALID_START_REQUEST"]
+    assert invalid["result"]["start_request_summary"] == {
+        "stock_count": 0,
+        "has_max_events": True,
+        "has_max_seconds": True,
+        "has_poll_interval": True,
+    }
+
+
 def test_stop_returns_run_id_and_coherent_terminal_state_when_process_exits(tmp_path: Path) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     pid = os.getpid()

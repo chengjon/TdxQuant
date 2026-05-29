@@ -1072,6 +1072,74 @@ class SubscriptionWatchBackgroundController:
             result["replayed"] = True
         return {"ok": True, "result": result}
 
+    def _restart_preflight_state(self) -> dict[str, Any]:
+        try:
+            payload = read_active_payload(self.paths)
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            return {
+                "state": "stopped",
+                "active": False,
+                "run_id": None,
+                "pid": None,
+                "reason": None,
+            }
+        state = str(payload.get("state") or "failed")
+        if state not in ACTIVE_PROCESS_STATES:
+            current = dict(payload)
+            current["active"] = False
+            return current
+        payload_pid = _parse_pid(payload.get("pid"))
+        owned_pid = _read_owned_pid(self.paths)
+        if payload_pid <= 0 or owned_pid != payload_pid or not self._pid_is_alive(payload_pid):
+            current = dict(payload)
+            current["state"] = "stopped" if state == "stopping" else "failed"
+            current["active"] = False
+            current["reason"] = (
+                str(payload.get("reason") or "operator_stop") if state == "stopping" else "stale_process_state"
+            )
+            return current
+        return dict(payload)
+
+    def _restart_preflight_start_request_summary(self, start_request: Any) -> dict[str, Any] | None:
+        if not isinstance(start_request, dict):
+            return None
+        stock_list = start_request.get("stock_list")
+        return {
+            "stock_count": len(stock_list) if isinstance(stock_list, list) else 0,
+            "has_max_events": start_request.get("max_events") is not None,
+            "has_max_seconds": start_request.get("max_seconds") is not None,
+            "has_poll_interval": start_request.get("poll_interval") is not None,
+        }
+
+    def _restart_preflight_start_request_valid(self, start_request: Any) -> bool:
+        if not isinstance(start_request, dict):
+            return False
+        stock_list = start_request.get("stock_list")
+        max_events = start_request.get("max_events")
+        max_seconds = start_request.get("max_seconds")
+        poll_interval = start_request.get("poll_interval")
+        if not isinstance(stock_list, list) or not stock_list or not all(isinstance(item, str) for item in stock_list):
+            return False
+        if max_events is not None and (isinstance(max_events, bool) or not isinstance(max_events, int)):
+            return False
+        if max_seconds is not None and (isinstance(max_seconds, bool) or not isinstance(max_seconds, (int, float))):
+            return False
+        if poll_interval is not None and (
+            isinstance(poll_interval, bool) or not isinstance(poll_interval, (int, float))
+        ):
+            return False
+        return (
+            self._validate_start_request(
+                stock_list=list(stock_list),
+                max_events=max_events,
+                max_seconds=max_seconds,
+                poll_interval=poll_interval,
+            )
+            is None
+        )
+
     def _background_state(self) -> dict[str, Any]:
         payload = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
         if isinstance(payload, dict):
@@ -1503,6 +1571,36 @@ class SubscriptionWatchBackgroundController:
                 "stop_result": stop_payload,
                 "start_result": start_payload,
                 "start_request": copy.deepcopy(start_request),
+            },
+        }
+
+    def restart_preflight(self) -> dict[str, Any]:
+        current = self._restart_preflight_state()
+        state = current.get("state")
+        active = state in ACTIVE_PROCESS_STATES
+        start_request = current.get("start_request")
+        reason_codes: list[str] = []
+        if not active:
+            reason_codes.append("NO_ACTIVE_RUN")
+        elif not isinstance(start_request, dict):
+            reason_codes.append("MISSING_START_REQUEST")
+        elif not self._restart_preflight_start_request_valid(start_request):
+            reason_codes.append("INVALID_START_REQUEST")
+
+        ready = not reason_codes
+        return {
+            "ok": True,
+            "result": {
+                "schema_version": "tdx.subscription_watch.restart_preflight.v1",
+                "ready": ready,
+                "decision": "ready" if ready else "blocked",
+                "reason_codes": reason_codes,
+                "run_id": current.get("run_id"),
+                "state": state,
+                "active": active,
+                "has_start_request": isinstance(start_request, dict),
+                "start_request_summary": self._restart_preflight_start_request_summary(start_request),
+                "boundary": "read_only;does_not_stop_start_or_schedule_restart",
             },
         }
 
