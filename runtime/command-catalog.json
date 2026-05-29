@@ -671,6 +671,12 @@
     "description": "统一入口下的平安桌面 preflight 只读 readiness 模板。",
     "labels": ["trade", "pingan", "preflight", "readiness", "diagnostics"]
   },
+  "trade-health-pingan-readiness": {
+    "source": "trade",
+    "preset": "health-pingan-readiness",
+    "description": "统一入口下的平安桌面 health 只读 readiness 模板。",
+    "labels": ["trade", "pingan", "health", "readiness", "diagnostics"]
+  },
   "guarded-buy": {
     "source": "task",
     "preset": "guarded-default",

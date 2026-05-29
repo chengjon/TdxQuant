@@ -8,6 +8,7 @@ from typing import Any
 TRADE_COMMAND_DEFAULT_PROFILES: dict[str, str] = {
     "broker-capabilities": "balanced",
     "buy": "balanced",
+    "health": "balanced",
     "preflight": "balanced",
     "submit-once": "submit_once",
 }

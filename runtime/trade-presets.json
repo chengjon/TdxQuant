@@ -50,6 +50,18 @@
       "pre_delay": 0.0
     }
   },
+  "health-pingan-readiness": {
+    "command": "health",
+    "description": "平安证券 health 只读 readiness 模板，固定环境参数用于 broker/HID 健康检查。",
+    "profile": "balanced",
+    "title_key": "平安证券",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "pre_delay": 0.0
+    }
+  },
   "broker-capabilities-default": {
     "command": "broker-capabilities",
     "description": "平安证券桌面扩展 broker capability 只读边界探针。",
