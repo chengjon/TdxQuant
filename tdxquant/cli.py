@@ -2699,6 +2699,7 @@ def _build_trade_preset_namespace(args: argparse.Namespace) -> argparse.Namespac
     required_fields_by_command = {
         "broker-capabilities": (),
         "buy": ("port", "code", "price", "quantity"),
+        "preflight": ("port", "code", "price", "quantity"),
         "submit-once": ("port", "code", "price", "quantity"),
     }
     missing_required = [name for name in required_fields_by_command.get(command_name, ()) if merged.get(name) is None]
@@ -3151,6 +3152,7 @@ CATALOG_TRADE_PLAN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
     "trade-submit-once": ("side", "port", "code", "price", "quantity"),
     "trade-submit-ready": ("port", "code", "price", "quantity"),
     "guarded-trade-buy": ("port", "code", "price", "quantity"),
+    "preflight": ("port", "code", "price", "quantity"),
     "trade-confirm-current": (),
 }
 CATALOG_TRADE_PLAN_INPUT_KIND: dict[str, str] = {
@@ -3159,6 +3161,7 @@ CATALOG_TRADE_PLAN_INPUT_KIND: dict[str, str] = {
     "trade-submit-once": "submit_once_order",
     "trade-submit-ready": "submit_ready_order",
     "guarded-trade-buy": "guarded_order",
+    "preflight": "preflight_order_readiness",
     "trade-confirm-current": "confirmation",
 }
 

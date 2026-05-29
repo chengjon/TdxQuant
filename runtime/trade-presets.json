@@ -38,6 +38,18 @@
       "close_result_dialog": true
     }
   },
+  "preflight-pingan-readiness": {
+    "command": "preflight",
+    "description": "平安证券 preflight 只读 readiness 模板，固定环境参数，保留 code/price/quantity 动态输入。",
+    "profile": "balanced",
+    "title_key": "平安证券",
+    "options": {
+      "port": "COM3",
+      "baudrate": 115200,
+      "timeout": 2.0,
+      "pre_delay": 0.0
+    }
+  },
   "broker-capabilities-default": {
     "command": "broker-capabilities",
     "description": "平安证券桌面扩展 broker capability 只读边界探针。",

@@ -6506,6 +6506,18 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(entry["preset"], "buy-submit-once-default")
         self.assertIn("buy-submit-once", entry["labels"])
 
+    def test_handle_catalog_list_exposes_trade_preflight_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "preflight", "--view", "summary"])
+        result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        entry = next(row for row in output_payload["entries"] if row["name"] == "trade-preflight-pingan-readiness")
+        self.assertEqual(entry["source"], "trade")
+        self.assertEqual(entry["command"], "preflight")
+        self.assertIn("preflight", entry["labels"])
+        self.assertIn("readiness", entry["labels"])
+
     def test_handle_catalog_bundle_list_returns_read_zxg_review_metadata(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "bundle", "--bundle", "read-zxg-review"])
@@ -7362,6 +7374,63 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(boundary["missing_input_count"], 3)
         self.assertEqual(boundary["input_coverage_status"], "missing_required_inputs")
         self.assertEqual(boundary["dispatch_executed"], False)
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_trade_preflight_summary_exposes_readiness_boundary(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--entry",
+                "trade-preflight-pingan-readiness",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--view",
+                "summary",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        self.assertEqual(output_payload["dispatch"]["command_group"], "trade")
+        self.assertEqual(output_payload["dispatch"]["command_name"], "preflight")
+        boundary = output_payload["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "preflight")
+        self.assertEqual(boundary["input_kind"], "preflight_order_readiness")
+        self.assertEqual(boundary["execution_mode"], "non_executing_catalog_plan")
+        self.assertEqual(boundary["dispatch_executed"], False)
+        self.assertEqual(boundary["required_input_fields"], ["port", "code", "price", "quantity"])
+        self.assertEqual(boundary["provided_input_fields"], ["port", "code", "price", "quantity"])
+        self.assertEqual(boundary["missing_input_fields"], [])
+        self.assertEqual(boundary["input_coverage_status"], "complete")
+        self.assertEqual(output_payload["constraints"]["execution_mode"], "non_executing")
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_trade_preflight_summary_marks_missing_order_inputs(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "trade-preflight-pingan-readiness", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        boundary = output_payload["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "preflight")
+        self.assertEqual(boundary["input_kind"], "preflight_order_readiness")
+        self.assertEqual(boundary["required_input_fields"], ["port", "code", "price", "quantity"])
+        self.assertEqual(boundary["provided_input_fields"], ["port"])
+        self.assertEqual(boundary["missing_input_fields"], ["code", "price", "quantity"])
+        self.assertEqual(boundary["required_input_count"], 4)
+        self.assertEqual(boundary["provided_input_count"], 1)
+        self.assertEqual(boundary["missing_input_count"], 3)
+        self.assertEqual(boundary["input_coverage_status"], "missing_required_inputs")
+        self.assertEqual(boundary["dispatch_executed"], False)
+        self.assertEqual(output_payload["constraints"]["dispatch_executed"], False)
         mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_confirm_current_summary_marks_no_required_inputs(self) -> None:
