@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 import errno
 import fcntl
@@ -799,8 +800,9 @@ def _build_active_payload(
     reason: str | None,
     log_path: Path | None = None,
     idempotency_key: str | None = None,
+    start_request: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    payload = {
         "state": state,
         "active": state in ACTIVE_PROCESS_STATES,
         "run_id": run_id,
@@ -808,6 +810,24 @@ def _build_active_payload(
         "reason": reason,
         "runner_log_path": str(log_path) if log_path is not None else None,
         "idempotency_key": idempotency_key,
+    }
+    if start_request is not None:
+        payload["start_request"] = copy.deepcopy(start_request)
+    return payload
+
+
+def _build_start_request_payload(
+    *,
+    stock_list: list[str],
+    max_events: int | None,
+    max_seconds: float | None,
+    poll_interval: float | None,
+) -> dict[str, Any]:
+    return {
+        "stock_list": list(stock_list),
+        "max_events": max_events,
+        "max_seconds": float(max_seconds) if max_seconds is not None else None,
+        "poll_interval": float(poll_interval) if poll_interval is not None else None,
     }
 
 
@@ -1045,6 +1065,9 @@ class SubscriptionWatchBackgroundController:
             "state": payload.get("state"),
             "runner_log_path": payload.get("runner_log_path"),
         }
+        start_request = payload.get("start_request")
+        if isinstance(start_request, dict):
+            result["start_request"] = copy.deepcopy(start_request)
         if replayed:
             result["replayed"] = True
         return {"ok": True, "result": result}
@@ -1172,6 +1195,12 @@ class SubscriptionWatchBackgroundController:
 
                 previous_active_payload = read_active_payload(self.paths)
                 run_paths = build_subscription_watch_run_paths(self.paths.root_dir)
+                start_request = _build_start_request_payload(
+                    stock_list=list(stock_list),
+                    max_events=max_events,
+                    max_seconds=max_seconds,
+                    poll_interval=poll_interval,
+                )
                 try:
                     process = self._spawn_runner_process(
                         run_id=run_paths.run_id,
@@ -1195,6 +1224,7 @@ class SubscriptionWatchBackgroundController:
                             reason=None,
                             log_path=run_paths.runner_log_path,
                             idempotency_key=idempotency_key,
+                            start_request=start_request,
                         )
                     )
                 except Exception:

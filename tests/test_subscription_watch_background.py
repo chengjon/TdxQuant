@@ -416,18 +416,36 @@ def test_start_replays_current_active_run_for_same_idempotency_key(tmp_path: Pat
             "active": True,
             "runner_log_path": str(tmp_path / "run-001" / "runner.log"),
             "idempotency_key": "idem-001",
+            "start_request": {
+                "stock_list": ["600519.SH"],
+                "max_events": 10,
+                "max_seconds": 30.0,
+                "poll_interval": 0.5,
+            },
         }
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
 
-    result = controller.start(stock_list=["600519.SH"], idempotency_key="idem-001")
+    result = controller.start(
+        stock_list=["000001.SZ"],
+        max_events=20,
+        max_seconds=60.0,
+        poll_interval=1.0,
+        idempotency_key="idem-001",
+    )
 
     assert result["ok"] is True
     assert result["result"]["run_id"] == "run-001"
     assert result["result"]["state"] == "running"
     assert result["result"]["pid"] == pid
     assert result["result"]["replayed"] is True
+    assert result["result"]["start_request"] == {
+        "stock_list": ["600519.SH"],
+        "max_events": 10,
+        "max_seconds": 30.0,
+        "poll_interval": 0.5,
+    }
 
 
 @pytest.mark.parametrize(
@@ -507,6 +525,46 @@ def test_start_returns_start_timeout_when_runner_never_leaves_starting(
     assert result["error"]["details"]["state"] == "starting"
     assert persisted["state"] == "starting"
     assert persisted["active"] is True
+
+
+def test_start_persists_start_request_metadata_in_active_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(
+        root_dir=tmp_path,
+        python_executable="python",
+        start_timeout_seconds=0.0,
+    )
+
+    class FakeProcess:
+        pid = 4321
+
+    monkeypatch.setattr(controller, "_spawn_runner_process", lambda **kwargs: FakeProcess())
+    monkeypatch.setattr("tdxquant.subscription_watch_background.time.sleep", lambda _: None)
+    controller._pid_is_alive = Mock(return_value=True)
+
+    result = controller.start(
+        stock_list=["600519.SH", "000001.SZ"],
+        max_events=10,
+        max_seconds=30.0,
+        poll_interval=0.5,
+    )
+    persisted = read_active_payload(controller.paths)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "START_TIMEOUT"
+    assert result["error"]["details"]["start_request"] == {
+        "stock_list": ["600519.SH", "000001.SZ"],
+        "max_events": 10,
+        "max_seconds": 30.0,
+        "poll_interval": 0.5,
+    }
+    assert persisted["start_request"] == {
+        "stock_list": ["600519.SH", "000001.SZ"],
+        "max_events": 10,
+        "max_seconds": 30.0,
+        "poll_interval": 0.5,
+    }
 
 
 def test_stop_returns_run_id_and_coherent_terminal_state_when_process_exits(tmp_path: Path) -> None:
