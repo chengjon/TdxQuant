@@ -1424,6 +1424,88 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertNotIn("control", payload["result"])
         self.assertNotIn("watch_status", payload["result"])
 
+    def test_watch_status_diagnostics_view_projects_supervisor_tick_observation(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {
+                    "state": "restart_backoff",
+                    "active": False,
+                    "run_id": "run-001",
+                    "pid": None,
+                    "last_supervisor_tick_observation": {
+                        "schema_version": "tdx.subscription_watch.supervisor_tick_observation.v1",
+                        "status": "recovered",
+                        "decision": "recovered",
+                        "action_taken": True,
+                        "reason_codes": [],
+                        "previous_run_id": "run-001",
+                        "new_run_id": "run-002",
+                        "reason": "manual_tick",
+                        "start_request_summary": {
+                            "stock_count": 2,
+                            "has_max_events": True,
+                            "has_max_seconds": True,
+                            "has_poll_interval": True,
+                        },
+                        "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+                        "start_result": {"run_id": "run-002"},
+                        "restart_backoff": {"status": "expired"},
+                    },
+                },
+                "watch_status": None,
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "control_rollup": {"control_state": "restart_backoff", "control_active": False},
+                    "consistency_rollup": {"has_mismatch": False},
+                    "governance": {
+                        "requires_manual_review": False,
+                        "staleness_evaluated": False,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=diagnostics", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(
+            payload["result"]["diagnostics"]["supervisor_tick_observation"],
+            {
+                "schema_version": "tdx.subscription_watch.supervisor_tick_observation.v1",
+                "status": "recovered",
+                "decision": "recovered",
+                "action_taken": True,
+                "reason_codes": [],
+                "previous_run_id": "run-001",
+                "new_run_id": "run-002",
+                "reason": "manual_tick",
+                "start_request_summary": {
+                    "stock_count": 2,
+                    "has_max_events": True,
+                    "has_max_seconds": True,
+                    "has_poll_interval": True,
+                },
+                "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+            },
+        )
+        self.assertNotIn("start_result", payload["result"]["diagnostics"]["supervisor_tick_observation"])
+        self.assertNotIn("restart_backoff", payload["result"]["diagnostics"]["supervisor_tick_observation"])
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+
     def test_watch_status_summary_view_rejects_unknown_view(self) -> None:
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()

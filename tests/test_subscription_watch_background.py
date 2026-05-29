@@ -775,6 +775,7 @@ def test_supervisor_tick_waits_during_active_restart_backoff(
     monkeypatch.setattr(controller, "stop", stop)
 
     result = controller.supervisor_tick(reason="manual_tick")
+    persisted = read_active_payload(controller.paths)
 
     assert result == {
         "ok": True,
@@ -788,6 +789,16 @@ def test_supervisor_tick_waits_during_active_restart_backoff(
             "boundary": "single_step_only;does_not_run_loop_or_schedule_retry",
         },
     }
+    assert persisted["last_supervisor_tick_observation"] == {
+        "schema_version": "tdx.subscription_watch.supervisor_tick_observation.v1",
+        "status": "waiting",
+        "decision": "wait",
+        "action_taken": False,
+        "reason_codes": ["BACKOFF_ACTIVE"],
+        "reason": "manual_tick",
+        "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+    }
+    assert "restart_backoff" not in persisted["last_supervisor_tick_observation"]
     start.assert_not_called()
     stop.assert_not_called()
 
@@ -835,12 +846,22 @@ def test_supervisor_tick_recovers_once_after_restart_backoff_expires(
 
     def fake_start(**kwargs: object) -> dict[str, object]:
         start_calls.append(dict(kwargs))
+        controller._write_active_state(
+            {
+                "state": "running",
+                "active": True,
+                "run_id": "run-002",
+                "pid": 4321,
+                "start_request": start_request,
+            }
+        )
         return {"ok": True, "result": {"run_id": "run-002", "state": "running", "start_request": start_request}}
 
     monkeypatch.setattr(controller, "start", fake_start)
     monkeypatch.setattr(controller, "stop", stop)
 
     result = controller.supervisor_tick(reason="manual_tick")
+    persisted = read_active_payload(controller.paths)
 
     assert result["ok"] is True
     assert result["result"]["schema_version"] == "tdx.subscription_watch.supervisor_tick.v1"
@@ -856,6 +877,24 @@ def test_supervisor_tick_recovers_once_after_restart_backoff_expires(
         "has_max_seconds": True,
         "has_poll_interval": True,
     }
+    assert persisted["last_supervisor_tick_observation"] == {
+        "schema_version": "tdx.subscription_watch.supervisor_tick_observation.v1",
+        "status": "recovered",
+        "decision": "recovered",
+        "action_taken": True,
+        "reason_codes": [],
+        "previous_run_id": "run-001",
+        "new_run_id": "run-002",
+        "reason": "manual_tick",
+        "start_request_summary": {
+            "stock_count": 2,
+            "has_max_events": True,
+            "has_max_seconds": True,
+            "has_poll_interval": True,
+        },
+        "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+    }
+    assert "start_result" not in persisted["last_supervisor_tick_observation"]
     assert start_calls == [
         {
             "stock_list": ["600519.SH", "000001.SZ"],
@@ -923,6 +962,17 @@ def test_supervisor_tick_records_new_backoff_when_recovery_start_fails(
     assert persisted["state"] == "restart_backoff"
     assert persisted["start_request"] == start_request
     assert persisted["restart_backoff"] == backoff
+    assert persisted["last_supervisor_tick_observation"] == {
+        "schema_version": "tdx.subscription_watch.supervisor_tick_observation.v1",
+        "status": "failed",
+        "decision": "failed",
+        "action_taken": False,
+        "reason_codes": ["BACKOFF_ACTIVE"],
+        "error_code": "SUPERVISOR_TICK_START_FAILED",
+        "reason": "manual_tick",
+        "boundary": "observation_only;does_not_schedule_supervisor_or_background_retry",
+    }
+    assert "start_result" not in persisted["last_supervisor_tick_observation"]
 
 
 def test_supervisor_tick_noops_without_restart_backoff(
@@ -947,6 +997,7 @@ def test_supervisor_tick_noops_without_restart_backoff(
             "boundary": "single_step_only;does_not_run_loop_or_schedule_retry",
         },
     }
+    assert not controller.paths.active_path.exists()
     start.assert_not_called()
     stop.assert_not_called()
 

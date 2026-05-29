@@ -36,6 +36,12 @@ SUBSCRIPTION_WATCH_SUPERVISOR_RUN_OBSERVATION_SCHEMA_VERSION = (
 SUBSCRIPTION_WATCH_SUPERVISOR_RUN_OBSERVATION_BOUNDARY = (
     "observation_only;does_not_schedule_supervisor_or_background_retry"
 )
+SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_SCHEMA_VERSION = (
+    "tdx.subscription_watch.supervisor_tick_observation.v1"
+)
+SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_BOUNDARY = (
+    "observation_only;does_not_schedule_supervisor_or_background_retry"
+)
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_SCHEMA_VERSION = "tdx.subscription_watch.statefile_ownership.v1"
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY = (
     "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control"
@@ -1816,10 +1822,11 @@ class SubscriptionWatchBackgroundController:
         }
 
     def supervisor_tick(self, *, reason: str | None = None) -> dict[str, Any]:
+        tick_reason = reason if reason is not None else "supervisor_tick"
         current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
         active_backoff = self._active_restart_backoff(current)
         if active_backoff is not None:
-            return {
+            response = {
                 "ok": True,
                 "result": {
                     "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION,
@@ -1831,10 +1838,14 @@ class SubscriptionWatchBackgroundController:
                     "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY,
                 },
             }
+            self._persist_supervisor_tick_observation(
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+            )
+            return response
 
         restart_backoff = current.get("restart_backoff")
         if not isinstance(restart_backoff, dict):
-            return {
+            response = {
                 "ok": True,
                 "result": {
                     "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION,
@@ -1845,10 +1856,14 @@ class SubscriptionWatchBackgroundController:
                     "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY,
                 },
             }
+            self._persist_supervisor_tick_observation(
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+            )
+            return response
 
         start_request = current.get("start_request")
         if not self._restart_preflight_start_request_valid(start_request):
-            return {
+            response = {
                 "ok": False,
                 "error": {
                     "code": "SUPERVISOR_TICK_MISSING_START_REQUEST",
@@ -1860,13 +1875,16 @@ class SubscriptionWatchBackgroundController:
                     },
                 },
             }
+            self._persist_supervisor_tick_observation(
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+            )
+            return response
 
         start_request = copy.deepcopy(start_request)
         stock_list = start_request.get("stock_list")
         max_events = start_request.get("max_events")
         max_seconds = start_request.get("max_seconds")
         poll_interval = start_request.get("poll_interval")
-        tick_reason = reason if reason is not None else "supervisor_tick"
         previous_run_id = restart_backoff.get("previous_run_id", current.get("run_id"))
         start_result = self.start(
             stock_list=list(stock_list),
@@ -1887,7 +1905,7 @@ class SubscriptionWatchBackgroundController:
                 restart_backoff=next_backoff,
                 start_request=start_request,
             )
-            return {
+            response = {
                 "ok": False,
                 "error": {
                     "code": "SUPERVISOR_TICK_START_FAILED",
@@ -1899,8 +1917,12 @@ class SubscriptionWatchBackgroundController:
                     },
                 },
             }
+            self._persist_supervisor_tick_observation(
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+            )
+            return response
 
-        return {
+        response = {
             "ok": True,
             "result": {
                 "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_SCHEMA_VERSION,
@@ -1915,6 +1937,10 @@ class SubscriptionWatchBackgroundController:
                 "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_BOUNDARY,
             },
         }
+        self._persist_supervisor_tick_observation(
+            self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+        )
+        return response
 
     def supervisor_run(
         self,
@@ -2060,6 +2086,54 @@ class SubscriptionWatchBackgroundController:
             return
         active_payload = dict(active_payload)
         active_payload["last_supervisor_run_observation"] = copy.deepcopy(observation)
+        self._write_active_state(active_payload)
+
+    def _build_supervisor_tick_observation(
+        self, *, tick_result: dict[str, Any], reason: str | None
+    ) -> dict[str, Any]:
+        if bool(tick_result.get("ok")):
+            result = tick_result.get("result")
+            result = result if isinstance(result, dict) else {}
+            observation: dict[str, Any] = {
+                "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_SCHEMA_VERSION,
+                "status": result.get("status"),
+                "decision": result.get("decision"),
+                "action_taken": bool(result.get("action_taken")),
+                "reason_codes": list(result.get("reason_codes") or []),
+                "reason": result.get("reason") or reason,
+                "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_BOUNDARY,
+            }
+            for key in ("previous_run_id", "new_run_id", "start_request_summary"):
+                if key in result:
+                    observation[key] = copy.deepcopy(result[key])
+            return observation
+
+        error = tick_result.get("error")
+        error = error if isinstance(error, dict) else {}
+        details = error.get("details")
+        details = details if isinstance(details, dict) else {}
+        restart_backoff = details.get("restart_backoff")
+        restart_backoff = restart_backoff if isinstance(restart_backoff, dict) else {}
+        reason_codes = details.get("reason_codes")
+        if not isinstance(reason_codes, list):
+            reason_codes = restart_backoff.get("reason_codes")
+        return {
+            "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_SCHEMA_VERSION,
+            "status": "failed",
+            "decision": "failed",
+            "action_taken": False,
+            "reason_codes": list(reason_codes or []),
+            "error_code": error.get("code"),
+            "reason": reason,
+            "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_BOUNDARY,
+        }
+
+    def _persist_supervisor_tick_observation(self, observation: dict[str, Any]) -> None:
+        active_payload = read_active_payload(self.paths)
+        if not isinstance(active_payload, dict):
+            return
+        active_payload = dict(active_payload)
+        active_payload["last_supervisor_tick_observation"] = copy.deepcopy(observation)
         self._write_active_state(active_payload)
 
     def status(
