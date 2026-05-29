@@ -2797,6 +2797,8 @@ def _dispatch_catalog_resolved_entry(args: argparse.Namespace, *, entry_name: st
 
 def _build_catalog_bundle_step_namespace(args: argparse.Namespace, *, step: dict[str, object]) -> argparse.Namespace:
     merged = dict(vars(args))
+    # Entry-level plan/preview side overrides must not change side-specific bundle steps.
+    merged.pop("side", None)
     for key, value in dict(step.get("options", {})).items():
         if key not in merged or merged.get(key) is None:
             merged[key] = value

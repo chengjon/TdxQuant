@@ -7582,6 +7582,39 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(output_payload["constraints"]["dispatch_executed"], False)
         mocked_dispatch.assert_not_called()
 
+    def test_handle_catalog_plan_sell_submit_once_bundle_ignores_top_level_side_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "catalog",
+                "plan",
+                "--bundle",
+                "sell-submit-once-pingan-complete-review",
+                "--side",
+                "buy",
+                "--code",
+                "000001.SZ",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--view",
+                "summary",
+            ]
+        )
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        first_step = output_payload["steps"][0]
+        self.assertEqual(first_step["entry"], "task-sell-submit-once")
+        boundary = first_step["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "trade-submit-once")
+        self.assertEqual(boundary["side"], "sell")
+        self.assertEqual(boundary["provided_input_fields"], ["side", "port", "code", "price", "quantity"])
+        self.assertEqual(output_payload["constraints"]["dispatch_executed"], False)
+        mocked_dispatch.assert_not_called()
+
     def test_handle_catalog_plan_trade_health_summary_exposes_readiness_boundary(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "plan", "--entry", "trade-health-pingan-readiness", "--view", "summary"])
