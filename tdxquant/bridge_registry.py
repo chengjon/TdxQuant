@@ -267,6 +267,28 @@ def run_bridge_watch_stop(*, registry_path: str | Path, worker_id: str) -> dict[
     )
 
 
+def run_bridge_watch_restart(
+    *,
+    registry_path: str | Path,
+    worker_id: str,
+    reason: str | None = None,
+    grace_period_seconds: int | None = None,
+) -> dict[str, Any]:
+    worker = _resolve_worker(registry_path=registry_path, worker_id=worker_id)
+    body: dict[str, Any] = {}
+    if reason is not None:
+        body["reason"] = reason
+    if grace_period_seconds is not None:
+        body["grace_period_seconds"] = grace_period_seconds
+    return call_worker(
+        worker,
+        method="POST",
+        route="/bridge/v1/watch/restart",
+        token=resolve_worker_token(worker),
+        body=body,
+    )
+
+
 def _resolve_worker(*, registry_path: str | Path, worker_id: str) -> BridgeWorker:
     return select_worker(load_worker_registry(registry_path), worker_id=worker_id)
 

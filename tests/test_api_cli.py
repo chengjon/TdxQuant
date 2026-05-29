@@ -226,6 +226,28 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
         self.assertEqual(args.worker, "worker-a")
 
+    def test_bridge_watch_restart_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-restart",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--reason",
+                "operator_restart",
+                "--grace-period-seconds",
+                "2",
+            ]
+        )
+        self.assertEqual(args.bridge_command, "watch-restart")
+        self.assertEqual(args.registry, "runtime/bridge/master-workers.json")
+        self.assertEqual(args.worker, "worker-a")
+        self.assertEqual(args.reason, "operator_restart")
+        self.assertEqual(args.grace_period_seconds, 2)
+
     def test_api_capabilities_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["api", "capabilities"])
@@ -10706,6 +10728,39 @@ class ReportCliDispatchTests(unittest.TestCase):
             reconnect_stale_after_seconds=180.0,
         )
         self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "idle"}})
+
+    def test_handle_bridge_watch_restart_dispatches_registry_client(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-restart",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--reason",
+                "operator_restart",
+                "--grace-period-seconds",
+                "2",
+            ]
+        )
+        with (
+            patch(
+                "tdxquant.cli.run_bridge_watch_restart",
+                return_value={"ok": True, "result": {"status": "restarted"}},
+            ) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            reason="operator_restart",
+            grace_period_seconds=2,
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {"ok": True, "result": {"status": "restarted"}})
 
     def test_handle_bridge_watch_status_summary_view_projects_governance_rollup(self) -> None:
         args = build_parser().parse_args(

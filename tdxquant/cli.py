@@ -43,6 +43,7 @@ from .desktop.inspect import enumerate_controls, find_main_window
 from .bridge_registry import (
     run_bridge_watch_event_stream,
     run_bridge_watch_events,
+    run_bridge_watch_restart,
     run_bridge_watch_start,
     run_bridge_watch_status,
     run_bridge_watch_stop,
@@ -723,6 +724,12 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_stop_parser = bridge_subparsers.add_parser("watch-stop")
     bridge_watch_stop_parser.add_argument("--registry", required=True)
     bridge_watch_stop_parser.add_argument("--worker", required=True)
+
+    bridge_watch_restart_parser = bridge_subparsers.add_parser("watch-restart")
+    bridge_watch_restart_parser.add_argument("--registry", required=True)
+    bridge_watch_restart_parser.add_argument("--worker", required=True)
+    bridge_watch_restart_parser.add_argument("--reason")
+    bridge_watch_restart_parser.add_argument("--grace-period-seconds", type=int)
 
     return bridge_parser
 
@@ -5951,6 +5958,15 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
             )
         if args.bridge_command == "watch-stop":
             return _emit_bridge_payload(run_bridge_watch_stop(registry_path=args.registry, worker_id=args.worker))
+        if args.bridge_command == "watch-restart":
+            return _emit_bridge_payload(
+                run_bridge_watch_restart(
+                    registry_path=args.registry,
+                    worker_id=args.worker,
+                    reason=args.reason,
+                    grace_period_seconds=args.grace_period_seconds,
+                )
+            )
         return 2
     except Exception as exc:
         return _emit_bridge_payload(_build_bridge_local_failure(exc))

@@ -567,6 +567,97 @@ def test_start_persists_start_request_metadata_in_active_state(
     }
 
 
+def test_restart_uses_persisted_start_request_for_replacement_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    start_request = {
+        "stock_list": ["600519.SH", "000001.SZ"],
+        "max_events": 10,
+        "max_seconds": 30.0,
+        "poll_interval": 0.5,
+    }
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": os.getpid(),
+            "reason": None,
+            "active": True,
+            "start_request": start_request,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    stop_calls: list[dict[str, object]] = []
+    start_calls: list[dict[str, object]] = []
+
+    def fake_stop(**kwargs: object) -> dict[str, object]:
+        stop_calls.append(dict(kwargs))
+        return {"ok": True, "result": {"run_id": "run-001", "state": "stopped"}}
+
+    def fake_start(**kwargs: object) -> dict[str, object]:
+        start_calls.append(dict(kwargs))
+        return {
+            "ok": True,
+            "result": {
+                "run_id": "run-002",
+                "state": "running",
+                "start_request": start_request,
+            },
+        }
+
+    monkeypatch.setattr(controller, "stop", fake_stop)
+    monkeypatch.setattr(controller, "start", fake_start)
+
+    result = controller.restart(reason="operator_restart", grace_period_seconds=2)
+
+    assert result["ok"] is True
+    assert result["result"]["status"] == "restarted"
+    assert result["result"]["previous_run_id"] == "run-001"
+    assert result["result"]["new_run_id"] == "run-002"
+    assert result["result"]["reason"] == "operator_restart"
+    assert result["result"]["start_request"] == start_request
+    assert result["result"]["stop_result"] == {"run_id": "run-001", "state": "stopped"}
+    assert result["result"]["start_result"]["run_id"] == "run-002"
+    assert stop_calls == [{"reason": "operator_restart", "grace_period_seconds": 2}]
+    assert start_calls == [
+        {
+            "stock_list": ["600519.SH", "000001.SZ"],
+            "max_events": 10,
+            "max_seconds": 30.0,
+            "poll_interval": 0.5,
+        }
+    ]
+
+
+def test_restart_rejects_active_run_without_persisted_start_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": os.getpid(),
+            "reason": None,
+            "active": True,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    stop = Mock()
+    start = Mock()
+    monkeypatch.setattr(controller, "stop", stop)
+    monkeypatch.setattr(controller, "start", start)
+
+    result = controller.restart(reason="operator_restart")
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "MISSING_START_REQUEST"
+    assert result["error"]["details"]["run_id"] == "run-001"
+    stop.assert_not_called()
+    start.assert_not_called()
+
+
 def test_stop_returns_run_id_and_coherent_terminal_state_when_process_exits(tmp_path: Path) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
     pid = os.getpid()

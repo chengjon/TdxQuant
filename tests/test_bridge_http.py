@@ -16,6 +16,7 @@ class _FakeController:
     def __init__(self) -> None:
         self.start_calls: list[dict[str, object]] = []
         self.stop_calls: list[dict[str, object]] = []
+        self.restart_calls: list[dict[str, object]] = []
         self.status_calls: list[dict[str, object]] = []
         self.control_status_calls = 0
         self.status_handler = None
@@ -25,6 +26,14 @@ class _FakeController:
         self.log_calls: list[dict[str, object]] = []
         self.start_result: dict[str, object] = {"ok": True, "result": {"run_id": "run-001", "state": "starting"}}
         self.stop_result: dict[str, object] = {"ok": True, "result": {"run_id": "run-001", "state": "stopped"}}
+        self.restart_result: dict[str, object] = {
+            "ok": True,
+            "result": {
+                "status": "restarted",
+                "previous_run_id": "run-001",
+                "new_run_id": "run-002",
+            },
+        }
         self.status_result: dict[str, object] = {
             "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234, "reason": None},
             "watch_status": {"run_id": "run-001", "event_count": 3},
@@ -41,6 +50,10 @@ class _FakeController:
     def stop(self, **kwargs: object) -> dict[str, object]:
         self.stop_calls.append(dict(kwargs))
         return dict(self.stop_result)
+
+    def restart(self, **kwargs: object) -> dict[str, object]:
+        self.restart_calls.append(dict(kwargs))
+        return dict(self.restart_result)
 
     def status(self, **kwargs: object) -> dict[str, object]:
         self.status_calls.append(dict(kwargs))
@@ -300,6 +313,38 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 self.assertEqual(controller.start_calls[0]["max_events"], 2)
                 self.assertEqual(controller.start_calls[0]["poll_interval"], 0.1)
                 self.assertEqual(controller.start_calls[0]["idempotency_key"], "idem-001")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_watch_restart_dispatches_to_controller(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(
+                    f"{base_url}/bridge/v1/watch/restart",
+                    method="POST",
+                    token="secret-token",
+                    payload={"reason": "operator_restart", "grace_period_seconds": 2},
+                )
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["result"]["status"], "restarted")
+                self.assertEqual(payload["result"]["previous_run_id"], "run-001")
+                self.assertEqual(payload["result"]["new_run_id"], "run-002")
+                self.assertEqual(
+                    controller.restart_calls[0],
+                    {"reason": "operator_restart", "grace_period_seconds": 2},
+                )
             finally:
                 server.shutdown()
                 server.server_close()

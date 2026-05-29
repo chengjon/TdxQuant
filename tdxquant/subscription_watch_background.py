@@ -1379,6 +1379,133 @@ class SubscriptionWatchBackgroundController:
             finally:
                 _release_control_lock(control_lock)
 
+    def restart(self, *, reason: str | None = None, grace_period_seconds: int | None = None) -> dict[str, Any]:
+        current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+        if current.get("state") not in ACTIVE_PROCESS_STATES:
+            return {
+                "ok": False,
+                "error": {
+                    "code": "NO_ACTIVE_RUN",
+                    "message": "subscription-watch restart requires an active background run",
+                    "details": {
+                        "run_id": current.get("run_id"),
+                        "state": current.get("state"),
+                    },
+                },
+            }
+
+        start_request = current.get("start_request")
+        if not isinstance(start_request, dict):
+            return {
+                "ok": False,
+                "error": {
+                    "code": "MISSING_START_REQUEST",
+                    "message": "active subscription-watch run does not have a persisted start_request",
+                    "details": {
+                        "run_id": current.get("run_id"),
+                        "state": current.get("state"),
+                    },
+                },
+            }
+
+        stock_list = start_request.get("stock_list")
+        max_events = start_request.get("max_events")
+        max_seconds = start_request.get("max_seconds")
+        poll_interval = start_request.get("poll_interval")
+        if (
+            not isinstance(stock_list, list)
+            or not all(isinstance(item, str) for item in stock_list)
+            or (max_events is not None and (isinstance(max_events, bool) or not isinstance(max_events, int)))
+            or (max_seconds is not None and (isinstance(max_seconds, bool) or not isinstance(max_seconds, (int, float))))
+            or (
+                poll_interval is not None
+                and (isinstance(poll_interval, bool) or not isinstance(poll_interval, (int, float)))
+            )
+        ):
+            return {
+                "ok": False,
+                "error": {
+                    "code": "MISSING_START_REQUEST",
+                    "message": "active subscription-watch run has an invalid persisted start_request",
+                    "details": {
+                        "run_id": current.get("run_id"),
+                        "state": current.get("state"),
+                    },
+                },
+            }
+
+        validation_error = self._validate_start_request(
+            stock_list=list(stock_list),
+            max_events=max_events,
+            max_seconds=max_seconds,
+            poll_interval=poll_interval,
+        )
+        if validation_error is not None:
+            return {
+                "ok": False,
+                "error": {
+                    "code": "MISSING_START_REQUEST",
+                    "message": "active subscription-watch run has an unusable persisted start_request",
+                    "details": {
+                        "run_id": current.get("run_id"),
+                        "state": current.get("state"),
+                        "start_request_error": dict(validation_error.get("error") or {}),
+                    },
+                },
+            }
+
+        previous_run_id = current.get("run_id")
+        restart_reason = reason if reason is not None else "operator_restart"
+        stop_result = self.stop(reason=restart_reason, grace_period_seconds=grace_period_seconds)
+        stop_payload = dict(stop_result.get("result") or {})
+        if stop_result.get("ok") is not True or stop_payload.get("status") == "noop":
+            return {
+                "ok": False,
+                "error": {
+                    "code": "RESTART_STOP_FAILED",
+                    "message": "failed to stop active subscription-watch run before restart",
+                    "details": {
+                        "previous_run_id": previous_run_id,
+                        "stop_result": stop_result,
+                    },
+                },
+            }
+
+        start_result = self.start(
+            stock_list=list(stock_list),
+            max_events=max_events,
+            max_seconds=float(max_seconds) if max_seconds is not None else None,
+            poll_interval=float(poll_interval) if poll_interval is not None else None,
+        )
+        start_payload = dict(start_result.get("result") or {})
+        if start_result.get("ok") is not True:
+            return {
+                "ok": False,
+                "error": {
+                    "code": "RESTART_START_FAILED",
+                    "message": "failed to start replacement subscription-watch run after stop",
+                    "details": {
+                        "previous_run_id": previous_run_id,
+                        "stop_result": stop_result,
+                        "start_result": start_result,
+                        "start_request": copy.deepcopy(start_request),
+                    },
+                },
+            }
+
+        return {
+            "ok": True,
+            "result": {
+                "status": "restarted",
+                "previous_run_id": previous_run_id,
+                "new_run_id": start_payload.get("run_id"),
+                "reason": restart_reason,
+                "stop_result": stop_payload,
+                "start_result": start_payload,
+                "start_request": copy.deepcopy(start_request),
+            },
+        }
+
     def status(
         self,
         *,
