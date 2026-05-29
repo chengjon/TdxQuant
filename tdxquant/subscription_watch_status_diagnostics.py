@@ -24,6 +24,7 @@ def build_subscription_watch_status_diagnostics(
     reconnect_rollup = reconnect_rollup if isinstance(reconnect_rollup, dict) else {}
     evaluation_rollup = governance.get("evaluation_summary")
     evaluation_rollup = evaluation_rollup if isinstance(evaluation_rollup, dict) else {}
+    lifecycle_readiness = _build_lifecycle_readiness_diagnostics(summary_view)
     restartability = _build_restartability_diagnostics(status_payload)
     restart_observation = _build_restart_observation_diagnostics(status_payload)
     supervisor_run_observation = _build_supervisor_run_observation_diagnostics(status_payload)
@@ -47,6 +48,7 @@ def build_subscription_watch_status_diagnostics(
         "has_not_evaluated_component": bool(evaluation_rollup.get("has_not_evaluated_component")),
         "all_components_evaluated": bool(evaluation_rollup.get("all_components_evaluated")),
         "restartability": restartability,
+        "lifecycle_readiness": lifecycle_readiness,
         "restart_observation": restart_observation,
         "restart_backoff": restart_backoff,
         "boundary": governance.get("boundary"),
@@ -60,6 +62,40 @@ def build_subscription_watch_status_diagnostics(
     if supervisor_daemon is not None:
         diagnostics["supervisor_daemon"] = dict(supervisor_daemon)
     return diagnostics
+
+
+def _build_lifecycle_readiness_diagnostics(summary_view: dict[str, Any]) -> dict[str, Any] | None:
+    status_summary = summary_view.get("status_summary")
+    status_summary = status_summary if isinstance(status_summary, dict) else {}
+    lifecycle_readiness = status_summary.get("lifecycle_readiness")
+    if not isinstance(lifecycle_readiness, dict):
+        return None
+
+    compact: dict[str, Any] = {}
+    for key in (
+        "schema_version",
+        "ready",
+        "decision",
+        "run_id",
+        "state",
+        "active",
+        "has_start_request",
+        "restart_backoff_active",
+        "statefile_ownership_status",
+        "statefile_pid_matches_owned_state",
+        "statefile_process_alive",
+        "supervisor_daemon_status",
+        "supervisor_daemon_control_allowed",
+        "boundary",
+    ):
+        if key in lifecycle_readiness:
+            compact[key] = lifecycle_readiness[key]
+
+    reason_codes = lifecycle_readiness.get("reason_codes")
+    compact["reason_codes"] = list(reason_codes) if isinstance(reason_codes, list) else []
+    start_request_summary = lifecycle_readiness.get("start_request_summary")
+    compact["start_request_summary"] = dict(start_request_summary) if isinstance(start_request_summary, dict) else None
+    return compact
 
 
 def _build_supervisor_tick_observation_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any] | None:
