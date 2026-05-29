@@ -31,6 +31,9 @@ def test_build_background_paths_uses_fixed_bridge_directory(tmp_path: Path) -> N
     assert paths.active_path == tmp_path / "active.json"
     assert paths.pid_path == tmp_path / "pid"
     assert paths.lock_path == tmp_path / "lock"
+    assert paths.supervisor_state_path == tmp_path / "supervisor.json"
+    assert paths.supervisor_pid_path == tmp_path / "supervisor.pid"
+    assert paths.supervisor_lock_path == tmp_path / "supervisor.lock"
 
 
 def test_reconcile_marks_missing_pid_as_failed(tmp_path: Path) -> None:
@@ -1437,6 +1440,168 @@ def test_supervisor_run_noop_without_statefile_does_not_create_observation_state
 
     assert result["ok"] is True
     assert not controller.paths.active_path.exists()
+
+
+def test_supervisor_daemon_start_launches_process_and_writes_owned_state(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    launches: list[tuple[list[str], dict[str, object]]] = []
+
+    class FakeProcess:
+        pid = 4321
+
+    def popen_factory(command: list[str], **kwargs: object) -> FakeProcess:
+        launches.append((command, dict(kwargs)))
+        return FakeProcess()
+
+    result = controller.start_supervisor_daemon(
+        max_ticks=2,
+        interval_seconds=0.5,
+        loop_sleep_seconds=3.0,
+        reason="daemon_supervise",
+        owner_token="owner-1",
+        popen_factory=popen_factory,
+    )
+    persisted = json.loads(controller.paths.supervisor_state_path.read_text(encoding="utf-8"))
+
+    assert result["ok"] is True
+    assert result["result"]["schema_version"] == "tdx.subscription_watch.supervisor_daemon.v1"
+    assert result["result"]["start_status"] == "started"
+    assert result["result"]["pid"] == 4321
+    assert result["result"]["owner_token"] == "owner-1"
+    assert result["result"]["boundary"] == "explicit_supervisor_daemon_lifecycle;does_not_enable_default_policy"
+    assert launches == [
+        (
+            [
+                "python",
+                "-m",
+                "tdxquant.subscription_watch_supervisor_daemon",
+                "--root-dir",
+                str(tmp_path),
+                "--max-ticks",
+                "2",
+                "--interval-seconds",
+                "0.5",
+                "--loop-sleep-seconds",
+                "3.0",
+                "--reason",
+                "daemon_supervise",
+            ],
+            {
+                "stdin": subprocess.DEVNULL,
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+                "start_new_session": True,
+            },
+        )
+    ]
+    assert persisted["schema_version"] == "tdx.subscription_watch.supervisor_daemon.v1"
+    assert persisted["state"] == "running"
+    assert persisted["pid"] == 4321
+    assert persisted["owner_token"] == "owner-1"
+    assert persisted["settings"] == {
+        "max_ticks": 2,
+        "interval_seconds": 0.5,
+        "loop_sleep_seconds": 3.0,
+        "reason": "daemon_supervise",
+    }
+    assert controller.paths.supervisor_pid_path.read_text(encoding="utf-8") == "4321\n"
+    assert not controller.paths.active_path.exists()
+    assert not controller.paths.pid_path.exists()
+
+
+def test_supervisor_daemon_status_reports_running_owned_pid_read_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller.paths.root_dir.mkdir(parents=True, exist_ok=True)
+    controller.paths.supervisor_pid_path.write_text("4321\n", encoding="utf-8")
+    controller.paths.supervisor_state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                "state": "running",
+                "pid": 4321,
+                "owner_token": "owner-1",
+                "generation": 1,
+                "settings": {"max_ticks": 2, "interval_seconds": 0.5, "loop_sleep_seconds": 3.0},
+                "boundary": "explicit_supervisor_daemon_lifecycle;does_not_enable_default_policy",
+            }
+        ),
+        encoding="utf-8",
+    )
+    before = controller.paths.supervisor_state_path.read_text(encoding="utf-8")
+    tick = Mock()
+    run = Mock()
+    start = Mock()
+    stop = Mock()
+    restart = Mock()
+    monkeypatch.setattr(controller, "_pid_is_alive", lambda pid: pid == 4321)
+    monkeypatch.setattr(controller, "supervisor_tick", tick)
+    monkeypatch.setattr(controller, "supervisor_run", run)
+    monkeypatch.setattr(controller, "start", start)
+    monkeypatch.setattr(controller, "stop", stop)
+    monkeypatch.setattr(controller, "restart", restart)
+
+    result = controller.supervisor_daemon_status()
+
+    assert result["ok"] is True
+    assert result["result"]["schema_version"] == "tdx.subscription_watch.supervisor_daemon.v1"
+    assert result["result"]["daemon_status"] == "running"
+    assert result["result"]["state"] == "running"
+    assert result["result"]["pid"] == 4321
+    assert result["result"]["process_running"] is True
+    assert result["result"]["write_attempted"] is False
+    assert result["result"]["boundary"] == "read_only_supervisor_daemon_status;does_not_execute_lifecycle"
+    assert controller.paths.supervisor_state_path.read_text(encoding="utf-8") == before
+    tick.assert_not_called()
+    run.assert_not_called()
+    start.assert_not_called()
+    stop.assert_not_called()
+    restart.assert_not_called()
+
+
+def test_supervisor_daemon_stop_requires_owner_and_writes_stopping_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller.paths.root_dir.mkdir(parents=True, exist_ok=True)
+    controller.paths.supervisor_pid_path.write_text("4321\n", encoding="utf-8")
+    controller.paths.supervisor_state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "tdx.subscription_watch.supervisor_daemon.v1",
+                "state": "running",
+                "pid": 4321,
+                "owner_token": "owner-1",
+                "generation": 1,
+                "settings": {"max_ticks": 2, "interval_seconds": 0.5, "loop_sleep_seconds": 3.0},
+                "boundary": "explicit_supervisor_daemon_lifecycle;does_not_enable_default_policy",
+            }
+        ),
+        encoding="utf-8",
+    )
+    signals: list[tuple[int, signal.Signals]] = []
+    monkeypatch.setattr(controller, "_pid_is_alive", lambda pid: pid == 4321)
+    monkeypatch.setattr(controller, "_signal_process", lambda pid, sig: signals.append((pid, sig)) or True)
+
+    mismatch = controller.stop_supervisor_daemon(owner_token="other", reason="operator_stop")
+
+    assert mismatch["ok"] is False
+    assert mismatch["error"]["code"] == "SUPERVISOR_DAEMON_OWNERSHIP_MISMATCH"
+    assert signals == []
+
+    result = controller.stop_supervisor_daemon(owner_token="owner-1", reason="operator_stop")
+    persisted = json.loads(controller.paths.supervisor_state_path.read_text(encoding="utf-8"))
+
+    assert result["ok"] is True
+    assert result["result"]["stop_status"] == "signal_sent"
+    assert result["result"]["pid"] == 4321
+    assert result["result"]["signal_sent"] is True
+    assert signals == [(4321, signal.SIGTERM)]
+    assert persisted["state"] == "stopping"
+    assert persisted["active"] is False
+    assert persisted["reason"] == "operator_stop"
+    assert persisted["generation"] == 2
 
 
 def test_restart_rejects_active_backoff_without_stop_or_start(

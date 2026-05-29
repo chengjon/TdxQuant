@@ -13,6 +13,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import uuid4
 
 from .subscription_watch_run import build_subscription_watch_run_paths
 
@@ -41,6 +42,13 @@ SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_SCHEMA_VERSION = (
 )
 SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_BOUNDARY = (
     "observation_only;does_not_schedule_supervisor_or_background_retry"
+)
+SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_SCHEMA_VERSION = "tdx.subscription_watch.supervisor_daemon.v1"
+SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_BOUNDARY = (
+    "explicit_supervisor_daemon_lifecycle;does_not_enable_default_policy"
+)
+SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_STATUS_BOUNDARY = (
+    "read_only_supervisor_daemon_status;does_not_execute_lifecycle"
 )
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_SCHEMA_VERSION = "tdx.subscription_watch.statefile_ownership.v1"
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY = (
@@ -663,6 +671,9 @@ class SubscriptionWatchBackgroundPaths:
     active_path: Path
     pid_path: Path
     lock_path: Path
+    supervisor_state_path: Path
+    supervisor_pid_path: Path
+    supervisor_lock_path: Path
 
 
 def build_background_paths(root_dir: Path) -> SubscriptionWatchBackgroundPaths:
@@ -671,6 +682,9 @@ def build_background_paths(root_dir: Path) -> SubscriptionWatchBackgroundPaths:
         active_path=root_dir / "active.json",
         pid_path=root_dir / "pid",
         lock_path=root_dir / "lock",
+        supervisor_state_path=root_dir / "supervisor.json",
+        supervisor_pid_path=root_dir / "supervisor.pid",
+        supervisor_lock_path=root_dir / "supervisor.lock",
     )
 
 
@@ -915,9 +929,9 @@ def _build_start_request_payload(
     }
 
 
-def _acquire_control_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None:
-    paths.root_dir.mkdir(parents=True, exist_ok=True)
-    handle = paths.lock_path.open("a+", encoding="utf-8")
+def _acquire_path_lock(lock_path: Path) -> Any | None:
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+", encoding="utf-8")
     try:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError as exc:
@@ -926,6 +940,14 @@ def _acquire_control_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None
             return None
         raise
     return handle
+
+
+def _acquire_control_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None:
+    return _acquire_path_lock(paths.lock_path)
+
+
+def _acquire_supervisor_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None:
+    return _acquire_path_lock(paths.supervisor_lock_path)
 
 
 def _release_control_lock(handle: Any) -> None:
@@ -949,6 +971,46 @@ def _read_json_file(path: Path) -> dict[str, Any] | None:
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
     return payload if isinstance(payload, dict) else None
+
+
+def _read_optional_json_file(path: Path) -> dict[str, Any] | None:
+    try:
+        return _read_json_file(path)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _read_supervisor_pid(paths: SubscriptionWatchBackgroundPaths) -> int:
+    if not paths.supervisor_pid_path.exists():
+        return 0
+    return _parse_pid(paths.supervisor_pid_path.read_text(encoding="utf-8").strip())
+
+
+def build_supervisor_daemon_command(
+    *,
+    root_dir: Path,
+    python_executable: str,
+    max_ticks: int,
+    interval_seconds: float,
+    loop_sleep_seconds: float,
+    reason: str | None,
+) -> list[str]:
+    command = [
+        python_executable,
+        "-m",
+        "tdxquant.subscription_watch_supervisor_daemon",
+        "--root-dir",
+        str(root_dir),
+        "--max-ticks",
+        str(int(max_ticks)),
+        "--interval-seconds",
+        str(float(interval_seconds)),
+        "--loop-sleep-seconds",
+        str(float(loop_sleep_seconds)),
+    ]
+    if reason is not None:
+        command.extend(["--reason", reason])
+    return command
 
 
 def _read_jsonl_tail(path: Path, *, limit: int) -> list[dict[str, Any]]:
@@ -1398,6 +1460,265 @@ class SubscriptionWatchBackgroundController:
             return True
         except Exception:
             return False
+
+    def _write_supervisor_daemon_state(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.paths.root_dir.mkdir(parents=True, exist_ok=True)
+        self.paths.supervisor_state_path.write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        return payload
+
+    def _build_supervisor_daemon_state(
+        self,
+        *,
+        state: str,
+        pid: int | None,
+        owner_token: str | None,
+        generation: int,
+        command: list[str] | None,
+        settings: dict[str, Any] | None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_SCHEMA_VERSION,
+            "state": state,
+            "active": state == "running",
+            "pid": pid,
+            "owner_token": owner_token,
+            "generation": generation,
+            "command": list(command) if command is not None else None,
+            "settings": copy.deepcopy(settings or {}),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_BOUNDARY,
+        }
+        if reason is not None:
+            payload["reason"] = reason
+        return payload
+
+    def _supervisor_daemon_payload(self) -> dict[str, Any] | None:
+        return _read_optional_json_file(self.paths.supervisor_state_path)
+
+    def supervisor_daemon_status(self) -> dict[str, Any]:
+        payload = self._supervisor_daemon_payload()
+        statefile_exists = self.paths.supervisor_state_path.exists()
+        statefile_valid = isinstance(payload, dict)
+        state = str(payload.get("state") or "missing") if statefile_valid else ("invalid" if statefile_exists else "missing")
+        payload_pid = _parse_pid(payload.get("pid") if statefile_valid else None)
+        owned_pid = _read_supervisor_pid(self.paths)
+        pid = payload_pid if payload_pid > 0 else owned_pid if owned_pid > 0 else None
+        process_running = bool(pid is not None and self._pid_is_alive(pid))
+        if not statefile_exists:
+            daemon_status = "missing"
+        elif not statefile_valid:
+            daemon_status = "invalid"
+        elif state == "running" and process_running:
+            daemon_status = "running"
+        elif state == "stopping" and process_running:
+            daemon_status = "stopping"
+        elif state in {"running", "stopping"}:
+            daemon_status = "not_running"
+        else:
+            daemon_status = state
+        result = {
+            "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_SCHEMA_VERSION,
+            "daemon_status": daemon_status,
+            "state": state,
+            "statefile_exists": statefile_exists,
+            "statefile_valid": statefile_valid,
+            "pidfile_exists": self.paths.supervisor_pid_path.exists(),
+            "pid": pid,
+            "process_running": process_running,
+            "owner_token": payload.get("owner_token") if statefile_valid else None,
+            "generation": payload.get("generation") if statefile_valid else None,
+            "settings": copy.deepcopy(payload.get("settings") or {}) if statefile_valid else {},
+            "write_attempted": False,
+            "control_allowed": daemon_status == "running",
+            "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_STATUS_BOUNDARY,
+        }
+        return {"ok": True, "result": result}
+
+    def start_supervisor_daemon(
+        self,
+        *,
+        max_ticks: int,
+        interval_seconds: float = 0.0,
+        loop_sleep_seconds: float = 30.0,
+        reason: str | None = None,
+        owner_token: str | None = None,
+        popen_factory: Any | None = None,
+    ) -> dict[str, Any]:
+        try:
+            resolved_max_ticks = int(max_ticks)
+            resolved_interval_seconds = float(interval_seconds)
+            resolved_loop_sleep_seconds = float(loop_sleep_seconds)
+        except (TypeError, ValueError):
+            return {
+                "ok": False,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "supervisor daemon requires numeric max_ticks, interval_seconds, and loop_sleep_seconds",
+                },
+            }
+        if resolved_max_ticks < 1 or resolved_interval_seconds < 0 or resolved_loop_sleep_seconds < 0:
+            return {
+                "ok": False,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "supervisor daemon requires max_ticks >= 1 and non-negative intervals",
+                },
+            }
+
+        with self._control_lock:
+            supervisor_lock = _acquire_supervisor_lock(self.paths)
+            if supervisor_lock is None:
+                return {"ok": False, "error": {"code": "SUPERVISOR_DAEMON_LOCKED"}}
+            try:
+                status = self.supervisor_daemon_status()["result"]
+                if status.get("daemon_status") == "running":
+                    return {
+                        "ok": True,
+                        "result": {
+                            "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_SCHEMA_VERSION,
+                            "start_status": "already_running",
+                            "pid": status.get("pid"),
+                            "owner_token": status.get("owner_token"),
+                            "generation": status.get("generation"),
+                            "command": None,
+                            "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_BOUNDARY,
+                        },
+                    }
+                resolved_owner_token = (owner_token or uuid4().hex).strip()
+                settings = {
+                    "max_ticks": resolved_max_ticks,
+                    "interval_seconds": resolved_interval_seconds,
+                    "loop_sleep_seconds": resolved_loop_sleep_seconds,
+                    "reason": reason,
+                }
+                command = build_supervisor_daemon_command(
+                    root_dir=self.paths.root_dir,
+                    python_executable=self.python_executable,
+                    max_ticks=resolved_max_ticks,
+                    interval_seconds=resolved_interval_seconds,
+                    loop_sleep_seconds=resolved_loop_sleep_seconds,
+                    reason=reason,
+                )
+                popen_kwargs: dict[str, Any] = {
+                    "stdin": subprocess.DEVNULL,
+                    "stdout": subprocess.DEVNULL,
+                    "stderr": subprocess.DEVNULL,
+                }
+                if os.name == "nt":
+                    popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                else:
+                    popen_kwargs["start_new_session"] = True
+                launch = popen_factory or subprocess.Popen
+                try:
+                    process = launch(command, **popen_kwargs)
+                except OSError as exc:
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "SUPERVISOR_DAEMON_LAUNCH_FAILED",
+                            "message": "failed to launch subscription-watch supervisor daemon",
+                            "details": {"error": exc.__class__.__name__, "command": command},
+                        },
+                    }
+                pid = _parse_pid(getattr(process, "pid", None))
+                generation = (status.get("generation") if isinstance(status.get("generation"), int) else 0) + 1
+                self.paths.root_dir.mkdir(parents=True, exist_ok=True)
+                self.paths.supervisor_pid_path.write_text(f"{pid}\n", encoding="utf-8")
+                payload = self._write_supervisor_daemon_state(
+                    self._build_supervisor_daemon_state(
+                        state="running",
+                        pid=pid,
+                        owner_token=resolved_owner_token,
+                        generation=generation,
+                        command=command,
+                        settings=settings,
+                    )
+                )
+                return {
+                    "ok": True,
+                    "result": {
+                        "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_SCHEMA_VERSION,
+                        "start_status": "started",
+                        "pid": pid,
+                        "owner_token": resolved_owner_token,
+                        "generation": generation,
+                        "command": command,
+                        "statefile": payload,
+                        "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_BOUNDARY,
+                    },
+                }
+            finally:
+                _release_control_lock(supervisor_lock)
+
+    def stop_supervisor_daemon(self, *, owner_token: str | None, reason: str | None = None) -> dict[str, Any]:
+        with self._control_lock:
+            supervisor_lock = _acquire_supervisor_lock(self.paths)
+            if supervisor_lock is None:
+                return {"ok": False, "error": {"code": "SUPERVISOR_DAEMON_LOCKED"}}
+            try:
+                status = self.supervisor_daemon_status()["result"]
+                payload = self._supervisor_daemon_payload()
+                pid = _parse_pid(status.get("pid"))
+                if status.get("daemon_status") != "running" or not isinstance(payload, dict) or pid <= 0:
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "SUPERVISOR_DAEMON_NOT_RUNNING",
+                            "details": status,
+                        },
+                    }
+                if not owner_token or payload.get("owner_token") != owner_token:
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "SUPERVISOR_DAEMON_OWNERSHIP_MISMATCH",
+                            "details": {
+                                "owner_token_present": bool(owner_token),
+                                "state_owner_token_present": bool(payload.get("owner_token")),
+                            },
+                        },
+                    }
+                if not self._signal_process(pid, signal.SIGTERM):
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "SUPERVISOR_DAEMON_SIGNAL_FAILED",
+                            "details": {"pid": pid},
+                        },
+                    }
+                generation = payload.get("generation")
+                next_generation = generation + 1 if isinstance(generation, int) else 1
+                next_payload = self._build_supervisor_daemon_state(
+                    state="stopping",
+                    pid=pid,
+                    owner_token=owner_token,
+                    generation=next_generation,
+                    command=payload.get("command") if isinstance(payload.get("command"), list) else None,
+                    settings=payload.get("settings") if isinstance(payload.get("settings"), dict) else {},
+                    reason=reason,
+                )
+                next_payload["active"] = False
+                next_payload["signal_sent"] = True
+                self._write_supervisor_daemon_state(next_payload)
+                return {
+                    "ok": True,
+                    "result": {
+                        "schema_version": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_SCHEMA_VERSION,
+                        "stop_status": "signal_sent",
+                        "pid": pid,
+                        "owner_token": owner_token,
+                        "generation": next_generation,
+                        "signal_sent": True,
+                        "statefile": next_payload,
+                        "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_DAEMON_BOUNDARY,
+                    },
+                }
+            finally:
+                _release_control_lock(supervisor_lock)
 
     def start(
         self,
