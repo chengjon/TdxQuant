@@ -55,7 +55,10 @@ from .bridge_registry import (
     run_bridge_watch_supervisor_tick,
 )
 from .bridge_http import serve_bridge_from_config
-from .subscription_watch_status_diagnostics import build_subscription_watch_status_diagnostics
+from .subscription_watch_status_diagnostics import (
+    build_subscription_watch_status_diagnostics,
+    build_subscription_watch_status_runbook,
+)
 from .provider_transport_replay import (
     build_provider_replay_managed_daemon_command,
     build_provider_transport_replay_status,
@@ -702,7 +705,9 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_status_parser.add_argument("--heartbeat-stale-after-seconds", type=float)
     bridge_watch_status_parser.add_argument("--watermark-stale-after-seconds", type=float)
     bridge_watch_status_parser.add_argument("--reconnect-stale-after-seconds", type=float)
-    bridge_watch_status_parser.add_argument("--view", choices=["detailed", "summary", "diagnostics"], default="detailed")
+    bridge_watch_status_parser.add_argument(
+        "--view", choices=["detailed", "summary", "diagnostics", "runbook"], default="detailed"
+    )
 
     bridge_watch_events_parser = bridge_subparsers.add_parser("watch-events")
     bridge_watch_events_parser.add_argument("--registry", required=True)
@@ -5963,6 +5968,8 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
                 payload = _build_bridge_watch_status_summary_payload(payload, worker_id=args.worker)
             elif args.view == "diagnostics":
                 payload = _build_bridge_watch_status_diagnostics_payload(payload, worker_id=args.worker)
+            elif args.view == "runbook":
+                payload = _build_bridge_watch_status_runbook_payload(payload, worker_id=args.worker)
             return _emit_bridge_payload(payload)
         if args.bridge_command == "watch-events":
             return _emit_bridge_payload(
@@ -6950,6 +6957,20 @@ def _build_bridge_watch_status_diagnostics_payload(payload: dict[str, object], *
         result,
         status_payload=detailed_result if isinstance(detailed_result, dict) else None,
     )
+    return {"ok": True, "result": result}
+
+
+def _build_bridge_watch_status_runbook_payload(payload: dict[str, object], *, worker_id: str) -> dict[str, object]:
+    runbook_payload = _build_bridge_watch_status_diagnostics_payload(payload, worker_id=worker_id)
+    if not runbook_payload.get("ok"):
+        return runbook_payload
+    result = runbook_payload.get("result")
+    if not isinstance(result, dict):
+        return runbook_payload
+
+    result = copy.deepcopy(result)
+    result["mode"] = "runbook"
+    result["runbook"] = build_subscription_watch_status_runbook(result)
     return {"ok": True, "result": result}
 
 

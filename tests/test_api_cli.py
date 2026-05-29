@@ -141,6 +141,24 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.bridge_command, "watch-status")
         self.assertEqual(args.view, "diagnostics")
 
+    def test_bridge_watch_status_runbook_view_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--view",
+                "runbook",
+            ]
+        )
+        self.assertEqual(args.command, "bridge")
+        self.assertEqual(args.bridge_command, "watch-status")
+        self.assertEqual(args.view, "runbook")
+
     def test_bridge_watch_events_commands_parse(self) -> None:
         parser = build_parser()
         events = parser.parse_args(
@@ -11897,6 +11915,149 @@ class ReportCliDispatchTests(unittest.TestCase):
         self.assertNotIn("watch_status", payload["result"])
         self.assertNotIn("reasons", payload["result"]["governance"])
         self.assertNotIn("actions", payload["result"]["governance"])
+
+    def test_handle_bridge_watch_status_runbook_view_projects_operator_checklist(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--view",
+                "runbook",
+            ]
+        )
+        detailed_payload = {
+            "ok": True,
+            "result": {
+                "status": "running",
+                "control": {
+                    "state": "running",
+                    "active": True,
+                    "run_id": "run-001",
+                    "pid": 1234,
+                    "start_request": {
+                        "stock_list": ["600519.SH", "000001.SZ"],
+                        "max_events": 10,
+                        "max_seconds": 30.0,
+                        "poll_interval": 0.5,
+                    },
+                },
+                "watch_status": {"state": "running", "run_id": "run-001"},
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "overall_status": "active",
+                    "control_rollup": {"control_state": "running", "control_active": True},
+                    "consistency_rollup": {
+                        "control_state": "running",
+                        "watch_state": "running",
+                        "has_watch_status": True,
+                        "run_id_match": True,
+                        "state_match": True,
+                        "has_mismatch": False,
+                    },
+                    "lifecycle_readiness": {
+                        "schema_version": "tdx.subscription_watch.lifecycle_readiness.v1",
+                        "ready": True,
+                        "decision": "ready",
+                        "reason_codes": [],
+                        "run_id": "run-001",
+                        "state": "running",
+                        "active": True,
+                        "has_start_request": True,
+                        "start_request_summary": {
+                            "stock_count": 2,
+                            "has_max_events": True,
+                            "has_max_seconds": True,
+                            "has_poll_interval": True,
+                        },
+                        "restart_backoff_active": False,
+                        "statefile_ownership_status": "owned_active",
+                        "statefile_pid_matches_owned_state": True,
+                        "statefile_process_alive": True,
+                        "supervisor_daemon_status": "missing",
+                        "supervisor_daemon_control_allowed": False,
+                        "boundary": "read_only_lifecycle_readiness;does_not_execute_lifecycle_control",
+                    },
+                    "governance": {
+                        "decision": "observe",
+                        "requires_manual_review": False,
+                        "staleness_evaluated": True,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                        "evaluation_summary": {
+                            "has_stale_component": False,
+                            "has_not_evaluated_component": False,
+                            "all_components_evaluated": True,
+                        },
+                    },
+                },
+            },
+        }
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", return_value=detailed_payload) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            heartbeat_stale_after_seconds=None,
+            watermark_stale_after_seconds=None,
+            reconnect_stale_after_seconds=None,
+        )
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["result"]["mode"], "runbook")
+        self.assertEqual(
+            payload["result"]["runbook"],
+            {
+                "schema_version": "tdx.subscription_watch.operator_runbook.v1",
+                "decision": "ready",
+                "manual_review_required": False,
+                "check_count": 5,
+                "blocking_check_count": 0,
+                "checks": [
+                    {
+                        "code": "lifecycle_readiness",
+                        "status": "passed",
+                        "decision": "ready",
+                        "reason_codes": [],
+                        "action": "none",
+                    },
+                    {
+                        "code": "governance_review",
+                        "status": "passed",
+                        "requires_manual_review": False,
+                        "action": "none",
+                    },
+                    {
+                        "code": "runtime_consistency",
+                        "status": "passed",
+                        "has_mismatch": False,
+                        "action": "none",
+                    },
+                    {
+                        "code": "staleness",
+                        "status": "passed",
+                        "has_stale_component": False,
+                        "has_not_evaluated_component": False,
+                        "action": "none",
+                    },
+                    {
+                        "code": "restart_backoff",
+                        "status": "passed",
+                        "active": False,
+                        "action": "none",
+                    },
+                ],
+                "boundary": "read_only_operator_runbook;does_not_execute_lifecycle_control",
+            },
+        )
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
 
     def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(

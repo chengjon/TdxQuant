@@ -5,6 +5,8 @@ from typing import Any
 
 
 RESTARTABILITY_BOUNDARY = "read_only;does_not_stop_start_or_schedule_restart"
+OPERATOR_RUNBOOK_SCHEMA_VERSION = "tdx.subscription_watch.operator_runbook.v1"
+OPERATOR_RUNBOOK_BOUNDARY = "read_only_operator_runbook;does_not_execute_lifecycle_control"
 
 
 def build_subscription_watch_status_diagnostics(
@@ -62,6 +64,83 @@ def build_subscription_watch_status_diagnostics(
     if supervisor_daemon is not None:
         diagnostics["supervisor_daemon"] = dict(supervisor_daemon)
     return diagnostics
+
+
+def build_subscription_watch_status_runbook(diagnostics_view: dict[str, Any]) -> dict[str, Any]:
+    """Build a compact read-only operator checklist from an existing diagnostics view."""
+    diagnostics = diagnostics_view.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    lifecycle_readiness = diagnostics.get("lifecycle_readiness")
+    lifecycle_readiness = lifecycle_readiness if isinstance(lifecycle_readiness, dict) else {}
+    restart_backoff = diagnostics.get("restart_backoff")
+    restart_backoff = restart_backoff if isinstance(restart_backoff, dict) else {}
+
+    lifecycle_ready = lifecycle_readiness.get("ready")
+    lifecycle_decision = lifecycle_readiness.get("decision")
+    lifecycle_reason_codes = lifecycle_readiness.get("reason_codes")
+    lifecycle_reason_codes = list(lifecycle_reason_codes) if isinstance(lifecycle_reason_codes, list) else []
+    lifecycle_status = "passed" if lifecycle_ready is True else "blocked"
+
+    manual_review_required = bool(diagnostics.get("requires_manual_review"))
+    has_mismatch = bool(diagnostics.get("has_mismatch"))
+    has_stale_component = bool(diagnostics.get("has_stale_component"))
+    has_not_evaluated_component = bool(diagnostics.get("has_not_evaluated_component"))
+    restart_backoff_active = bool(restart_backoff.get("active"))
+    staleness_status = "blocked" if has_stale_component else "observe" if has_not_evaluated_component else "passed"
+
+    checks = [
+        {
+            "code": "lifecycle_readiness",
+            "status": lifecycle_status,
+            "decision": lifecycle_decision,
+            "reason_codes": lifecycle_reason_codes,
+            "action": "none" if lifecycle_status == "passed" else "review_lifecycle_readiness",
+        },
+        {
+            "code": "governance_review",
+            "status": "blocked" if manual_review_required else "passed",
+            "requires_manual_review": manual_review_required,
+            "action": "review_governance_reasons" if manual_review_required else "none",
+        },
+        {
+            "code": "runtime_consistency",
+            "status": "blocked" if has_mismatch else "passed",
+            "has_mismatch": has_mismatch,
+            "action": "compare_control_and_watch_status" if has_mismatch else "none",
+        },
+        {
+            "code": "staleness",
+            "status": staleness_status,
+            "has_stale_component": has_stale_component,
+            "has_not_evaluated_component": has_not_evaluated_component,
+            "action": "review_stale_components" if has_stale_component else "inspect_not_evaluated_components"
+            if has_not_evaluated_component
+            else "none",
+        },
+        {
+            "code": "restart_backoff",
+            "status": "blocked" if restart_backoff_active else "passed",
+            "active": restart_backoff_active,
+            "action": "wait_for_restart_backoff" if restart_backoff_active else "none",
+        },
+    ]
+    blocking_check_count = sum(1 for check in checks if check.get("status") == "blocked")
+    has_observe_check = any(check.get("status") == "observe" for check in checks)
+    if blocking_check_count:
+        decision = "blocked"
+    elif has_observe_check:
+        decision = "observe"
+    else:
+        decision = "ready"
+    return {
+        "schema_version": OPERATOR_RUNBOOK_SCHEMA_VERSION,
+        "decision": decision,
+        "manual_review_required": manual_review_required,
+        "check_count": len(checks),
+        "blocking_check_count": blocking_check_count,
+        "checks": checks,
+        "boundary": OPERATOR_RUNBOOK_BOUNDARY,
+    }
 
 
 def _build_lifecycle_readiness_diagnostics(summary_view: dict[str, Any]) -> dict[str, Any] | None:

@@ -16,7 +16,10 @@ from .subscription_watch_background import (
     build_background_paths,
     build_supervisor_daemon_status_projection,
 )
-from .subscription_watch_status_diagnostics import build_subscription_watch_status_diagnostics
+from .subscription_watch_status_diagnostics import (
+    build_subscription_watch_status_diagnostics,
+    build_subscription_watch_status_runbook,
+)
 
 BRIDGE_VERSION = "v1"
 WATCH_EVENT_STREAM_SCHEMA_VERSION = "tdx.bridge.watch.event_stream.v1"
@@ -249,6 +252,14 @@ def build_bridge_watch_status_diagnostics_result(result: dict[str, Any], *, work
         status_payload=result,
     )
     return diagnostics_view
+
+
+def build_bridge_watch_status_runbook_result(result: dict[str, Any], *, worker_id: str) -> dict[str, Any]:
+    runbook_view = build_bridge_watch_status_diagnostics_result(result, worker_id=worker_id)
+    runbook_view = copy.deepcopy(runbook_view)
+    runbook_view["mode"] = "runbook"
+    runbook_view["runbook"] = build_subscription_watch_status_runbook(runbook_view)
+    return runbook_view
 
 
 def build_bridge_watch_status_action_samples(actions: list[object]) -> list[dict[str, str]]:
@@ -636,8 +647,8 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_watch_status(self, request_id: str) -> None:
         view = self._query_optional_str("view") or "detailed"
-        if view not in {"detailed", "diagnostics", "summary"}:
-            raise ValueError("query parameter view must be one of: detailed, diagnostics, summary")
+        if view not in {"detailed", "diagnostics", "runbook", "summary"}:
+            raise ValueError("query parameter view must be one of: detailed, diagnostics, runbook, summary")
         result = self.server.bridge_controller.status(
             heartbeat_stale_after_seconds=self._query_optional_float("heartbeat_stale_after_seconds"),
             watermark_stale_after_seconds=self._query_optional_float("watermark_stale_after_seconds"),
@@ -650,6 +661,11 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             )
         elif view == "diagnostics":
             result = build_bridge_watch_status_diagnostics_result(
+                result,
+                worker_id=self.server.bridge_config.worker_id,
+            )
+        elif view == "runbook":
+            result = build_bridge_watch_status_runbook_result(
                 result,
                 worker_id=self.server.bridge_config.worker_id,
             )

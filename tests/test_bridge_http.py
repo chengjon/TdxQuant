@@ -1494,6 +1494,138 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             ],
         )
 
+    def test_watch_status_runbook_view_projects_operator_checklist(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {
+                    "state": "running",
+                    "active": True,
+                    "run_id": "run-001",
+                    "pid": 1234,
+                    "start_request": {
+                        "stock_list": ["600519.SH", "000001.SZ"],
+                        "max_events": 10,
+                        "max_seconds": 30.0,
+                        "poll_interval": 0.5,
+                    },
+                },
+                "watch_status": {"state": "running", "run_id": "run-001", "event_count": 3},
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "overall_status": "active",
+                    "control_rollup": {"control_state": "running", "control_active": True},
+                    "consistency_rollup": {
+                        "control_state": "running",
+                        "watch_state": "running",
+                        "has_watch_status": True,
+                        "run_id_match": True,
+                        "state_match": True,
+                        "has_mismatch": False,
+                    },
+                    "lifecycle_readiness": {
+                        "schema_version": "tdx.subscription_watch.lifecycle_readiness.v1",
+                        "ready": True,
+                        "decision": "ready",
+                        "reason_codes": [],
+                        "run_id": "run-001",
+                        "state": "running",
+                        "active": True,
+                        "has_start_request": True,
+                        "start_request_summary": {
+                            "stock_count": 2,
+                            "has_max_events": True,
+                            "has_max_seconds": True,
+                            "has_poll_interval": True,
+                        },
+                        "restart_backoff_active": False,
+                        "statefile_ownership_status": "owned_active",
+                        "statefile_pid_matches_owned_state": True,
+                        "statefile_process_alive": True,
+                        "supervisor_daemon_status": "missing",
+                        "supervisor_daemon_control_allowed": False,
+                        "boundary": "read_only_lifecycle_readiness;does_not_execute_lifecycle_control",
+                    },
+                    "governance": {
+                        "decision": "observe",
+                        "requires_manual_review": False,
+                        "staleness_evaluated": True,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                        "evaluation_summary": {
+                            "has_stale_component": False,
+                            "has_not_evaluated_component": False,
+                            "all_components_evaluated": True,
+                        },
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=runbook", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"]["mode"], "runbook")
+        self.assertEqual(payload["result"]["worker"], "worker-a")
+        self.assertEqual(
+            payload["result"]["runbook"],
+            {
+                "schema_version": "tdx.subscription_watch.operator_runbook.v1",
+                "decision": "ready",
+                "manual_review_required": False,
+                "check_count": 5,
+                "blocking_check_count": 0,
+                "checks": [
+                    {
+                        "code": "lifecycle_readiness",
+                        "status": "passed",
+                        "decision": "ready",
+                        "reason_codes": [],
+                        "action": "none",
+                    },
+                    {
+                        "code": "governance_review",
+                        "status": "passed",
+                        "requires_manual_review": False,
+                        "action": "none",
+                    },
+                    {
+                        "code": "runtime_consistency",
+                        "status": "passed",
+                        "has_mismatch": False,
+                        "action": "none",
+                    },
+                    {
+                        "code": "staleness",
+                        "status": "passed",
+                        "has_stale_component": False,
+                        "has_not_evaluated_component": False,
+                        "action": "none",
+                    },
+                    {
+                        "code": "restart_backoff",
+                        "status": "passed",
+                        "active": False,
+                        "action": "none",
+                    },
+                ],
+                "boundary": "read_only_operator_runbook;does_not_execute_lifecycle_control",
+            },
+        )
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+
     def test_watch_status_diagnostics_view_projects_blocked_restartability_reason(self) -> None:
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()
@@ -1924,7 +2056,10 @@ class BridgeRequestHandlerTests(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, 400)
         self.assertEqual(payload["error"]["code"], "INVALID_REQUEST")
-        self.assertEqual(payload["error"]["message"], "query parameter view must be one of: detailed, diagnostics, summary")
+        self.assertEqual(
+            payload["error"]["message"],
+            "query parameter view must be one of: detailed, diagnostics, runbook, summary",
+        )
         self.assertEqual(controller.status_calls, [])
 
     def test_watch_event_stream_projects_status_and_event_rows_as_sse(self) -> None:
