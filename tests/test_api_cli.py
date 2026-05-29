@@ -11114,6 +11114,24 @@ class ReportCliDispatchTests(unittest.TestCase):
             "process_alive": False,
             "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
         }
+        lifecycle_readiness = {
+            "schema_version": "tdx.subscription_watch.lifecycle_readiness.v1",
+            "ready": False,
+            "decision": "blocked",
+            "reason_codes": ["STATEFILE_OWNERSHIP_NOT_OWNED_ACTIVE"],
+            "run_id": "run-001",
+            "state": "starting",
+            "active": True,
+            "has_start_request": False,
+            "start_request_summary": None,
+            "restart_backoff_active": False,
+            "statefile_ownership_status": "mismatch",
+            "statefile_pid_matches_owned_state": False,
+            "statefile_process_alive": False,
+            "supervisor_daemon_status": "missing",
+            "supervisor_daemon_control_allowed": False,
+            "boundary": "read_only_lifecycle_readiness;does_not_execute_lifecycle_control",
+        }
         detailed_payload = {
             "ok": True,
             "result": {
@@ -11126,6 +11144,7 @@ class ReportCliDispatchTests(unittest.TestCase):
                         "overall_status": "starting",
                         "boundary": "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
                         "statefile_ownership": ownership,
+                        "lifecycle_readiness": lifecycle_readiness,
                     },
                 },
             }
@@ -11145,6 +11164,7 @@ class ReportCliDispatchTests(unittest.TestCase):
         )
         output = json.loads(stdout.getvalue())
         self.assertEqual(output["result"]["status_summary"]["statefile_ownership"], ownership)
+        self.assertEqual(output["result"]["status_summary"]["lifecycle_readiness"], lifecycle_readiness)
         self.assertEqual(
             output["result"]["status_summary"]["boundary"],
             "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",

@@ -6806,6 +6806,7 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
             "consistency_rollup",
             "statefile_ownership",
             "supervisor_daemon",
+            "lifecycle_readiness",
             "heartbeat",
             "watermark",
             "reconnect",

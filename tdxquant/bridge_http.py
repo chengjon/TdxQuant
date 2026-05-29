@@ -111,6 +111,7 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
             "consistency_rollup",
             "statefile_ownership",
             "supervisor_daemon",
+            "lifecycle_readiness",
             "heartbeat",
             "watermark",
             "reconnect",

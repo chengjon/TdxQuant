@@ -802,6 +802,29 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                         "control_allowed": True,
                         "boundary": "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
                     },
+                    "lifecycle_readiness": {
+                        "schema_version": "tdx.subscription_watch.lifecycle_readiness.v1",
+                        "ready": True,
+                        "decision": "ready",
+                        "reason_codes": [],
+                        "run_id": "run-001",
+                        "state": "running",
+                        "active": True,
+                        "has_start_request": True,
+                        "start_request_summary": {
+                            "stock_count": 2,
+                            "has_max_events": True,
+                            "has_max_seconds": True,
+                            "has_poll_interval": True,
+                        },
+                        "restart_backoff_active": False,
+                        "statefile_ownership_status": "owned_active",
+                        "statefile_pid_matches_owned_state": True,
+                        "statefile_process_alive": True,
+                        "supervisor_daemon_status": "running",
+                        "supervisor_daemon_control_allowed": True,
+                        "boundary": "read_only_lifecycle_readiness;does_not_execute_lifecycle_control",
+                    },
                     "heartbeat": {"status": "stale", "age_seconds": 180.0},
                     "watermark": {"status": "fresh", "age_seconds": 15.0},
                     "reconnect": {"status": "degraded", "reconnect_count": 2},
@@ -1023,6 +1046,12 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         self.assertEqual(
             payload["result"]["status_summary"]["supervisor_daemon"]["boundary"],
             "read_only_supervisor_daemon_status;does_not_execute_lifecycle",
+        )
+        self.assertEqual(payload["result"]["status_summary"]["lifecycle_readiness"]["ready"], True)
+        self.assertEqual(payload["result"]["status_summary"]["lifecycle_readiness"]["decision"], "ready")
+        self.assertEqual(
+            payload["result"]["status_summary"]["lifecycle_readiness"]["boundary"],
+            "read_only_lifecycle_readiness;does_not_execute_lifecycle_control",
         )
         self.assertEqual(payload["result"]["governance"]["decision"], "manual_review")
         self.assertEqual(payload["result"]["governance"]["requires_manual_review"], True)

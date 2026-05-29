@@ -54,6 +54,10 @@ SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_SCHEMA_VERSION = "tdx.subscription_watch.
 SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY = (
     "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control"
 )
+SUBSCRIPTION_WATCH_LIFECYCLE_READINESS_SCHEMA_VERSION = "tdx.subscription_watch.lifecycle_readiness.v1"
+SUBSCRIPTION_WATCH_LIFECYCLE_READINESS_BOUNDARY = (
+    "read_only_lifecycle_readiness;does_not_execute_lifecycle_control"
+)
 SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
     "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes"
 )
@@ -110,6 +114,107 @@ def build_statefile_ownership_projection(payload: dict[str, Any] | None) -> dict
         if key in resolved:
             projected[key] = copy.deepcopy(resolved[key])
     return projected
+
+
+def build_subscription_watch_lifecycle_readiness(
+    *,
+    control: dict[str, Any] | None,
+    statefile_ownership: dict[str, Any] | None,
+    supervisor_daemon: dict[str, Any] | None,
+) -> dict[str, Any]:
+    resolved_control = control if isinstance(control, dict) else {}
+    ownership = statefile_ownership if isinstance(statefile_ownership, dict) else {}
+    daemon = supervisor_daemon if isinstance(supervisor_daemon, dict) else {}
+
+    state = _optional_str(resolved_control.get("state")) or "unknown"
+    active = state in ACTIVE_PROCESS_STATES
+    start_request = resolved_control.get("start_request")
+    start_request_summary = _build_subscription_watch_start_request_summary(start_request)
+    restart_backoff = resolved_control.get("restart_backoff")
+    restart_backoff_active = isinstance(restart_backoff, dict) and restart_backoff.get("status") == "active"
+    ownership_status = _optional_str(ownership.get("status"))
+    pid_matches_owned_state = ownership.get("pid_matches_owned_state")
+    process_alive = ownership.get("process_alive")
+    daemon_status = _optional_str(daemon.get("daemon_status"))
+    daemon_control_allowed = bool(daemon.get("control_allowed"))
+
+    reason_codes: list[str] = []
+    if restart_backoff_active:
+        reason_codes.append("BACKOFF_ACTIVE")
+    elif not active:
+        reason_codes.append("NO_ACTIVE_RUN")
+    elif not isinstance(start_request, dict):
+        reason_codes.append("MISSING_START_REQUEST")
+    elif not _subscription_watch_start_request_valid(start_request):
+        reason_codes.append("INVALID_START_REQUEST")
+
+    if not ownership:
+        reason_codes.append("MISSING_STATEFILE_OWNERSHIP")
+    elif ownership_status != "owned_active":
+        reason_codes.append("STATEFILE_OWNERSHIP_NOT_OWNED_ACTIVE")
+    if pid_matches_owned_state is False:
+        reason_codes.append("PID_NOT_MATCHING_OWNED_STATE")
+    if process_alive is False:
+        reason_codes.append("OWNED_PROCESS_NOT_ALIVE")
+
+    if daemon_status == "invalid":
+        reason_codes.append("SUPERVISOR_DAEMON_INVALID")
+    elif daemon_status == "stopping":
+        reason_codes.append("SUPERVISOR_DAEMON_STOPPING")
+
+    ready = not reason_codes
+    return {
+        "schema_version": SUBSCRIPTION_WATCH_LIFECYCLE_READINESS_SCHEMA_VERSION,
+        "ready": ready,
+        "decision": "ready" if ready else "blocked",
+        "reason_codes": reason_codes,
+        "run_id": _optional_str(resolved_control.get("run_id")),
+        "state": state,
+        "active": active,
+        "has_start_request": isinstance(start_request, dict),
+        "start_request_summary": start_request_summary,
+        "restart_backoff_active": restart_backoff_active,
+        "statefile_ownership_status": ownership_status,
+        "statefile_pid_matches_owned_state": pid_matches_owned_state if isinstance(pid_matches_owned_state, bool) else None,
+        "statefile_process_alive": process_alive if isinstance(process_alive, bool) else None,
+        "supervisor_daemon_status": daemon_status,
+        "supervisor_daemon_control_allowed": daemon_control_allowed,
+        "boundary": SUBSCRIPTION_WATCH_LIFECYCLE_READINESS_BOUNDARY,
+    }
+
+
+def _build_subscription_watch_start_request_summary(start_request: Any) -> dict[str, Any] | None:
+    if not isinstance(start_request, dict):
+        return None
+    stock_list = start_request.get("stock_list")
+    return {
+        "stock_count": len(stock_list) if isinstance(stock_list, list) else 0,
+        "has_max_events": start_request.get("max_events") is not None,
+        "has_max_seconds": start_request.get("max_seconds") is not None,
+        "has_poll_interval": start_request.get("poll_interval") is not None,
+    }
+
+
+def _subscription_watch_start_request_valid(start_request: Any) -> bool:
+    if not isinstance(start_request, dict):
+        return False
+    stock_list = start_request.get("stock_list")
+    max_events = start_request.get("max_events")
+    max_seconds = start_request.get("max_seconds")
+    poll_interval = start_request.get("poll_interval")
+    if not isinstance(stock_list, list) or not stock_list or not all(isinstance(item, str) for item in stock_list):
+        return False
+    if max_events is not None and (isinstance(max_events, bool) or not isinstance(max_events, int) or max_events <= 0):
+        return False
+    if max_seconds is not None and (
+        isinstance(max_seconds, bool) or not isinstance(max_seconds, (int, float)) or max_seconds <= 0
+    ):
+        return False
+    if poll_interval is not None and (
+        isinstance(poll_interval, bool) or not isinstance(poll_interval, (int, float)) or poll_interval < 0
+    ):
+        return False
+    return True
 
 
 def build_subscription_watch_status_summary(
@@ -188,6 +293,11 @@ def build_subscription_watch_status_summary(
     supervisor_daemon_projection = build_supervisor_daemon_status_projection(supervisor_daemon)
     if supervisor_daemon_projection:
         summary["supervisor_daemon"] = supervisor_daemon_projection
+    summary["lifecycle_readiness"] = build_subscription_watch_lifecycle_readiness(
+        control=resolved_control,
+        statefile_ownership=statefile_ownership_projection,
+        supervisor_daemon=supervisor_daemon_projection,
+    )
     return summary
 
 

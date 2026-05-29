@@ -396,6 +396,12 @@ def test_start_rejects_when_active_state_is_resilience_runtime_state(tmp_path: P
             "pid": pid,
             "reason": None,
             "active": True,
+            "start_request": {
+                "stock_list": ["688318.SH", "600519.SH"],
+                "max_events": 10,
+                "max_seconds": 30.0,
+                "poll_interval": 0.5,
+            },
         }
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
@@ -2609,6 +2615,12 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
             "pid": pid,
             "reason": None,
             "active": True,
+            "start_request": {
+                "stock_list": ["688318.SH", "600519.SH"],
+                "max_events": 10,
+                "max_seconds": 30.0,
+                "poll_interval": 0.5,
+            },
         }
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
@@ -2651,6 +2663,29 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
     assert status_view["status_summary"]["state"] == "running"
     assert status_view["status_summary"]["overall_status"] == "active"
     assert status_view["status_summary"]["run_id"] == "run-001"
+    assert status_view["status_summary"]["lifecycle_readiness"] == {
+        "schema_version": "tdx.subscription_watch.lifecycle_readiness.v1",
+        "ready": True,
+        "decision": "ready",
+        "reason_codes": [],
+        "run_id": "run-001",
+        "state": "running",
+        "active": True,
+        "has_start_request": True,
+        "start_request_summary": {
+            "stock_count": 2,
+            "has_max_events": True,
+            "has_max_seconds": True,
+            "has_poll_interval": True,
+        },
+        "restart_backoff_active": False,
+        "statefile_ownership_status": "owned_active",
+        "statefile_pid_matches_owned_state": True,
+        "statefile_process_alive": True,
+        "supervisor_daemon_status": "missing",
+        "supervisor_daemon_control_allowed": False,
+        "boundary": "read_only_lifecycle_readiness;does_not_execute_lifecycle_control",
+    }
     assert status_view["status_summary"]["heartbeat"]["status"] == "present"
     assert status_view["status_summary"]["heartbeat"]["heartbeat_at"] == "2026-05-17T09:30:00+00:00"
     assert status_view["status_summary"]["watermark"] == {
@@ -2697,6 +2732,17 @@ def test_status_view_reports_statefile_ownership_mismatch_for_unowned_startup_st
     }
     assert status_view["status_summary"]["governance"]["decision"] == "observe"
     assert status_view["status_summary"]["governance"]["staleness_evaluated"] is False
+    assert status_view["status_summary"]["lifecycle_readiness"]["ready"] is False
+    assert status_view["status_summary"]["lifecycle_readiness"]["decision"] == "blocked"
+    assert status_view["status_summary"]["lifecycle_readiness"]["reason_codes"] == [
+        "MISSING_START_REQUEST",
+        "STATEFILE_OWNERSHIP_NOT_OWNED_ACTIVE",
+        "PID_NOT_MATCHING_OWNED_STATE",
+    ]
+    assert (
+        status_view["status_summary"]["lifecycle_readiness"]["boundary"]
+        == "read_only_lifecycle_readiness;does_not_execute_lifecycle_control"
+    )
 
 
 def test_status_view_evaluates_heartbeat_staleness_when_threshold_is_passed(tmp_path: Path) -> None:
