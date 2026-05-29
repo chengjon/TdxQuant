@@ -15,6 +15,7 @@ from .subscription_watch_background import (
     SubscriptionWatchBackgroundController,
     build_background_paths,
 )
+from .subscription_watch_status_diagnostics import build_subscription_watch_status_diagnostics
 
 BRIDGE_VERSION = "v1"
 WATCH_EVENT_STREAM_SCHEMA_VERSION = "tdx.bridge.watch.event_stream.v1"
@@ -228,6 +229,14 @@ def build_bridge_watch_status_summary_result(result: dict[str, Any], *, worker_i
         summary_view["governance"] = governance_view
 
     return summary_view
+
+
+def build_bridge_watch_status_diagnostics_result(result: dict[str, Any], *, worker_id: str) -> dict[str, Any]:
+    diagnostics_view = build_bridge_watch_status_summary_result(result, worker_id=worker_id)
+    diagnostics_view = copy.deepcopy(diagnostics_view)
+    diagnostics_view["mode"] = "diagnostics"
+    diagnostics_view["diagnostics"] = build_subscription_watch_status_diagnostics(diagnostics_view)
+    return diagnostics_view
 
 
 def build_bridge_watch_status_action_samples(actions: list[object]) -> list[dict[str, str]]:
@@ -521,8 +530,8 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_watch_status(self, request_id: str) -> None:
         view = self._query_optional_str("view") or "detailed"
-        if view not in {"detailed", "summary"}:
-            raise ValueError("query parameter view must be one of: detailed, summary")
+        if view not in {"detailed", "diagnostics", "summary"}:
+            raise ValueError("query parameter view must be one of: detailed, diagnostics, summary")
         result = self.server.bridge_controller.status(
             heartbeat_stale_after_seconds=self._query_optional_float("heartbeat_stale_after_seconds"),
             watermark_stale_after_seconds=self._query_optional_float("watermark_stale_after_seconds"),
@@ -530,6 +539,11 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         )
         if view == "summary":
             result = build_bridge_watch_status_summary_result(
+                result,
+                worker_id=self.server.bridge_config.worker_id,
+            )
+        elif view == "diagnostics":
+            result = build_bridge_watch_status_diagnostics_result(
                 result,
                 worker_id=self.server.bridge_config.worker_id,
             )

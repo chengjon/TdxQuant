@@ -48,6 +48,7 @@ from .bridge_registry import (
     run_bridge_watch_stop,
 )
 from .bridge_http import serve_bridge_from_config
+from .subscription_watch_status_diagnostics import build_subscription_watch_status_diagnostics
 from .provider_transport_replay import (
     build_provider_replay_managed_daemon_command,
     build_provider_transport_replay_status,
@@ -694,7 +695,7 @@ def _build_bridge_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     bridge_watch_status_parser.add_argument("--heartbeat-stale-after-seconds", type=float)
     bridge_watch_status_parser.add_argument("--watermark-stale-after-seconds", type=float)
     bridge_watch_status_parser.add_argument("--reconnect-stale-after-seconds", type=float)
-    bridge_watch_status_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
+    bridge_watch_status_parser.add_argument("--view", choices=["detailed", "summary", "diagnostics"], default="detailed")
 
     bridge_watch_events_parser = bridge_subparsers.add_parser("watch-events")
     bridge_watch_events_parser.add_argument("--registry", required=True)
@@ -5912,6 +5913,8 @@ def _handle_bridge_subcommand(args: argparse.Namespace) -> int:
             )
             if args.view == "summary":
                 payload = _build_bridge_watch_status_summary_payload(payload, worker_id=args.worker)
+            elif args.view == "diagnostics":
+                payload = _build_bridge_watch_status_diagnostics_payload(payload, worker_id=args.worker)
             return _emit_bridge_payload(payload)
         if args.bridge_command == "watch-events":
             return _emit_bridge_payload(
@@ -6816,6 +6819,20 @@ def _build_bridge_watch_status_summary_payload(payload: dict[str, object], *, wo
         summary_view["governance"] = governance_view
 
     return {"ok": True, "result": summary_view}
+
+
+def _build_bridge_watch_status_diagnostics_payload(payload: dict[str, object], *, worker_id: str) -> dict[str, object]:
+    diagnostics_payload = _build_bridge_watch_status_summary_payload(payload, worker_id=worker_id)
+    if not diagnostics_payload.get("ok"):
+        return diagnostics_payload
+    result = diagnostics_payload.get("result")
+    if not isinstance(result, dict):
+        return diagnostics_payload
+
+    result = copy.deepcopy(result)
+    result["mode"] = "diagnostics"
+    result["diagnostics"] = build_subscription_watch_status_diagnostics(result)
+    return {"ok": True, "result": result}
 
 
 def _build_bridge_watch_status_action_samples(actions: list[object]) -> list[dict[str, str]]:

@@ -123,6 +123,24 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.bridge_command, "watch-status")
         self.assertEqual(args.view, "summary")
 
+    def test_bridge_watch_status_diagnostics_view_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--view",
+                "diagnostics",
+            ]
+        )
+        self.assertEqual(args.command, "bridge")
+        self.assertEqual(args.bridge_command, "watch-status")
+        self.assertEqual(args.view, "diagnostics")
+
     def test_bridge_watch_events_commands_parse(self) -> None:
         parser = build_parser()
         events = parser.parse_args(
@@ -11136,6 +11154,119 @@ class ReportCliDispatchTests(unittest.TestCase):
                 "action_sample_truncated": True,
             },
         )
+
+    def test_handle_bridge_watch_status_diagnostics_view_projects_rollup_flags(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "bridge",
+                "watch-status",
+                "--registry",
+                "runtime/bridge/master-workers.json",
+                "--worker",
+                "worker-a",
+                "--view",
+                "diagnostics",
+            ]
+        )
+        detailed_payload = {
+            "ok": True,
+            "result": {
+                "status": "running",
+                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {"state": "degraded", "run_id": "run-002"},
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "overall_status": "manual_review",
+                    "control_rollup": {
+                        "control_state": "running",
+                        "control_active": True,
+                        "has_control_run_id": True,
+                        "has_control_pid": True,
+                        "control_reason": None,
+                        "has_control_reason": False,
+                        "stale_process_state": False,
+                        "startup_persistence_failed": False,
+                    },
+                    "consistency_rollup": {
+                        "control_state": "running",
+                        "watch_state": "degraded",
+                        "has_watch_status": True,
+                        "has_control_run_id": True,
+                        "has_watch_run_id": True,
+                        "run_id_match": False,
+                        "state_match": False,
+                        "has_control_pid": True,
+                        "has_mismatch": True,
+                    },
+                    "governance": {
+                        "decision": "manual_review",
+                        "requires_manual_review": True,
+                        "staleness_evaluated": True,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                        "reasons": ["watch_status:mismatch", "reconnect:stale"],
+                        "actions": [{"action": "inspect_worker", "reason": "watch_status:mismatch"}],
+                        "reconnect_rollup": {
+                            "staleness": "stale",
+                            "reconnect_count": 2,
+                            "consecutive_reconnect_failures": 1,
+                            "has_reconnects": True,
+                            "has_reconnect_failures": True,
+                            "has_last_error": True,
+                            "has_next_reconnect_at": True,
+                            "age_source": "last_disconnect_at",
+                            "stale_after_seconds": 60.0,
+                        },
+                        "evaluation_summary": {
+                            "evaluated_components": ["heartbeat", "watermark"],
+                            "stale_components": ["heartbeat"],
+                            "fresh_components": ["watermark"],
+                            "not_evaluated_components": ["reconnect"],
+                            "has_stale_component": True,
+                            "has_not_evaluated_component": True,
+                            "all_components_evaluated": False,
+                        },
+                    },
+                },
+            },
+        }
+        with (
+            patch("tdxquant.cli.run_bridge_watch_status", return_value=detailed_payload) as mocked_run,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = _handle_bridge_subcommand(args)
+
+        self.assertEqual(exit_code, 0)
+        mocked_run.assert_called_once_with(
+            registry_path="runtime/bridge/master-workers.json",
+            worker_id="worker-a",
+            heartbeat_stale_after_seconds=None,
+            watermark_stale_after_seconds=None,
+            reconnect_stale_after_seconds=None,
+        )
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["result"]["mode"], "diagnostics")
+        self.assertEqual(
+            payload["result"]["diagnostics"],
+            {
+                "has_control_rollup": True,
+                "has_consistency_rollup": True,
+                "has_reconnect_rollup": True,
+                "has_evaluation_rollup": True,
+                "has_mismatch": True,
+                "requires_manual_review": True,
+                "staleness_evaluated": True,
+                "has_reconnect_failures": True,
+                "has_reconnect_last_error": True,
+                "has_stale_component": True,
+                "has_not_evaluated_component": True,
+                "all_components_evaluated": False,
+                "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+            },
+        )
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+        self.assertNotIn("reasons", payload["result"]["governance"])
+        self.assertNotIn("actions", payload["result"]["governance"])
 
     def test_handle_bridge_watch_events_dispatches_registry_client(self) -> None:
         args = build_parser().parse_args(

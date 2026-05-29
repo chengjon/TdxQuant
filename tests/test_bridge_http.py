@@ -854,6 +854,118 @@ class BridgeRequestHandlerTests(unittest.TestCase):
             ],
         )
 
+    def test_watch_status_diagnostics_view_projects_rollup_flags(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            controller = _FakeController()
+            controller.status_result = {
+                "control": {"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+                "watch_status": {"state": "degraded", "run_id": "run-002", "event_count": 3},
+                "status_summary": {
+                    "schema_version": "tdx.subscription_watch.status_summary.v1",
+                    "overall_status": "manual_review",
+                    "control_rollup": {
+                        "control_state": "running",
+                        "control_active": True,
+                        "has_control_run_id": True,
+                        "has_control_pid": True,
+                        "control_reason": None,
+                        "has_control_reason": False,
+                        "stale_process_state": False,
+                        "startup_persistence_failed": False,
+                    },
+                    "consistency_rollup": {
+                        "control_state": "running",
+                        "watch_state": "degraded",
+                        "has_watch_status": True,
+                        "has_control_run_id": True,
+                        "has_watch_run_id": True,
+                        "run_id_match": False,
+                        "state_match": False,
+                        "has_control_pid": True,
+                        "has_mismatch": True,
+                    },
+                    "governance": {
+                        "decision": "manual_review",
+                        "requires_manual_review": True,
+                        "staleness_evaluated": True,
+                        "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+                        "reasons": ["watch_status:mismatch", "reconnect:stale"],
+                        "actions": [{"action": "inspect_worker", "reason": "watch_status:mismatch"}],
+                        "reconnect_rollup": {
+                            "staleness": "stale",
+                            "reconnect_count": 2,
+                            "consecutive_reconnect_failures": 1,
+                            "has_reconnects": True,
+                            "has_reconnect_failures": True,
+                            "has_last_error": True,
+                            "has_next_reconnect_at": True,
+                            "age_source": "last_disconnect_at",
+                            "stale_after_seconds": 60.0,
+                        },
+                        "evaluation_summary": {
+                            "evaluated_components": ["heartbeat", "watermark"],
+                            "stale_components": ["heartbeat"],
+                            "fresh_components": ["watermark"],
+                            "not_evaluated_components": ["reconnect"],
+                            "has_stale_component": True,
+                            "has_not_evaluated_component": True,
+                            "all_components_evaluated": False,
+                        },
+                    },
+                },
+            }
+            config = BridgeConfig(
+                worker_id="worker-a",
+                bind_host="127.0.0.1",
+                port=0,
+                token="secret-token",
+                master_allowlist=["127.0.0.1"],
+                run_root_dir=temp_dir,
+            )
+            server, base_url, thread = self._start_server(config, controller=controller)
+            try:
+                payload = self._request(f"{base_url}/bridge/v1/watch/status?view=diagnostics", token="secret-token")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"]["mode"], "diagnostics")
+        self.assertEqual(payload["result"]["worker"], "worker-a")
+        self.assertEqual(
+            payload["result"]["diagnostics"],
+            {
+                "has_control_rollup": True,
+                "has_consistency_rollup": True,
+                "has_reconnect_rollup": True,
+                "has_evaluation_rollup": True,
+                "has_mismatch": True,
+                "requires_manual_review": True,
+                "staleness_evaluated": True,
+                "has_reconnect_failures": True,
+                "has_reconnect_last_error": True,
+                "has_stale_component": True,
+                "has_not_evaluated_component": True,
+                "all_components_evaluated": False,
+                "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+            },
+        )
+        self.assertNotIn("control", payload["result"])
+        self.assertNotIn("watch_status", payload["result"])
+        self.assertNotIn("reasons", payload["result"]["governance"])
+        self.assertNotIn("actions", payload["result"]["governance"])
+        self.assertEqual(
+            controller.status_calls,
+            [
+                {
+                    "heartbeat_stale_after_seconds": None,
+                    "watermark_stale_after_seconds": None,
+                    "reconnect_stale_after_seconds": None,
+                }
+            ],
+        )
+
     def test_watch_status_summary_view_rejects_unknown_view(self) -> None:
         with TemporaryDirectory() as temp_dir:
             controller = _FakeController()
@@ -877,7 +989,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, 400)
         self.assertEqual(payload["error"]["code"], "INVALID_REQUEST")
-        self.assertEqual(payload["error"]["message"], "query parameter view must be one of: detailed, summary")
+        self.assertEqual(payload["error"]["message"], "query parameter view must be one of: detailed, diagnostics, summary")
         self.assertEqual(controller.status_calls, [])
 
     def test_watch_event_stream_projects_status_and_event_rows_as_sse(self) -> None:
