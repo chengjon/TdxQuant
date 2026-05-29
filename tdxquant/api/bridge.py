@@ -1112,6 +1112,36 @@ def run_tdx_send_warn(
     return _run_tq_call("sent TongDaXin client warn payload", callback, strategy_path=strategy_path)
 
 
+def run_tdx_send_message(msg_str: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_message")
+        return method(msg_str)
+
+    return _run_tq_call("sent TongDaXin client message", callback, strategy_path=strategy_path)
+
+
+def run_tdx_send_file(file: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_file")
+        return method(file)
+
+    return _run_tq_call("sent TongDaXin client file", callback, strategy_path=strategy_path)
+
+
+def run_tdx_send_bt_data(
+    stock_code: str,
+    time_list: list[str],
+    data_list: list[list[str]],
+    count: int,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "send_bt_data")
+        return method(stock_code=stock_code, time_list=time_list, data_list=data_list, count=count)
+
+    return _run_tq_call("sent TongDaXin client backtest data", callback, strategy_path=strategy_path)
+
+
 def run_tdx_get_user_sector(strategy_path: str | None = None) -> Result:
     def callback(tq_class):
         method = _require_tq_method(tq_class, "get_user_sector")
@@ -1588,3 +1618,174 @@ def run_tdx_formula_process_mul_zb(
         )
 
     return _run_tq_call("executed TongDaXin batch indicator formula", callback, strategy_path=strategy_path)
+
+
+# ---------------------------------------------------------------------------
+# Group B: documented-only functions (forward-compatible via _require_tq_method)
+# ---------------------------------------------------------------------------
+
+
+def run_tdx_get_relation(stock_code: str, relation_type: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_relation")
+        return method(stock_code=stock_code, relation_type=relation_type)
+
+    return _run_tq_call("fetched TongDaXin stock relation data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_gb_info_by_date(stock_code: str, date: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "gb_info_by_date")
+        return method(stock_code=stock_code, date=date)
+
+    return _run_tq_call("fetched TongDaXin stock board info by date", callback, strategy_path=strategy_path)
+
+
+def run_tdx_get_pricevol(
+    stock_code: str,
+    period: str,
+    start_time: str,
+    end_time: str,
+    count: int,
+    dividend_type: str,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_pricevol")
+        return method(
+            stock_code=stock_code,
+            period=period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+        )
+
+    return _run_tq_call("fetched TongDaXin price-volume data", callback, strategy_path=strategy_path)
+
+
+def run_tdx_get_trackzs_etf_info(stock_code: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "get_trackzs_etf_info")
+        return method(stock_code=stock_code)
+
+    return _run_tq_call("fetched TongDaXin ETF tracking index info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_get_all(strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_get_all")
+        return method()
+
+    return _run_tq_call("fetched TongDaXin all formula list", callback, strategy_path=strategy_path)
+
+
+def run_tdx_formula_get_info(formula_name: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "formula_get_info")
+        return method(formula_name=formula_name)
+
+    return _run_tq_call("fetched TongDaXin formula info", callback, strategy_path=strategy_path)
+
+
+def run_tdx_print_to_tdx(
+    df_list: list,
+    sp_name: str = "",
+    xml_filename: str = "",
+    jsn_filenames: list[str] | None = None,
+    vertical: int | None = None,
+    horizontal: int | None = None,
+    height: list | None = None,
+    table_names: list[str] | None = None,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "print_to_tdx")
+        return method(
+            df_list=df_list,
+            sp_name=sp_name,
+            xml_filename=xml_filename,
+            jsn_filenames=jsn_filenames or [],
+            vertical=vertical,
+            horizontal=horizontal,
+            height=height or [],
+            table_names=table_names or [],
+        )
+
+    return _run_tq_call("exported data to TongDaXin client", callback, strategy_path=strategy_path)
+
+
+def run_tdx_exec_to_tdx(url: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "exec_to_tdx")
+        return method(url=url)
+
+    return _run_tq_call("executed TongDaXin client command", callback, strategy_path=strategy_path)
+
+
+# ---------------------------------------------------------------------------
+# Group C: trading domain functions
+# ---------------------------------------------------------------------------
+
+
+def run_tdx_stock_account(account: str, account_type: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "stock_account")
+        return method(account=account, account_type=account_type)
+
+    return _run_tq_call("acquired TongDaXin stock account handle", callback, strategy_path=strategy_path)
+
+
+def run_tdx_order_stock(
+    account_id: int,
+    stock_code: str,
+    order_type: int,
+    order_volume: int,
+    price_type: int,
+    price: float,
+    strategy_path: str | None = None,
+) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "order_stock")
+        return method(
+            account_id=account_id,
+            stock_code=stock_code,
+            order_type=order_type,
+            order_volume=order_volume,
+            price_type=price_type,
+            price=price,
+        )
+
+    return _run_tq_call("submitted TongDaXin stock order", callback, strategy_path=strategy_path)
+
+
+def run_tdx_query_stock_orders(account_id: int, stock_code: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "query_stock_orders")
+        return method(account_id=account_id, stock_code=stock_code)
+
+    return _run_tq_call("queried TongDaXin stock orders", callback, strategy_path=strategy_path)
+
+
+def run_tdx_query_stock_positions(account_id: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "query_stock_positions")
+        return method(account_id=account_id)
+
+    return _run_tq_call("queried TongDaXin stock positions", callback, strategy_path=strategy_path)
+
+
+def run_tdx_cancel_order_stock(account_id: int, stock_code: str, order_id: str, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "cancel_order_stock")
+        return method(account_id=account_id, stock_code=stock_code, order_id=order_id)
+
+    return _run_tq_call("cancelled TongDaXin stock order", callback, strategy_path=strategy_path)
+
+
+def run_tdx_query_stock_asset(account_id: int, strategy_path: str | None = None) -> Result:
+    def callback(tq_class):
+        method = _require_tq_method(tq_class, "query_stock_asset")
+        return method(account_id=account_id)
+
+    return _run_tq_call("queried TongDaXin stock asset", callback, strategy_path=strategy_path)

@@ -6,6 +6,8 @@ from .bridge import (
     run_tdx_data_snapshot,
     run_tdx_data_stock_info,
     run_tdx_full_tick,
+    run_tdx_get_pricevol,
+    run_tdx_get_trackzs_etf_info,
     run_tdx_market_snapshot,
     run_tdx_more_info,
 )
@@ -58,3 +60,25 @@ class MarketApi:
 
     def cb_info(self, stock_code: str, field_list: list[str]) -> Result:
         return run_tdx_cb_info(stock_code=stock_code, field_list=field_list, strategy_path=self.strategy_path)
+
+    def get_pricevol(
+        self,
+        stock_code: str,
+        period: str,
+        start_time: str = "",
+        end_time: str = "",
+        count: int = -1,
+        dividend_type: str = "none",
+    ) -> Result:
+        return run_tdx_get_pricevol(
+            stock_code=stock_code,
+            period=period,
+            start_time=start_time,
+            end_time=end_time,
+            count=count,
+            dividend_type=dividend_type,
+            strategy_path=self.strategy_path,
+        )
+
+    def get_trackzs_etf_info(self, stock_code: str) -> Result:
+        return run_tdx_get_trackzs_etf_info(stock_code=stock_code, strategy_path=self.strategy_path)

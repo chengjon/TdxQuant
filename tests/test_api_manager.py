@@ -22,7 +22,9 @@ from tdxquant.api.formula import FormulaApi
 from tdxquant.api.market import MarketApi
 from tdxquant.api.meta import MetaApi
 from tdxquant.api.runtime import RuntimeApi
+from tdxquant.api.trade_api import TradeApi
 from tdxquant.models import ErrorCode, Result
+from tdxquant.provider_discovery import SIDE_EFFECT_LEVELS, list_provider_capabilities
 from tdxquant.replay_fixtures import load_provider_replay_fixture
 from tdxquant.reporting import get_report_preset_path, load_report_presets, resolve_report_preset
 from tdxquant.tasking import get_task_preset_path, load_task_presets, resolve_task_preset
@@ -2633,6 +2635,252 @@ class RuntimeApiTests(unittest.TestCase):
             strategy_path="strategy.py",
             hid_port="COM4",
         )
+
+
+class TqcenterOfficialApiWrapperTests(unittest.TestCase):
+    def test_api_facades_delegate_official_tqcenter_methods_to_bridge(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"value": 1})
+        cases = [
+            (
+                RuntimeApi,
+                "tdxquant.api.runtime.run_tdx_send_message",
+                "send_message",
+                {"msg_str": "hello"},
+                {"msg_str": "hello", "strategy_path": "strategy.py"},
+            ),
+            (
+                RuntimeApi,
+                "tdxquant.api.runtime.run_tdx_send_file",
+                "send_file",
+                {"file": "report.txt"},
+                {"file": "report.txt", "strategy_path": "strategy.py"},
+            ),
+            (
+                RuntimeApi,
+                "tdxquant.api.runtime.run_tdx_send_bt_data",
+                "send_bt_data",
+                {"stock_code": "000001.SZ", "time_list": ["20250101"], "data_list": [["1"]], "count": 1},
+                {
+                    "stock_code": "000001.SZ",
+                    "time_list": ["20250101"],
+                    "data_list": [["1"]],
+                    "count": 1,
+                    "strategy_path": "strategy.py",
+                },
+            ),
+            (
+                RuntimeApi,
+                "tdxquant.api.runtime.run_tdx_print_to_tdx",
+                "print_to_tdx",
+                {
+                    "df_list": [{"name": "demo"}],
+                    "sp_name": "strategy-panel",
+                    "xml_filename": "layout.xml",
+                    "jsn_filenames": ["one.jsn"],
+                    "vertical": 1,
+                    "horizontal": 2,
+                    "height": [20],
+                    "table_names": ["orders"],
+                },
+                {
+                    "df_list": [{"name": "demo"}],
+                    "sp_name": "strategy-panel",
+                    "xml_filename": "layout.xml",
+                    "jsn_filenames": ["one.jsn"],
+                    "vertical": 1,
+                    "horizontal": 2,
+                    "height": [20],
+                    "table_names": ["orders"],
+                    "strategy_path": "strategy.py",
+                },
+            ),
+            (
+                RuntimeApi,
+                "tdxquant.api.runtime.run_tdx_exec_to_tdx",
+                "exec_to_tdx",
+                {"url": "tdx://open"},
+                {"url": "tdx://open", "strategy_path": "strategy.py"},
+            ),
+            (
+                MarketApi,
+                "tdxquant.api.market.run_tdx_get_pricevol",
+                "get_pricevol",
+                {
+                    "stock_code": "600519.SH",
+                    "period": "1d",
+                    "start_time": "20250101",
+                    "end_time": "20250131",
+                    "count": 30,
+                    "dividend_type": "front",
+                },
+                {
+                    "stock_code": "600519.SH",
+                    "period": "1d",
+                    "start_time": "20250101",
+                    "end_time": "20250131",
+                    "count": 30,
+                    "dividend_type": "front",
+                    "strategy_path": "strategy.py",
+                },
+            ),
+            (
+                MarketApi,
+                "tdxquant.api.market.run_tdx_get_trackzs_etf_info",
+                "get_trackzs_etf_info",
+                {"stock_code": "510300.SH"},
+                {"stock_code": "510300.SH", "strategy_path": "strategy.py"},
+            ),
+            (
+                MetaApi,
+                "tdxquant.api.meta.run_tdx_get_relation",
+                "get_relation",
+                {"stock_code": "600519.SH", "relation_type": 1},
+                {"stock_code": "600519.SH", "relation_type": 1, "strategy_path": "strategy.py"},
+            ),
+            (
+                MetaApi,
+                "tdxquant.api.meta.run_tdx_gb_info_by_date",
+                "gb_info_by_date",
+                {"stock_code": "600519.SH", "date": "20250101"},
+                {"stock_code": "600519.SH", "date": "20250101", "strategy_path": "strategy.py"},
+            ),
+            (
+                FormulaApi,
+                "tdxquant.api.formula.run_tdx_formula_get_all",
+                "get_all",
+                {},
+                {"strategy_path": "strategy.py"},
+            ),
+            (
+                FormulaApi,
+                "tdxquant.api.formula.run_tdx_formula_get_info",
+                "get_info",
+                {"formula_name": "UPN"},
+                {"formula_name": "UPN", "strategy_path": "strategy.py"},
+            ),
+            (
+                TradeApi,
+                "tdxquant.api.trade_api.run_tdx_stock_account",
+                "stock_account",
+                {"account": "A1", "account_type": "stock"},
+                {"account": "A1", "account_type": "stock", "strategy_path": "strategy.py"},
+            ),
+            (
+                TradeApi,
+                "tdxquant.api.trade_api.run_tdx_order_stock",
+                "order_stock",
+                {
+                    "account_id": 1,
+                    "stock_code": "600519.SH",
+                    "order_type": 0,
+                    "order_volume": 100,
+                    "price_type": 0,
+                    "price": 1688.5,
+                },
+                {
+                    "account_id": 1,
+                    "stock_code": "600519.SH",
+                    "order_type": 0,
+                    "order_volume": 100,
+                    "price_type": 0,
+                    "price": 1688.5,
+                    "strategy_path": "strategy.py",
+                },
+            ),
+            (
+                TradeApi,
+                "tdxquant.api.trade_api.run_tdx_query_stock_orders",
+                "query_stock_orders",
+                {"account_id": 1, "stock_code": "600519.SH"},
+                {"account_id": 1, "stock_code": "600519.SH", "strategy_path": "strategy.py"},
+            ),
+            (
+                TradeApi,
+                "tdxquant.api.trade_api.run_tdx_query_stock_positions",
+                "query_stock_positions",
+                {"account_id": 1},
+                {"account_id": 1, "strategy_path": "strategy.py"},
+            ),
+            (
+                TradeApi,
+                "tdxquant.api.trade_api.run_tdx_cancel_order_stock",
+                "cancel_order_stock",
+                {"account_id": 1, "stock_code": "600519.SH", "order_id": "O-1"},
+                {"account_id": 1, "stock_code": "600519.SH", "order_id": "O-1", "strategy_path": "strategy.py"},
+            ),
+            (
+                TradeApi,
+                "tdxquant.api.trade_api.run_tdx_query_stock_asset",
+                "query_stock_asset",
+                {"account_id": 1},
+                {"account_id": 1, "strategy_path": "strategy.py"},
+            ),
+        ]
+        for api_cls, patch_target, method_name, call_kwargs, expected_kwargs in cases:
+            with self.subTest(method=method_name), patch(patch_target, return_value=expected) as mocked:
+                api = api_cls(strategy_path="strategy.py")
+                result = getattr(api, method_name)(**call_kwargs)
+                self.assertIs(result, expected)
+                mocked.assert_called_once_with(**expected_kwargs)
+
+    def test_provider_discovery_registers_official_tqcenter_methods_with_valid_grading(self) -> None:
+        expected_side_effects = {
+            "runtime.send_message": "live_side_effecting",
+            "runtime.send_file": "live_side_effecting",
+            "runtime.send_bt_data": "live_side_effecting",
+            "market.get_pricevol": "read_only",
+            "market.get_trackzs_etf_info": "read_only",
+            "meta.get_relation": "read_only",
+            "meta.gb_info_by_date": "read_only",
+            "formula.get_all": "read_only",
+            "formula.get_info": "read_only",
+            "runtime.print_to_tdx": "live_side_effecting",
+            "runtime.exec_to_tdx": "live_side_effecting",
+            "trade.stock_account": "read_only",
+            "trade.order_stock": "live_side_effecting",
+            "trade.query_stock_orders": "read_only",
+            "trade.query_stock_positions": "read_only",
+            "trade.cancel_order_stock": "live_side_effecting",
+            "trade.query_stock_asset": "read_only",
+        }
+        capabilities = {item["name"]: item for item in list_provider_capabilities()}
+        self.assertEqual(set(), set(expected_side_effects) - set(capabilities))
+        invalid_levels = {
+            name: item["side_effect_level"]
+            for name, item in capabilities.items()
+            if item["side_effect_level"] not in SIDE_EFFECT_LEVELS
+        }
+        self.assertEqual({}, invalid_levels)
+        for name, side_effect_level in expected_side_effects.items():
+            with self.subTest(capability=name):
+                capability = capabilities[name]
+                self.assertEqual(capability["side_effect_level"], side_effect_level)
+                self.assertEqual(capability["entrypoints"]["manager_method"], name)
+
+    def test_manager_trade_proxy_delegates_without_live_execution(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="queued", data={"order_id": "O-1"})
+        manager = TdxApiManager(profile="default")
+        with patch.object(type(manager._trade_api), "order_stock", return_value=expected) as mocked:
+            result = manager.trade.order_stock(
+                account_id=1,
+                stock_code="600519.SH",
+                order_type=0,
+                order_volume=100,
+                price_type=0,
+                price=1688.5,
+            )
+        mocked.assert_called_once_with(
+            account_id=1,
+            stock_code="600519.SH",
+            order_type=0,
+            order_volume=100,
+            price_type=0,
+            price=1688.5,
+        )
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["order_id"], "O-1")
+        self.assertEqual(result.data["manager"]["domain"], "trade")
+        self.assertEqual(result.data["manager"]["method"], "order_stock")
 
 
 class _FakeRuntimeSubscriptionSession:

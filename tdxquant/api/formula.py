@@ -6,7 +6,9 @@ from ..models import Result
 from .bridge import (
     run_tdx_formula_exp,
     run_tdx_formula_format_data,
+    run_tdx_formula_get_all,
     run_tdx_formula_get_data,
+    run_tdx_formula_get_info,
     run_tdx_formula_process_mul_xg,
     run_tdx_formula_process_mul_zb,
     run_tdx_formula_screen,
@@ -170,3 +172,9 @@ class FormulaApi:
             dividend_type=dividend_type,
             strategy_path=self.strategy_path,
         )
+
+    def get_all(self) -> Result:
+        return run_tdx_formula_get_all(strategy_path=self.strategy_path)
+
+    def get_info(self, formula_name: str) -> Result:
+        return run_tdx_formula_get_info(formula_name=formula_name, strategy_path=self.strategy_path)
