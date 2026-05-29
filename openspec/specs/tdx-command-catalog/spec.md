@@ -609,18 +609,21 @@ The command catalog validation workflow SHALL expose an opt-in summary view that
 
 The command catalog SHALL include a compact `step_source_counts` object in bundle `plan` and `preview` summary views, derived from the selected resolved steps without executing catalog dispatch.
 
-#### Scenario: Caller plans a mixed task/report bundle summary
+#### Scenario: Submit-once buy bundle summary exposes trade boundary rollup
 
-- **WHEN** a caller executes `catalog plan --bundle <task-report-bundle> --view summary`
-- **THEN** the summary view MUST include `step_source_counts` with counts for the selected task and report steps
-- **AND** the summary view MUST continue to include non-execution provenance and constraints
-- **AND** the underlying catalog step dispatch workflow MUST NOT be invoked
+- **WHEN** a maintainer runs `catalog plan --bundle buy-submit-once-pingan-complete-review --view summary` or `catalog preview --bundle buy-submit-once-pingan-complete-review --view summary`
+- **THEN** the summary payload MUST include `trade_plan_boundary_step_count` equal to the number of selected steps with `trade_plan_boundary`
+- **AND** the summary payload MUST include `trade_plan_boundary_sides` containing `buy`
+- **AND** the nested `plan_summary` MUST expose the same count and side list
+- **AND** the command MUST NOT execute catalog dispatch or any selected step.
 
-#### Scenario: Caller previews a filtered bundle summary
+#### Scenario: Submit-once sell bundle summary exposes trade boundary rollup
 
-- **WHEN** a caller executes `catalog preview --bundle <bundle> --only-step <step> --view summary`
-- **THEN** `step_source_counts` MUST reflect only the selected step range
-- **AND** the summary view MUST continue to report the selected step count
+- **WHEN** a maintainer runs `catalog plan --bundle sell-submit-once-pingan-complete-review --view summary` or `catalog preview --bundle sell-submit-once-pingan-complete-review --view summary`
+- **THEN** the summary payload MUST include `trade_plan_boundary_step_count` equal to the number of selected steps with `trade_plan_boundary`
+- **AND** the summary payload MUST include `trade_plan_boundary_sides` containing `sell`
+- **AND** the nested `plan_summary` MUST expose the same count and side list
+- **AND** the command MUST NOT execute catalog dispatch or any selected step.
 
 ### Requirement: Command catalog trade plan summary SHALL expose non-execution trade input boundaries
 

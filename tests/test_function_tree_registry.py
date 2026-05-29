@@ -122,6 +122,22 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("交易安全审批", combined)
         self.assertIn("桌面执行原语", combined)
 
+    def test_submit_once_bundle_boundary_rollup_evidence_is_registered(self) -> None:
+        row = _current_function_tree_rows()["D-08"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("catalog plan --bundle buy-submit-once-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog preview --bundle buy-submit-once-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog plan --bundle sell-submit-once-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog preview --bundle sell-submit-once-pingan-complete-review --view summary", combined)
+        self.assertIn("trade_plan_boundary_step_count", combined)
+        self.assertIn("trade_plan_boundary_sides", combined)
+        self.assertIn("不执行 task/trade/report/bundle step", combined)
+        self.assertIn("broker readiness", combined)
+        self.assertIn("交易安全审批", combined)
+        self.assertIn("桌面执行原语", combined)
+
     def test_validator_json_report_returns_errors_without_stderr(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

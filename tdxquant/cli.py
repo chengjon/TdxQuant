@@ -2969,6 +2969,8 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "step_source_entry_key_count": summary.get("step_source_entry_key_count"),
         "step_resolved_arg_key_count": summary.get("step_resolved_arg_key_count"),
         "step_source_resolved_arg_key_count": summary.get("step_source_resolved_arg_key_count"),
+        "trade_plan_boundary_step_count": summary.get("trade_plan_boundary_step_count"),
+        "trade_plan_boundary_sides": copy.deepcopy(summary.get("trade_plan_boundary_sides", [])),
         "has_step_slice": bool(selected_from_step or selected_to_step),
         "has_steps": isinstance(selected_step_count, int) and selected_step_count > 0,
     }
@@ -3017,6 +3019,10 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
         "step_resolved_arg_key_count": selected_steps.get("step_resolved_arg_key_count"),
         "step_source_resolved_arg_key_count": selected_steps.get(
             "step_source_resolved_arg_key_count"
+        ),
+        "trade_plan_boundary_step_count": selected_steps.get("trade_plan_boundary_step_count"),
+        "trade_plan_boundary_sides": copy.deepcopy(
+            selected_steps.get("trade_plan_boundary_sides", [])
         ),
         "has_steps": selected_steps.get("has_steps", outcome.get("has_steps")),
         "has_step_slice": selected_steps.get("has_step_slice", False),
@@ -3149,6 +3155,26 @@ def _build_catalog_step_source_resolved_arg_key_counts(steps: object) -> dict[st
             source_key = f"{source}:{key}"
             counts[source_key] = counts.get(source_key, 0) + 1
     return {key: counts[key] for key in sorted(counts)}
+
+
+def _build_catalog_trade_plan_boundary_rollup(steps: object) -> dict[str, object]:
+    boundary_count = 0
+    sides: set[str] = set()
+    if isinstance(steps, list):
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            boundary = step.get("trade_plan_boundary")
+            if not isinstance(boundary, dict):
+                continue
+            boundary_count += 1
+            side = boundary.get("side")
+            if isinstance(side, str) and side:
+                sides.add(side)
+    return {
+        "trade_plan_boundary_step_count": boundary_count,
+        "trade_plan_boundary_sides": sorted(sides),
+    }
 
 
 CATALOG_TRADE_PLAN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
@@ -3769,6 +3795,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
                         step_view["trade_plan_boundary"] = trade_boundary
                     plan_steps.append(step_view)
             summary["steps"] = plan_steps
+            summary.update(_build_catalog_trade_plan_boundary_rollup(plan_steps))
             summary["selected_step_summary"] = _build_catalog_selected_step_summary(summary)
             _copy_catalog_non_execution_metadata(summary, result)
             summary["plan_outcome"] = _build_catalog_plan_outcome(summary)
