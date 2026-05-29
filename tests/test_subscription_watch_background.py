@@ -658,6 +658,177 @@ def test_restart_uses_persisted_start_request_for_replacement_run(
     ]
 
 
+def test_restart_records_backoff_when_replacement_start_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    start_request = {
+        "stock_list": ["600519.SH", "000001.SZ"],
+        "max_events": 10,
+        "max_seconds": 30.0,
+        "poll_interval": 0.5,
+    }
+    controller._write_active_state(
+        {
+            "state": "running",
+            "run_id": "run-001",
+            "pid": os.getpid(),
+            "reason": None,
+            "active": True,
+            "start_request": start_request,
+        }
+    )
+    controller.paths.pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    stop_calls: list[dict[str, object]] = []
+    start_calls: list[dict[str, object]] = []
+
+    def fake_stop(**kwargs: object) -> dict[str, object]:
+        stop_calls.append(dict(kwargs))
+        return {"ok": True, "result": {"run_id": "run-001", "state": "stopped"}}
+
+    def fake_start(**kwargs: object) -> dict[str, object]:
+        start_calls.append(dict(kwargs))
+        return {"ok": False, "error": {"code": "START_FAILED", "message": "startup failed"}}
+
+    monkeypatch.setattr(controller, "stop", fake_stop)
+    monkeypatch.setattr(controller, "start", fake_start)
+
+    result = controller.restart(reason="operator_restart", grace_period_seconds=2)
+    persisted = read_active_payload(controller.paths)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "RESTART_START_FAILED"
+    backoff = result["error"]["details"]["restart_backoff"]
+    assert backoff["schema_version"] == "tdx.subscription_watch.restart_backoff.v1"
+    assert backoff["status"] == "active"
+    assert backoff["reason_codes"] == ["BACKOFF_ACTIVE"]
+    assert backoff["previous_run_id"] == "run-001"
+    assert backoff["reason"] == "operator_restart"
+    assert backoff["start_error_code"] == "START_FAILED"
+    assert backoff["backoff_seconds"] == 30.0
+    assert backoff["start_request_summary"] == {
+        "stock_count": 2,
+        "has_max_events": True,
+        "has_max_seconds": True,
+        "has_poll_interval": True,
+    }
+    assert backoff["boundary"] == "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor"
+    assert isinstance(backoff["created_at"], str)
+    assert isinstance(backoff["retry_after_at"], str)
+    assert persisted["state"] == "restart_backoff"
+    assert persisted["active"] is False
+    assert persisted["reason"] == "restart_start_failed"
+    assert persisted["restart_backoff"] == backoff
+    assert stop_calls == [{"reason": "operator_restart", "grace_period_seconds": 2}]
+    assert start_calls == [
+        {
+            "stock_list": ["600519.SH", "000001.SZ"],
+            "max_events": 10,
+            "max_seconds": 30.0,
+            "poll_interval": 0.5,
+        }
+    ]
+
+
+def test_restart_rejects_active_backoff_without_stop_or_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    restart_backoff = {
+        "schema_version": "tdx.subscription_watch.restart_backoff.v1",
+        "status": "active",
+        "reason_codes": ["BACKOFF_ACTIVE"],
+        "previous_run_id": "run-001",
+        "reason": "operator_restart",
+        "created_at": "2026-05-29T00:00:00+00:00",
+        "retry_after_at": "2999-01-01T00:00:00+00:00",
+        "backoff_seconds": 30.0,
+        "start_error_code": "START_FAILED",
+        "start_request_summary": {
+            "stock_count": 2,
+            "has_max_events": True,
+            "has_max_seconds": True,
+            "has_poll_interval": True,
+        },
+        "boundary": "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor",
+    }
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "restart_backoff": restart_backoff,
+        }
+    )
+    stop = Mock()
+    start = Mock()
+    monkeypatch.setattr(controller, "stop", stop)
+    monkeypatch.setattr(controller, "start", start)
+
+    result = controller.restart(reason="operator_restart")
+
+    assert result == {
+        "ok": False,
+        "error": {
+            "code": "RESTART_BACKOFF_ACTIVE",
+            "message": "subscription-watch restart is blocked by active restart backoff",
+            "details": {
+                "reason_codes": ["BACKOFF_ACTIVE"],
+                "restart_backoff": restart_backoff,
+            },
+        },
+    }
+    stop.assert_not_called()
+    start.assert_not_called()
+
+
+def test_restart_expired_backoff_falls_through_to_non_active_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "restart_backoff": {
+                "schema_version": "tdx.subscription_watch.restart_backoff.v1",
+                "status": "active",
+                "reason_codes": ["BACKOFF_ACTIVE"],
+                "previous_run_id": "run-001",
+                "reason": "operator_restart",
+                "created_at": "2000-01-01T00:00:00+00:00",
+                "retry_after_at": "2000-01-01T00:00:30+00:00",
+                "backoff_seconds": 30.0,
+                "start_error_code": "START_FAILED",
+                "start_request_summary": {
+                    "stock_count": 2,
+                    "has_max_events": True,
+                    "has_max_seconds": True,
+                    "has_poll_interval": True,
+                },
+                "boundary": "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor",
+            },
+        }
+    )
+    stop = Mock()
+    start = Mock()
+    monkeypatch.setattr(controller, "stop", stop)
+    monkeypatch.setattr(controller, "start", start)
+
+    result = controller.restart(reason="operator_restart")
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "NO_ACTIVE_RUN"
+    assert result["error"]["details"] == {"run_id": "run-001", "state": "restart_backoff"}
+    stop.assert_not_called()
+    start.assert_not_called()
+
+
 def test_restart_rejects_active_run_without_persisted_start_request(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -784,6 +955,46 @@ def test_restart_preflight_reports_missing_or_invalid_start_request(tmp_path: Pa
         "has_max_seconds": True,
         "has_poll_interval": True,
     }
+
+
+def test_restart_preflight_reports_active_backoff(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    restart_backoff = {
+        "schema_version": "tdx.subscription_watch.restart_backoff.v1",
+        "status": "active",
+        "reason_codes": ["BACKOFF_ACTIVE"],
+        "previous_run_id": "run-001",
+        "reason": "operator_restart",
+        "created_at": "2026-05-29T00:00:00+00:00",
+        "retry_after_at": "2999-01-01T00:00:00+00:00",
+        "backoff_seconds": 30.0,
+        "start_error_code": "START_FAILED",
+        "start_request_summary": {
+            "stock_count": 2,
+            "has_max_events": True,
+            "has_max_seconds": True,
+            "has_poll_interval": True,
+        },
+        "boundary": "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor",
+    }
+    controller._write_active_state(
+        {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": "run-001",
+            "pid": None,
+            "reason": "restart_start_failed",
+            "restart_backoff": restart_backoff,
+        }
+    )
+
+    result = controller.restart_preflight()
+
+    assert result["ok"] is True
+    assert result["result"]["ready"] is False
+    assert result["result"]["decision"] == "blocked"
+    assert result["result"]["reason_codes"] == ["BACKOFF_ACTIVE"]
+    assert result["result"]["restart_backoff"] == restart_backoff
 
 
 def test_stop_returns_run_id_and_coherent_terminal_state_when_process_exits(tmp_path: Path) -> None:

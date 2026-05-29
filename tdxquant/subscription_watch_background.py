@@ -11,7 +11,7 @@ import signal
 import subprocess
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .subscription_watch_run import build_subscription_watch_run_paths
@@ -19,10 +19,13 @@ from .subscription_watch_run import build_subscription_watch_run_paths
 DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
 DEFAULT_START_TIMEOUT_SECONDS = 10
 DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
+DEFAULT_RESTART_BACKOFF_SECONDS = 30.0
 ACTIVE_PROCESS_STATES = {"starting", "running", "reconnecting", "degraded", "stopping"}
 SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION = "tdx.subscription_watch.status_summary.v1"
 SUBSCRIPTION_WATCH_RESTART_OBSERVATION_SCHEMA_VERSION = "tdx.subscription_watch.restart_observation.v1"
 SUBSCRIPTION_WATCH_RESTART_OBSERVATION_BOUNDARY = "observation_only;does_not_schedule_restart_backoff_or_supervisor"
+SUBSCRIPTION_WATCH_RESTART_BACKOFF_SCHEMA_VERSION = "tdx.subscription_watch.restart_backoff.v1"
+SUBSCRIPTION_WATCH_RESTART_BACKOFF_BOUNDARY = "explicit_restart_guard_only;does_not_schedule_restart_or_supervisor"
 SUBSCRIPTION_WATCH_GOVERNANCE_BOUNDARY = (
     "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes"
 )
@@ -1177,6 +1180,57 @@ class SubscriptionWatchBackgroundController:
         active_payload["last_restart_observation"] = copy.deepcopy(observation)
         self._write_active_state(active_payload)
 
+    def _build_restart_backoff(
+        self,
+        *,
+        previous_run_id: Any,
+        reason: str,
+        start_result: dict[str, Any],
+        start_request: dict[str, Any],
+        backoff_seconds: float = DEFAULT_RESTART_BACKOFF_SECONDS,
+    ) -> dict[str, Any]:
+        created_at = datetime.now(timezone.utc)
+        retry_after_at = created_at + timedelta(seconds=max(float(backoff_seconds), 0.0))
+        start_error = start_result.get("error")
+        start_error = start_error if isinstance(start_error, dict) else {}
+        return {
+            "schema_version": SUBSCRIPTION_WATCH_RESTART_BACKOFF_SCHEMA_VERSION,
+            "status": "active",
+            "reason_codes": ["BACKOFF_ACTIVE"],
+            "previous_run_id": previous_run_id,
+            "reason": reason,
+            "created_at": created_at.isoformat(),
+            "retry_after_at": retry_after_at.isoformat(),
+            "backoff_seconds": float(backoff_seconds),
+            "start_error_code": start_error.get("code"),
+            "start_request_summary": self._restart_preflight_start_request_summary(start_request),
+            "boundary": SUBSCRIPTION_WATCH_RESTART_BACKOFF_BOUNDARY,
+        }
+
+    def _persist_restart_backoff(self, *, previous_run_id: Any, restart_backoff: dict[str, Any]) -> dict[str, Any]:
+        _cleanup_owned_state(self.paths)
+        payload = {
+            "state": "restart_backoff",
+            "active": False,
+            "run_id": previous_run_id,
+            "pid": None,
+            "reason": "restart_start_failed",
+            "restart_backoff": copy.deepcopy(restart_backoff),
+        }
+        return self._write_active_state(payload)
+
+    def _active_restart_backoff(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+        restart_backoff = payload.get("restart_backoff")
+        if not isinstance(restart_backoff, dict):
+            return None
+        try:
+            retry_after_at = _parse_rfc3339_datetime(str(restart_backoff.get("retry_after_at") or ""))
+        except ValueError:
+            return None
+        if retry_after_at <= datetime.now(timezone.utc):
+            return None
+        return copy.deepcopy(restart_backoff)
+
     def _background_state(self) -> dict[str, Any]:
         payload = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
         if isinstance(payload, dict):
@@ -1486,6 +1540,19 @@ class SubscriptionWatchBackgroundController:
 
     def restart(self, *, reason: str | None = None, grace_period_seconds: int | None = None) -> dict[str, Any]:
         current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+        active_backoff = self._active_restart_backoff(current)
+        if active_backoff is not None:
+            return {
+                "ok": False,
+                "error": {
+                    "code": "RESTART_BACKOFF_ACTIVE",
+                    "message": "subscription-watch restart is blocked by active restart backoff",
+                    "details": {
+                        "reason_codes": ["BACKOFF_ACTIVE"],
+                        "restart_backoff": active_backoff,
+                    },
+                },
+            }
         if current.get("state") not in ACTIVE_PROCESS_STATES:
             return {
                 "ok": False,
@@ -1584,6 +1651,13 @@ class SubscriptionWatchBackgroundController:
         )
         start_payload = dict(start_result.get("result") or {})
         if start_result.get("ok") is not True:
+            restart_backoff = self._build_restart_backoff(
+                previous_run_id=previous_run_id,
+                reason=restart_reason,
+                start_result=start_result,
+                start_request=start_request,
+            )
+            self._persist_restart_backoff(previous_run_id=previous_run_id, restart_backoff=restart_backoff)
             return {
                 "ok": False,
                 "error": {
@@ -1594,6 +1668,7 @@ class SubscriptionWatchBackgroundController:
                         "stop_result": stop_result,
                         "start_result": start_result,
                         "start_request": copy.deepcopy(start_request),
+                        "restart_backoff": restart_backoff,
                     },
                 },
             }
@@ -1626,8 +1701,11 @@ class SubscriptionWatchBackgroundController:
         state = current.get("state")
         active = state in ACTIVE_PROCESS_STATES
         start_request = current.get("start_request")
+        active_backoff = self._active_restart_backoff(current)
         reason_codes: list[str] = []
-        if not active:
+        if active_backoff is not None:
+            reason_codes.append("BACKOFF_ACTIVE")
+        elif not active:
             reason_codes.append("NO_ACTIVE_RUN")
         elif not isinstance(start_request, dict):
             reason_codes.append("MISSING_START_REQUEST")
@@ -1647,6 +1725,7 @@ class SubscriptionWatchBackgroundController:
                 "active": active,
                 "has_start_request": isinstance(start_request, dict),
                 "start_request_summary": self._restart_preflight_start_request_summary(start_request),
+                "restart_backoff": active_backoff,
                 "boundary": "read_only;does_not_stop_start_or_schedule_restart",
             },
         }

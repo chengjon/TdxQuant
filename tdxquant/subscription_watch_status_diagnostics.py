@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -25,6 +26,7 @@ def build_subscription_watch_status_diagnostics(
     evaluation_rollup = evaluation_rollup if isinstance(evaluation_rollup, dict) else {}
     restartability = _build_restartability_diagnostics(status_payload)
     restart_observation = _build_restart_observation_diagnostics(status_payload)
+    restart_backoff = _build_restart_backoff_diagnostics(status_payload)
 
     return {
         "has_control_rollup": bool(control_rollup),
@@ -41,6 +43,7 @@ def build_subscription_watch_status_diagnostics(
         "all_components_evaluated": bool(evaluation_rollup.get("all_components_evaluated")),
         "restartability": restartability,
         "restart_observation": restart_observation,
+        "restart_backoff": restart_backoff,
         "boundary": governance.get("boundary"),
     }
 
@@ -52,8 +55,11 @@ def _build_restartability_diagnostics(status_payload: dict[str, Any] | None) -> 
     state = control.get("state")
     active = bool(control.get("active")) and state in {"starting", "running", "reconnecting", "degraded", "stopping"}
     start_request = control.get("start_request")
+    restart_backoff = _build_restart_backoff_diagnostics(status_payload)
     reason_codes: list[str] = []
-    if not active:
+    if bool(restart_backoff.get("active")):
+        reason_codes.append("BACKOFF_ACTIVE")
+    elif not active:
         reason_codes.append("NO_ACTIVE_RUN")
     elif not isinstance(start_request, dict):
         reason_codes.append("MISSING_START_REQUEST")
@@ -127,3 +133,54 @@ def _build_restart_observation_diagnostics(status_payload: dict[str, Any] | None
         "start_request_summary": start_request_summary,
         "boundary": observation.get("boundary"),
     }
+
+
+def _build_restart_backoff_diagnostics(status_payload: dict[str, Any] | None) -> dict[str, Any]:
+    payload = status_payload if isinstance(status_payload, dict) else {}
+    control = payload.get("control")
+    control = control if isinstance(control, dict) else {}
+    restart_backoff = control.get("restart_backoff")
+    if not isinstance(restart_backoff, dict) or not _restart_backoff_is_active(restart_backoff):
+        return {"active": False}
+
+    start_request_summary = restart_backoff.get("start_request_summary")
+    if isinstance(start_request_summary, dict):
+        start_request_summary = dict(start_request_summary)
+    else:
+        start_request_summary = None
+
+    reason_codes = restart_backoff.get("reason_codes")
+    if isinstance(reason_codes, list):
+        reason_codes = [str(item) for item in reason_codes if isinstance(item, str)]
+    else:
+        reason_codes = ["BACKOFF_ACTIVE"]
+
+    return {
+        "active": True,
+        "status": restart_backoff.get("status"),
+        "reason_codes": reason_codes,
+        "previous_run_id": restart_backoff.get("previous_run_id"),
+        "reason": restart_backoff.get("reason"),
+        "created_at": restart_backoff.get("created_at"),
+        "retry_after_at": restart_backoff.get("retry_after_at"),
+        "backoff_seconds": restart_backoff.get("backoff_seconds"),
+        "start_error_code": restart_backoff.get("start_error_code"),
+        "start_request_summary": start_request_summary,
+        "boundary": restart_backoff.get("boundary"),
+    }
+
+
+def _restart_backoff_is_active(restart_backoff: dict[str, Any]) -> bool:
+    retry_after_at = restart_backoff.get("retry_after_at")
+    if not isinstance(retry_after_at, str):
+        return False
+    try:
+        parsed = retry_after_at
+        if parsed.endswith("Z"):
+            parsed = f"{parsed[:-1]}+00:00"
+        retry_after_dt = datetime.fromisoformat(parsed)
+    except ValueError:
+        return False
+    if retry_after_dt.tzinfo is None:
+        retry_after_dt = retry_after_dt.replace(tzinfo=timezone.utc)
+    return retry_after_dt.astimezone(timezone.utc) > datetime.now(timezone.utc)
