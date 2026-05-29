@@ -2970,6 +2970,7 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "step_resolved_arg_key_count": summary.get("step_resolved_arg_key_count"),
         "step_source_resolved_arg_key_count": summary.get("step_source_resolved_arg_key_count"),
         "trade_plan_boundary_step_count": summary.get("trade_plan_boundary_step_count"),
+        "trade_plan_boundary_commands": copy.deepcopy(summary.get("trade_plan_boundary_commands", [])),
         "trade_plan_boundary_sides": copy.deepcopy(summary.get("trade_plan_boundary_sides", [])),
         "has_step_slice": bool(selected_from_step or selected_to_step),
         "has_steps": isinstance(selected_step_count, int) and selected_step_count > 0,
@@ -3021,6 +3022,9 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
             "step_source_resolved_arg_key_count"
         ),
         "trade_plan_boundary_step_count": selected_steps.get("trade_plan_boundary_step_count"),
+        "trade_plan_boundary_commands": copy.deepcopy(
+            selected_steps.get("trade_plan_boundary_commands", [])
+        ),
         "trade_plan_boundary_sides": copy.deepcopy(
             selected_steps.get("trade_plan_boundary_sides", [])
         ),
@@ -3159,6 +3163,7 @@ def _build_catalog_step_source_resolved_arg_key_counts(steps: object) -> dict[st
 
 def _build_catalog_trade_plan_boundary_rollup(steps: object) -> dict[str, object]:
     boundary_count = 0
+    commands: set[str] = set()
     sides: set[str] = set()
     if isinstance(steps, list):
         for step in steps:
@@ -3168,11 +3173,15 @@ def _build_catalog_trade_plan_boundary_rollup(steps: object) -> dict[str, object
             if not isinstance(boundary, dict):
                 continue
             boundary_count += 1
+            command = boundary.get("trade_command")
+            if isinstance(command, str) and command:
+                commands.add(command)
             side = boundary.get("side")
             if isinstance(side, str) and side:
                 sides.add(side)
     return {
         "trade_plan_boundary_step_count": boundary_count,
+        "trade_plan_boundary_commands": sorted(commands),
         "trade_plan_boundary_sides": sorted(sides),
     }
 

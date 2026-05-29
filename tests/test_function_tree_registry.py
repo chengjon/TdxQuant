@@ -106,6 +106,25 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("broker readiness", combined)
         self.assertIn("交易安全审批", combined)
 
+    def test_pingan_bundle_command_rollup_evidence_is_registered(self) -> None:
+        row = _current_function_tree_rows()["D-07"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("catalog plan --bundle buy-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog preview --bundle buy-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog plan --bundle sell-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog preview --bundle sell-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog plan --bundle confirm-current-pingan-complete-review --view summary", combined)
+        self.assertIn("catalog preview --bundle confirm-current-pingan-complete-review --view summary", combined)
+        self.assertIn("trade_plan_boundary_commands", combined)
+        self.assertIn("trade-buy", combined)
+        self.assertIn("trade-sell", combined)
+        self.assertIn("confirm-current", combined)
+        self.assertIn("不执行 task/trade/report/bundle step", combined)
+        self.assertIn("broker readiness", combined)
+        self.assertIn("交易安全审批", combined)
+
     def test_submit_once_task_plan_preview_boundary_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
