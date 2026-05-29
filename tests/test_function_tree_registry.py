@@ -90,6 +90,19 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不代表 broker readiness", combined)
                 self.assertIn("不代表交易 readiness", combined)
 
+    def test_pingan_task_plan_boundary_evidence_is_registered(self) -> None:
+        row = _current_function_tree_rows()["D-07"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("catalog plan --entry task-buy --view summary", combined)
+        self.assertIn("catalog plan --entry task-sell --view summary", combined)
+        self.assertIn("catalog plan --entry task-confirm-current --view summary", combined)
+        self.assertIn("non_executing_catalog_plan", combined)
+        self.assertIn("不执行 task/trade/report/bundle step", combined)
+        self.assertIn("不代表 broker readiness", combined)
+        self.assertIn("不代表交易安全审批", combined)
+
     def test_validator_json_report_returns_errors_without_stderr(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

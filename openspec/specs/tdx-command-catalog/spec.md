@@ -624,28 +624,24 @@ The command catalog SHALL include a compact `step_source_counts` object in bundl
 
 ### Requirement: Command catalog trade plan summary SHALL expose non-execution trade input boundaries
 
-The command catalog SHALL include a `trade_plan_boundary` in plan/preview summary views for trade-related catalog entries and selected bundle steps, derived from resolved dispatch metadata and arguments without executing catalog dispatch.
+The command catalog plan summary view SHALL expose a non-executing trade boundary for supported trading task entries without dispatching the underlying task, trade, report, or bundle execution.
 
-#### Scenario: Caller plans a trade entry with summary view
+#### Scenario: PingAn task buy plan exposes order input boundary
 
-- **WHEN** a caller executes `catalog plan --entry <trade-entry> --view summary`
-- **THEN** the summary view MUST include `trade_plan_boundary`
-- **AND** the boundary MUST include the resolved trade command, non-executing execution mode, dispatch-executed flag, required input fields, provided input fields, and missing input fields
-- **AND** the plan MUST retain non-execution provenance and constraints
-- **AND** the underlying trade/task dispatch workflow MUST NOT be invoked
+- **WHEN** a maintainer runs `catalog plan --entry task-buy --view summary`
+- **THEN** the result MUST include `trade_plan_boundary.trade_command` set to `trade-buy`
+- **AND** `execution_mode` MUST be `non_executing_catalog_plan`
+- **AND** `dispatch_executed` MUST be `false`
+- **AND** required/provided/missing input fields and input coverage counts MUST be derived without executing the task.
 
-#### Scenario: Caller plans a submit-once entry with summary view
+#### Scenario: PingAn task confirm-current plan exposes confirmation boundary
 
-- **WHEN** a caller executes `catalog plan --entry <submit-once-entry> --view summary`
-- **THEN** `trade_plan_boundary` MUST include the resolved submit-once side when present
-- **AND** it MUST report the submit-once input fields without executing trade dispatch
-
-#### Scenario: Caller plans a trade follow-up bundle with summary view
-
-- **WHEN** a caller executes `catalog plan --bundle <trade-follow-up-bundle> --view summary`
-- **THEN** each selected trade-related step MUST include a `trade_plan_boundary`
-- **AND** selected report-only steps MUST NOT be marked as trade plan boundaries
-- **AND** the bundle plan MUST remain non-executing
+- **WHEN** a maintainer runs `catalog plan --entry task-confirm-current --view summary`
+- **THEN** the result MUST include `trade_plan_boundary.trade_command` set to `trade-confirm-current`
+- **AND** `input_kind` MUST be `confirmation`
+- **AND** `execution_mode` MUST be `non_executing_catalog_plan`
+- **AND** `dispatch_executed` MUST be `false`
+- **AND** the boundary MUST NOT require order input fields.
 
 ### Requirement: Command catalog validate SHALL summarize task/report bundle step sources
 
@@ -2368,7 +2364,6 @@ The command catalog SHALL allow non-executing plan and preview summaries to over
 - **WHEN** a caller runs `catalog plan --entry submit-once --side sell --view summary`
 - **THEN** the plan summary MUST include `trade_plan_boundary.side=sell`
 - **AND** planning MUST NOT execute the submit-once workflow
-
 #### Scenario: Caller previews task submit-once with sell side
 - **WHEN** a caller runs `catalog preview --entry task-submit-once --side sell --view summary`
 - **THEN** the preview summary MUST include `trade_plan_boundary.side=sell`
