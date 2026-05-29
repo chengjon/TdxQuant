@@ -91,6 +91,7 @@ def build_subscription_watch_status_summary(
     *,
     control: dict[str, Any] | None,
     watch_status: dict[str, Any] | None,
+    supervisor_daemon: dict[str, Any] | None = None,
     heartbeat_stale_after_seconds: float | int | None = None,
     watermark_stale_after_seconds: float | int | None = None,
     reconnect_stale_after_seconds: float | int | None = None,
@@ -133,7 +134,7 @@ def build_subscription_watch_status_summary(
         reconnect_stale_after_seconds=reconnect_stale_after_seconds,
         now_utc=now_utc,
     )
-    return {
+    summary = {
         "schema_version": SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION,
         "overall_status": overall_status,
         "state": state,
@@ -155,6 +156,10 @@ def build_subscription_watch_status_summary(
         ),
         "boundary": "summary_projection_only; optional heartbeat/watermark/reconnect staleness evaluation only; does not change reconnect/backoff behavior",
     }
+    supervisor_daemon_projection = build_supervisor_daemon_status_projection(supervisor_daemon)
+    if supervisor_daemon_projection:
+        summary["supervisor_daemon"] = supervisor_daemon_projection
+    return summary
 
 
 def _build_heartbeat_summary(
@@ -2531,6 +2536,7 @@ class SubscriptionWatchBackgroundController:
             "status_summary": build_subscription_watch_status_summary(
                 control=control,
                 watch_status=watch_status,
+                supervisor_daemon=supervisor_daemon,
                 heartbeat_stale_after_seconds=heartbeat_stale_after_seconds,
                 watermark_stale_after_seconds=watermark_stale_after_seconds,
                 reconnect_stale_after_seconds=reconnect_stale_after_seconds,

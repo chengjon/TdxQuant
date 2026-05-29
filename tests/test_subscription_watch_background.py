@@ -1611,6 +1611,7 @@ def test_status_includes_compact_supervisor_daemon_read_model(
     }
     assert "owner_token" not in result["supervisor_daemon"]
     assert "settings" not in result["supervisor_daemon"]
+    assert result["status_summary"]["supervisor_daemon"] == result["supervisor_daemon"]
     assert controller.paths.supervisor_state_path.read_text(encoding="utf-8") == before
     tick.assert_not_called()
     run.assert_not_called()
