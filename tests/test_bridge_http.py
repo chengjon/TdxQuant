@@ -444,6 +444,17 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                         "stale_process_state": False,
                         "startup_persistence_failed": False,
                     },
+                    "consistency_rollup": {
+                        "control_state": "running",
+                        "watch_state": "running",
+                        "has_watch_status": True,
+                        "has_control_run_id": True,
+                        "has_watch_run_id": True,
+                        "run_id_match": True,
+                        "state_match": True,
+                        "has_control_pid": True,
+                        "has_mismatch": False,
+                    },
                     "heartbeat": {"status": "stale", "age_seconds": 180.0},
                     "watermark": {"status": "fresh", "age_seconds": 15.0},
                     "reconnect": {"status": "degraded", "reconnect_count": 2},
@@ -633,6 +644,20 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 "has_control_reason": False,
                 "stale_process_state": False,
                 "startup_persistence_failed": False,
+            },
+        )
+        self.assertEqual(
+            payload["result"]["status_summary"]["consistency_rollup"],
+            {
+                "control_state": "running",
+                "watch_state": "running",
+                "has_watch_status": True,
+                "has_control_run_id": True,
+                "has_watch_run_id": True,
+                "run_id_match": True,
+                "state_match": True,
+                "has_control_pid": True,
+                "has_mismatch": False,
             },
         )
         self.assertEqual(payload["result"]["status_summary"]["heartbeat"]["status"], "stale")

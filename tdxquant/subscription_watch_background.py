@@ -78,6 +78,10 @@ def build_subscription_watch_status_summary(
         "active": active,
         "run_id": run_id,
         "control_rollup": _build_subscription_watch_control_rollup(resolved_control),
+        "consistency_rollup": _build_subscription_watch_consistency_rollup(
+            control=resolved_control,
+            watch_status=resolved_status,
+        ),
         "heartbeat": heartbeat,
         "watermark": watermark,
         "reconnect": reconnect,
@@ -354,6 +358,35 @@ def _build_subscription_watch_control_rollup(control: dict[str, Any]) -> dict[st
         "has_control_reason": control_reason is not None,
         "stale_process_state": control_reason == "stale_process_state",
         "startup_persistence_failed": control_reason == "startup_persistence_failed",
+    }
+
+
+def _build_subscription_watch_consistency_rollup(
+    *,
+    control: dict[str, Any],
+    watch_status: dict[str, Any],
+) -> dict[str, Any]:
+    control_state = _optional_str(control.get("state")) or "unknown"
+    watch_state = _optional_str(watch_status.get("state"))
+    control_run_id = _optional_str(control.get("run_id"))
+    watch_run_id = _optional_str(watch_status.get("run_id"))
+    control_pid = _optional_int_or_none(control.get("pid"))
+    state_match = control_state == watch_state if watch_state is not None else None
+    run_id_match = (
+        control_run_id == watch_run_id
+        if control_run_id is not None and watch_run_id is not None
+        else None
+    )
+    return {
+        "control_state": control_state,
+        "watch_state": watch_state,
+        "has_watch_status": bool(watch_status),
+        "has_control_run_id": control_run_id is not None,
+        "has_watch_run_id": watch_run_id is not None,
+        "run_id_match": run_id_match,
+        "state_match": state_match,
+        "has_control_pid": _positive_non_bool_int(control_pid),
+        "has_mismatch": state_match is False or run_id_match is False,
     }
 
 

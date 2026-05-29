@@ -721,6 +721,17 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         "stale_process_state": False,
         "startup_persistence_failed": False,
     }
+    assert summary["consistency_rollup"] == {
+        "control_state": "running",
+        "watch_state": "running",
+        "has_watch_status": True,
+        "has_control_run_id": True,
+        "has_watch_run_id": True,
+        "run_id_match": True,
+        "state_match": True,
+        "has_control_pid": False,
+        "has_mismatch": False,
+    }
     assert summary["governance"] == {
         "decision": "observe",
         "requires_manual_review": False,
@@ -791,6 +802,25 @@ def test_status_summary_governance_observes_without_stale_thresholds() -> None:
         },
         "staleness_evaluated": False,
         "boundary": "advisory_only; does_not_trigger_reconnect_backoff_restart_or_lifecycle_changes",
+    }
+
+
+def test_status_summary_consistency_rollup_marks_mismatched_run_identity() -> None:
+    summary = build_subscription_watch_status_summary(
+        control={"state": "running", "active": True, "run_id": "run-001", "pid": 1234},
+        watch_status={"state": "reconnecting", "run_id": "run-002"},
+    )
+
+    assert summary["consistency_rollup"] == {
+        "control_state": "running",
+        "watch_state": "reconnecting",
+        "has_watch_status": True,
+        "has_control_run_id": True,
+        "has_watch_run_id": True,
+        "run_id_match": False,
+        "state_match": False,
+        "has_control_pid": True,
+        "has_mismatch": True,
     }
 
 
