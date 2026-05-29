@@ -1839,7 +1839,8 @@ class SubscriptionWatchBackgroundController:
                 },
             }
             self._persist_supervisor_tick_observation(
-                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason),
+                expected_run_id=current.get("run_id"),
             )
             return response
 
@@ -1857,7 +1858,8 @@ class SubscriptionWatchBackgroundController:
                 },
             }
             self._persist_supervisor_tick_observation(
-                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason),
+                expected_run_id=current.get("run_id"),
             )
             return response
 
@@ -1876,7 +1878,8 @@ class SubscriptionWatchBackgroundController:
                 },
             }
             self._persist_supervisor_tick_observation(
-                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason),
+                expected_run_id=current.get("run_id"),
             )
             return response
 
@@ -1918,7 +1921,8 @@ class SubscriptionWatchBackgroundController:
                 },
             }
             self._persist_supervisor_tick_observation(
-                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+                self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason),
+                expected_run_id=previous_run_id,
             )
             return response
 
@@ -1938,7 +1942,8 @@ class SubscriptionWatchBackgroundController:
             },
         }
         self._persist_supervisor_tick_observation(
-            self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason)
+            self._build_supervisor_tick_observation(tick_result=response, reason=tick_reason),
+            expected_run_id=start_payload.get("run_id"),
         )
         return response
 
@@ -2002,7 +2007,11 @@ class SubscriptionWatchBackgroundController:
             "tick_summaries": tick_summaries,
             "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_RUN_BOUNDARY,
         }
-        self._persist_supervisor_run_observation(self._build_supervisor_run_observation(result))
+        observation = self._build_supervisor_run_observation(result)
+        self._persist_supervisor_run_observation(
+            observation,
+            expected_run_id=observation.get("new_run_id") or observation.get("previous_run_id"),
+        )
         return {"ok": True, "result": result}
 
     def _build_supervisor_run_tick_summary(
@@ -2080,9 +2089,13 @@ class SubscriptionWatchBackgroundController:
                 return value
         return None
 
-    def _persist_supervisor_run_observation(self, observation: dict[str, Any]) -> None:
+    def _persist_supervisor_run_observation(
+        self, observation: dict[str, Any], *, expected_run_id: Any | None = None
+    ) -> None:
         active_payload = read_active_payload(self.paths)
         if not isinstance(active_payload, dict):
+            return
+        if expected_run_id is not None and str(active_payload.get("run_id") or "") != str(expected_run_id):
             return
         active_payload = dict(active_payload)
         active_payload["last_supervisor_run_observation"] = copy.deepcopy(observation)
@@ -2128,9 +2141,13 @@ class SubscriptionWatchBackgroundController:
             "boundary": SUBSCRIPTION_WATCH_SUPERVISOR_TICK_OBSERVATION_BOUNDARY,
         }
 
-    def _persist_supervisor_tick_observation(self, observation: dict[str, Any]) -> None:
+    def _persist_supervisor_tick_observation(
+        self, observation: dict[str, Any], *, expected_run_id: Any | None = None
+    ) -> None:
         active_payload = read_active_payload(self.paths)
         if not isinstance(active_payload, dict):
+            return
+        if expected_run_id is not None and str(active_payload.get("run_id") or "") != str(expected_run_id):
             return
         active_payload = dict(active_payload)
         active_payload["last_supervisor_tick_observation"] = copy.deepcopy(observation)
