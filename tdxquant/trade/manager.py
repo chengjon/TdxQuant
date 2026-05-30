@@ -226,6 +226,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
     title_keyword: str,
     exe_path: str | None,
     observed_process_window_ownership: dict[str, Any],
+    retry_policy_status: dict[str, Any],
 ) -> dict[str, Any]:
     dialog_checks = _extract_dialog_lifecycle_checks(checks)
     return {
@@ -253,6 +254,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
             "boundary": "Dialog readiness records configured ownership inputs only; it does not manage the desktop process lifecycle.",
         },
         "observed_process_window_ownership": observed_process_window_ownership,
+        "retry_policy_status": retry_policy_status,
         "covered_lifecycle_gates": [
             name
             for name in (
@@ -294,6 +296,29 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
             "detail": check.get("detail"),
         }
     return dialog_checks
+
+
+def _build_pingan_retry_policy_status(profile_options: dict[str, Any]) -> dict[str, Any]:
+    configured_policy = {
+        key: profile_options[key]
+        for key in ("retry_attempts", "retry_backoff_seconds", "retry_backoff_mode")
+        if key in profile_options
+    }
+    return {
+        "status": "configured" if configured_policy else "not_configured",
+        "execution_mode": "readonly_policy_status",
+        "policy_source": "trade_profile",
+        "configured_policy": configured_policy,
+        "retry_executed": False,
+        "backoff_executed": False,
+        "recovery_executed": False,
+        "resubmission_executed": False,
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only retry policy status only; dialog readiness does not retry, back off, "
+            "recover, resubmit, or write trade artifacts."
+        ),
+    }
 
 
 def _build_pingan_observed_process_window_ownership(
@@ -1421,6 +1446,7 @@ class _PingAnTradeProxy:
                     exe_path=self._manager.exe_path,
                     error=exc,
                 )
+            retry_policy_status = _build_pingan_retry_policy_status(effective_profile)
             lifecycle_gate_status = _build_pingan_desktop_lifecycle_gate_status(
                 checks=checks,
                 dialog=dialog,
@@ -1431,6 +1457,7 @@ class _PingAnTradeProxy:
                 title_keyword=self._manager.title_keyword,
                 exe_path=self._manager.exe_path,
                 observed_process_window_ownership=observed_process_window_ownership,
+                retry_policy_status=retry_policy_status,
             )
             return Result(
                 ok=ok,
