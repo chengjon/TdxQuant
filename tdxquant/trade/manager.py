@@ -239,6 +239,48 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
     return dialog_checks
 
 
+def _build_pingan_audit_status_classification(result: Result, covered_status: str) -> dict[str, Any]:
+    data = result.data if isinstance(result.data, dict) else {}
+    trade_safety = data.get("trade_safety", {})
+    trade_safety = trade_safety if isinstance(trade_safety, dict) else {}
+    risk_gate = trade_safety.get("risk_gate", {})
+    risk_gate = risk_gate if isinstance(risk_gate, dict) else {}
+    idempotency = trade_safety.get("idempotency", {})
+    idempotency = idempotency if isinstance(idempotency, dict) else {}
+    idempotency_decision = str(idempotency.get("decision") or "unknown")
+    explicit_exception = isinstance(data.get("desktop_exception"), dict) or isinstance(data.get("trade_exception"), dict)
+    rejected_request = (
+        idempotency_decision == "reject_conflict"
+        or not bool(risk_gate.get("passed", True))
+        or result.code == ErrorCode.INVALID_REQUEST
+    )
+
+    if idempotency_decision == "skip_duplicate":
+        source = "duplicate_submission_key_skip"
+    elif rejected_request:
+        source = "rejected_request"
+    elif explicit_exception:
+        source = "explicit_exception_metadata"
+    elif result.ok:
+        source = "confirmed_result"
+    else:
+        source = "generic_execution_failure"
+
+    return {
+        "status": covered_status,
+        "source": source,
+        "result_ok": bool(result.ok),
+        "error_code": result.code.value if isinstance(result.code, ErrorCode) else str(result.code),
+        "idempotency_decision": idempotency_decision,
+        "rejected_request": rejected_request,
+        "explicit_exception_metadata": explicit_exception,
+        "boundary": (
+            "Audit-only status classification for one finalized PingAn result; does not implement retry, "
+            "recovery, broker readiness, or live/manual acceptance."
+        ),
+    }
+
+
 def _build_pingan_trade_audit_gate_status(result: Result) -> dict[str, Any]:
     trade_audit = result.data.get("trade_audit", {})
     trade_audit = trade_audit if isinstance(trade_audit, dict) else {}
@@ -257,6 +299,7 @@ def _build_pingan_trade_audit_gate_status(result: Result) -> dict[str, Any]:
         "evidence_scope": "single_finalized_trade_result",
         "audit_id": trade_audit.get("audit_id"),
         "covered_audit_status": covered_status,
+        "audit_status_classification": _build_pingan_audit_status_classification(result, covered_status),
         "broker": trade_audit.get("broker"),
         "method": trade_audit.get("method"),
         "artifact_paths": artifact_paths,

@@ -100,7 +100,7 @@ The FUNCTION_TREE registry SHALL allow lifecycle-related feature nodes to be mar
 
 ### Requirement: PingAn trading status promotion SHALL require explicit implementation evidence
 
-`FUNCTION_TREE.md` SHALL keep D-07 and D-08 as `[部分实现]` until a later implementation change provides explicit evidence for provider ownership, safety gates, desktop lifecycle/result handling, audit evidence, acceptance gates, and status transition. Readonly preflight provider/safety status, readonly dialog lifecycle status, per-result audit gate status, read-only acceptance outcome coverage status, and explicit exception audit outcome status SHALL be registered as partial promotion evidence only.
+`FUNCTION_TREE.md` SHALL keep D-07 and D-08 as `[部分实现]` until a later implementation change provides explicit evidence for provider ownership, safety gates, desktop lifecycle/result handling, audit evidence, acceptance gates, and status transition. Readonly preflight provider/safety status, readonly dialog lifecycle status, per-result audit gate status, read-only acceptance outcome coverage status, explicit exception audit outcome status, and failed audit classification status SHALL be registered as partial promotion evidence only.
 
 #### Scenario: D-07 and D-08 promotion plan is registered without status change
 
@@ -142,6 +142,13 @@ The FUNCTION_TREE registry SHALL allow lifecycle-related feature nodes to be mar
 - **THEN** the node SHALL remain `[部分实现]`
 - **AND** the evidence SHALL identify the code and tests that produce the exception audit outcome status
 - **AND** the boundary SHALL state that exception popup handling, retry policy, and live/manual acceptance remain before `[已实现]`.
+
+#### Scenario: Failed audit classification evidence is registered as partial evidence
+
+- **WHEN** D-07 or D-08 evidence cites PingAn `trade_audit_gate_status.audit_status_classification.source=generic_execution_failure`
+- **THEN** the node SHALL remain `[部分实现]`
+- **AND** the evidence SHALL identify the code and tests that produce the failed audit classification status
+- **AND** the boundary SHALL state that generic failed outcome classification does not prove retry, recovery, broker readiness, or live/manual acceptance.
 
 #### Scenario: Acceptance outcome coverage evidence is registered as partial evidence
 

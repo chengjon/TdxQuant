@@ -948,6 +948,51 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(audit_gate["artifact_paths"]["trade_audit_path"], str(audit_path))
         self.assertIn("failed", audit_gate["remaining_audit_gate_statuses"])
 
+    def test_pingan_buy_failed_result_exposes_audit_status_classification(self) -> None:
+        expected = Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message="desktop execution failed without explicit exception metadata",
+            data={
+                "input": {"code": "000001", "price": "10.00", "quantity": 100},
+                "result_dialog": {
+                    "status": "failed",
+                    "message": "result dialog reported a generic failure",
+                },
+            },
+        )
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "state.json"
+            event_log_path = Path(temp_dir) / "events.jsonl"
+            ledger_path = Path(temp_dir) / "submission-ledger.jsonl"
+            audit_dir = Path(temp_dir) / "trade-audits"
+            with patch("tdxquant.trade.manager.run_pingan_buy_fast", return_value=expected):
+                manager = TdxTradeManager(
+                    profile="balanced",
+                    state_path=str(state_path),
+                    event_log_path=str(event_log_path),
+                    submission_ledger_path=str(ledger_path),
+                    trade_audit_dir=str(audit_dir),
+                )
+                result = manager.pingan.buy(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="failed-20260428-001",
+                )
+                audit_path = Path(result.data["artifacts"]["trade_audit_path"])
+                audit_payload = json.loads(audit_path.read_text(encoding="utf-8"))
+        self.assertFalse(result.ok)
+        self.assertEqual(result.data["trade_audit"]["status"], "failed")
+        self.assertEqual(audit_payload["trade_audit"]["status"], "failed")
+        audit_gate = result.data["trade_audit_gate_status"]
+        self.assertEqual(audit_gate["covered_audit_status"], "failed")
+        self.assertEqual(audit_gate["audit_status_classification"]["source"], "generic_execution_failure")
+        self.assertFalse(audit_gate["audit_status_classification"]["explicit_exception_metadata"])
+        self.assertFalse(audit_gate["audit_status_classification"]["rejected_request"])
+        self.assertIn("exception", audit_gate["remaining_audit_gate_statuses"])
+
     def test_pingan_buy_rejects_conflicting_submission_key_after_side_effecting_attempt(self) -> None:
         expected = Result(
             ok=True,
