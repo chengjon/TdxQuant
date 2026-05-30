@@ -5342,6 +5342,18 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["value_diagnostics"]["requested_order_value"], "1000.00")
         self.assertEqual(result.data["value_diagnostics"]["by_status"][0]["requested_order_value"], "1000.00")
         self.assertIn("price * quantity", result.data["value_diagnostics"]["calculation"])
+        coverage_status = result.data["acceptance_outcome_coverage_status"]
+        self.assertEqual(coverage_status["schema"], "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1")
+        self.assertEqual(coverage_status["execution_mode"], "readonly_report")
+        self.assertEqual(coverage_status["side_effect_level"], "none")
+        self.assertEqual(coverage_status["covered_outcome_statuses"], ["confirmed"])
+        self.assertEqual(coverage_status["covered_outcome_status_counts"], {"confirmed": 1})
+        self.assertEqual(
+            coverage_status["missing_automated_outcome_statuses"],
+            ["rejected", "failed", "exception"],
+        )
+        self.assertFalse(coverage_status["acceptance_complete"])
+        self.assertEqual(coverage_status["live_manual_acceptance"]["status"], "not_provided")
         self.assertEqual(result.data["task"]["name"], "trade_audit_daily_report")
 
     def test_task_trade_audit_daily_report_supports_multi_status_filter(self) -> None:
@@ -5507,6 +5519,18 @@ class TdxTaskManagerTests(unittest.TestCase):
             self.assertEqual(value_by_method["buy"]["requested_order_value"], "1000.00")
             self.assertEqual(value_by_method["buy_submit_once"]["requested_order_value"], "1150.00")
             self.assertEqual(value_by_method["confirm_current"]["unpriced_entries"], 1)
+            coverage_status = result.data["acceptance_outcome_coverage_status"]
+            self.assertEqual(coverage_status["schema"], "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1")
+            self.assertEqual(coverage_status["source_kind"], "period_report")
+            self.assertEqual(coverage_status["covered_outcome_statuses"], ["confirmed", "rejected", "replayed"])
+            self.assertEqual(
+                coverage_status["covered_outcome_status_counts"],
+                {"confirmed": 1, "rejected": 1, "replayed": 1},
+            )
+            self.assertEqual(coverage_status["missing_automated_outcome_statuses"], ["failed", "exception"])
+            self.assertEqual(coverage_status["live_manual_acceptance"]["status"], "not_provided")
+            self.assertFalse(coverage_status["acceptance_complete"])
+            self.assertFalse(coverage_status["order_submitted"])
             self.assertIn("trade_days", json_path.read_text(encoding="utf-8"))
             self.assertIn("report_date", csv_path.read_text(encoding="utf-8"))
 

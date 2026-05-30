@@ -861,6 +861,51 @@ def _build_trade_audit_value_diagnostics(entries: list[dict[str, Any]], *, scope
     }
 
 
+_PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA = "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1"
+_PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES = ("confirmed", "rejected", "failed", "exception")
+
+
+def _build_pingan_acceptance_outcome_coverage_status(
+    entries: list[dict[str, Any]], *, source_kind: str
+) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    for entry in entries:
+        trade_audit = entry.get("trade_audit", {})
+        status = str(trade_audit.get("status", "")).strip() or "<unknown>"
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    covered_statuses = sorted(status_counts)
+    missing_automated_statuses = [
+        status for status in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES if status_counts.get(status, 0) <= 0
+    ]
+
+    return {
+        "schema": _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA,
+        "status": "partial",
+        "source_kind": source_kind,
+        "evidence_scope": "selected_trade_audit_entries",
+        "execution_mode": "readonly_report",
+        "side_effect_level": "none",
+        "entries_count": len(entries),
+        "required_automated_outcome_statuses": list(_PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES),
+        "covered_outcome_statuses": covered_statuses,
+        "covered_outcome_status_counts": {status: status_counts[status] for status in covered_statuses},
+        "missing_automated_outcome_statuses": missing_automated_statuses,
+        "live_manual_acceptance_required": True,
+        "live_manual_acceptance": {
+            "status": "not_provided",
+            "required_for_implemented_status": True,
+        },
+        "acceptance_complete": False,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "boundary": (
+            "Read-only report coverage from selected immutable audit artifacts; does not execute trades or prove "
+            "live/manual acceptance, broker readiness, production readiness, or D-07/D-08 implemented status."
+        ),
+    }
+
+
 def _extract_trade_audit_local_date_iso(entry: dict[str, Any], tzinfo: ZoneInfo) -> str | None:
     parsed = _parse_iso_datetime(entry.get("trade_audit", {}).get("recorded_at"))
     if parsed is None:
@@ -2741,6 +2786,10 @@ class TdxTaskManager:
                 "by_code": by_code_rows,
                 "by_status": by_status_rows,
                 "value_diagnostics": _build_trade_audit_value_diagnostics(report_entries, scope="daily"),
+                "acceptance_outcome_coverage_status": _build_pingan_acceptance_outcome_coverage_status(
+                    report_entries,
+                    source_kind="daily_report",
+                ),
                 "entries": recent_entries,
             }
 
@@ -2940,6 +2989,10 @@ class TdxTaskManager:
                 "by_code": by_code_rows,
                 "by_status": by_status_rows,
                 "value_diagnostics": _build_trade_audit_value_diagnostics(report_entries, scope="period"),
+                "acceptance_outcome_coverage_status": _build_pingan_acceptance_outcome_coverage_status(
+                    report_entries,
+                    source_kind="period_report",
+                ),
                 "entries": recent_entries,
             }
 
