@@ -82,6 +82,51 @@ PINGAN_PROMOTION_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_promotion_gate_s
 PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1"
 PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_trade_audit_gate_status.v1"
 PINGAN_REQUIRED_AUDIT_GATE_STATUSES = ("confirmed", "rejected", "failed", "exception")
+PINGAN_EXCEPTION_POPUP_KEYWORDS = (
+    "异常",
+    "错误",
+    "失败",
+    "拒绝",
+    "超时",
+    "exception",
+    "error",
+    "failed",
+    "timeout",
+)
+
+
+def _collect_dialog_text_payload_strings(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        normalized = value.strip()
+        return [normalized] if normalized else []
+    if isinstance(value, dict):
+        texts: list[str] = []
+        for item in value.values():
+            texts.extend(_collect_dialog_text_payload_strings(item))
+        return texts
+    if isinstance(value, (list, tuple, set)):
+        texts: list[str] = []
+        for item in value:
+            texts.extend(_collect_dialog_text_payload_strings(item))
+        return texts
+    return []
+
+
+def _build_pingan_exception_popup_lookup_detail(text_payload: dict[str, Any]) -> dict[str, Any]:
+    passive_texts = list(dict.fromkeys(_collect_dialog_text_payload_strings(text_payload)))
+    haystack = "\n".join(passive_texts).casefold()
+    matched_keywords = [
+        keyword for keyword in PINGAN_EXCEPTION_POPUP_KEYWORDS if keyword.casefold() in haystack
+    ]
+    return {
+        "ok": True,
+        "exception_detected": bool(matched_keywords),
+        "matched_keywords": matched_keywords,
+        "passive_texts": passive_texts,
+        "text_payload": text_payload,
+    }
 
 
 def _build_pingan_promotion_gate_status(
@@ -208,7 +253,12 @@ def _build_pingan_desktop_lifecycle_gate_status(
         },
         "covered_lifecycle_gates": [
             name
-            for name in ("confirm_lookup", "result_dialog_lookup", "result_confirm_lookup")
+            for name in (
+                "confirm_lookup",
+                "result_dialog_lookup",
+                "result_confirm_lookup",
+                "exception_popup_lookup",
+            )
             if name in dialog_checks
         ],
         "remaining_lifecycle_gates": [
@@ -229,7 +279,12 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
     dialog_checks: dict[str, dict[str, Any]] = {}
     for check in checks:
         name = check.get("name")
-        if name not in {"confirm_lookup", "result_dialog_lookup", "result_confirm_lookup"}:
+        if name not in {
+            "confirm_lookup",
+            "result_dialog_lookup",
+            "result_confirm_lookup",
+            "exception_popup_lookup",
+        }:
             continue
         dialog_checks[str(name)] = {
             "status": check.get("status"),
@@ -1208,6 +1263,39 @@ class _PingAnTradeProxy:
                     )
                 )
                 if result_dialog_ok:
+                    result_info = result_dialog.get("info")
+                    result_hwnd = getattr(result_info, "handle", result_dialog.get("hwnd", None))
+                    try:
+                        exception_text_payload = _extract_dialog_text_payload_from_sources(
+                            hwnd=result_hwnd,
+                            element=result_dialog.get("element"),
+                        )
+                        exception_detail = _build_pingan_exception_popup_lookup_detail(exception_text_payload)
+                    except Exception as exc:
+                        exception_detail = {
+                            "ok": False,
+                            "exception_detected": None,
+                            "matched_keywords": [],
+                            "passive_texts": [],
+                            "text_payload": {},
+                            "last_error": str(exc),
+                        }
+                    exception_detected = bool(exception_detail.get("exception_detected"))
+                    checks.append(
+                        _build_trade_health_check(
+                            "exception_popup_lookup",
+                            "warning" if exception_detected else "ok",
+                            "exception-like result popup text detected"
+                            if exception_detected
+                            else "no exception-like result popup text detected",
+                            detail=exception_detail,
+                            recommended_action=(
+                                "Review the visible exception popup manually; dialog readiness does not close, retry, or recover it."
+                                if exception_detected
+                                else None
+                            ),
+                        )
+                    )
                     result_confirm = _find_result_confirm_target_for_lookup(
                         title_keyword=self._manager.title_keyword,
                         lookup_mode=resolved_lookup_mode,
@@ -1230,6 +1318,20 @@ class _PingAnTradeProxy:
                         )
                     )
                 else:
+                    checks.append(
+                        _build_trade_health_check(
+                            "exception_popup_lookup",
+                            "skipped",
+                            "exception popup lookup skipped because the result dialog was not detected",
+                            detail={
+                                "ok": False,
+                                "skipped": True,
+                                "exception_detected": None,
+                                "matched_keywords": [],
+                                "text_payload": {},
+                            },
+                        )
+                    )
                     checks.append(
                         _build_trade_health_check(
                             "result_confirm_lookup",
