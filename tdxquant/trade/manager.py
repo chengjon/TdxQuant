@@ -227,6 +227,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
     exe_path: str | None,
     observed_process_window_ownership: dict[str, Any],
     retry_policy_status: dict[str, Any],
+    statefile_lock_status: dict[str, Any],
 ) -> dict[str, Any]:
     dialog_checks = _extract_dialog_lifecycle_checks(checks)
     exception_popup_handling_status = _build_pingan_exception_popup_handling_status(dialog_checks)
@@ -257,6 +258,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
         "observed_process_window_ownership": observed_process_window_ownership,
         "retry_policy_status": retry_policy_status,
         "exception_popup_handling_status": exception_popup_handling_status,
+        "statefile_lock_status": statefile_lock_status,
         "covered_lifecycle_gates": [
             name
             for name in (
@@ -298,6 +300,25 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
             "detail": check.get("detail"),
         }
     return dialog_checks
+
+
+def _build_pingan_statefile_lock_status(artifact_targets: dict[str, str]) -> dict[str, Any]:
+    return {
+        "status": "not_acquired",
+        "execution_mode": "readonly_lock_status",
+        "artifact_targets": dict(artifact_targets),
+        "lock_acquired": False,
+        "owner_token": None,
+        "statefile_write_executed": False,
+        "event_log_write_executed": False,
+        "submission_ledger_write_executed": False,
+        "trade_audit_write_executed": False,
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only statefile lock status only; dialog readiness does not acquire locks, "
+            "write owner tokens, write trade artifacts, or own the desktop process lifecycle."
+        ),
+    }
 
 
 def _build_pingan_exception_popup_handling_status(
@@ -1484,6 +1505,8 @@ class _PingAnTradeProxy:
                     error=exc,
                 )
             retry_policy_status = _build_pingan_retry_policy_status(effective_profile)
+            artifact_targets = self._manager._artifact_targets()
+            statefile_lock_status = _build_pingan_statefile_lock_status(artifact_targets)
             lifecycle_gate_status = _build_pingan_desktop_lifecycle_gate_status(
                 checks=checks,
                 dialog=dialog,
@@ -1495,6 +1518,7 @@ class _PingAnTradeProxy:
                 exe_path=self._manager.exe_path,
                 observed_process_window_ownership=observed_process_window_ownership,
                 retry_policy_status=retry_policy_status,
+                statefile_lock_status=statefile_lock_status,
             )
             return Result(
                 ok=ok,
@@ -1512,7 +1536,7 @@ class _PingAnTradeProxy:
                         },
                         "checks": checks,
                         "artifact_targets": {
-                            **self._manager._artifact_targets(),
+                            **artifact_targets,
                         },
                     },
                     "desktop_lifecycle_gate_status": lifecycle_gate_status,

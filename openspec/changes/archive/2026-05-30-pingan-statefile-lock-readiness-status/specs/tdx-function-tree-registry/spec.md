@@ -1,0 +1,12 @@
+## ADDED Requirements
+
+### Requirement: PingAn statefile lock status evidence SHALL be registered as partial evidence
+
+`FUNCTION_TREE.md` SHALL register PingAn statefile lock status as read-only lifecycle evidence without promoting D-07 or D-08 to `[已实现]`.
+
+#### Scenario: Statefile lock status is registered without status change
+
+- **WHEN** D-07 or D-08 evidence cites `desktop_lifecycle_gate_status.statefile_lock_status`
+- **THEN** the node SHALL remain `[部分实现]`
+- **AND** the evidence SHALL identify the code and tests that produce the status
+- **AND** the boundary SHALL state that executable statefile locking, owner token writes, lifecycle control, process ownership, restart/backoff, and live/manual acceptance remain required before `[已实现]`.
