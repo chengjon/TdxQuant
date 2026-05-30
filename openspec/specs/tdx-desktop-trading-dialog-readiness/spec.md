@@ -44,7 +44,7 @@ The stable PingAn dialog readiness workflow SHALL expose a readonly `desktop_lif
 
 - **WHEN** a caller executes `TdxTradeManager.pingan.dialog_readiness(dialog="both")`
 - **THEN** the result data SHALL include `desktop_lifecycle_gate_status`
-- **AND** the payload SHALL include confirm dialog lookup status, result dialog lookup status, result confirm-button lookup status, exception popup lookup status, dialog lookup mode, confirm/result timeout settings, declared process/window ownership inputs, `execution_mode=readonly_dialog_readiness`, and `side_effect_level=none`.
+- **AND** the payload SHALL include confirm dialog lookup status, result dialog lookup status, result confirm-button lookup status, exception popup lookup status, dialog lookup mode, confirm/result timeout settings, declared process/window ownership inputs, passive observed process/window ownership status, `execution_mode=readonly_dialog_readiness`, and `side_effect_level=none`.
 
 #### Scenario: Lifecycle gate status remains partial
 
@@ -67,5 +67,23 @@ The stable PingAn dialog readiness workflow SHALL expose a passive `exception_po
 
 - **WHEN** `exception_popup_lookup` is returned
 - **THEN** the workflow MUST NOT close the popup, click confirmation controls, submit orders, write trade state, write audit artifacts, or mutate the submission ledger
+- **AND** `desktop_lifecycle_gate_status.side_effect_level` SHALL remain `none`.
+
+### Requirement: Stable desktop trading dialog readiness SHALL expose passive process/window ownership observation
+
+The stable PingAn dialog readiness workflow SHALL expose a passive `observed_process_window_ownership` status in `desktop_lifecycle_gate_status`.
+
+#### Scenario: Caller checks dialog readiness with runtime and window observed
+
+- **WHEN** a caller executes `TdxTradeManager.pingan.dialog_readiness(...)`
+- **AND** PingAn runtime/window health discovery succeeds
+- **THEN** `desktop_lifecycle_gate_status.observed_process_window_ownership.status` SHALL be `observed`
+- **AND** the payload SHALL include `title_keyword`, `exe_path`, `runtime_ok`, `window_ok`, and the serialized read-only health result.
+
+#### Scenario: Process/window observation remains read-only
+
+- **WHEN** `observed_process_window_ownership` is returned
+- **THEN** the workflow MUST NOT start, stop, restart, or supervise the PingAn process
+- **AND** it MUST NOT write statefile ownership, lock ownership, submission ledger entries, trade audit artifacts, or order state
 - **AND** `desktop_lifecycle_gate_status.side_effect_level` SHALL remain `none`.
 

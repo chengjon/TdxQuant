@@ -225,6 +225,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
     result_timeout: float,
     title_keyword: str,
     exe_path: str | None,
+    observed_process_window_ownership: dict[str, Any],
 ) -> dict[str, Any]:
     dialog_checks = _extract_dialog_lifecycle_checks(checks)
     return {
@@ -251,6 +252,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
             "exe_path": exe_path,
             "boundary": "Dialog readiness records configured ownership inputs only; it does not manage the desktop process lifecycle.",
         },
+        "observed_process_window_ownership": observed_process_window_ownership,
         "covered_lifecycle_gates": [
             name
             for name in (
@@ -292,6 +294,61 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
             "detail": check.get("detail"),
         }
     return dialog_checks
+
+
+def _build_pingan_observed_process_window_ownership(
+    *,
+    health_result: Result,
+    title_keyword: str,
+    exe_path: str | None,
+) -> dict[str, Any]:
+    health_data = health_result.data if isinstance(health_result.data, dict) else {}
+    runtime = health_data.get("runtime") if isinstance(health_data.get("runtime"), dict) else {}
+    window = health_data.get("window") if isinstance(health_data.get("window"), dict) else {}
+    runtime_ok = runtime.get("ok") if isinstance(runtime, dict) else None
+    window_ok = window.get("ok") if isinstance(window, dict) else None
+    return {
+        "status": "observed" if health_result.ok else "unverified",
+        "title_keyword": title_keyword,
+        "exe_path": exe_path,
+        "runtime_ok": runtime_ok,
+        "window_ok": window_ok,
+        "health_result": health_result.to_dict(),
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only runtime/window observation only; dialog readiness does not start, stop, "
+            "restart, supervise, lock, or own the PingAn desktop process."
+        ),
+    }
+
+
+def _build_pingan_unverified_process_window_ownership(
+    *,
+    title_keyword: str,
+    exe_path: str | None,
+    error: Exception,
+) -> dict[str, Any]:
+    return {
+        "status": "unverified",
+        "title_keyword": title_keyword,
+        "exe_path": exe_path,
+        "runtime_ok": None,
+        "window_ok": None,
+        "health_result": {
+            "ok": False,
+            "code": ErrorCode.EXECUTION_FAILED.value,
+            "message": "process/window observation failed",
+            "data": {},
+            "warnings": [],
+            "next_action": None,
+            "last_error": str(error),
+        },
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only runtime/window observation only; dialog readiness does not start, stop, "
+            "restart, supervise, lock, or own the PingAn desktop process."
+        ),
+    }
 
 
 def _build_pingan_audit_status_classification(result: Result, covered_status: str) -> dict[str, Any]:
@@ -1348,6 +1405,22 @@ class _PingAnTradeProxy:
                 message = "stable trade dialog readiness check completed with warnings"
             else:
                 message = "stable trade dialog readiness check found failures"
+            try:
+                adapter = PingAnBrokerAdapter(
+                    title_keyword=self._manager.title_keyword,
+                    exe_path=self._manager.exe_path,
+                )
+                observed_process_window_ownership = _build_pingan_observed_process_window_ownership(
+                    health_result=adapter.health_check(),
+                    title_keyword=self._manager.title_keyword,
+                    exe_path=self._manager.exe_path,
+                )
+            except Exception as exc:
+                observed_process_window_ownership = _build_pingan_unverified_process_window_ownership(
+                    title_keyword=self._manager.title_keyword,
+                    exe_path=self._manager.exe_path,
+                    error=exc,
+                )
             lifecycle_gate_status = _build_pingan_desktop_lifecycle_gate_status(
                 checks=checks,
                 dialog=dialog,
@@ -1357,6 +1430,7 @@ class _PingAnTradeProxy:
                 result_timeout=resolved_result_timeout,
                 title_keyword=self._manager.title_keyword,
                 exe_path=self._manager.exe_path,
+                observed_process_window_ownership=observed_process_window_ownership,
             )
             return Result(
                 ok=ok,
