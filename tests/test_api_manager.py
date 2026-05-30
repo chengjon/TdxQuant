@@ -5534,6 +5534,50 @@ class TdxTaskManagerTests(unittest.TestCase):
             self.assertIn("trade_days", json_path.read_text(encoding="utf-8"))
             self.assertIn("report_date", csv_path.read_text(encoding="utf-8"))
 
+    def test_task_trade_audit_period_report_separates_automated_coverage_from_acceptance(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "trade-audits"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            for name, recorded_at, status in [
+                ("a1.json", "2026-04-28T01:00:00+00:00", "confirmed"),
+                ("a2.json", "2026-04-28T02:00:00+00:00", "rejected"),
+                ("a3.json", "2026-04-28T03:00:00+00:00", "failed"),
+                ("a4.json", "2026-04-28T04:00:00+00:00", "exception"),
+            ]:
+                (audit_dir / name).write_text(
+                    json.dumps(
+                        {
+                            "trade_audit": {
+                                "audit_id": name.replace(".json", ""),
+                                "recorded_at": recorded_at,
+                                "status": status,
+                                "broker": "pingan",
+                                "method": "buy",
+                            },
+                            "result": {"data": {"code": "000001"}},
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
+            manager = TdxTaskManager(
+                profile="trade_audit_period_report",
+                strategy_path="strategy.py",
+                profile_overrides={"export_dir": temp_dir, "audit_dir": str(audit_dir)},
+            )
+            result = manager.trade_audit_period_report(
+                start_date="2026-04-28",
+                end_date="2026-04-28",
+                timezone_name="UTC",
+            )
+        self.assertTrue(result.ok)
+        coverage_status = result.data["acceptance_outcome_coverage_status"]
+        self.assertEqual(coverage_status["missing_automated_outcome_statuses"], [])
+        self.assertTrue(coverage_status["automated_outcome_coverage_complete"])
+        self.assertFalse(coverage_status["live_manual_acceptance_complete"])
+        self.assertEqual(coverage_status["live_manual_acceptance"]["status"], "not_provided")
+        self.assertFalse(coverage_status["acceptance_complete"])
+
     def test_task_trade_audit_period_report_supports_multi_status_filter(self) -> None:
         with TemporaryDirectory() as temp_dir:
             audit_dir = Path(temp_dir) / "trade-audits"

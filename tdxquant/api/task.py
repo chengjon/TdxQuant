@@ -878,6 +878,7 @@ def _build_pingan_acceptance_outcome_coverage_status(
     missing_automated_statuses = [
         status for status in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES if status_counts.get(status, 0) <= 0
     ]
+    automated_outcome_coverage_complete = not missing_automated_statuses
 
     return {
         "schema": _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA,
@@ -891,7 +892,9 @@ def _build_pingan_acceptance_outcome_coverage_status(
         "covered_outcome_statuses": covered_statuses,
         "covered_outcome_status_counts": {status: status_counts[status] for status in covered_statuses},
         "missing_automated_outcome_statuses": missing_automated_statuses,
+        "automated_outcome_coverage_complete": automated_outcome_coverage_complete,
         "live_manual_acceptance_required": True,
+        "live_manual_acceptance_complete": False,
         "live_manual_acceptance": {
             "status": "not_provided",
             "required_for_implemented_status": True,

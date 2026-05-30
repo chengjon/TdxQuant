@@ -44,6 +44,13 @@ The daily trade audit report SHALL include a read-only `acceptance_outcome_cover
 - **AND** it SHALL include covered outcome statuses and counts from the selected daily report entries
 - **AND** it SHALL include required automated outcome statuses and missing automated outcome statuses.
 
+#### Scenario: Daily report separates automated coverage from full acceptance
+
+- **WHEN** the daily report includes `acceptance_outcome_coverage_status`
+- **THEN** the payload SHALL include `automated_outcome_coverage_complete`
+- **AND** it SHALL include `live_manual_acceptance_complete=false`
+- **AND** it SHALL keep `acceptance_complete=false` when live/manual acceptance evidence is not provided.
+
 #### Scenario: Daily acceptance coverage remains read-only partial evidence
 
 - **WHEN** the daily report includes `acceptance_outcome_coverage_status`
