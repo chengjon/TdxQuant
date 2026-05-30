@@ -229,6 +229,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
     retry_policy_status: dict[str, Any],
 ) -> dict[str, Any]:
     dialog_checks = _extract_dialog_lifecycle_checks(checks)
+    exception_popup_handling_status = _build_pingan_exception_popup_handling_status(dialog_checks)
     return {
         "schema_version": PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA,
         "status": "partial",
@@ -255,6 +256,7 @@ def _build_pingan_desktop_lifecycle_gate_status(
         },
         "observed_process_window_ownership": observed_process_window_ownership,
         "retry_policy_status": retry_policy_status,
+        "exception_popup_handling_status": exception_popup_handling_status,
         "covered_lifecycle_gates": [
             name
             for name in (
@@ -296,6 +298,41 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
             "detail": check.get("detail"),
         }
     return dialog_checks
+
+
+def _build_pingan_exception_popup_handling_status(
+    dialog_checks: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    lookup = dialog_checks.get("exception_popup_lookup", {})
+    detail = lookup.get("detail") if isinstance(lookup.get("detail"), dict) else {}
+    exception_detected = detail.get("exception_detected")
+    matched_keywords = detail.get("matched_keywords") if isinstance(detail.get("matched_keywords"), list) else []
+    if exception_detected is True:
+        status = "manual_required"
+    elif exception_detected is False:
+        status = "not_triggered"
+    else:
+        status = "unknown"
+    return {
+        "status": status,
+        "execution_mode": "readonly_handling_status",
+        "handling_available": False,
+        "lookup_status": lookup.get("status"),
+        "lookup_summary": lookup.get("summary"),
+        "exception_detected": exception_detected,
+        "matched_keywords": matched_keywords,
+        "manual_action_required": exception_detected is True,
+        "close_executed": False,
+        "confirm_click_executed": False,
+        "recovery_executed": False,
+        "retry_executed": False,
+        "resubmission_executed": False,
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only exception popup handling status only; dialog readiness does not close popups, "
+            "click controls, recover, retry, resubmit, or write trade artifacts."
+        ),
+    }
 
 
 def _build_pingan_retry_policy_status(profile_options: dict[str, Any]) -> dict[str, Any]:

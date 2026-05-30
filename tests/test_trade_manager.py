@@ -771,6 +771,57 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(ledger_path.exists())
         self.assertFalse(audit_dir.exists())
 
+    def test_pingan_dialog_readiness_reports_exception_popup_handling_status_without_handling(self) -> None:
+        result_dialog = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1001, "name": "提示", "class_name": "#32770", "automation_id": "", "control_type": "Pane"})()}
+        result_confirm = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1002, "name": "确认", "class_name": "Button", "automation_id": "7015", "control_type": "Button"})()}
+        text_payload = {
+            "merged_texts": ["系统异常：委托失败"],
+            "contract_no": None,
+            "uia_texts": ["系统异常：委托失败"],
+        }
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "state.json"
+            event_log_path = Path(temp_dir) / "events.jsonl"
+            ledger_path = Path(temp_dir) / "submission-ledger.jsonl"
+            audit_dir = Path(temp_dir) / "trade-audits"
+            with (
+                patch("tdxquant.trade.manager._find_pingan_result_dialog", return_value=result_dialog),
+                patch("tdxquant.trade.manager._find_pingan_result_confirm_button", return_value=result_confirm),
+                patch("tdxquant.trade.manager._extract_dialog_text_payload_from_sources", return_value=text_payload),
+            ):
+                manager = TdxTradeManager(
+                    profile="balanced",
+                    state_path=str(state_path),
+                    event_log_path=str(event_log_path),
+                    submission_ledger_path=str(ledger_path),
+                    trade_audit_dir=str(audit_dir),
+                )
+                result = manager.pingan.dialog_readiness(dialog="result", require_visible=True)
+
+        self.assertTrue(result.ok)
+        lifecycle = result.data["desktop_lifecycle_gate_status"]
+        handling = lifecycle["exception_popup_handling_status"]
+        self.assertEqual(handling["status"], "manual_required")
+        self.assertEqual(handling["execution_mode"], "readonly_handling_status")
+        self.assertFalse(handling["handling_available"])
+        self.assertTrue(handling["exception_detected"])
+        self.assertEqual(handling["lookup_status"], "warning")
+        self.assertIn("异常", handling["matched_keywords"])
+        self.assertFalse(handling["close_executed"])
+        self.assertFalse(handling["confirm_click_executed"])
+        self.assertFalse(handling["recovery_executed"])
+        self.assertFalse(handling["retry_executed"])
+        self.assertFalse(handling["resubmission_executed"])
+        self.assertTrue(handling["manual_action_required"])
+        self.assertEqual(lifecycle["side_effect_level"], "none")
+        self.assertFalse(lifecycle["order_submitted"])
+        self.assertFalse(lifecycle["control_dispatch_executed"])
+        self.assertIn("exception_popup_handling", lifecycle["remaining_lifecycle_gates"])
+        self.assertFalse(state_path.exists())
+        self.assertFalse(event_log_path.exists())
+        self.assertFalse(ledger_path.exists())
+        self.assertFalse(audit_dir.exists())
+
     def test_pingan_submit_ready_reaches_confirm_boundary_without_writing_live_artifacts(self) -> None:
         probe_result = Result(
             ok=True,
