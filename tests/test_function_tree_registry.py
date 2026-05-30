@@ -202,6 +202,21 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("交易安全审批", combined)
         self.assertIn("桌面执行原语", combined)
 
+    def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
+        row = _current_function_tree_rows()["E-11"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("catalog validate --kind bundle --label followup --view summary", combined)
+        self.assertIn("bundle_step_source_label_counts", combined)
+        self.assertIn("task_report_bundle_step_source_label_counts", combined)
+        self.assertIn("task:followup", combined)
+        self.assertIn("report:followup", combined)
+        self.assertIn("只读", combined)
+        self.assertIn("不执行 task/report/trade/bundle step", combined)
+        self.assertIn("不是任意 workflow builder", combined)
+        self.assertIn("production readiness", combined)
+
     def test_validator_json_report_returns_errors_without_stderr(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

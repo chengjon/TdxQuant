@@ -5689,6 +5689,7 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "step_entry_key_count": summary_view["bundle_step_entry_key_count"],
                 "step_source_name_key_count": summary_view["bundle_step_source_name_key_count"],
                 "step_source_entry_key_count": summary_view["bundle_step_source_entry_key_count"],
+                "step_source_label_key_count": summary_view["bundle_step_source_label_key_count"],
                 "step_option_key_count": summary_view["bundle_step_option_key_count"],
                 "step_source_option_key_count": summary_view["bundle_step_source_option_key_count"],
             },
@@ -5723,6 +5724,9 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "step_source_name_key_count": summary_view["task_report_bundle_step_source_name_key_count"],
                 "step_entry_key_count": summary_view["task_report_bundle_step_entry_key_count"],
                 "step_source_entry_key_count": summary_view["task_report_bundle_step_source_entry_key_count"],
+                "step_source_label_key_count": summary_view[
+                    "task_report_bundle_step_source_label_key_count"
+                ],
                 "step_option_key_count": summary_view["task_report_bundle_step_option_key_count"],
                 "step_source_option_key_count": summary_view[
                     "task_report_bundle_step_source_option_key_count"
@@ -5934,6 +5938,72 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertNotIn("entries", summary_view)
         self.assertNotIn("bundles", summary_view)
 
+    def test_handle_catalog_validate_summary_view_projects_bundle_step_source_label_counts(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["catalog", "validate", "--kind", "bundle", "--label", "followup", "--view", "summary"]
+        )
+
+        result = _handle_catalog_subcommand(args)
+
+        self.assertTrue(result.ok)
+        validation = result.data["validation"]
+        summary_view = result.data["summary_view"]
+        self.assertEqual(
+            summary_view["bundle_step_source_label_counts"],
+            validation["bundle_step_source_label_counts"],
+        )
+        self.assertEqual(
+            summary_view["bundle_step_source_label_key_count"],
+            len(summary_view["bundle_step_source_label_counts"]),
+        )
+        self.assertEqual(
+            summary_view["bundle_step_source_label_counts"]["task:followup"],
+            summary_view["bundle_step_source_counts"]["task"],
+        )
+        self.assertEqual(
+            summary_view["bundle_step_source_label_counts"]["report:followup"],
+            summary_view["bundle_step_source_counts"]["report"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_source_label_counts"],
+            validation["task_report_bundle_step_source_label_counts"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_source_label_key_count"],
+            len(summary_view["task_report_bundle_step_source_label_counts"]),
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_source_label_counts"]["task:followup"],
+            summary_view["task_report_bundle_step_source_counts"]["task"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_step_source_label_counts"]["report:followup"],
+            summary_view["task_report_bundle_step_source_counts"]["report"],
+        )
+        self.assertEqual(
+            summary_view["bundle_step_summary"]["step_source_label_key_count"],
+            summary_view["bundle_step_source_label_key_count"],
+        )
+        self.assertEqual(
+            summary_view["task_report_bundle_summary"]["step_source_label_key_count"],
+            summary_view["task_report_bundle_step_source_label_key_count"],
+        )
+        self.assertEqual(summary_view["non_execution"], True)
+        self.assertNotIn("bundles", summary_view)
+
+        empty_args = parser.parse_args(
+            ["catalog", "validate", "--kind", "bundle", "--label", "no-such-label", "--view", "summary"]
+        )
+        empty_result = _handle_catalog_subcommand(empty_args)
+        empty_summary = empty_result.data["summary_view"]
+        self.assertTrue(empty_result.ok)
+        self.assertEqual(empty_summary["bundle_step_source_label_counts"], {})
+        self.assertEqual(empty_summary["bundle_step_source_label_key_count"], 0)
+        self.assertEqual(empty_summary["task_report_bundle_step_source_label_counts"], {})
+        self.assertEqual(empty_summary["task_report_bundle_step_source_label_key_count"], 0)
+        self.assertEqual(empty_summary["non_execution"], True)
+
     def test_handle_catalog_validate_entry_summary_view_projects_entry_label_counts(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -6016,6 +6086,7 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "step_entry_key_count": 0,
                 "step_source_name_key_count": 0,
                 "step_source_entry_key_count": 0,
+                "step_source_label_key_count": 0,
                 "step_option_key_count": 0,
                 "step_source_option_key_count": 0,
             },
@@ -6060,6 +6131,7 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "step_source_name_key_count": 0,
                 "step_entry_key_count": 0,
                 "step_source_entry_key_count": 0,
+                "step_source_label_key_count": 0,
                 "step_option_key_count": 0,
                 "step_source_option_key_count": 0,
             },

@@ -3376,6 +3376,12 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "bundle_step_source_entry_key_count": len(
                 validation.get("bundle_step_source_entry_counts") or {}
             ),
+            "bundle_step_source_label_counts": copy.deepcopy(
+                validation.get("bundle_step_source_label_counts", {})
+            ),
+            "bundle_step_source_label_key_count": len(
+                validation.get("bundle_step_source_label_counts") or {}
+            ),
             "bundle_step_option_key_counts": copy.deepcopy(
                 validation.get("bundle_step_option_key_counts", {})
             ),
@@ -3417,6 +3423,12 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             ),
             "task_report_bundle_step_source_entry_key_count": len(
                 validation.get("task_report_bundle_step_source_entry_counts") or {}
+            ),
+            "task_report_bundle_step_source_label_counts": copy.deepcopy(
+                validation.get("task_report_bundle_step_source_label_counts", {})
+            ),
+            "task_report_bundle_step_source_label_key_count": len(
+                validation.get("task_report_bundle_step_source_label_counts") or {}
             ),
             "task_report_bundle_step_entry_counts": copy.deepcopy(
                 validation.get("task_report_bundle_step_entry_counts", {})
@@ -3665,6 +3677,7 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "step_entry_key_count": summary.get("bundle_step_entry_key_count"),
             "step_source_name_key_count": summary.get("bundle_step_source_name_key_count"),
             "step_source_entry_key_count": summary.get("bundle_step_source_entry_key_count"),
+            "step_source_label_key_count": summary.get("bundle_step_source_label_key_count"),
             "step_option_key_count": summary.get("bundle_step_option_key_count"),
             "step_source_option_key_count": summary.get("bundle_step_source_option_key_count"),
         }
@@ -3680,6 +3693,9 @@ def _build_catalog_summary_view(args: argparse.Namespace, result: Result) -> dic
             "step_source_name_key_count": summary.get("task_report_bundle_step_source_name_key_count"),
             "step_entry_key_count": summary.get("task_report_bundle_step_entry_key_count"),
             "step_source_entry_key_count": summary.get("task_report_bundle_step_source_entry_key_count"),
+            "step_source_label_key_count": summary.get(
+                "task_report_bundle_step_source_label_key_count"
+            ),
             "step_option_key_count": summary.get("task_report_bundle_step_option_key_count"),
             "step_source_option_key_count": summary.get("task_report_bundle_step_source_option_key_count"),
         }
@@ -4413,6 +4429,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     bundle_step_entry_counts: dict[str, int] = {}
     bundle_step_source_name_counts: dict[str, int] = {}
     bundle_step_source_entry_counts: dict[str, int] = {}
+    bundle_step_source_label_counts: dict[str, int] = {}
     bundle_step_option_key_counts: dict[str, int] = {}
     bundle_step_source_option_key_counts: dict[str, int] = {}
     task_report_bundle_count = 0
@@ -4422,6 +4439,7 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
     task_report_bundle_step_name_counts: dict[str, int] = {}
     task_report_bundle_step_source_name_counts: dict[str, int] = {}
     task_report_bundle_step_source_entry_counts: dict[str, int] = {}
+    task_report_bundle_step_source_label_counts: dict[str, int] = {}
     task_report_bundle_step_entry_counts: dict[str, int] = {}
     task_report_bundle_step_option_key_counts: dict[str, int] = {}
     task_report_bundle_step_source_option_key_counts: dict[str, int] = {}
@@ -4494,6 +4512,12 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                     source = step.get("source")
                     if isinstance(source, str) and source:
                         bundle_step_source_counts[source] = bundle_step_source_counts.get(source, 0) + 1
+                        for label in sorted(bundle_labels):
+                            if label:
+                                source_label = f"{source}:{label}"
+                                bundle_step_source_label_counts[source_label] = (
+                                    bundle_step_source_label_counts.get(source_label, 0) + 1
+                                )
                     step_name = step.get("name")
                     if isinstance(step_name, str) and step_name:
                         bundle_step_name_counts[step_name] = bundle_step_name_counts.get(step_name, 0) + 1
@@ -4543,6 +4567,13 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
                             task_report_bundle_step_source_counts[source] = (
                                 task_report_bundle_step_source_counts.get(source, 0) + 1
                             )
+                            for label in sorted(bundle_labels):
+                                if label:
+                                    source_label = f"{source}:{label}"
+                                    task_report_bundle_step_source_label_counts[source_label] = (
+                                        task_report_bundle_step_source_label_counts.get(source_label, 0)
+                                        + 1
+                                    )
                         step_name = step.get("name")
                         if isinstance(step_name, str) and step_name:
                             task_report_bundle_step_name_counts[step_name] = (
@@ -4740,6 +4771,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
             source_entry: bundle_step_source_entry_counts[source_entry]
             for source_entry in sorted(bundle_step_source_entry_counts)
         },
+        "bundle_step_source_label_counts": {
+            source_label: bundle_step_source_label_counts[source_label]
+            for source_label in sorted(bundle_step_source_label_counts)
+        },
         "bundle_step_option_key_counts": {
             option_key: bundle_step_option_key_counts[option_key]
             for option_key in sorted(bundle_step_option_key_counts)
@@ -4768,6 +4803,10 @@ def _validate_catalog_registry(args: argparse.Namespace) -> Result:
         "task_report_bundle_step_source_entry_counts": {
             source_entry: task_report_bundle_step_source_entry_counts[source_entry]
             for source_entry in sorted(task_report_bundle_step_source_entry_counts)
+        },
+        "task_report_bundle_step_source_label_counts": {
+            source_label: task_report_bundle_step_source_label_counts[source_label]
+            for source_label in sorted(task_report_bundle_step_source_label_counts)
         },
         "task_report_bundle_step_entry_counts": {
             entry: task_report_bundle_step_entry_counts[entry]
