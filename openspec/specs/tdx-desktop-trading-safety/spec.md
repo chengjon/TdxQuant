@@ -35,7 +35,7 @@ The system SHALL reject invalid requests before any desktop automation side effe
 
 ### Requirement: PingAn live trading implementation SHALL be gated by safety and acceptance evidence
 
-Before PingAn buy/sell/confirm_current/submit_once paths are claimed implemented, the implementation SHALL provide evidence for live-provider capability ownership, explicit safety checks, desktop result/exception handling, audit persistence, and acceptance verification.
+D-07 and D-08 SHALL remain `[部分实现]` until implementation evidence covers all ordered promotion gates. Readonly provider/broker ownership plus safety preflight status SHALL count only as the first partial promotion gate and SHALL NOT by itself satisfy live trading implementation.
 
 #### Scenario: Live trading promotion requires ordered gates
 
@@ -48,5 +48,34 @@ Before PingAn buy/sell/confirm_current/submit_once paths are claimed implemented
 
 #### Scenario: Read-only catalog evidence cannot satisfy live trading safety gates
 
-- **WHEN** evidence only comes from catalog validate, catalog plan, or catalog preview output
-- **THEN** the evidence MUST NOT satisfy live trading safety, readiness, or acceptance gates.
+- **WHEN** D-07 or D-08 evidence only shows catalog validation, catalog plan, catalog preview, or bundle summary output
+- **THEN** the node MUST remain `[部分实现]`
+- **AND** the boundary MUST state that catalog-only evidence is non-executing discovery evidence and does not prove broker readiness, approval safety, desktop lifecycle coverage, audit coverage, or production readiness.
+
+#### Scenario: Read-only preflight evidence remains partial
+
+- **WHEN** D-07 or D-08 evidence includes PingAn provider/broker ownership and safety gate status from readonly preflight
+- **THEN** the node MUST remain `[部分实现]`
+- **AND** the boundary MUST state that lifecycle, audit, and acceptance gates still remain before `[已实现]`.
+
+### Requirement: PingAn preflight SHALL expose provider and safety promotion gate status
+
+The PingAn desktop trade preflight SHALL expose a readonly `promotion_gate_status` payload that summarizes provider/broker ownership and safety readiness without submitting an order.
+
+#### Scenario: Preflight reports broker ownership and non-execution boundary
+
+- **WHEN** `TdxTradeManager.pingan.preflight` completes
+- **THEN** the result data SHALL include `promotion_gate_status.provider_broker_ownership`
+- **AND** that provider/broker ownership payload SHALL identify `broker=pingan_desktop`, the PingAn desktop adapter/manager ownership, supported brokers, `execution_mode=readonly_preflight`, `dispatch_executed=false`, and `order_submitted=false`.
+
+#### Scenario: Preflight reports safety gate readiness
+
+- **WHEN** `TdxTradeManager.pingan.preflight` is called with trade inputs, `max_price`, and `submission_key`
+- **THEN** the result data SHALL include `promotion_gate_status.safety_gates`
+- **AND** the safety gate payload SHALL report max-price guard configuration, submission-key presence, idempotency decision, risk-gate pass/fail, explicit approval status, and remaining gate names.
+
+#### Scenario: Preflight gate status does not satisfy implemented status by itself
+
+- **WHEN** `promotion_gate_status` is available from preflight
+- **THEN** the payload SHALL state that it is partial promotion evidence
+- **AND** the remaining gates SHALL include desktop lifecycle, audit evidence, and acceptance evidence.

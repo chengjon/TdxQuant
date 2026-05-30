@@ -78,6 +78,95 @@ def _summarize_trade_health_checks(checks: list[dict[str, Any]]) -> tuple[str, b
     return "ok", True, [], None
 
 
+PINGAN_PROMOTION_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_promotion_gate_status.v1"
+
+
+def _build_pingan_promotion_gate_status(
+    *,
+    broker_health: Result,
+    detect_result: Result | None,
+    risk_gate: dict[str, Any],
+    idempotency: dict[str, Any],
+    submission_key: str | None,
+    max_price: float | None,
+) -> dict[str, Any]:
+    max_price_guard = _build_max_price_guard_status(risk_gate=risk_gate, max_price=max_price)
+    submission_key_status = "provided" if submission_key else "missing"
+    return {
+        "schema_version": PINGAN_PROMOTION_GATE_STATUS_SCHEMA,
+        "status": "partial",
+        "evidence_scope": "provider_broker_ownership_and_safety_preflight",
+        "execution_mode": "readonly_preflight",
+        "dispatch_executed": False,
+        "order_submitted": False,
+        "provider_broker_ownership": {
+            "status": "ready" if broker_health.ok and (detect_result is None or detect_result.ok) else "blocked",
+            "broker": "pingan_desktop",
+            "broker_family": "pingan",
+            "adapter": "PingAnBrokerAdapter",
+            "gateway_adapter": "PingAnDesktopTraderGateway",
+            "manager_entrypoint": "TdxTradeManager.pingan.preflight",
+            "supported_brokers": ["pingan_desktop"],
+            "execution_mode": "readonly_preflight",
+            "dispatch_executed": False,
+            "order_submitted": False,
+            "evidence": {
+                "broker_health_ok": broker_health.ok,
+                "buy_page_detection_ok": None if detect_result is None else detect_result.ok,
+            },
+            "boundary": "Read-only PingAn desktop preflight ownership evidence; no order is submitted.",
+        },
+        "safety_gates": {
+            "status": "ready"
+            if risk_gate.get("passed") and submission_key_status == "provided" and max_price is not None
+            else "incomplete",
+            "max_price_guard": max_price_guard,
+            "submission_key": {
+                "status": submission_key_status,
+                "value": submission_key,
+            },
+            "idempotency": idempotency,
+            "risk_gate": risk_gate,
+            "explicit_approval": {
+                "status": "not_granted",
+                "required_for_live_trade": True,
+                "live_trade_requires_explicit_run": True,
+                "boundary": "Preflight cannot grant live trade approval; execution requires an explicit trade command.",
+            },
+        },
+        "completed_gates": ["provider_broker_ownership", "safety_gates"],
+        "remaining_gates": ["desktop_lifecycle", "audit_evidence", "acceptance_evidence"],
+        "boundary": (
+            "Partial promotion evidence only. D-07/D-08 still require desktop lifecycle, audit, "
+            "and acceptance evidence before implemented status."
+        ),
+    }
+
+
+def _build_max_price_guard_status(*, risk_gate: dict[str, Any], max_price: float | None) -> dict[str, Any]:
+    requested_price = risk_gate.get("requested_price")
+    if max_price is None:
+        status = "missing"
+        passed = False
+    else:
+        max_price_check = next(
+            (
+                check
+                for check in risk_gate.get("checks", [])
+                if isinstance(check, dict) and check.get("name") == "max_price"
+            ),
+            None,
+        )
+        passed = bool(max_price_check.get("passed", True)) if isinstance(max_price_check, dict) else True
+        status = "configured" if passed else "failed"
+    return {
+        "status": status,
+        "max_price": max_price,
+        "requested_price": requested_price,
+        "passed": passed,
+    }
+
+
 def _serialize_dialog_lookup_target(target: dict[str, Any]) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "ok": bool(target.get("ok")),
@@ -640,6 +729,7 @@ class _PingAnTradeProxy:
         def run() -> Result:
             adapter = PingAnBrokerAdapter(title_keyword=self._manager.title_keyword, exe_path=self._manager.exe_path)
             broker_health = adapter.health_check()
+            detect_result: Result | None = None
             checks = [
                 _build_trade_health_check(
                     "broker_runtime",
@@ -848,6 +938,14 @@ class _PingAnTradeProxy:
                 message = "stable trade preflight completed with warnings"
             else:
                 message = "stable trade preflight found failures"
+            promotion_gate_status = _build_pingan_promotion_gate_status(
+                broker_health=broker_health,
+                detect_result=detect_result,
+                risk_gate=risk_gate,
+                idempotency=idempotency,
+                submission_key=submission_key,
+                max_price=max_price,
+            )
 
             return Result(
                 ok=ok,
@@ -871,7 +969,8 @@ class _PingAnTradeProxy:
                         "artifact_targets": {
                             **self._manager._artifact_targets(),
                         },
-                    }
+                    },
+                    "promotion_gate_status": promotion_gate_status,
                 },
                 warnings=warnings,
                 next_action=next_action,

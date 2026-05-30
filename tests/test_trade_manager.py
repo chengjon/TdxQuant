@@ -380,6 +380,66 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(ledger_path.exists())
         self.assertNotIn("artifacts", result.data)
 
+    def test_pingan_preflight_reports_provider_safety_promotion_gate_status(self) -> None:
+        broker_health = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="health-check passed",
+            data={"runtime": {"ok": True}, "window": {"ok": True}},
+        )
+        detect_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="detected Ping An buy-page controls",
+            data={"detection": {"code_hwnd": 1, "quantity_hwnd": 2, "buy_button_hwnd": 3}},
+        )
+        hid_ping = Result(ok=True, code=ErrorCode.OK, message="hid bridge ping completed", data={"response": "OK"})
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "pingan-last-order.json"
+            event_log_path = Path(temp_dir) / "pingan-order-events.jsonl"
+            ledger_path = Path(temp_dir) / "pingan-submission-ledger.jsonl"
+            with (
+                patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health),
+                patch("tdxquant.trade.manager.PingAnBrokerAdapter.detect", return_value=detect_result),
+                patch("tdxquant.trade.manager.run_hid_ping", return_value=hid_ping),
+            ):
+                manager = TdxTradeManager(
+                    profile="balanced",
+                    state_path=str(state_path),
+                    event_log_path=str(event_log_path),
+                    submission_ledger_path=str(ledger_path),
+                )
+                result = manager.pingan.preflight(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="preflight-gate-001",
+                    max_price=10.50,
+                )
+
+        self.assertTrue(result.ok)
+        gate_status = result.data["promotion_gate_status"]
+        self.assertEqual(gate_status["schema_version"], "tdx.desktop_trade.pingan_promotion_gate_status.v1")
+        self.assertEqual(gate_status["status"], "partial")
+        self.assertEqual(gate_status["execution_mode"], "readonly_preflight")
+        self.assertFalse(gate_status["dispatch_executed"])
+        self.assertFalse(gate_status["order_submitted"])
+        ownership = gate_status["provider_broker_ownership"]
+        self.assertEqual(ownership["broker"], "pingan_desktop")
+        self.assertEqual(ownership["manager_entrypoint"], "TdxTradeManager.pingan.preflight")
+        self.assertEqual(ownership["supported_brokers"], ["pingan_desktop"])
+        safety = gate_status["safety_gates"]
+        self.assertEqual(safety["max_price_guard"]["status"], "configured")
+        self.assertEqual(safety["submission_key"]["status"], "provided")
+        self.assertEqual(safety["idempotency"]["decision"], "execute")
+        self.assertTrue(safety["risk_gate"]["passed"])
+        self.assertEqual(safety["explicit_approval"]["status"], "not_granted")
+        self.assertIn("desktop_lifecycle", gate_status["remaining_gates"])
+        self.assertFalse(state_path.exists())
+        self.assertFalse(event_log_path.exists())
+        self.assertFalse(ledger_path.exists())
+
     def test_pingan_preflight_fails_on_conflicting_submission_key_without_writing_ledger(self) -> None:
         expected = Result(
             ok=True,
