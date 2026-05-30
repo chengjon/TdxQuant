@@ -80,6 +80,8 @@ def _summarize_trade_health_checks(checks: list[dict[str, Any]]) -> tuple[str, b
 
 PINGAN_PROMOTION_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_promotion_gate_status.v1"
 PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1"
+PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_trade_audit_gate_status.v1"
+PINGAN_REQUIRED_AUDIT_GATE_STATUSES = ("confirmed", "rejected", "failed", "exception")
 
 
 def _build_pingan_promotion_gate_status(
@@ -235,6 +237,43 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
             "detail": check.get("detail"),
         }
     return dialog_checks
+
+
+def _build_pingan_trade_audit_gate_status(result: Result) -> dict[str, Any]:
+    trade_audit = result.data.get("trade_audit", {})
+    trade_audit = trade_audit if isinstance(trade_audit, dict) else {}
+    artifacts = result.data.get("artifacts", {})
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    covered_status = str(trade_audit.get("status") or "unknown")
+    artifact_paths = {
+        "last_order_state_path": artifacts.get("last_order_state_path"),
+        "order_event_log_path": artifacts.get("order_event_log_path"),
+        "submission_ledger_path": artifacts.get("submission_ledger_path"),
+        "trade_audit_path": artifacts.get("trade_audit_path"),
+    }
+    return {
+        "schema_version": PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA,
+        "status": "partial",
+        "evidence_scope": "single_finalized_trade_result",
+        "audit_id": trade_audit.get("audit_id"),
+        "covered_audit_status": covered_status,
+        "broker": trade_audit.get("broker"),
+        "method": trade_audit.get("method"),
+        "artifact_paths": artifact_paths,
+        "persisted_artifacts": {
+            "last_order_state": bool(artifact_paths["last_order_state_path"]),
+            "order_event_log": bool(artifact_paths["order_event_log_path"]),
+            "submission_ledger": bool(artifact_paths["submission_ledger_path"]),
+            "trade_audit": bool(artifact_paths["trade_audit_path"]),
+        },
+        "remaining_audit_gate_statuses": [
+            status for status in PINGAN_REQUIRED_AUDIT_GATE_STATUSES if status != covered_status
+        ],
+        "boundary": (
+            "Partial audit promotion evidence for one finalized result only. Separate success, failure, "
+            "rejection, exception, and acceptance evidence are still required before implemented status."
+        ),
+    }
 
 
 def _serialize_dialog_lookup_target(target: dict[str, Any]) -> dict[str, Any]:
@@ -1790,6 +1829,7 @@ class TdxTradeManager:
             audit_dir=None if self.trade_audit_dir is None else Path(self.trade_audit_dir),
         )
         result.data.setdefault("artifacts", {})["trade_audit_path"] = str(trade_audit_path)
+        result.data["trade_audit_gate_status"] = _build_pingan_trade_audit_gate_status(result)
         return result
 
     def _build_trade_risk_rejection_result(

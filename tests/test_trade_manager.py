@@ -106,6 +106,18 @@ class TdxTradeManagerTests(unittest.TestCase):
             self.assertEqual(event_row["trade_audit"]["audit_id"], result.data["trade_audit"]["audit_id"])
             self.assertEqual(audit_payload["trade_audit"]["audit_id"], result.data["trade_audit"]["audit_id"])
             self.assertEqual(audit_payload["trade_audit"]["status"], "confirmed")
+            audit_gate = result.data["trade_audit_gate_status"]
+            self.assertEqual(audit_gate["schema_version"], "tdx.desktop_trade.pingan_trade_audit_gate_status.v1")
+            self.assertEqual(audit_gate["status"], "partial")
+            self.assertEqual(audit_gate["covered_audit_status"], "confirmed")
+            self.assertEqual(audit_gate["audit_id"], result.data["trade_audit"]["audit_id"])
+            self.assertEqual(audit_gate["artifact_paths"]["trade_audit_path"], str(audit_path))
+            self.assertTrue(audit_gate["persisted_artifacts"]["last_order_state"])
+            self.assertTrue(audit_gate["persisted_artifacts"]["order_event_log"])
+            self.assertTrue(audit_gate["persisted_artifacts"]["submission_ledger"])
+            self.assertTrue(audit_gate["persisted_artifacts"]["trade_audit"])
+            self.assertIn("rejected", audit_gate["remaining_audit_gate_statuses"])
+            self.assertIn("exception", audit_gate["remaining_audit_gate_statuses"])
         mocked.assert_called_once()
         self.assertEqual(result.data["manager"]["entrypoint"], "TdxTradeManager")
         self.assertEqual(result.data["manager"]["broker"], "pingan")
@@ -882,6 +894,13 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(audit_payload["trade_audit"]["status"], "rejected")
         self.assertEqual(state_payload["trade_audit"]["audit_id"], result.data["trade_audit"]["audit_id"])
         self.assertEqual(event_row["trade_audit"]["audit_id"], result.data["trade_audit"]["audit_id"])
+        audit_gate = result.data["trade_audit_gate_status"]
+        self.assertEqual(audit_gate["covered_audit_status"], "rejected")
+        self.assertEqual(audit_gate["artifact_paths"]["trade_audit_path"], str(audit_path))
+        self.assertTrue(audit_gate["persisted_artifacts"]["last_order_state"])
+        self.assertTrue(audit_gate["persisted_artifacts"]["order_event_log"])
+        self.assertFalse(audit_gate["persisted_artifacts"]["submission_ledger"])
+        self.assertIn("confirmed", audit_gate["remaining_audit_gate_statuses"])
 
     def test_pingan_buy_rejects_conflicting_submission_key_after_side_effecting_attempt(self) -> None:
         expected = Result(
