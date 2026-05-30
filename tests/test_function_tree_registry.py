@@ -140,6 +140,19 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("broker readiness", combined)
         self.assertIn("交易安全审批", combined)
 
+    def test_pingan_bundle_coverage_status_evidence_is_registered(self) -> None:
+        row = _current_function_tree_rows()["D-07"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("trade_plan_boundary_input_coverage_status_counts", combined)
+        self.assertIn("missing_required_inputs", combined)
+        self.assertIn("no_required_inputs", combined)
+        self.assertIn("selected steps", combined)
+        self.assertIn("不执行 task/trade/report/bundle step", combined)
+        self.assertIn("broker readiness", combined)
+        self.assertIn("交易安全审批", combined)
+
     def test_submit_once_task_plan_preview_boundary_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
