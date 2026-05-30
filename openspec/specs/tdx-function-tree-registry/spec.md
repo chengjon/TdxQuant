@@ -7,13 +7,13 @@ TBD - created by archiving change function-tree-registry-validator. Update Purpo
 
 `FUNCTION_TREE.md` SHALL remain a single feature registry where each feature row carries explicit status, evidence, and boundary text that can be mechanically validated.
 
-#### Scenario: E-11 source-label summary evidence stays bounded
+#### Scenario: D-07 PingAn input-kind rollup evidence stays bounded
 
-- **WHEN** E-11 cites catalog bundle step source-label count evidence
-- **THEN** E-11 MUST remain `[部分实现]`
-- **AND** the row MUST cite `bundle_step_source_label_counts` and `task_report_bundle_step_source_label_counts`
-- **AND** the boundary MUST state that the fields are read-only catalog validation summary evidence
-- **AND** the row MUST NOT imply workflow execution, arbitrary workflow builder completion, task/report/trade execution, or production readiness.
+- **WHEN** D-07 cites PingAn bundle trade boundary input-kind count evidence
+- **THEN** D-07 MUST remain `[部分实现]`
+- **AND** the row MUST cite `trade_plan_boundary_input_kind_counts`
+- **AND** the boundary MUST state that the field is read-only catalog plan/preview summary evidence
+- **AND** the row MUST NOT imply task/trade/report/bundle execution, broker readiness, trading safety approval, production readiness, or complete desktop exception coverage.
 
 ### Requirement: FUNCTION_TREE registry SHALL validate cited OpenSpec evidence
 

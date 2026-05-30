@@ -2975,6 +2975,9 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "trade_plan_boundary_input_coverage_status_counts": copy.deepcopy(
             summary.get("trade_plan_boundary_input_coverage_status_counts", {})
         ),
+        "trade_plan_boundary_input_kind_counts": copy.deepcopy(
+            summary.get("trade_plan_boundary_input_kind_counts", {})
+        ),
         "trade_plan_boundary_sides": copy.deepcopy(summary.get("trade_plan_boundary_sides", [])),
         "has_step_slice": bool(selected_from_step or selected_to_step),
         "has_steps": isinstance(selected_step_count, int) and selected_step_count > 0,
@@ -3032,6 +3035,9 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
         ),
         "trade_plan_boundary_input_coverage_status_counts": copy.deepcopy(
             selected_steps.get("trade_plan_boundary_input_coverage_status_counts", {})
+        ),
+        "trade_plan_boundary_input_kind_counts": copy.deepcopy(
+            selected_steps.get("trade_plan_boundary_input_kind_counts", {})
         ),
         "trade_plan_boundary_sides": copy.deepcopy(
             selected_steps.get("trade_plan_boundary_sides", [])
@@ -3173,6 +3179,7 @@ def _build_catalog_trade_plan_boundary_rollup(steps: object) -> dict[str, object
     boundary_count = 0
     commands: set[str] = set()
     coverage_status_counts: dict[str, int] = {}
+    input_kind_counts: dict[str, int] = {}
     sides: set[str] = set()
     if isinstance(steps, list):
         for step in steps:
@@ -3190,6 +3197,9 @@ def _build_catalog_trade_plan_boundary_rollup(steps: object) -> dict[str, object
                 coverage_status_counts[input_coverage_status] = (
                     coverage_status_counts.get(input_coverage_status, 0) + 1
                 )
+            input_kind = boundary.get("input_kind")
+            if isinstance(input_kind, str) and input_kind:
+                input_kind_counts[input_kind] = input_kind_counts.get(input_kind, 0) + 1
             side = boundary.get("side")
             if isinstance(side, str) and side:
                 sides.add(side)
@@ -3199,6 +3209,9 @@ def _build_catalog_trade_plan_boundary_rollup(steps: object) -> dict[str, object
         "trade_plan_boundary_commands": sorted(commands),
         "trade_plan_boundary_input_coverage_status_counts": {
             key: coverage_status_counts[key] for key in sorted(coverage_status_counts)
+        },
+        "trade_plan_boundary_input_kind_counts": {
+            key: input_kind_counts[key] for key in sorted(input_kind_counts)
         },
         "trade_plan_boundary_sides": sorted(sides),
     }
