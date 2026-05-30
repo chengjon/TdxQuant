@@ -57,6 +57,13 @@ The standard finalized PingAn trade persistence path SHALL expose a normalized `
 - **AND** the covered audit status SHALL be `rejected`
 - **AND** the payload SHALL identify which artifact paths were persisted for the rejected result.
 
+#### Scenario: Explicit exception finalized trade exposes audit gate status
+
+- **WHEN** a PingAn trade workflow returns a finalized result with explicit desktop exception metadata
+- **THEN** the result data SHALL include `trade_audit_gate_status`
+- **AND** the covered audit status SHALL be `exception`
+- **AND** the immutable audit artifact SHALL preserve the same `trade_audit.status=exception`.
+
 #### Scenario: Audit gate status remains partial
 
 - **WHEN** `trade_audit_gate_status` is returned for one finalized result

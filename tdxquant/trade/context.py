@@ -189,9 +189,16 @@ def _resolve_trade_audit_status(
         return "replayed"
     if idempotency_decision == "reject_conflict" or not bool(risk_gate.get("passed", True)) or result.code == ErrorCode.INVALID_REQUEST:
         return "rejected"
+    if not result.ok and _has_explicit_trade_exception_metadata(result):
+        return "exception"
     if result.ok:
         return "confirmed"
     return "failed"
+
+
+def _has_explicit_trade_exception_metadata(result: Result) -> bool:
+    data = result.data if isinstance(result.data, dict) else {}
+    return isinstance(data.get("desktop_exception"), dict) or isinstance(data.get("trade_exception"), dict)
 
 
 def attach_trade_audit_metadata(
