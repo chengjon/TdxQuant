@@ -237,6 +237,25 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("production readiness", combined)
         self.assertIn("桌面执行原语", combined)
 
+    def test_pingan_trading_implemented_promotion_plan_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-trading-implemented-promotion-plan", combined)
+                self.assertIn("provider/broker ownership", combined)
+                self.assertIn("safety gates", combined)
+                self.assertIn("desktop lifecycle", combined)
+                self.assertIn("audit evidence", combined)
+                self.assertIn("acceptance gates", combined)
+                self.assertIn("只读 catalog", combined)
+                self.assertIn("broker readiness", combined)
+                self.assertIn("交易安全审批", combined)
+                self.assertIn("production readiness", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"
