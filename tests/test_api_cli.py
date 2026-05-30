@@ -7190,6 +7190,7 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "step_resolved_arg_key_count": 5,
                 "step_source_resolved_arg_key_count": 6,
                 "trade_plan_boundary_step_count": 1,
+                "has_trade_plan_boundary": True,
                 "trade_plan_boundary_commands": ["trade-confirm-current"],
                 "trade_plan_boundary_sides": [],
                 "has_step_slice": True,
@@ -7244,6 +7245,7 @@ class ApiCliDispatchTests(unittest.TestCase):
                 "step_resolved_arg_key_count": 5,
                 "step_source_resolved_arg_key_count": 6,
                 "trade_plan_boundary_step_count": 1,
+                "has_trade_plan_boundary": True,
                 "trade_plan_boundary_commands": ["trade-confirm-current"],
                 "trade_plan_boundary_sides": [],
                 "has_steps": True,
@@ -7870,6 +7872,80 @@ class ApiCliDispatchTests(unittest.TestCase):
                     self.assertEqual(first_step["trade_plan_boundary"]["trade_command"], expected_command)
                     self.assertEqual(output_payload["constraints"]["dispatch_executed"], False)
                     mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_pingan_bundle_step_slice_exposes_trade_boundary_presence(self) -> None:
+        parser = build_parser()
+        cases = [
+            (
+                ["catalog", "plan", "--bundle", "buy-pingan-complete-review", "--from-step", "success", "--view", "summary"],
+                False,
+                0,
+                [],
+                "success",
+                "audit",
+            ),
+            (
+                [
+                    "catalog",
+                    "preview",
+                    "--bundle",
+                    "buy-pingan-complete-review",
+                    "--from-step",
+                    "success",
+                    "--view",
+                    "summary",
+                ],
+                False,
+                0,
+                [],
+                "success",
+                "audit",
+            ),
+            (
+                ["catalog", "plan", "--bundle", "buy-pingan-complete-review", "--to-step", "trade", "--view", "summary"],
+                True,
+                1,
+                ["trade-buy"],
+                "trade",
+                "trade",
+            ),
+            (
+                [
+                    "catalog",
+                    "preview",
+                    "--bundle",
+                    "confirm-current-pingan-complete-review",
+                    "--to-step",
+                    "confirm",
+                    "--view",
+                    "summary",
+                ],
+                True,
+                1,
+                ["trade-confirm-current"],
+                "confirm",
+                "confirm",
+            ),
+        ]
+        for argv, expected_presence, expected_count, expected_commands, first_step, last_step in cases:
+            with self.subTest(argv=argv):
+                args = parser.parse_args(argv)
+                with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+                    result = _handle_catalog_subcommand(args)
+                output_payload = _select_catalog_output_payload(args, result)
+                self.assertTrue(result.ok)
+                self.assertEqual(output_payload["has_trade_plan_boundary"], expected_presence)
+                self.assertEqual(
+                    output_payload["selected_step_summary"]["has_trade_plan_boundary"],
+                    expected_presence,
+                )
+                self.assertEqual(output_payload["plan_summary"]["has_trade_plan_boundary"], expected_presence)
+                self.assertEqual(output_payload["trade_plan_boundary_step_count"], expected_count)
+                self.assertEqual(output_payload["trade_plan_boundary_commands"], expected_commands)
+                self.assertEqual(output_payload["selected_step_summary"]["first_step_name"], first_step)
+                self.assertEqual(output_payload["selected_step_summary"]["last_step_name"], last_step)
+                self.assertEqual(output_payload["constraints"]["dispatch_executed"], False)
+                mocked_dispatch.assert_not_called()
 
     def test_handle_catalog_plan_trade_health_summary_exposes_readiness_boundary(self) -> None:
         parser = build_parser()

@@ -2970,6 +2970,7 @@ def _build_catalog_selected_step_summary(summary: dict[str, object]) -> dict[str
         "step_resolved_arg_key_count": summary.get("step_resolved_arg_key_count"),
         "step_source_resolved_arg_key_count": summary.get("step_source_resolved_arg_key_count"),
         "trade_plan_boundary_step_count": summary.get("trade_plan_boundary_step_count"),
+        "has_trade_plan_boundary": summary.get("has_trade_plan_boundary"),
         "trade_plan_boundary_commands": copy.deepcopy(summary.get("trade_plan_boundary_commands", [])),
         "trade_plan_boundary_sides": copy.deepcopy(summary.get("trade_plan_boundary_sides", [])),
         "has_step_slice": bool(selected_from_step or selected_to_step),
@@ -3022,6 +3023,7 @@ def _build_catalog_plan_summary(summary: dict[str, object]) -> dict[str, object]
             "step_source_resolved_arg_key_count"
         ),
         "trade_plan_boundary_step_count": selected_steps.get("trade_plan_boundary_step_count"),
+        "has_trade_plan_boundary": selected_steps.get("has_trade_plan_boundary"),
         "trade_plan_boundary_commands": copy.deepcopy(
             selected_steps.get("trade_plan_boundary_commands", [])
         ),
@@ -3181,6 +3183,7 @@ def _build_catalog_trade_plan_boundary_rollup(steps: object) -> dict[str, object
                 sides.add(side)
     return {
         "trade_plan_boundary_step_count": boundary_count,
+        "has_trade_plan_boundary": boundary_count > 0,
         "trade_plan_boundary_commands": sorted(commands),
         "trade_plan_boundary_sides": sorted(sides),
     }
