@@ -870,6 +870,56 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(ledger_path.exists())
         self.assertFalse(audit_dir.exists())
 
+    def test_pingan_dialog_readiness_reports_lifecycle_control_status_without_control(self) -> None:
+        confirm_target = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1000, "name": "确认买入", "class_name": "Button", "automation_id": "1", "control_type": "Button"})()}
+        result_dialog = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1001, "name": "提示", "class_name": "#32770", "automation_id": "", "control_type": "Pane"})()}
+        result_confirm = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1002, "name": "确认", "class_name": "Button", "automation_id": "7015", "control_type": "Button"})()}
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "state.json"
+            event_log_path = Path(temp_dir) / "events.jsonl"
+            ledger_path = Path(temp_dir) / "submission-ledger.jsonl"
+            audit_dir = Path(temp_dir) / "trade-audits"
+            with (
+                patch("tdxquant.trade.manager._find_pingan_confirm_button", return_value=confirm_target),
+                patch("tdxquant.trade.manager._find_pingan_result_dialog", return_value=result_dialog),
+                patch("tdxquant.trade.manager._find_pingan_result_confirm_button", return_value=result_confirm),
+                patch("tdxquant.trade.manager._extract_dialog_text_payload_from_sources", return_value={"merged_texts": []}),
+            ):
+                manager = TdxTradeManager(
+                    profile="balanced",
+                    title_keyword="平安证券",
+                    exe_path=r"D:\ProgramData\PinganSec\TdxW.exe",
+                    state_path=str(state_path),
+                    event_log_path=str(event_log_path),
+                    submission_ledger_path=str(ledger_path),
+                    trade_audit_dir=str(audit_dir),
+                )
+                result = manager.pingan.dialog_readiness(dialog="both", require_visible=True)
+
+        self.assertTrue(result.ok)
+        lifecycle = result.data["desktop_lifecycle_gate_status"]
+        control = lifecycle["lifecycle_control_status"]
+        self.assertEqual(control["status"], "not_owned")
+        self.assertEqual(control["execution_mode"], "readonly_lifecycle_control_status")
+        self.assertFalse(control["control_available"])
+        self.assertEqual(control["title_keyword"], "平安证券")
+        self.assertEqual(control["exe_path"], r"D:\ProgramData\PinganSec\TdxW.exe")
+        self.assertFalse(control["start_executed"])
+        self.assertFalse(control["stop_executed"])
+        self.assertFalse(control["restart_executed"])
+        self.assertFalse(control["supervisor_owned"])
+        self.assertFalse(control["backoff_executed"])
+        self.assertFalse(control["process_kill_executed"])
+        self.assertFalse(control["pid_ownership_claimed"])
+        self.assertEqual(lifecycle["side_effect_level"], "none")
+        self.assertFalse(lifecycle["order_submitted"])
+        self.assertFalse(lifecycle["control_dispatch_executed"])
+        self.assertIn("process_window_lifecycle_ownership", lifecycle["remaining_lifecycle_gates"])
+        self.assertFalse(state_path.exists())
+        self.assertFalse(event_log_path.exists())
+        self.assertFalse(ledger_path.exists())
+        self.assertFalse(audit_dir.exists())
+
     def test_pingan_submit_ready_reaches_confirm_boundary_without_writing_live_artifacts(self) -> None:
         probe_result = Result(
             ok=True,
