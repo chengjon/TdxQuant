@@ -100,7 +100,7 @@ The FUNCTION_TREE registry SHALL allow lifecycle-related feature nodes to be mar
 
 ### Requirement: PingAn trading status promotion SHALL require explicit implementation evidence
 
-`FUNCTION_TREE.md` SHALL keep D-07 and D-08 as `[部分实现]` until a later implementation change provides explicit evidence for provider ownership, safety gates, desktop lifecycle/result handling, audit evidence, acceptance gates, and status transition. Readonly preflight provider/safety status SHALL be registered as partial promotion evidence only.
+`FUNCTION_TREE.md` SHALL keep D-07 and D-08 as `[部分实现]` until a later implementation change provides explicit evidence for provider ownership, safety gates, desktop lifecycle/result handling, audit evidence, acceptance gates, and status transition. Readonly preflight provider/safety status and readonly dialog lifecycle status SHALL be registered as partial promotion evidence only.
 
 #### Scenario: D-07 and D-08 promotion plan is registered without status change
 
@@ -121,3 +121,10 @@ The FUNCTION_TREE registry SHALL allow lifecycle-related feature nodes to be mar
 - **THEN** the node SHALL remain `[部分实现]`
 - **AND** the evidence SHALL identify the code and tests that produce the gate status
 - **AND** the boundary SHALL state that desktop lifecycle, audit, and acceptance gates remain before `[已实现]`.
+
+#### Scenario: Dialog lifecycle gate evidence is registered as partial evidence
+
+- **WHEN** D-07 or D-08 evidence cites readonly PingAn `desktop_lifecycle_gate_status` from `trade dialog-readiness`
+- **THEN** the node SHALL remain `[部分实现]`
+- **AND** the evidence SHALL identify the code and tests that produce the gate status
+- **AND** the boundary SHALL state that exception popup handling, retry policy, audit evidence, and acceptance evidence remain before `[已实现]`.

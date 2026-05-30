@@ -35,7 +35,7 @@ The system SHALL reject invalid requests before any desktop automation side effe
 
 ### Requirement: PingAn live trading implementation SHALL be gated by safety and acceptance evidence
 
-D-07 and D-08 SHALL remain `[部分实现]` until implementation evidence covers all ordered promotion gates. Readonly provider/broker ownership plus safety preflight status SHALL count only as the first partial promotion gate and SHALL NOT by itself satisfy live trading implementation.
+D-07 and D-08 SHALL remain `[部分实现]` until implementation evidence covers all ordered promotion gates. Readonly provider/broker ownership plus safety preflight status and readonly desktop dialog lifecycle status SHALL count only as partial promotion evidence and SHALL NOT by themselves satisfy live trading implementation.
 
 #### Scenario: Live trading promotion requires ordered gates
 
@@ -57,6 +57,12 @@ D-07 and D-08 SHALL remain `[部分实现]` until implementation evidence covers
 - **WHEN** D-07 or D-08 evidence includes PingAn provider/broker ownership and safety gate status from readonly preflight
 - **THEN** the node MUST remain `[部分实现]`
 - **AND** the boundary MUST state that lifecycle, audit, and acceptance gates still remain before `[已实现]`.
+
+#### Scenario: Read-only dialog lifecycle evidence remains partial
+
+- **WHEN** D-07 or D-08 evidence includes PingAn desktop lifecycle gate status from readonly dialog readiness
+- **THEN** the node MUST remain `[部分实现]`
+- **AND** the boundary MUST state that exception popup handling, retry policy, audit evidence, and acceptance evidence still remain before `[已实现]`.
 
 ### Requirement: PingAn preflight SHALL expose provider and safety promotion gate status
 

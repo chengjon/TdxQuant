@@ -79,6 +79,7 @@ def _summarize_trade_health_checks(checks: list[dict[str, Any]]) -> tuple[str, b
 
 
 PINGAN_PROMOTION_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_promotion_gate_status.v1"
+PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1"
 
 
 def _build_pingan_promotion_gate_status(
@@ -165,6 +166,75 @@ def _build_max_price_guard_status(*, risk_gate: dict[str, Any], max_price: float
         "requested_price": requested_price,
         "passed": passed,
     }
+
+
+def _build_pingan_desktop_lifecycle_gate_status(
+    *,
+    checks: list[dict[str, Any]],
+    dialog: str,
+    require_visible: bool,
+    dialog_lookup_mode: str,
+    confirm_timeout: float,
+    result_timeout: float,
+    title_keyword: str,
+    exe_path: str | None,
+) -> dict[str, Any]:
+    dialog_checks = _extract_dialog_lifecycle_checks(checks)
+    return {
+        "schema_version": PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA,
+        "status": "partial",
+        "evidence_scope": "readonly_dialog_readiness",
+        "execution_mode": "readonly_dialog_readiness",
+        "side_effect_level": "none",
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "requested": {
+            "dialog": dialog,
+            "require_visible": require_visible,
+        },
+        "dialog_lookup_mode": dialog_lookup_mode,
+        "timeouts": {
+            "confirm_timeout": confirm_timeout,
+            "result_timeout": result_timeout,
+        },
+        "dialog_checks": dialog_checks,
+        "declared_process_window_ownership": {
+            "status": "declared",
+            "title_keyword": title_keyword,
+            "exe_path": exe_path,
+            "boundary": "Dialog readiness records configured ownership inputs only; it does not manage the desktop process lifecycle.",
+        },
+        "covered_lifecycle_gates": [
+            name
+            for name in ("confirm_lookup", "result_dialog_lookup", "result_confirm_lookup")
+            if name in dialog_checks
+        ],
+        "remaining_lifecycle_gates": [
+            "exception_popup_handling",
+            "retry_policy",
+            "process_window_lifecycle_ownership",
+            "audit_evidence",
+            "acceptance_evidence",
+        ],
+        "boundary": (
+            "Partial desktop lifecycle evidence only. Dialog readiness performs passive lookup checks and does not "
+            "submit orders, close dialogs, write artifacts, or prove exception/retry/live acceptance coverage."
+        ),
+    }
+
+
+def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    dialog_checks: dict[str, dict[str, Any]] = {}
+    for check in checks:
+        name = check.get("name")
+        if name not in {"confirm_lookup", "result_dialog_lookup", "result_confirm_lookup"}:
+            continue
+        dialog_checks[str(name)] = {
+            "status": check.get("status"),
+            "summary": check.get("summary"),
+            "detail": check.get("detail"),
+        }
+    return dialog_checks
 
 
 def _serialize_dialog_lookup_target(target: dict[str, Any]) -> dict[str, Any]:
@@ -1094,6 +1164,16 @@ class _PingAnTradeProxy:
                 message = "stable trade dialog readiness check completed with warnings"
             else:
                 message = "stable trade dialog readiness check found failures"
+            lifecycle_gate_status = _build_pingan_desktop_lifecycle_gate_status(
+                checks=checks,
+                dialog=dialog,
+                require_visible=require_visible,
+                dialog_lookup_mode=resolved_lookup_mode,
+                confirm_timeout=resolved_confirm_timeout,
+                result_timeout=resolved_result_timeout,
+                title_keyword=self._manager.title_keyword,
+                exe_path=self._manager.exe_path,
+            )
             return Result(
                 ok=ok,
                 code=ErrorCode.OK if ok else ErrorCode.CONTROL_NOT_FOUND,
@@ -1112,7 +1192,8 @@ class _PingAnTradeProxy:
                         "artifact_targets": {
                             **self._manager._artifact_targets(),
                         },
-                    }
+                    },
+                    "desktop_lifecycle_gate_status": lifecycle_gate_status,
                 },
                 warnings=warnings,
                 next_action=next_action,
