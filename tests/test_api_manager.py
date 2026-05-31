@@ -6158,6 +6158,29 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["result_dialog"]["title"], "提示")
         self.assertEqual(result.data["task"]["name"], "trade_confirm_current")
 
+    def test_task_trade_confirm_current_forwards_lifecycle_owner_lock_guard(self) -> None:
+        trade_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="confirmed",
+            data={"confirm_current": {"overall_status": "ok", "confirmation_advanced": True}},
+        )
+        manager = TdxTaskManager(profile="trade_confirm_current", strategy_path="strategy.py")
+        with patch.object(type(manager.trade_manager.pingan), "confirm_current", return_value=trade_result) as mocked_confirm:
+            result = manager.trade_confirm_current(
+                lifecycle_statefile_path="/tmp/pingan-owner.json",
+                lifecycle_owner_token="task-confirm-owner",
+                lifecycle_stale_after_seconds=45.0,
+                require_lifecycle_owner_lock=True,
+            )
+
+        self.assertTrue(result.ok)
+        call = mocked_confirm.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "task-confirm-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 45.0)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
+
     def test_task_guarded_trade_buy_runs_prechecks_and_writes_report(self) -> None:
         snapshot_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"Now": 10.2}]})
         block_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"stocks": [{"code": "000001"}]})

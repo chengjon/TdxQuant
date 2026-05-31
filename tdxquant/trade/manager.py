@@ -2424,6 +2424,10 @@ class _PingAnTradeProxy:
         result_timeout: float | None = None,
         close_result_dialog: bool = True,
         result_close_pre_delay: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         resolved_lookup_mode = str(dialog_lookup_mode or effective_profile["dialog_lookup_mode"])
@@ -2452,6 +2456,81 @@ class _PingAnTradeProxy:
             "max_price": None,
             "rejection_reason": None,
         }
+        boundary_risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            boundary_risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
+        if not boundary_risk_gate["passed"]:
+            owner_lock_status = boundary_risk_gate.get("lifecycle_owner_lock_required_status", {})
+            result = Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="stable trade confirm-current rejected by lifecycle owner-lock requirement",
+                data={
+                    "input": {
+                        "boundary": "confirm_current",
+                        "close_result_dialog": close_result_dialog,
+                        "dialog_lookup_mode": resolved_lookup_mode,
+                        "confirm_timeout": resolved_confirm_timeout,
+                        "result_timeout": resolved_result_timeout,
+                        "lifecycle_statefile_path": lifecycle_statefile_path,
+                        "lifecycle_owner_token": lifecycle_owner_token,
+                        "lifecycle_stale_after_seconds": lifecycle_stale_after_seconds,
+                        "require_lifecycle_owner_lock": require_lifecycle_owner_lock,
+                    },
+                    "confirm_current": {
+                        "overall_status": "failed",
+                        "confirmation_advanced": False,
+                        "result_dialog_closed": False,
+                        "requested": {
+                            "close_result_dialog": close_result_dialog,
+                            "dialog_lookup_mode": resolved_lookup_mode,
+                            "confirm_timeout": resolved_confirm_timeout,
+                            "result_timeout": resolved_result_timeout,
+                            "result_close_pre_delay": resolved_result_close_pre_delay,
+                        },
+                        "checks": [
+                            _build_trade_health_check(
+                                "lifecycle_owner_lock_required",
+                                "failed",
+                                str(
+                                    owner_lock_status.get("requirement_reason")
+                                    or "lifecycle owner lock requirement failed"
+                                ),
+                                detail=owner_lock_status,
+                                critical=True,
+                                recommended_action=(
+                                    "Acquire the PingAn lifecycle owner lock with the expected owner token before "
+                                    "running confirm-current."
+                                ),
+                            )
+                        ],
+                    },
+                    "result_dialog": {},
+                },
+                next_action="Acquire the PingAn lifecycle owner lock and retry confirm-current.",
+            )
+            attach_trade_metadata(
+                result,
+                profile_name=self._manager.profile_name,
+                profile_options=effective_profile,
+                broker="pingan",
+                method="confirm_current",
+                title_keyword=self._manager.title_keyword,
+                exe_path=self._manager.exe_path,
+                timing={},
+            )
+            attach_trade_safety_metadata(
+                result,
+                submission_key=None,
+                risk_gate=boundary_risk_gate,
+                idempotency={"decision": "not_applicable", "fingerprint": None, "ledger_consulted": False},
+                side_effect_level="none",
+            )
+            return result
 
         def run() -> Result:
             checks: list[dict[str, Any]] = []

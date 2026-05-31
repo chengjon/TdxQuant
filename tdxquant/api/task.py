@@ -3806,8 +3806,18 @@ class TdxTaskManager:
         result_timeout: float | None = None,
         close_result_dialog: bool = True,
         result_close_pre_delay: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         def run() -> Result:
+            lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
             kwargs: dict[str, Any] = {
                 "dialog_lookup_mode": dialog_lookup_mode,
                 "confirm_timeout": confirm_timeout,
@@ -3816,21 +3826,24 @@ class TdxTaskManager:
             }
             if result_close_pre_delay is not None:
                 kwargs["result_close_pre_delay"] = result_close_pre_delay
+            kwargs.update(lifecycle_guard_kwargs)
             trade_result = self.trade_manager.pingan.confirm_current(**kwargs)
             if not trade_result.ok:
                 return trade_result
+            input_payload = {
+                "dialog_lookup_mode": dialog_lookup_mode,
+                "confirm_timeout": confirm_timeout,
+                "result_timeout": result_timeout,
+                "close_result_dialog": close_result_dialog,
+                "result_close_pre_delay": result_close_pre_delay,
+            }
+            input_payload.update(lifecycle_guard_kwargs)
             return Result(
                 ok=True,
                 code=ErrorCode.OK,
                 message="completed trade confirm-current task",
                 data={
-                    "input": {
-                        "dialog_lookup_mode": dialog_lookup_mode,
-                        "confirm_timeout": confirm_timeout,
-                        "result_timeout": result_timeout,
-                        "close_result_dialog": close_result_dialog,
-                        "result_close_pre_delay": result_close_pre_delay,
-                    },
+                    "input": input_payload,
                     "trade_result": trade_result.to_dict(),
                     "artifacts": copy.deepcopy(trade_result.data.get("artifacts", {})),
                     "result_dialog": copy.deepcopy(trade_result.data.get("result_dialog", {})),

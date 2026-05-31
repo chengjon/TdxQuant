@@ -447,6 +447,7 @@ The task layer SHALL delegate owner-lock execution guard enforcement to the Ping
 - **THEN** the task layer MUST NOT acquire or release owner locks
 - **AND** it MUST NOT write lifecycle statefile/lock artifacts directly
 - **AND** it MUST NOT start, stop, restart, kill, supervise, or back off PingAn processes.
+
 ### Requirement: Task preset execution SHALL preserve lifecycle owner-lock guard options for trade tasks
 
 Task preset execution SHALL preserve preset-provided lifecycle owner-lock guard options and expose them to the resolved task trade command namespace.
@@ -492,3 +493,15 @@ Guarded trade-buy owner-lock forwarding SHALL remain argument forwarding to the 
 - **THEN** it MUST NOT acquire or release owner locks
 - **AND** it MUST NOT write lifecycle statefile/lock artifacts directly
 - **AND** it MUST NOT start, stop, restart, kill, supervise, or back off PingAn processes.
+
+### Requirement: Task confirm-current SHALL forward lifecycle owner-lock guard options
+`TdxTaskManager.trade_confirm_current(...)` SHALL accept optional lifecycle owner-lock guard options and forward them to `TdxTradeManager.pingan.confirm_current(...)`.
+
+#### Scenario: Task confirm-current forwards owner-lock guard options
+- **WHEN** a caller executes `TdxTaskManager.trade_confirm_current(...)` with lifecycle statefile path, owner token, stale timeout, and `require_lifecycle_owner_lock=true`
+- **THEN** the task MUST pass those values to `TdxTradeManager.pingan.confirm_current(...)`
+- **AND** the task MUST NOT perform lifecycle owner-lock acquire/release or write statefile/lock artifacts itself.
+
+#### Scenario: Task confirm-current default dispatch remains unchanged
+- **WHEN** a caller executes `TdxTaskManager.trade_confirm_current(...)` without lifecycle owner-lock guard options
+- **THEN** the task MUST keep the existing confirm-current manager call shape.

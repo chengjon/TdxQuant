@@ -1546,6 +1546,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
     task_trade_confirm_current_parser = task_subparsers.add_parser("trade-confirm-current")
     _add_task_trade_confirm_current_arguments(task_trade_confirm_current_parser)
+    _add_trade_lifecycle_owner_guard_arguments(task_trade_confirm_current_parser)
     _add_task_common_arguments(task_trade_confirm_current_parser)
 
     task_guarded_trade_buy_parser = task_subparsers.add_parser("guarded-trade-buy")
@@ -1656,6 +1657,7 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
 
     trade_confirm_current_parser = trade_subparsers.add_parser("confirm-current")
     _add_trade_confirm_current_arguments(trade_confirm_current_parser)
+    _add_trade_lifecycle_owner_guard_arguments(trade_confirm_current_parser)
     trade_confirm_current_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_dialog_readiness_parser = trade_subparsers.add_parser("dialog-readiness")
@@ -2632,6 +2634,7 @@ def _run_trade_confirm_current(args: argparse.Namespace) -> Result:
     }
     if args.result_close_pre_delay is not None:
         kwargs["result_close_pre_delay"] = args.result_close_pre_delay
+    kwargs.update(_get_lifecycle_owner_guard_kwargs(args))
     return trade_manager.pingan.confirm_current(**kwargs)
 
 
@@ -6031,6 +6034,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             result_timeout=args.result_timeout,
             close_result_dialog=args.close_result_dialog,
             result_close_pre_delay=args.result_close_pre_delay,
+            **_get_lifecycle_owner_guard_kwargs(args),
         )
     if args.task_command == "guarded-trade-buy":
         return manager.guarded_trade_buy(
