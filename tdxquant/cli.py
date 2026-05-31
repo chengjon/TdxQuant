@@ -1550,6 +1550,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
     task_guarded_trade_buy_parser = task_subparsers.add_parser("guarded-trade-buy")
     _add_trade_common_arguments(task_guarded_trade_buy_parser)
+    _add_trade_lifecycle_owner_guard_arguments(task_guarded_trade_buy_parser)
     task_guarded_trade_buy_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_guarded_trade_buy_parser.add_argument("--refresh-market")
     task_guarded_trade_buy_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -6061,6 +6062,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             formula_dividend_type=args.formula_dividend_type,
             json_output_path=args.json_output_path,
             csv_output_path=args.csv_output_path,
+            **_get_lifecycle_owner_guard_kwargs(args),
         )
     return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported task subcommand: {args.task_command}")
 

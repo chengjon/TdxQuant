@@ -6223,6 +6223,33 @@ class TdxTaskManagerTests(unittest.TestCase):
             self.assertEqual(result.data["task"]["name"], "guarded_trade_buy")
             self.assertEqual(result.data["result_dialog"]["contract_no"], "B202604260005")
 
+    def test_task_guarded_trade_buy_forwards_lifecycle_owner_lock_guard(self) -> None:
+        trade_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"artifacts": {}, "result_dialog": {}})
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTaskManager(
+                profile="guarded_trade_buy",
+                strategy_path="strategy.py",
+                profile_overrides={"export_dir": temp_dir, "export_stem": "guarded-owner-lock"},
+            )
+            with patch.object(type(manager), "trade_buy", return_value=trade_result) as mocked_trade_buy:
+                result = manager.guarded_trade_buy(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    lifecycle_statefile_path="/tmp/pingan-owner.json",
+                    lifecycle_owner_token="guarded-owner",
+                    lifecycle_stale_after_seconds=42.5,
+                    require_lifecycle_owner_lock=True,
+                )
+
+        self.assertTrue(result.ok)
+        call = mocked_trade_buy.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "guarded-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
+
     def test_task_guarded_trade_buy_blocks_when_snapshot_price_is_too_high(self) -> None:
         snapshot_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"Now": 10.8}]})
         manager = TdxTaskManager(profile="guarded_trade_buy", strategy_path="strategy.py")

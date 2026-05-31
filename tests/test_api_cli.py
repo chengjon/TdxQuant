@@ -2054,6 +2054,13 @@ class ApiCliParserTests(unittest.TestCase):
                 "guarded-task-001",
                 "--max-price",
                 "10.40",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "guarded-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
             ]
         )
         self.assertEqual(args.command, "task")
@@ -2062,6 +2069,10 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.submission_key, "guarded-task-001")
         self.assertEqual(args.max_price, 10.40)
         self.assertEqual(args.formula_return_count, 1)
+        self.assertEqual(args.lifecycle_statefile_path, "/tmp/pingan-owner.json")
+        self.assertEqual(args.lifecycle_owner_token, "guarded-owner")
+        self.assertEqual(args.lifecycle_stale_after_seconds, 42.5)
+        self.assertTrue(args.require_lifecycle_owner_lock)
 
     def test_task_presets_command_parses(self) -> None:
         parser = build_parser()
@@ -10844,6 +10855,42 @@ class TaskCliDispatchTests(unittest.TestCase):
             json_output_path=None,
             csv_output_path=None,
         )
+
+    def test_handle_task_guarded_trade_buy_forwards_lifecycle_owner_lock_guard(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "guarded-trade-buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "guarded-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.guarded_trade_buy.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+
+        self.assertIs(result, expected)
+        call = manager.guarded_trade_buy.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "guarded-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
 
 
 class TradeCliDispatchTests(unittest.TestCase):

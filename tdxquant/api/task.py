@@ -3873,8 +3873,18 @@ class TdxTaskManager:
         formula_dividend_type: int = 0,
         json_output_path: str | None = None,
         csv_output_path: str | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         def run() -> Result:
+            lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
             snapshot_result: Result | None = None
             snapshot_now: float | None = None
             if max_snapshot_price is not None:
@@ -3995,6 +4005,7 @@ class TdxTaskManager:
                 refresh_before_trade=refresh_before_trade,
                 refresh_market=refresh_market,
                 refresh_force=refresh_force,
+                **lifecycle_guard_kwargs,
             )
             if not trade_result.ok:
                 return trade_result
@@ -4034,6 +4045,7 @@ class TdxTaskManager:
                         "formula_end_time": formula_end_time,
                         "formula_count": formula_count,
                         "formula_dividend_type": formula_dividend_type,
+                        **lifecycle_guard_kwargs,
                     },
                     "prechecks": {
                         "snapshot_result": snapshot_result.to_dict() if snapshot_result is not None else None,
