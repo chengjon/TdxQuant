@@ -591,6 +591,23 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
+    def test_pingan_promotion_readiness_artifact_output_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-promotion-readiness-artifact-output", combined)
+                self.assertIn("json_output_path", combined)
+                self.assertIn("promotion_readiness_rollup_artifact", combined)
+                self.assertIn("readonly artifact write", combined)
+                self.assertIn("不刷新 source evidence", combined)
+                self.assertIn("不执行 broker/desktop/trade/report/catalog workflow", combined)
+                self.assertIn("不证明 production readiness", combined)
+                self.assertIn("不证明 implemented status", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"

@@ -4229,6 +4229,72 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertFalse(rollup["order_submitted"])
         self.assertFalse(rollup["control_dispatch_executed"])
 
+    def test_task_pingan_promotion_readiness_rollup_writes_json_artifact(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            artifact_path = root / "artifacts" / "promotion-readiness.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {
+                        "promotion_gate_status": {
+                            "provider_broker_ownership": {"status": "ready"},
+                            "safety_gates": {"status": "ready"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(
+                    {
+                        "desktop_lifecycle_gate_status": {
+                            "status": "complete",
+                            "remaining_lifecycle_gates": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "acceptance_outcome_coverage_status": {
+                            "automated_outcome_coverage_complete": True,
+                            "live_manual_acceptance_complete": True,
+                            "acceptance_complete": True,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(
+                preflight_path=str(preflight_path),
+                dialog_readiness_path=str(dialog_path),
+                acceptance_coverage_path=str(acceptance_path),
+                json_output_path=str(artifact_path),
+            )
+
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result.ok)
+        artifact_meta = result.data["promotion_readiness_rollup_artifact"]
+        self.assertTrue(artifact_meta["written"])
+        self.assertEqual(artifact_meta["json_output_path"], str(artifact_path))
+        self.assertEqual(artifact_meta["schema"], "tdx.desktop_trade.pingan_promotion_readiness_rollup_artifact.v1")
+        self.assertEqual(
+            artifact["promotion_readiness_rollup"]["schema"],
+            "tdx.desktop_trade.pingan_promotion_readiness_rollup.v1",
+        )
+        self.assertEqual(artifact["promotion_readiness_rollup"]["status"], "complete")
+        self.assertEqual(artifact["task"]["name"], "pingan_promotion_readiness_rollup")
+        self.assertIn("task_call", artifact["timing"])
+        self.assertFalse(artifact["promotion_readiness_rollup"]["order_submitted"])
+        self.assertFalse(artifact["promotion_readiness_rollup"]["control_dispatch_executed"])
+
     def test_task_block_sync_attaches_task_metadata_and_forwards_symbols(self) -> None:
         expected = Result(
             ok=True,

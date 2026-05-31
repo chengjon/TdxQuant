@@ -1026,6 +1026,9 @@ def _build_pingan_acceptance_outcome_coverage_status(
 
 
 _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA = "tdx.desktop_trade.pingan_promotion_readiness_rollup.v1"
+_PINGAN_PROMOTION_READINESS_ROLLUP_ARTIFACT_SCHEMA = (
+    "tdx.desktop_trade.pingan_promotion_readiness_rollup_artifact.v1"
+)
 _PINGAN_PROMOTION_READINESS_GATE_ORDER = (
     "provider_broker_ownership",
     "safety_gates",
@@ -1786,6 +1789,7 @@ class TdxTaskManager:
         dialog_readiness_path: str | None = None,
         acceptance_coverage_path: str | None = None,
         max_evidence_age_seconds: float | None = None,
+        json_output_path: str | None = None,
     ) -> Result:
         def run() -> Result:
             return Result(
@@ -1803,7 +1807,40 @@ class TdxTaskManager:
             )
 
         result, timing = _capture_task_timing("task.pingan_promotion_readiness_rollup", run)
-        return self._attach_task_metadata(result, task_name="pingan_promotion_readiness_rollup", timing=timing)
+        result = self._attach_task_metadata(result, task_name="pingan_promotion_readiness_rollup", timing=timing)
+        if json_output_path is None:
+            return result
+
+        artifact_meta = {
+            "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_ARTIFACT_SCHEMA,
+            "json_output_path": json_output_path,
+            "written": False,
+        }
+        result.data["promotion_readiness_rollup_artifact"] = artifact_meta
+        artifact_payload_meta = {**artifact_meta, "written": True}
+        artifact_payload = {
+            "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_ARTIFACT_SCHEMA,
+            "promotion_readiness_rollup": result.data["promotion_readiness_rollup"],
+            "promotion_readiness_rollup_artifact": artifact_payload_meta,
+            "task": result.data["task"],
+            "task_profile": result.data["task_profile"],
+            "timing": result.data["timing"],
+        }
+        try:
+            output_path = Path(json_output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(json.dumps(artifact_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        except OSError as exc:
+            artifact_meta["error"] = str(exc)
+            return Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message=f"failed to write promotion readiness rollup artifact: {exc}",
+                data=result.data,
+                next_action="Choose a writable JSON output path and retry.",
+            )
+        artifact_meta["written"] = True
+        return result
 
     def block_read_watchlist(
         self,

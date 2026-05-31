@@ -1847,6 +1847,8 @@ class ApiCliParserTests(unittest.TestCase):
                 "runtime/pingan/acceptance-coverage.json",
                 "--max-evidence-age-seconds",
                 "3600",
+                "--json-output-path",
+                "runtime/pingan/promotion-readiness-rollup.json",
             ]
         )
         self.assertEqual(args.command, "task")
@@ -1855,6 +1857,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.dialog_readiness_path, "runtime/pingan/dialog-readiness.json")
         self.assertEqual(args.acceptance_coverage_path, "runtime/pingan/acceptance-coverage.json")
         self.assertEqual(args.max_evidence_age_seconds, 3600)
+        self.assertEqual(args.json_output_path, "runtime/pingan/promotion-readiness-rollup.json")
 
     def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
         parser = build_parser()
@@ -10758,6 +10761,8 @@ class TaskCliDispatchTests(unittest.TestCase):
                 "runtime/pingan/acceptance-coverage.json",
                 "--max-evidence-age-seconds",
                 "3600",
+                "--json-output-path",
+                "runtime/pingan/promotion-readiness-rollup.json",
             ]
         )
         expected = Result(ok=True, code=ErrorCode.OK, message="ok")
@@ -10771,6 +10776,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             dialog_readiness_path="runtime/pingan/dialog-readiness.json",
             acceptance_coverage_path="runtime/pingan/acceptance-coverage.json",
             max_evidence_age_seconds=3600,
+            json_output_path="runtime/pingan/promotion-readiness-rollup.json",
         )
 
     def test_handle_task_trade_audit_daily_report_rejects_mixed_status_filters(self) -> None:
