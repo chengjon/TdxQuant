@@ -6124,6 +6124,33 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["trade_result"]["data"]["submit_ready"]["overall_status"], "ok")
         self.assertEqual(result.data["task"]["name"], "trade_submit_ready")
 
+    def test_task_trade_submit_ready_forwards_lifecycle_owner_lock_guard(self) -> None:
+        trade_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ready",
+            data={"submit_ready": {"overall_status": "ok", "manual_confirmation_required": True}},
+        )
+        manager = TdxTaskManager(profile="trade_submit_ready", strategy_path="strategy.py")
+        with patch.object(type(manager.trade_manager.pingan), "submit_ready", return_value=trade_result) as mocked_submit_ready:
+            result = manager.trade_submit_ready(
+                port="COM3",
+                code="000001",
+                price="10.00",
+                quantity=100,
+                lifecycle_statefile_path="/tmp/pingan-owner.json",
+                lifecycle_owner_token="task-submit-ready-owner",
+                lifecycle_stale_after_seconds=45.0,
+                require_lifecycle_owner_lock=True,
+            )
+
+        self.assertTrue(result.ok)
+        call = mocked_submit_ready.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "task-submit-ready-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 45.0)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
+
     def test_task_trade_confirm_current_uses_trade_manager_boundary_workflow(self) -> None:
         trade_result = Result(
             ok=True,

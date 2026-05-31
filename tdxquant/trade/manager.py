@@ -2270,6 +2270,10 @@ class _PingAnTradeProxy:
         max_price: float | None = None,
         dialog_lookup_mode: str | None = None,
         confirm_timeout: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         resolved_lookup_mode = str(dialog_lookup_mode or effective_profile["dialog_lookup_mode"])
@@ -2277,6 +2281,13 @@ class _PingAnTradeProxy:
             effective_profile["confirm_timeout"] if confirm_timeout is None else confirm_timeout
         )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
         if not risk_gate["passed"]:
             result = self._manager._build_trade_risk_rejection_result(
                 code=code,
@@ -2298,7 +2309,7 @@ class _PingAnTradeProxy:
                 result,
                 submission_key=None,
                 risk_gate=risk_gate,
-                side_effect_level="local_state_mutating",
+                side_effect_level="none" if risk_gate.get("lifecycle_owner_lock_required_status") else "local_state_mutating",
             )
             return result
 
@@ -2388,6 +2399,10 @@ class _PingAnTradeProxy:
                             "max_price": max_price,
                             "dialog_lookup_mode": resolved_lookup_mode,
                             "confirm_timeout": resolved_confirm_timeout,
+                            "lifecycle_statefile_path": lifecycle_statefile_path,
+                            "lifecycle_owner_token": lifecycle_owner_token,
+                            "lifecycle_stale_after_seconds": lifecycle_stale_after_seconds,
+                            "require_lifecycle_owner_lock": require_lifecycle_owner_lock,
                         },
                         "checks": checks,
                         "submit_probe": probe_result.to_dict(),

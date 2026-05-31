@@ -1542,6 +1542,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
     task_trade_submit_ready_parser = task_subparsers.add_parser("trade-submit-ready")
     _add_task_trade_submit_ready_arguments(task_trade_submit_ready_parser)
+    _add_trade_lifecycle_owner_guard_arguments(task_trade_submit_ready_parser)
     _add_task_common_arguments(task_trade_submit_ready_parser)
 
     task_trade_confirm_current_parser = task_subparsers.add_parser("trade-confirm-current")
@@ -1653,6 +1654,7 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
 
     trade_submit_ready_parser = trade_subparsers.add_parser("submit-ready")
     _add_trade_submit_ready_arguments(trade_submit_ready_parser)
+    _add_trade_lifecycle_owner_guard_arguments(trade_submit_ready_parser)
     trade_submit_ready_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_confirm_current_parser = trade_subparsers.add_parser("confirm-current")
@@ -2615,6 +2617,7 @@ def _run_trade_submit_ready(args: argparse.Namespace) -> Result:
         max_price=args.max_price,
         dialog_lookup_mode=args.dialog_lookup_mode,
         confirm_timeout=args.confirm_timeout,
+        **_get_lifecycle_owner_guard_kwargs(args),
     )
 
 
@@ -6026,6 +6029,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_force=args.refresh_force,
             dialog_lookup_mode=args.dialog_lookup_mode,
             confirm_timeout=args.confirm_timeout,
+            **_get_lifecycle_owner_guard_kwargs(args),
         )
     if args.task_command == "trade-confirm-current":
         return manager.trade_confirm_current(

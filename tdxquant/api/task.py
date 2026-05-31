@@ -3714,8 +3714,18 @@ class TdxTaskManager:
         refresh_force: bool | None = None,
         dialog_lookup_mode: str | None = None,
         confirm_timeout: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         def run() -> Result:
+            lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
             resolved_refresh_first = bool(
                 self.profile_options.get("refresh_before_trade", False)
                 if refresh_before_trade is None
@@ -3746,6 +3756,7 @@ class TdxTaskManager:
                                 "refresh_force": resolved_refresh_force,
                                 "dialog_lookup_mode": dialog_lookup_mode,
                                 "confirm_timeout": confirm_timeout,
+                                **lifecycle_guard_kwargs,
                             },
                             "refresh_result": refresh_result.to_dict(),
                         },
@@ -3763,29 +3774,32 @@ class TdxTaskManager:
                 max_price=max_price,
                 dialog_lookup_mode=dialog_lookup_mode,
                 confirm_timeout=confirm_timeout,
+                **lifecycle_guard_kwargs,
             )
             if not trade_result.ok:
                 return trade_result
+            input_payload = {
+                "port": port,
+                "code": code,
+                "price": price,
+                "quantity": quantity,
+                "baudrate": baudrate,
+                "timeout": timeout,
+                "max_depth": max_depth,
+                "max_price": max_price,
+                "refresh_before_trade": resolved_refresh_first,
+                "refresh_market": resolved_refresh_market,
+                "refresh_force": resolved_refresh_force,
+                "dialog_lookup_mode": dialog_lookup_mode,
+                "confirm_timeout": confirm_timeout,
+            }
+            input_payload.update(lifecycle_guard_kwargs)
             return Result(
                 ok=True,
                 code=ErrorCode.OK,
                 message="completed trade submit-ready task",
                 data={
-                    "input": {
-                        "port": port,
-                        "code": code,
-                        "price": price,
-                        "quantity": quantity,
-                        "baudrate": baudrate,
-                        "timeout": timeout,
-                        "max_depth": max_depth,
-                        "max_price": max_price,
-                        "refresh_before_trade": resolved_refresh_first,
-                        "refresh_market": resolved_refresh_market,
-                        "refresh_force": resolved_refresh_force,
-                        "dialog_lookup_mode": dialog_lookup_mode,
-                        "confirm_timeout": confirm_timeout,
-                    },
+                    "input": input_payload,
                     "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
                     "trade_result": trade_result.to_dict(),
                     "artifacts": copy.deepcopy(trade_result.data.get("artifacts", {})),

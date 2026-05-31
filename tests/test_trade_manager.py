@@ -1421,6 +1421,42 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
         self.assertFalse(result.data["trade_safety"]["risk_gate"]["passed"])
 
+    def test_pingan_submit_ready_requires_owner_lock_before_ui_side_effects(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            lifecycle_lock_path = Path(f"{lifecycle_statefile_path}.lock")
+            manager = TdxTradeManager(profile="balanced")
+            with (
+                patch("tdxquant.trade.manager.run_pingan_hid_submit_probe") as mocked_probe,
+                patch("tdxquant.trade.manager._find_confirm_target_for_lookup") as mocked_lookup,
+            ):
+                result = manager.pingan.submit_ready(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    lifecycle_statefile_path=str(lifecycle_statefile_path),
+                    lifecycle_owner_token="submit-ready-owner",
+                    lifecycle_stale_after_seconds=60.0,
+                    require_lifecycle_owner_lock=True,
+                )
+
+        mocked_probe.assert_not_called()
+        mocked_lookup.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        risk_gate = result.data["trade_safety"]["risk_gate"]
+        self.assertFalse(risk_gate["passed"])
+        owner_lock_status = risk_gate["lifecycle_owner_lock_required_status"]
+        self.assertTrue(owner_lock_status["required"])
+        self.assertEqual(owner_lock_status["requirement_status"], "failed")
+        self.assertEqual(owner_lock_status["status"], "not_acquired")
+        self.assertFalse(owner_lock_status["statefile_write_executed"])
+        self.assertFalse(owner_lock_status["lock_file_write_executed"])
+        self.assertFalse(owner_lock_status["control_dispatch_executed"])
+        self.assertFalse(lifecycle_statefile_path.exists())
+        self.assertFalse(lifecycle_lock_path.exists())
+
     def test_pingan_confirm_current_advances_confirmation_and_writes_artifacts(self) -> None:
         confirm_target = {
             "ok": True,
