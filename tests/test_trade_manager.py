@@ -920,6 +920,125 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(ledger_path.exists())
         self.assertFalse(audit_dir.exists())
 
+    def test_pingan_lifecycle_owner_lock_acquires_statefile_without_desktop_control(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            statefile_path = Path(temp_dir) / "lifecycle" / "pingan-owner.json"
+            lock_path = Path(str(statefile_path) + ".lock")
+            manager = TdxTradeManager(profile="balanced")
+
+            result = manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(statefile_path),
+                owner_token="owner-a",
+                stale_after_seconds=60.0,
+            )
+
+            self.assertTrue(result.ok)
+            owner_lock = result.data["lifecycle_owner_lock"]
+            self.assertEqual(owner_lock["status"], "owned")
+            self.assertEqual(owner_lock["action"], "acquire")
+            self.assertEqual(owner_lock["execution_mode"], "explicit_operator_lifecycle_owner_lock")
+            self.assertEqual(owner_lock["statefile_path"], str(statefile_path))
+            self.assertEqual(owner_lock["lock_path"], str(lock_path))
+            self.assertEqual(owner_lock["owner_token"], "owner-a")
+            self.assertTrue(owner_lock["lock_acquired"])
+            self.assertTrue(owner_lock["statefile_write_executed"])
+            self.assertTrue(owner_lock["lock_file_write_executed"])
+            self.assertFalse(owner_lock["event_log_write_executed"])
+            self.assertFalse(owner_lock["submission_ledger_write_executed"])
+            self.assertFalse(owner_lock["trade_audit_write_executed"])
+            self.assertFalse(owner_lock["order_submitted"])
+            self.assertFalse(owner_lock["control_dispatch_executed"])
+            self.assertFalse(owner_lock["start_executed"])
+            self.assertFalse(owner_lock["stop_executed"])
+            self.assertFalse(owner_lock["restart_executed"])
+            self.assertFalse(owner_lock["supervisor_owned"])
+            self.assertFalse(owner_lock["backoff_executed"])
+            self.assertFalse(owner_lock["process_kill_executed"])
+            self.assertFalse(owner_lock["pid_ownership_claimed"])
+            self.assertEqual(owner_lock["side_effect_level"], "local_lifecycle_statefile")
+            self.assertTrue(statefile_path.exists())
+            self.assertTrue(lock_path.exists())
+
+            state_payload = json.loads(statefile_path.read_text(encoding="utf-8"))
+            self.assertEqual(state_payload["schema_version"], "tdx.desktop_trade.pingan_lifecycle_owner_state.v1")
+            self.assertEqual(state_payload["status"], "owned")
+            self.assertEqual(state_payload["owner_token"], "owner-a")
+            self.assertEqual(state_payload["statefile_path"], str(statefile_path))
+            self.assertEqual(state_payload["lock_path"], str(lock_path))
+
+    def test_pingan_lifecycle_owner_lock_releases_owned_statefile(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            statefile_path = Path(temp_dir) / "pingan-owner.json"
+            lock_path = Path(str(statefile_path) + ".lock")
+            manager = TdxTradeManager(profile="balanced")
+            manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(statefile_path),
+                owner_token="owner-a",
+                stale_after_seconds=60.0,
+            )
+
+            result = manager.pingan.lifecycle_owner_lock(
+                action="release",
+                statefile_path=str(statefile_path),
+                owner_token="owner-a",
+                stale_after_seconds=60.0,
+            )
+
+            self.assertTrue(result.ok)
+            owner_lock = result.data["lifecycle_owner_lock"]
+            self.assertEqual(owner_lock["status"], "released")
+            self.assertEqual(owner_lock["action"], "release")
+            self.assertTrue(owner_lock["lock_released"])
+            self.assertTrue(owner_lock["statefile_write_executed"])
+            self.assertFalse(owner_lock["lock_acquired"])
+            self.assertFalse(owner_lock["control_dispatch_executed"])
+            self.assertFalse(owner_lock["restart_executed"])
+            self.assertFalse(lock_path.exists())
+            state_payload = json.loads(statefile_path.read_text(encoding="utf-8"))
+            self.assertEqual(state_payload["status"], "released")
+            self.assertEqual(state_payload["owner_token"], "owner-a")
+
+    def test_pingan_lifecycle_owner_lock_status_reports_stale_without_writing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            statefile_path = Path(temp_dir) / "pingan-owner.json"
+            lock_path = Path(str(statefile_path) + ".lock")
+            statefile_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "tdx.desktop_trade.pingan_lifecycle_owner_state.v1",
+                        "status": "owned",
+                        "owner_token": "owner-a",
+                        "updated_at": "2000-01-01T00:00:00+00:00",
+                        "statefile_path": str(statefile_path),
+                        "lock_path": str(lock_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            lock_path.write_text("owner-a", encoding="utf-8")
+            before_payload = statefile_path.read_text(encoding="utf-8")
+
+            manager = TdxTradeManager(profile="balanced")
+            result = manager.pingan.lifecycle_owner_lock(
+                action="status",
+                statefile_path=str(statefile_path),
+                owner_token="owner-b",
+                stale_after_seconds=1.0,
+            )
+
+            self.assertTrue(result.ok)
+            owner_lock = result.data["lifecycle_owner_lock"]
+            self.assertEqual(owner_lock["status"], "stale")
+            self.assertEqual(owner_lock["action"], "status")
+            self.assertTrue(owner_lock["stale_detected"])
+            self.assertEqual(owner_lock["current_owner_token"], "owner-a")
+            self.assertFalse(owner_lock["statefile_write_executed"])
+            self.assertFalse(owner_lock["lock_file_write_executed"])
+            self.assertFalse(owner_lock["lock_released"])
+            self.assertEqual(statefile_path.read_text(encoding="utf-8"), before_payload)
+
     def test_pingan_submit_ready_reaches_confirm_boundary_without_writing_live_artifacts(self) -> None:
         probe_result = Result(
             ok=True,

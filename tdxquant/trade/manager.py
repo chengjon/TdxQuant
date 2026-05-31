@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +84,8 @@ def _summarize_trade_health_checks(checks: list[dict[str, Any]]) -> tuple[str, b
 PINGAN_PROMOTION_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_promotion_gate_status.v1"
 PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1"
 PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_trade_audit_gate_status.v1"
+PINGAN_LIFECYCLE_OWNER_LOCK_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_lock.v1"
+PINGAN_LIFECYCLE_OWNER_STATE_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_state.v1"
 PINGAN_REQUIRED_AUDIT_GATE_STATUSES = ("confirmed", "rejected", "failed", "exception")
 PINGAN_EXCEPTION_POPUP_KEYWORDS = (
     "异常",
@@ -302,6 +307,318 @@ def _extract_dialog_lifecycle_checks(checks: list[dict[str, Any]]) -> dict[str, 
             "detail": check.get("detail"),
         }
     return dialog_checks
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _format_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat()
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _read_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _write_json_object(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f"{path.name}.tmp")
+    temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temp_path.replace(path)
+
+
+def _resolve_pingan_lifecycle_owner_lock_status(
+    *,
+    statefile_path: Path,
+    lock_path: Path,
+    state_payload: dict[str, Any] | None,
+    now: datetime,
+    stale_after_seconds: float,
+) -> tuple[str, bool, str | None]:
+    current_owner = None
+    updated_at = None
+    current_status = None
+    if state_payload:
+        current_owner = state_payload.get("owner_token")
+        current_status = str(state_payload.get("status") or "")
+        updated_at = _parse_timestamp(state_payload.get("updated_at") or state_payload.get("acquired_at"))
+    if updated_at is None and lock_path.exists():
+        try:
+            updated_at = datetime.fromtimestamp(lock_path.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            updated_at = None
+    stale_detected = False
+    if updated_at is not None and stale_after_seconds >= 0:
+        stale_detected = (now - updated_at).total_seconds() > stale_after_seconds
+    if stale_detected and (lock_path.exists() or current_status == "owned"):
+        return "stale", True, None if current_owner is None else str(current_owner)
+    if lock_path.exists() or current_status == "owned":
+        return "owned", False, None if current_owner is None else str(current_owner)
+    if current_status == "released":
+        return "released", False, None if current_owner is None else str(current_owner)
+    if statefile_path.exists():
+        return "unknown", False, None if current_owner is None else str(current_owner)
+    return "not_acquired", False, None if current_owner is None else str(current_owner)
+
+
+def _build_pingan_lifecycle_owner_lock_payload(
+    *,
+    action: str,
+    status: str,
+    statefile_path: Path,
+    lock_path: Path,
+    owner_token: str,
+    current_owner_token: str | None,
+    stale_after_seconds: float,
+    stale_detected: bool,
+    statefile_write_executed: bool = False,
+    lock_file_write_executed: bool = False,
+    lock_acquired: bool = False,
+    lock_released: bool = False,
+    lock_file_removed: bool = False,
+    stale_replaced: bool = False,
+) -> dict[str, Any]:
+    return {
+        "schema_version": PINGAN_LIFECYCLE_OWNER_LOCK_SCHEMA,
+        "action": action,
+        "status": status,
+        "execution_mode": "explicit_operator_lifecycle_owner_lock",
+        "statefile_path": str(statefile_path),
+        "lock_path": str(lock_path),
+        "owner_token": owner_token,
+        "current_owner_token": current_owner_token,
+        "stale_after_seconds": stale_after_seconds,
+        "stale_detected": stale_detected,
+        "stale_replaced": stale_replaced,
+        "statefile_present": statefile_path.exists(),
+        "lock_file_present": lock_path.exists(),
+        "lock_acquired": lock_acquired,
+        "lock_released": lock_released,
+        "lock_file_write_executed": lock_file_write_executed,
+        "lock_file_removed": lock_file_removed,
+        "statefile_write_executed": statefile_write_executed,
+        "event_log_write_executed": False,
+        "submission_ledger_write_executed": False,
+        "trade_audit_write_executed": False,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "start_executed": False,
+        "stop_executed": False,
+        "restart_executed": False,
+        "supervisor_owned": False,
+        "backoff_executed": False,
+        "process_kill_executed": False,
+        "pid_ownership_claimed": False,
+        "side_effect_level": "local_lifecycle_statefile" if statefile_write_executed or lock_file_write_executed or lock_file_removed else "none",
+        "boundary": (
+            "Local lifecycle owner lock statefile only; this operation does not start, stop, restart, "
+            "kill, supervise, back off, claim desktop PID ownership, submit orders, or write trade artifacts."
+        ),
+    }
+
+
+def _build_pingan_lifecycle_owner_state_payload(
+    *,
+    status: str,
+    statefile_path: Path,
+    lock_path: Path,
+    owner_token: str,
+    now: datetime,
+) -> dict[str, Any]:
+    return {
+        "schema_version": PINGAN_LIFECYCLE_OWNER_STATE_SCHEMA,
+        "status": status,
+        "broker": "pingan",
+        "manager_method": "lifecycle_owner_lock",
+        "owner_token": owner_token,
+        "owner_pid": os.getpid(),
+        "statefile_path": str(statefile_path),
+        "lock_path": str(lock_path),
+        "updated_at": _format_timestamp(now),
+        "acquired_at": _format_timestamp(now) if status == "owned" else None,
+        "released_at": _format_timestamp(now) if status == "released" else None,
+    }
+
+
+def _run_pingan_lifecycle_owner_lock(
+    *,
+    action: str,
+    statefile_path: str,
+    owner_token: str,
+    stale_after_seconds: float = 300.0,
+    force_stale: bool = False,
+) -> Result:
+    normalized_action = str(action or "").strip().lower()
+    if normalized_action not in {"status", "acquire", "release"}:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported lifecycle owner lock action: {action}")
+    normalized_owner_token = str(owner_token or "").strip()
+    if not normalized_owner_token:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="owner_token is required for PingAn lifecycle owner lock")
+    if not statefile_path:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="statefile_path is required for PingAn lifecycle owner lock")
+
+    resolved_statefile_path = Path(statefile_path)
+    resolved_lock_path = Path(f"{resolved_statefile_path}.lock")
+    now = _utc_now()
+    state_payload = _read_json_object(resolved_statefile_path)
+    current_status, stale_detected, current_owner = _resolve_pingan_lifecycle_owner_lock_status(
+        statefile_path=resolved_statefile_path,
+        lock_path=resolved_lock_path,
+        state_payload=state_payload,
+        now=now,
+        stale_after_seconds=float(stale_after_seconds),
+    )
+
+    if normalized_action == "status":
+        payload = _build_pingan_lifecycle_owner_lock_payload(
+            action=normalized_action,
+            status=current_status,
+            statefile_path=resolved_statefile_path,
+            lock_path=resolved_lock_path,
+            owner_token=normalized_owner_token,
+            current_owner_token=current_owner,
+            stale_after_seconds=float(stale_after_seconds),
+            stale_detected=stale_detected,
+        )
+        return Result(ok=True, code=ErrorCode.OK, message="completed PingAn lifecycle owner lock status check", data={"lifecycle_owner_lock": payload})
+
+    if normalized_action == "acquire":
+        if current_status == "owned" and current_owner != normalized_owner_token:
+            payload = _build_pingan_lifecycle_owner_lock_payload(
+                action=normalized_action,
+                status="blocked_by_active_lock",
+                statefile_path=resolved_statefile_path,
+                lock_path=resolved_lock_path,
+                owner_token=normalized_owner_token,
+                current_owner_token=current_owner,
+                stale_after_seconds=float(stale_after_seconds),
+                stale_detected=stale_detected,
+            )
+            return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle owner lock is held by another owner", data={"lifecycle_owner_lock": payload})
+        stale_replaced = False
+        if current_status == "stale":
+            if not force_stale:
+                payload = _build_pingan_lifecycle_owner_lock_payload(
+                    action=normalized_action,
+                    status="stale_requires_force",
+                    statefile_path=resolved_statefile_path,
+                    lock_path=resolved_lock_path,
+                    owner_token=normalized_owner_token,
+                    current_owner_token=current_owner,
+                    stale_after_seconds=float(stale_after_seconds),
+                    stale_detected=True,
+                )
+                return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle owner lock is stale; pass force_stale to replace it", data={"lifecycle_owner_lock": payload})
+            try:
+                resolved_lock_path.unlink()
+            except FileNotFoundError:
+                pass
+            stale_replaced = True
+        resolved_statefile_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_payload = {
+            "schema_version": PINGAN_LIFECYCLE_OWNER_LOCK_SCHEMA,
+            "owner_token": normalized_owner_token,
+            "statefile_path": str(resolved_statefile_path),
+            "created_at": _format_timestamp(now),
+            "owner_pid": os.getpid(),
+        }
+        try:
+            with resolved_lock_path.open("x", encoding="utf-8") as handle:
+                json.dump(lock_payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+                handle.write("\n")
+        except FileExistsError:
+            payload = _build_pingan_lifecycle_owner_lock_payload(
+                action=normalized_action,
+                status="blocked_by_active_lock",
+                statefile_path=resolved_statefile_path,
+                lock_path=resolved_lock_path,
+                owner_token=normalized_owner_token,
+                current_owner_token=current_owner,
+                stale_after_seconds=float(stale_after_seconds),
+                stale_detected=stale_detected,
+            )
+            return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle owner lock file already exists", data={"lifecycle_owner_lock": payload})
+        state_payload = _build_pingan_lifecycle_owner_state_payload(
+            status="owned",
+            statefile_path=resolved_statefile_path,
+            lock_path=resolved_lock_path,
+            owner_token=normalized_owner_token,
+            now=now,
+        )
+        _write_json_object(resolved_statefile_path, state_payload)
+        payload = _build_pingan_lifecycle_owner_lock_payload(
+            action=normalized_action,
+            status="owned",
+            statefile_path=resolved_statefile_path,
+            lock_path=resolved_lock_path,
+            owner_token=normalized_owner_token,
+            current_owner_token=normalized_owner_token,
+            stale_after_seconds=float(stale_after_seconds),
+            stale_detected=stale_detected,
+            statefile_write_executed=True,
+            lock_file_write_executed=True,
+            lock_acquired=True,
+            stale_replaced=stale_replaced,
+        )
+        return Result(ok=True, code=ErrorCode.OK, message="acquired PingAn lifecycle owner lock", data={"lifecycle_owner_lock": payload})
+
+    if current_owner is not None and current_owner != normalized_owner_token:
+        payload = _build_pingan_lifecycle_owner_lock_payload(
+            action=normalized_action,
+            status="owner_token_mismatch",
+            statefile_path=resolved_statefile_path,
+            lock_path=resolved_lock_path,
+            owner_token=normalized_owner_token,
+            current_owner_token=current_owner,
+            stale_after_seconds=float(stale_after_seconds),
+            stale_detected=stale_detected,
+        )
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle owner lock release requires the recorded owner token", data={"lifecycle_owner_lock": payload})
+    lock_file_removed = False
+    try:
+        resolved_lock_path.unlink()
+        lock_file_removed = True
+    except FileNotFoundError:
+        pass
+    released_payload = _build_pingan_lifecycle_owner_state_payload(
+        status="released",
+        statefile_path=resolved_statefile_path,
+        lock_path=resolved_lock_path,
+        owner_token=normalized_owner_token,
+        now=now,
+    )
+    _write_json_object(resolved_statefile_path, released_payload)
+    payload = _build_pingan_lifecycle_owner_lock_payload(
+        action=normalized_action,
+        status="released",
+        statefile_path=resolved_statefile_path,
+        lock_path=resolved_lock_path,
+        owner_token=normalized_owner_token,
+        current_owner_token=normalized_owner_token,
+        stale_after_seconds=float(stale_after_seconds),
+        stale_detected=stale_detected,
+        statefile_write_executed=True,
+        lock_released=True,
+        lock_file_removed=lock_file_removed,
+    )
+    return Result(ok=True, code=ErrorCode.OK, message="released PingAn lifecycle owner lock", data={"lifecycle_owner_lock": payload})
 
 
 def _build_pingan_lifecycle_control_status(*, title_keyword: str, exe_path: str | None) -> dict[str, Any]:
@@ -648,6 +965,39 @@ class _PingAnTradeProxy:
             profile_options=effective_profile,
             broker="pingan",
             method="extended_broker_capabilities",
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            timing=timing,
+        )
+        return result
+
+    def lifecycle_owner_lock(
+        self,
+        *,
+        action: str,
+        statefile_path: str,
+        owner_token: str,
+        stale_after_seconds: float = 300.0,
+        force_stale: bool = False,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+
+        def run() -> Result:
+            return _run_pingan_lifecycle_owner_lock(
+                action=action,
+                statefile_path=statefile_path,
+                owner_token=owner_token,
+                stale_after_seconds=stale_after_seconds,
+                force_stale=force_stale,
+            )
+
+        result, timing = capture_trade_timing("pingan.lifecycle_owner_lock", run)
+        attach_trade_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            broker="pingan",
+            method="lifecycle_owner_lock",
             title_keyword=self._manager.title_keyword,
             exe_path=self._manager.exe_path,
             timing=timing,
