@@ -468,6 +468,16 @@ def _add_trade_lifecycle_supervisor_arguments(subparser: argparse.ArgumentParser
     subparser.add_argument("--backoff-seconds", type=float, default=30.0)
 
 
+def _add_trade_lifecycle_process_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--profile", default="balanced")
+    subparser.add_argument("--action", choices=["status", "start", "stop", "restart"], default="status")
+    subparser.add_argument("--statefile-path", required=True)
+    subparser.add_argument("--owner-token", required=True)
+    subparser.add_argument("--exe-path")
+    subparser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    subparser.add_argument("--force-restart", action=argparse.BooleanOptionalAction, default=False)
+
+
 def _add_task_trade_submit_ready_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--port", required=True)
     subparser.add_argument("--baudrate", type=int, default=115200)
@@ -1707,6 +1717,10 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     _add_trade_lifecycle_owner_lock_arguments(trade_lifecycle_owner_lock_parser)
     trade_lifecycle_owner_lock_parser.add_argument("--output", help="Optional path to write the JSON result")
 
+    trade_lifecycle_process_parser = trade_subparsers.add_parser("lifecycle-process")
+    _add_trade_lifecycle_process_arguments(trade_lifecycle_process_parser)
+    trade_lifecycle_process_parser.add_argument("--output", help="Optional path to write the JSON result")
+
     trade_lifecycle_supervisor_tick_parser = trade_subparsers.add_parser("lifecycle-supervisor-tick")
     _add_trade_lifecycle_supervisor_arguments(trade_lifecycle_supervisor_tick_parser)
     trade_lifecycle_supervisor_tick_parser.add_argument("--output", help="Optional path to write the JSON result")
@@ -2741,6 +2755,22 @@ def _run_trade_lifecycle_owner_lock(args: argparse.Namespace) -> Result:
         owner_token=args.owner_token,
         stale_after_seconds=args.stale_after_seconds,
         force_stale=args.force_stale,
+    )
+
+
+def _run_trade_lifecycle_process(args: argparse.Namespace) -> Result:
+    trade_manager = TdxTradeManager(
+        profile=getattr(args, "profile", None) or "balanced",
+        title_keyword=args.title_key,
+        exe_path=getattr(args, "exe_path", None),
+    )
+    return trade_manager.pingan.lifecycle_process(
+        action=args.action,
+        statefile_path=args.statefile_path,
+        owner_token=args.owner_token,
+        exe_path=args.exe_path,
+        stale_after_seconds=args.stale_after_seconds,
+        force_restart=args.force_restart,
     )
 
 
@@ -6239,6 +6269,8 @@ def _handle_trade_subcommand(args: argparse.Namespace) -> Result:
         return _run_trade_exception_popup(args)
     if args.trade_command == "lifecycle-owner-lock":
         return _run_trade_lifecycle_owner_lock(args)
+    if args.trade_command == "lifecycle-process":
+        return _run_trade_lifecycle_process(args)
     if args.trade_command == "lifecycle-supervisor-tick":
         return _run_trade_lifecycle_supervisor_tick(args)
     if args.trade_command == "lifecycle-supervisor-run":

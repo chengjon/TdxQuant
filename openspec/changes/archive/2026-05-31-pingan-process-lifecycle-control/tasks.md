@@ -1,0 +1,7 @@
+- [x] 1.1 Add OpenSpec proposal, design, and delta specs for PingAn process lifecycle control.
+- [x] 1.2 Add focused red tests for owner-lock rejection, start statefile PID recording, guarded stop/restart, CLI parsing/dispatch, and FUNCTION_TREE registration.
+- [x] 1.3 Implement PingAn lifecycle process status/start/stop/restart manager method with owner-lock and recorded-PID guards.
+- [x] 1.4 Add explicit `trade lifecycle-process` CLI entrypoint.
+- [x] 1.5 Update `FUNCTION_TREE.md` D-07/D-08 evidence and boundary without promoting them beyond partial implementation.
+- [x] 1.6 Run focused pytest, `openspec validate --all --strict`, `git diff --check`, and `python scripts/validate_function_tree_registry.py`.
+- [x] 1.7 Archive the OpenSpec change, re-run verification, and commit only this slice.

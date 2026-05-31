@@ -992,6 +992,138 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(run["pid_ownership_claimed"])
         self.assertEqual(mocked_health.call_count, 3)
 
+    def test_pingan_lifecycle_process_start_rejects_missing_owner_lock_without_spawn(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            exe_path = Path(temp_dir) / "TdxW.exe"
+            exe_path.write_text("placeholder", encoding="utf-8")
+            manager = TdxTradeManager(profile="balanced")
+
+            with patch("tdxquant.trade.manager.subprocess.Popen") as mocked_popen:
+                result = manager.pingan.lifecycle_process(
+                    action="start",
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    exe_path=str(exe_path),
+                    stale_after_seconds=999.0,
+                )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        process = result.data["lifecycle_process"]
+        self.assertEqual(process["status"], "owner_lock_not_owned")
+        self.assertFalse(process["process_start_executed"])
+        self.assertFalse(process["process_stop_executed"])
+        self.assertFalse(process["process_kill_executed"])
+        self.assertFalse(process["pid_ownership_claimed"])
+        self.assertFalse(process["statefile_write_executed"])
+        self.assertEqual(process["side_effect_level"], "none")
+        self.assertFalse(lifecycle_statefile_path.exists())
+        mocked_popen.assert_not_called()
+
+    def test_pingan_lifecycle_process_start_records_spawned_pid(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            exe_path = Path(temp_dir) / "TdxW.exe"
+            exe_path.write_text("placeholder", encoding="utf-8")
+            manager = TdxTradeManager(profile="balanced")
+            acquire_result = manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(lifecycle_statefile_path),
+                owner_token="operator-a",
+                stale_after_seconds=999.0,
+            )
+            self.assertTrue(acquire_result.ok)
+            spawned = type("SpawnedProcess", (), {"pid": 4242})()
+
+            with patch("tdxquant.trade.manager.subprocess.Popen", return_value=spawned) as mocked_popen:
+                result = manager.pingan.lifecycle_process(
+                    action="start",
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    exe_path=str(exe_path),
+                    stale_after_seconds=999.0,
+                )
+            state_payload = json.loads(lifecycle_statefile_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result.ok)
+        process = result.data["lifecycle_process"]
+        self.assertEqual(process["status"], "started")
+        self.assertEqual(process["process_pid"], 4242)
+        self.assertEqual(process["process_command"], [str(exe_path)])
+        self.assertTrue(process["process_start_executed"])
+        self.assertFalse(process["process_stop_executed"])
+        self.assertFalse(process["process_kill_executed"])
+        self.assertTrue(process["pid_ownership_claimed"])
+        self.assertTrue(process["statefile_write_executed"])
+        self.assertEqual(process["side_effect_level"], "local_lifecycle_statefile_and_process")
+        self.assertEqual(state_payload["process"]["process_pid"], 4242)
+        self.assertEqual(state_payload["process"]["process_owner_token"], "operator-a")
+        self.assertEqual(state_payload["process"]["process_command"], [str(exe_path)])
+        mocked_popen.assert_called_once_with([str(exe_path)], start_new_session=True)
+
+    def test_pingan_lifecycle_process_restart_stops_recorded_pid_and_records_new_pid(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            exe_path = Path(temp_dir) / "TdxW.exe"
+            exe_path.write_text("placeholder", encoding="utf-8")
+            manager = TdxTradeManager(profile="balanced")
+            acquire_result = manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(lifecycle_statefile_path),
+                owner_token="operator-a",
+                stale_after_seconds=999.0,
+            )
+            self.assertTrue(acquire_result.ok)
+            first_process = type("SpawnedProcess", (), {"pid": 4242})()
+            restarted_process = type("SpawnedProcess", (), {"pid": 4343})()
+            killed: list[int] = []
+
+            def fake_kill(pid: int, sig: int) -> None:
+                if pid in {os.getpid(), 4242} and sig == 0:
+                    return
+                if pid == 4242:
+                    killed.append(pid)
+                    return
+                raise OSError("unexpected pid")
+
+            with patch("tdxquant.trade.manager.subprocess.Popen", return_value=first_process):
+                start_result = manager.pingan.lifecycle_process(
+                    action="start",
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    exe_path=str(exe_path),
+                    stale_after_seconds=999.0,
+                )
+            self.assertTrue(start_result.ok)
+
+            with (
+                patch("tdxquant.trade.manager.os.kill", side_effect=fake_kill),
+                patch("tdxquant.trade.manager.subprocess.Popen", return_value=restarted_process) as mocked_popen,
+            ):
+                result = manager.pingan.lifecycle_process(
+                    action="restart",
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    exe_path=str(exe_path),
+                    stale_after_seconds=999.0,
+                )
+            state_payload = json.loads(lifecycle_statefile_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result.ok)
+        process = result.data["lifecycle_process"]
+        self.assertEqual(process["status"], "restarted")
+        self.assertEqual(process["previous_process_pid"], 4242)
+        self.assertEqual(process["process_pid"], 4343)
+        self.assertTrue(process["process_stop_executed"])
+        self.assertTrue(process["process_start_executed"])
+        self.assertTrue(process["process_kill_executed"])
+        self.assertTrue(process["pid_ownership_claimed"])
+        self.assertEqual(killed, [4242])
+        self.assertEqual(state_payload["process"]["process_pid"], 4343)
+        self.assertEqual(state_payload["process"]["previous_process_pid"], 4242)
+        mocked_popen.assert_called_once_with([str(exe_path)], start_new_session=True)
+
     def test_pingan_preflight_fails_on_conflicting_submission_key_without_writing_ledger(self) -> None:
         expected = Result(
             ok=True,

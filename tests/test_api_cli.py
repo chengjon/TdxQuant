@@ -27,6 +27,7 @@ from tdxquant.cli import (
     _run_trade_dialog_readiness,
     _run_trade_exception_popup,
     _run_trade_lifecycle_owner_lock,
+    _run_trade_lifecycle_process,
     _run_trade_lifecycle_supervisor_run,
     _run_trade_lifecycle_supervisor_tick,
     _run_trade_health,
@@ -2572,6 +2573,34 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.backoff_seconds, 12.0)
         self.assertEqual(args.max_ticks, 2)
         self.assertEqual(args.interval_seconds, 0.0)
+
+    def test_trade_lifecycle_process_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-process",
+                "--action",
+                "restart",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+                "--exe-path",
+                "C:/tdx/TdxW.exe",
+                "--stale-after-seconds",
+                "45",
+                "--force-restart",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "lifecycle-process")
+        self.assertEqual(args.action, "restart")
+        self.assertEqual(args.statefile_path, "runtime/pingan/lifecycle-owner.json")
+        self.assertEqual(args.owner_token, "operator-a")
+        self.assertEqual(args.exe_path, "C:/tdx/TdxW.exe")
+        self.assertEqual(args.stale_after_seconds, 45.0)
+        self.assertTrue(args.force_restart)
 
     def test_trade_submit_ready_command_parses(self) -> None:
         parser = build_parser()
@@ -11497,6 +11526,28 @@ class TradeCliDispatchTests(unittest.TestCase):
         )
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"lifecycle_supervisor_run": {"tick_count": 2}})
         with patch("tdxquant.cli._run_trade_lifecycle_supervisor_run", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_lifecycle_process_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-process",
+                "--action",
+                "status",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+                "--exe-path",
+                "C:/tdx/TdxW.exe",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"lifecycle_process": {"status": "running"}})
+        with patch("tdxquant.cli._run_trade_lifecycle_process", return_value=expected) as mocked:
             result = _handle_trade_subcommand(args)
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)
