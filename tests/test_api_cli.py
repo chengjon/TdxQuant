@@ -1862,6 +1862,43 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.max_evidence_age_seconds, 3600)
         self.assertEqual(args.json_output_path, "runtime/pingan/promotion-readiness-rollup.json")
 
+    def test_task_pingan_live_manual_acceptance_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-live-manual-acceptance",
+                "--output-path",
+                "runtime/pingan/manual-acceptance.json",
+                "--operator",
+                "ops-reviewer",
+                "--environment",
+                "paper-live-review",
+                "--outcome",
+                "confirmed",
+                "--outcome",
+                "rejected",
+                "--outcome",
+                "failed",
+                "--outcome",
+                "exception",
+                "--accepted-at",
+                "2026-05-31T10:00:00+00:00",
+                "--evidence-ref",
+                "ticket-123",
+                "--dry-run",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "pingan-live-manual-acceptance")
+        self.assertEqual(args.output_path, "runtime/pingan/manual-acceptance.json")
+        self.assertEqual(args.operator, "ops-reviewer")
+        self.assertEqual(args.environment, "paper-live-review")
+        self.assertEqual(args.outcomes, ["confirmed", "rejected", "failed", "exception"])
+        self.assertEqual(args.accepted_at, "2026-05-31T10:00:00+00:00")
+        self.assertEqual(args.evidence_ref, "ticket-123")
+        self.assertTrue(args.dry_run)
+
     def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -5660,6 +5697,19 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertIn("manifest", labels)
         self.assertIn("readonly", labels)
 
+    def test_handle_catalog_list_includes_pingan_live_manual_acceptance_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "manual-acceptance"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entries = {row["name"]: row for row in result.data["entries"]}
+        self.assertIn("plan-pingan-live-manual-acceptance", entries)
+        labels = entries["plan-pingan-live-manual-acceptance"]["labels"]
+        self.assertIn("task", labels)
+        self.assertIn("pingan", labels)
+        self.assertIn("manual-acceptance", labels)
+        self.assertIn("dry-run", labels)
+
     def test_handle_catalog_list_includes_block_sync_write_policy_entry(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "sync"])
@@ -7333,6 +7383,28 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["constraints"]["execution_mode"], "non_executing")
         self.assertFalse(result.data["constraints"]["dispatch_executed"])
         self.assertTrue(result.data["summary_view"]["plan_summary"]["non_execution"])
+        mocked_task_handler.assert_not_called()
+
+    def test_handle_catalog_plan_pingan_live_manual_acceptance_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "plan-pingan-live-manual-acceptance"])
+        with patch("tdxquant.cli._handle_task_subcommand") as mocked_task_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "plan-pingan-live-manual-acceptance")
+        self.assertEqual(result.data["dispatch"]["source"], "task")
+        self.assertEqual(result.data["dispatch"]["command_group"], "task")
+        self.assertEqual(result.data["dispatch"]["command_name"], "pingan-live-manual-acceptance")
+        self.assertEqual(result.data["resolved_args"]["output_path"], "runtime/pingan/manual-acceptance.example.json")
+        self.assertEqual(result.data["resolved_args"]["operator"], "example-operator")
+        self.assertEqual(result.data["resolved_args"]["environment"], "example-manual-review")
+        self.assertEqual(
+            result.data["resolved_args"]["outcomes"],
+            ["confirmed", "rejected", "failed", "exception"],
+        )
+        self.assertTrue(result.data["resolved_args"]["dry_run"])
+        self.assertEqual(result.data["constraints"]["execution_mode"], "non_executing")
+        self.assertFalse(result.data["constraints"]["dispatch_executed"])
         mocked_task_handler.assert_not_called()
 
     def test_handle_catalog_plan_block_sync_write_policy_entry_without_execution(self) -> None:
@@ -10838,6 +10910,50 @@ class TaskCliDispatchTests(unittest.TestCase):
             acceptance_coverage_path="runtime/pingan/acceptance-coverage.json",
             max_evidence_age_seconds=3600,
             json_output_path="runtime/pingan/promotion-readiness-rollup.json",
+        )
+
+    def test_handle_task_pingan_live_manual_acceptance_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-live-manual-acceptance",
+                "--output-path",
+                "runtime/pingan/manual-acceptance.json",
+                "--operator",
+                "ops-reviewer",
+                "--environment",
+                "paper-live-review",
+                "--outcome",
+                "confirmed",
+                "--outcome",
+                "rejected",
+                "--outcome",
+                "failed",
+                "--outcome",
+                "exception",
+                "--accepted-at",
+                "2026-05-31T10:00:00+00:00",
+                "--evidence-ref",
+                "ticket-123",
+                "--dry-run",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.pingan_live_manual_acceptance.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.pingan_live_manual_acceptance.assert_called_once_with(
+            output_path="runtime/pingan/manual-acceptance.json",
+            operator="ops-reviewer",
+            environment="paper-live-review",
+            outcomes=["confirmed", "rejected", "failed", "exception"],
+            accepted_at="2026-05-31T10:00:00+00:00",
+            evidence_ref="ticket-123",
+            dry_run=True,
+            overwrite=False,
         )
 
     def test_handle_task_trade_audit_daily_report_rejects_mixed_status_filters(self) -> None:

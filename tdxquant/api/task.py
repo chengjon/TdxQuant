@@ -891,6 +891,7 @@ def _build_trade_audit_value_diagnostics(entries: list[dict[str, Any]], *, scope
 
 _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA = "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1"
 _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA = "tdx.desktop_trade.pingan_live_manual_acceptance.v1"
+_PINGAN_LIVE_MANUAL_ACCEPTANCE_RECORD_SCHEMA = "tdx.desktop_trade.pingan_live_manual_acceptance_record.v1"
 _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA = (
     "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1"
 )
@@ -906,6 +907,37 @@ def _build_pingan_readiness_evidence_artifact_provenance(
         "producer": producer,
         "evidence_schema": evidence_schema,
     }
+
+
+def _normalize_pingan_live_manual_acceptance_outcomes(outcomes: list[str] | None) -> tuple[list[str], list[str], list[str]]:
+    normalized = sorted({str(item).strip() for item in outcomes or [] if str(item).strip()})
+    invalid = [status for status in normalized if status not in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES]
+    missing = [status for status in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES if status not in normalized]
+    return normalized, invalid, missing
+
+
+def _build_pingan_live_manual_acceptance_artifact(
+    *,
+    operator: str,
+    environment: str,
+    outcomes: list[str],
+    accepted_at: str,
+    evidence_ref: str | None = None,
+) -> dict[str, Any]:
+    artifact: dict[str, Any] = {
+        "schema": _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA,
+        "operator": operator,
+        "environment": environment,
+        "accepted_at": accepted_at,
+        "outcomes": [{"status": status, "accepted": True} for status in outcomes],
+        "boundary": (
+            "Operator-provided live/manual acceptance evidence only; does not execute PingAn workflows, "
+            "control the desktop, submit orders, prove broker production readiness, or promote D-07/D-08 status."
+        ),
+    }
+    if evidence_ref:
+        artifact["evidence_ref"] = evidence_ref
+    return artifact
 
 
 def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str | None) -> dict[str, Any]:
@@ -3527,6 +3559,131 @@ class TdxTaskManager:
 
         result, timing = _capture_task_timing("task.trade_audit_lookup", run)
         return self._attach_task_metadata(result, task_name="trade_audit_lookup", timing=timing)
+
+    def pingan_live_manual_acceptance(
+        self,
+        *,
+        output_path: str | None,
+        operator: str | None,
+        environment: str | None,
+        outcomes: list[str] | None,
+        accepted_at: str | None = None,
+        evidence_ref: str | None = None,
+        dry_run: bool = False,
+        overwrite: bool = False,
+    ) -> Result:
+        def run() -> Result:
+            normalized_operator = str(operator or "").strip()
+            normalized_environment = str(environment or "").strip()
+            normalized_outcomes, invalid_outcomes, missing_outcomes = _normalize_pingan_live_manual_acceptance_outcomes(
+                outcomes
+            )
+            if not output_path:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="output_path is required",
+                    data={"missing_fields": ["output_path"]},
+                )
+            missing_fields = []
+            if not normalized_operator:
+                missing_fields.append("operator")
+            if not normalized_environment:
+                missing_fields.append("environment")
+            if missing_fields:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="missing live/manual acceptance recorder fields",
+                    data={"missing_fields": missing_fields},
+                )
+            if invalid_outcomes:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="unsupported live/manual acceptance outcome",
+                    data={
+                        "invalid_outcomes": invalid_outcomes,
+                        "supported_outcomes": list(_PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES),
+                    },
+                )
+            if missing_outcomes:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="missing required live/manual acceptance outcomes",
+                    data={
+                        "covered_outcomes": normalized_outcomes,
+                        "missing_outcomes": missing_outcomes,
+                        "required_outcomes": list(_PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES),
+                    },
+                )
+
+            target_path = Path(output_path)
+            if target_path.exists() and not overwrite and not dry_run:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"live/manual acceptance artifact already exists: {target_path}",
+                    data={"output_path": str(target_path), "overwrite": overwrite},
+                )
+
+            resolved_accepted_at = accepted_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            artifact = _build_pingan_live_manual_acceptance_artifact(
+                operator=normalized_operator,
+                environment=normalized_environment,
+                outcomes=normalized_outcomes,
+                accepted_at=resolved_accepted_at,
+                evidence_ref=str(evidence_ref).strip() if evidence_ref else None,
+            )
+            artifact_written = False
+            if not dry_run:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(json.dumps(artifact, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                artifact_written = True
+
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message=(
+                    "planned PingAn live/manual acceptance artifact"
+                    if dry_run
+                    else "wrote PingAn live/manual acceptance artifact"
+                ),
+                data={
+                    "input": {
+                        "output_path": str(target_path),
+                        "operator": normalized_operator,
+                        "environment": normalized_environment,
+                        "outcomes": normalized_outcomes,
+                        "accepted_at": resolved_accepted_at,
+                        "evidence_ref": str(evidence_ref).strip() if evidence_ref else None,
+                        "dry_run": dry_run,
+                        "overwrite": overwrite,
+                    },
+                    "artifact": artifact,
+                    "live_manual_acceptance_record": {
+                        "schema": _PINGAN_LIVE_MANUAL_ACCEPTANCE_RECORD_SCHEMA,
+                        "artifact_schema": _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA,
+                        "output_path": str(target_path),
+                        "artifact_written": artifact_written,
+                        "dry_run": dry_run,
+                        "overwrite": overwrite,
+                        "covered_outcomes": normalized_outcomes,
+                        "missing_outcomes": [],
+                        "execution_mode": "manual_acceptance_record",
+                        "side_effect_level": "none" if dry_run else "file_write",
+                        "boundary": (
+                            "Records operator-provided live/manual acceptance evidence only; does not execute "
+                            "PingAn workflows, control the desktop, submit orders, prove broker production "
+                            "readiness, prove implemented status, or promote D-07/D-08."
+                        ),
+                    },
+                },
+            )
+
+        result, timing = _capture_task_timing("task.pingan_live_manual_acceptance", run)
+        return self._attach_task_metadata(result, task_name="pingan_live_manual_acceptance", timing=timing)
 
     def trade_audit_daily_report(
         self,

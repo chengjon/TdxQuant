@@ -186,6 +186,23 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 UI login readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
+    def test_pingan_live_manual_acceptance_recorder_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-live-manual-acceptance-recorder", combined)
+                self.assertIn("task pingan-live-manual-acceptance", combined)
+                self.assertIn("tdx.desktop_trade.pingan_live_manual_acceptance.v1", combined)
+                self.assertIn("tdx.desktop_trade.pingan_live_manual_acceptance_record.v1", combined)
+                self.assertIn("operator-provided live/manual acceptance artifact", combined)
+                self.assertIn("不执行 PingAn workflow", combined)
+                self.assertIn("不证明 production readiness", combined)
+                self.assertIn("不证明 implemented status", combined)
+
     def test_pingan_readiness_manifest_sample_registry_evidence_is_registered_without_status_change(self) -> None:
         rows = _current_function_tree_rows()
 

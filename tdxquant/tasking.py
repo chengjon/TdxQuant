@@ -23,6 +23,7 @@ TASK_COMMAND_DEFAULT_PROFILES: dict[str, str] = {
     "block-read-full": "default",
     "block-watchlist-import": "default",
     "pingan-promotion-readiness-rollup": "default",
+    "pingan-live-manual-acceptance": "default",
 }
 
 

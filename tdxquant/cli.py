@@ -660,6 +660,17 @@ def _add_pingan_promotion_readiness_rollup_arguments(subparser: argparse.Argumen
     subparser.add_argument("--json-output-path")
 
 
+def _add_pingan_live_manual_acceptance_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--output-path")
+    subparser.add_argument("--operator")
+    subparser.add_argument("--environment")
+    subparser.add_argument("--outcome", dest="outcomes", action="append")
+    subparser.add_argument("--accepted-at")
+    subparser.add_argument("--evidence-ref")
+    subparser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
+
+
 def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--audit-id")
     subparser.add_argument("--contract-no")
@@ -1537,6 +1548,10 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_pingan_promotion_readiness_rollup_parser = task_subparsers.add_parser("pingan-promotion-readiness-rollup")
     _add_pingan_promotion_readiness_rollup_arguments(task_pingan_promotion_readiness_rollup_parser)
     _add_task_common_arguments(task_pingan_promotion_readiness_rollup_parser)
+
+    task_pingan_live_manual_acceptance_parser = task_subparsers.add_parser("pingan-live-manual-acceptance")
+    _add_pingan_live_manual_acceptance_arguments(task_pingan_live_manual_acceptance_parser)
+    _add_task_common_arguments(task_pingan_live_manual_acceptance_parser)
 
     task_trade_audit_cross_ledger_query_parser = task_subparsers.add_parser("trade-audit-cross-ledger-query")
     _add_trade_audit_cross_ledger_query_arguments(task_trade_audit_cross_ledger_query_parser)
@@ -5818,6 +5833,17 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
             max_evidence_age_seconds=args.max_evidence_age_seconds,
             json_output_path=args.json_output_path,
         )
+    if command_name == "pingan-live-manual-acceptance":
+        return manager.pingan_live_manual_acceptance(
+            output_path=args.output_path,
+            operator=args.operator,
+            environment=args.environment,
+            outcomes=args.outcomes,
+            accepted_at=args.accepted_at,
+            evidence_ref=args.evidence_ref,
+            dry_run=args.dry_run,
+            overwrite=args.overwrite,
+        )
     if command_name == "trade-audit-cross-ledger-query":
         return manager.trade_audit_cross_ledger_query(
             audit_dir=args.audit_dir,
@@ -5989,6 +6015,19 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
             "json_output_path",
         ):
             merged[name] = None if merged.get(name) is None else merged[name]
+
+    if command_name == "pingan-live-manual-acceptance":
+        missing_required = [
+            name
+            for name in ("output_path", "operator", "environment", "outcomes")
+            if merged.get(name) in (None, "", [])
+        ]
+        if missing_required:
+            raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
+        merged["dry_run"] = False if merged.get("dry_run") is None else merged["dry_run"]
+        merged["overwrite"] = False if merged.get("overwrite") is None else merged["overwrite"]
+        merged["accepted_at"] = None if merged.get("accepted_at") is None else merged["accepted_at"]
+        merged["evidence_ref"] = None if merged.get("evidence_ref") is None else merged["evidence_ref"]
 
     if command_name == "block-read-full":
         missing_required = [name for name in ("block_code",) if merged.get(name) in (None, "")]

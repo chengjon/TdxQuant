@@ -755,6 +755,12 @@
     "description": "统一入口下的平安 promotion readiness manifest 只读解析模板。",
     "labels": ["task", "pingan", "readiness", "manifest", "readonly"]
   },
+  "plan-pingan-live-manual-acceptance": {
+    "source": "task",
+    "preset": "plan-pingan-live-manual-acceptance",
+    "description": "统一入口下的平安 live/manual acceptance evidence dry-run 生成模板。",
+    "labels": ["task", "pingan", "manual-acceptance", "acceptance", "dry-run"]
+  },
   "read-zxg-full": {
     "source": "task",
     "preset": "read-zxg-full",

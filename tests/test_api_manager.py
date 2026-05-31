@@ -6289,6 +6289,83 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(coverage_status["live_manual_acceptance"]["status"], "not_provided")
         self.assertFalse(coverage_status["acceptance_complete"])
 
+    def test_task_pingan_live_manual_acceptance_writes_controlled_artifact(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "manual-acceptance.json"
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_live_manual_acceptance(
+                output_path=str(output_path),
+                operator="ops-reviewer",
+                environment="paper-live-review",
+                outcomes=["confirmed", "rejected", "failed", "exception"],
+                accepted_at="2026-05-31T10:00:00+00:00",
+                evidence_ref="ticket-123",
+            )
+
+            artifact = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result.ok)
+        record = result.data["live_manual_acceptance_record"]
+        self.assertEqual(record["schema"], "tdx.desktop_trade.pingan_live_manual_acceptance_record.v1")
+        self.assertTrue(record["artifact_written"])
+        self.assertEqual(record["output_path"], str(output_path))
+        self.assertEqual(record["covered_outcomes"], ["confirmed", "exception", "failed", "rejected"])
+        self.assertEqual(record["missing_outcomes"], [])
+        self.assertEqual(record["execution_mode"], "manual_acceptance_record")
+        self.assertEqual(record["side_effect_level"], "file_write")
+        self.assertEqual(artifact["schema"], "tdx.desktop_trade.pingan_live_manual_acceptance.v1")
+        self.assertEqual(artifact["operator"], "ops-reviewer")
+        self.assertEqual(artifact["environment"], "paper-live-review")
+        self.assertEqual(artifact["accepted_at"], "2026-05-31T10:00:00+00:00")
+        self.assertEqual(artifact["evidence_ref"], "ticket-123")
+        self.assertEqual(
+            artifact["outcomes"],
+            [
+                {"status": "confirmed", "accepted": True},
+                {"status": "exception", "accepted": True},
+                {"status": "failed", "accepted": True},
+                {"status": "rejected", "accepted": True},
+            ],
+        )
+        self.assertIn("does not execute PingAn workflows", record["boundary"])
+        self.assertEqual(result.data["task"]["name"], "pingan_live_manual_acceptance")
+
+    def test_task_pingan_live_manual_acceptance_dry_run_does_not_write(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "manual-acceptance.json"
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_live_manual_acceptance(
+                output_path=str(output_path),
+                operator="ops-reviewer",
+                environment="paper-live-review",
+                outcomes=["confirmed", "rejected", "failed", "exception"],
+                dry_run=True,
+            )
+
+        self.assertTrue(result.ok)
+        self.assertFalse(output_path.exists())
+        record = result.data["live_manual_acceptance_record"]
+        self.assertFalse(record["artifact_written"])
+        self.assertTrue(record["dry_run"])
+        self.assertEqual(record["side_effect_level"], "none")
+        self.assertEqual(result.data["artifact"]["schema"], "tdx.desktop_trade.pingan_live_manual_acceptance.v1")
+
+    def test_task_pingan_live_manual_acceptance_rejects_missing_required_outcome(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "manual-acceptance.json"
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_live_manual_acceptance(
+                output_path=str(output_path),
+                operator="ops-reviewer",
+                environment="paper-live-review",
+                outcomes=["confirmed", "rejected", "failed"],
+            )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertFalse(output_path.exists())
+        self.assertEqual(result.data["missing_outcomes"], ["exception"])
+
     def test_task_trade_audit_period_report_supports_multi_status_filter(self) -> None:
         with TemporaryDirectory() as temp_dir:
             audit_dir = Path(temp_dir) / "trade-audits"

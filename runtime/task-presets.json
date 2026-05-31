@@ -165,6 +165,26 @@
       "evidence_manifest_path": "runtime/pingan/promotion-readiness-manifest.example.json"
     }
   },
+  "plan-pingan-live-manual-acceptance": {
+    "command": "pingan-live-manual-acceptance",
+    "description": "演示平安 live/manual acceptance evidence artifact 的 dry-run 生成。",
+    "profile": "default",
+    "api_profile": "safe_read",
+    "options": {
+      "output_path": "runtime/pingan/manual-acceptance.example.json",
+      "operator": "example-operator",
+      "environment": "example-manual-review",
+      "outcomes": [
+        "confirmed",
+        "rejected",
+        "failed",
+        "exception"
+      ],
+      "accepted_at": "2026-05-31T00:00:00Z",
+      "evidence_ref": "example-only",
+      "dry_run": true
+    }
+  },
   "read-zxg-watchlist": {
     "command": "block-read-watchlist",
     "description": "读取 ZXG 板块标准化快照。",
