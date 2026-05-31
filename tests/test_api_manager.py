@@ -4024,6 +4024,68 @@ class TdxApiManagerTests(unittest.TestCase):
 
 
 class TdxTaskManagerTests(unittest.TestCase):
+    @staticmethod
+    def _pingan_artifact_provenance(source_kind: str, producer: str, evidence_schema: str) -> dict:
+        return {
+            "schema": "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1",
+            "source_kind": source_kind,
+            "producer": producer,
+            "evidence_schema": evidence_schema,
+        }
+
+    @classmethod
+    def _pingan_preflight_evidence(cls, safety_status: str = "ready") -> dict:
+        return {
+            "artifact_provenance": cls._pingan_artifact_provenance(
+                "preflight",
+                "trade preflight",
+                "tdx.desktop_trade.pingan_promotion_gate_status.v1",
+            ),
+            "promotion_gate_status": {
+                "schema_version": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
+                "provider_broker_ownership": {"status": "ready"},
+                "safety_gates": {"status": safety_status},
+            },
+        }
+
+    @classmethod
+    def _pingan_dialog_readiness_evidence(cls, *, wrap_data: bool = False) -> dict:
+        gate_status = {
+            "desktop_lifecycle_gate_status": {
+                "schema_version": "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
+                "status": "complete",
+                "remaining_lifecycle_gates": [],
+            }
+        }
+        payload = {
+            "artifact_provenance": cls._pingan_artifact_provenance(
+                "dialog_readiness",
+                "trade dialog-readiness",
+                "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
+            ),
+        }
+        if wrap_data:
+            payload["data"] = gate_status
+        else:
+            payload.update(gate_status)
+        return payload
+
+    @classmethod
+    def _pingan_acceptance_coverage_evidence(cls) -> dict:
+        return {
+            "artifact_provenance": cls._pingan_artifact_provenance(
+                "acceptance_coverage",
+                "task trade-audit-daily-report",
+                "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
+            ),
+            "acceptance_outcome_coverage_status": {
+                "schema": "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
+                "automated_outcome_coverage_complete": True,
+                "live_manual_acceptance_complete": True,
+                "acceptance_complete": True,
+            },
+        }
+
     def test_public_import_is_available(self) -> None:
         manager = TdxTaskManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
@@ -4120,42 +4182,15 @@ class TdxTaskManagerTests(unittest.TestCase):
             dialog_path = root / "dialog-readiness.json"
             acceptance_path = root / "acceptance-coverage.json"
             preflight_path.write_text(
-                json.dumps(
-                    {
-                        "promotion_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
-                            "provider_broker_ownership": {"status": "ready"},
-                            "safety_gates": {"status": "ready"},
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_preflight_evidence()),
                 encoding="utf-8",
             )
             dialog_path.write_text(
-                json.dumps(
-                    {
-                        "data": {
-                            "desktop_lifecycle_gate_status": {
-                                "schema_version": "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
-                                "status": "complete",
-                                "remaining_lifecycle_gates": [],
-                            }
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_dialog_readiness_evidence(wrap_data=True)),
                 encoding="utf-8",
             )
             acceptance_path.write_text(
-                json.dumps(
-                    {
-                        "acceptance_outcome_coverage_status": {
-                            "schema": "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
-                            "automated_outcome_coverage_complete": True,
-                            "live_manual_acceptance_complete": True,
-                            "acceptance_complete": True,
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_acceptance_coverage_evidence()),
                 encoding="utf-8",
             )
             manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
@@ -4254,7 +4289,7 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertFalse(decision["implemented_status_eligible"])
         self.assertIn("unverified_evidence_contract", decision["blocked_reasons"])
 
-    def test_task_pingan_promotion_readiness_rollup_rejects_stale_evidence(self) -> None:
+    def test_task_pingan_promotion_readiness_rollup_blocks_provenance_less_schema_valid_evidence(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             preflight_path = root / "preflight.json"
@@ -4295,6 +4330,46 @@ class TdxTaskManagerTests(unittest.TestCase):
                         }
                     }
                 ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(
+                preflight_path=str(preflight_path),
+                dialog_readiness_path=str(dialog_path),
+                acceptance_coverage_path=str(acceptance_path),
+            )
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["status"], "complete")
+        self.assertEqual(rollup["evidence_contract_status"]["status"], "verified")
+        provenance = rollup["artifact_provenance_status"]
+        self.assertEqual(provenance["status"], "unverified")
+        self.assertEqual(
+            provenance["invalid_source_kinds"],
+            ["preflight", "dialog_readiness", "acceptance_coverage"],
+        )
+        decision = rollup["implemented_status_promotion_decision"]
+        self.assertEqual(decision["decision"], "blocked")
+        self.assertFalse(decision["implemented_status_eligible"])
+        self.assertIn("unverified_artifact_provenance", decision["blocked_reasons"])
+
+    def test_task_pingan_promotion_readiness_rollup_rejects_stale_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            preflight_path.write_text(
+                json.dumps(self._pingan_preflight_evidence()),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(self._pingan_dialog_readiness_evidence()),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(self._pingan_acceptance_coverage_evidence()),
                 encoding="utf-8",
             )
             os.utime(preflight_path, (1, 1))
@@ -4335,40 +4410,15 @@ class TdxTaskManagerTests(unittest.TestCase):
             acceptance_path = root / "acceptance-coverage.json"
             artifact_path = root / "artifacts" / "promotion-readiness.json"
             preflight_path.write_text(
-                json.dumps(
-                    {
-                        "promotion_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
-                            "provider_broker_ownership": {"status": "ready"},
-                            "safety_gates": {"status": "ready"},
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_preflight_evidence()),
                 encoding="utf-8",
             )
             dialog_path.write_text(
-                json.dumps(
-                    {
-                        "desktop_lifecycle_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
-                            "status": "complete",
-                            "remaining_lifecycle_gates": [],
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_dialog_readiness_evidence()),
                 encoding="utf-8",
             )
             acceptance_path.write_text(
-                json.dumps(
-                    {
-                        "acceptance_outcome_coverage_status": {
-                            "schema": "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
-                            "automated_outcome_coverage_complete": True,
-                            "live_manual_acceptance_complete": True,
-                            "acceptance_complete": True,
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_acceptance_coverage_evidence()),
                 encoding="utf-8",
             )
             manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
@@ -4404,40 +4454,15 @@ class TdxTaskManagerTests(unittest.TestCase):
             acceptance_path = root / "acceptance-coverage.json"
             manifest_path = root / "promotion-readiness-manifest.json"
             preflight_path.write_text(
-                json.dumps(
-                    {
-                        "promotion_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
-                            "provider_broker_ownership": {"status": "ready"},
-                            "safety_gates": {"status": "ready"},
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_preflight_evidence()),
                 encoding="utf-8",
             )
             dialog_path.write_text(
-                json.dumps(
-                    {
-                        "desktop_lifecycle_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
-                            "status": "complete",
-                            "remaining_lifecycle_gates": [],
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_dialog_readiness_evidence()),
                 encoding="utf-8",
             )
             acceptance_path.write_text(
-                json.dumps(
-                    {
-                        "acceptance_outcome_coverage_status": {
-                            "schema": "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
-                            "automated_outcome_coverage_complete": True,
-                            "live_manual_acceptance_complete": True,
-                            "acceptance_complete": True,
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_acceptance_coverage_evidence()),
                 encoding="utf-8",
             )
             manifest_path.write_text(
@@ -4491,40 +4516,15 @@ class TdxTaskManagerTests(unittest.TestCase):
             acceptance_path = root / "acceptance-coverage.json"
             manifest_path = root / "promotion-readiness-manifest.json"
             preflight_path.write_text(
-                json.dumps(
-                    {
-                        "promotion_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
-                            "provider_broker_ownership": {"status": "ready"},
-                            "safety_gates": {"status": "ready"},
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_preflight_evidence()),
                 encoding="utf-8",
             )
             dialog_path.write_text(
-                json.dumps(
-                    {
-                        "desktop_lifecycle_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
-                            "status": "complete",
-                            "remaining_lifecycle_gates": [],
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_dialog_readiness_evidence()),
                 encoding="utf-8",
             )
             acceptance_path.write_text(
-                json.dumps(
-                    {
-                        "acceptance_outcome_coverage_status": {
-                            "schema": "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
-                            "automated_outcome_coverage_complete": True,
-                            "live_manual_acceptance_complete": True,
-                            "acceptance_complete": True,
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_acceptance_coverage_evidence()),
                 encoding="utf-8",
             )
             manifest_path.write_text(
@@ -4563,52 +4563,19 @@ class TdxTaskManagerTests(unittest.TestCase):
             acceptance_path = root / "acceptance-coverage.json"
             manifest_path = root / "promotion-readiness-manifest.json"
             manifest_preflight_path.write_text(
-                json.dumps(
-                    {
-                        "promotion_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
-                            "provider_broker_ownership": {"status": "ready"},
-                            "safety_gates": {"status": "incomplete"},
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_preflight_evidence(safety_status="incomplete")),
                 encoding="utf-8",
             )
             override_preflight_path.write_text(
-                json.dumps(
-                    {
-                        "promotion_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
-                            "provider_broker_ownership": {"status": "ready"},
-                            "safety_gates": {"status": "ready"},
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_preflight_evidence()),
                 encoding="utf-8",
             )
             dialog_path.write_text(
-                json.dumps(
-                    {
-                        "desktop_lifecycle_gate_status": {
-                            "schema_version": "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
-                            "status": "complete",
-                            "remaining_lifecycle_gates": [],
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_dialog_readiness_evidence()),
                 encoding="utf-8",
             )
             acceptance_path.write_text(
-                json.dumps(
-                    {
-                        "acceptance_outcome_coverage_status": {
-                            "schema": "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
-                            "automated_outcome_coverage_complete": True,
-                            "live_manual_acceptance_complete": True,
-                            "acceptance_complete": True,
-                        }
-                    }
-                ),
+                json.dumps(self._pingan_acceptance_coverage_evidence()),
                 encoding="utf-8",
             )
             manifest_path.write_text(

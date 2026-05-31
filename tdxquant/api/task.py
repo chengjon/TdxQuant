@@ -1036,6 +1036,9 @@ _PINGAN_IMPLEMENTED_STATUS_PROMOTION_DECISION_SCHEMA = (
 _PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_evidence_contract.v1"
 )
+_PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA = (
+    "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1"
+)
 _PINGAN_PROMOTION_READINESS_GATE_ORDER = (
     "provider_broker_ownership",
     "safety_gates",
@@ -1285,6 +1288,95 @@ def _build_pingan_evidence_contract_status(
     }
 
 
+def _build_pingan_artifact_provenance_status(
+    *,
+    preflight_payload: dict[str, Any] | None,
+    dialog_payload: dict[str, Any] | None,
+    acceptance_payload: dict[str, Any] | None,
+    source_paths: dict[str, str],
+    evidence_contract_status: dict[str, Any],
+) -> dict[str, Any]:
+    contract_sources = evidence_contract_status.get("source_statuses")
+    contract_sources = contract_sources if isinstance(contract_sources, dict) else {}
+    requirements = {
+        "preflight": {
+            "payload": preflight_payload,
+            "allowed_producers": {"trade preflight", "TdxTradeManager.pingan.preflight"},
+        },
+        "dialog_readiness": {
+            "payload": dialog_payload,
+            "allowed_producers": {"trade dialog-readiness", "TdxTradeManager.pingan.dialog_readiness"},
+        },
+        "acceptance_coverage": {
+            "payload": acceptance_payload,
+            "allowed_producers": {
+                "task trade-audit-daily-report",
+                "task trade-audit-period-report",
+                "TdxTaskManager.trade_audit_daily_report",
+                "TdxTaskManager.trade_audit_period_report",
+            },
+        },
+    }
+    source_statuses: dict[str, dict[str, Any]] = {}
+    invalid_source_kinds: list[str] = []
+    for source_kind, requirement in requirements.items():
+        payload = requirement["payload"]
+        provenance = payload.get("artifact_provenance") if isinstance(payload, dict) else None
+        provenance = provenance if isinstance(provenance, dict) else None
+        contract = contract_sources.get(source_kind)
+        contract = contract if isinstance(contract, dict) else {}
+        expected_evidence_schema = contract.get("expected_schema")
+        observed_schema = provenance.get("schema") if provenance else None
+        observed_source_kind = provenance.get("source_kind") if provenance else None
+        observed_producer = provenance.get("producer") if provenance else None
+        observed_evidence_schema = provenance.get("evidence_schema") if provenance else None
+        allowed_producers = requirement["allowed_producers"]
+        schema_valid = observed_schema == _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA
+        source_kind_valid = observed_source_kind == source_kind
+        evidence_schema_valid = observed_evidence_schema == expected_evidence_schema
+        producer_valid = observed_producer in allowed_producers
+        verified = bool(schema_valid and source_kind_valid and evidence_schema_valid and producer_valid)
+        invalid_reasons: list[str] = []
+        if not schema_valid:
+            invalid_reasons.append("invalid_artifact_provenance_schema")
+        if not source_kind_valid:
+            invalid_reasons.append("source_kind_mismatch")
+        if not evidence_schema_valid:
+            invalid_reasons.append("evidence_schema_mismatch")
+        if not producer_valid:
+            invalid_reasons.append("unsupported_producer")
+        if not verified:
+            invalid_source_kinds.append(source_kind)
+        source_statuses[source_kind] = {
+            "source_kind": source_kind,
+            "source_path": source_paths.get(source_kind),
+            "schema": observed_schema,
+            "expected_schema": _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA,
+            "source_kind_valid": source_kind_valid,
+            "producer": observed_producer,
+            "allowed_producers": sorted(allowed_producers),
+            "producer_valid": producer_valid,
+            "evidence_schema": observed_evidence_schema,
+            "expected_evidence_schema": expected_evidence_schema,
+            "evidence_schema_valid": evidence_schema_valid,
+            "verified": verified,
+            "status": "verified" if verified else "unverified",
+            "invalid_reasons": invalid_reasons,
+        }
+    return {
+        "schema": "tdx.desktop_trade.pingan_readiness_artifact_provenance_status.v1",
+        "status": "verified" if not invalid_source_kinds else "unverified",
+        "invalid_source_kinds": invalid_source_kinds,
+        "source_statuses": source_statuses,
+        "execution_mode": "readonly_artifact_provenance_validation",
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only artifact provenance metadata validation; does not execute PingAn workflows "
+            "and does not prove production readiness or implemented status by itself."
+        ),
+    }
+
+
 def _build_pingan_implemented_status_promotion_decision(
     *,
     gate_statuses: dict[str, dict[str, Any]],
@@ -1296,6 +1388,7 @@ def _build_pingan_implemented_status_promotion_decision(
     stale_evidence_paths: dict[str, str],
     evidence_manifest: dict[str, Any],
     evidence_contract_status: dict[str, Any],
+    artifact_provenance_status: dict[str, Any],
 ) -> dict[str, Any]:
     missing_expected_gates = evidence_manifest.get("missing_expected_gates")
     if not isinstance(missing_expected_gates, list):
@@ -1318,6 +1411,8 @@ def _build_pingan_implemented_status_promotion_decision(
         blocked_reasons.append("missing_expected_gates")
     if evidence_contract_status.get("status") != "verified":
         blocked_reasons.append("unverified_evidence_contract")
+    if artifact_provenance_status.get("status") != "verified":
+        blocked_reasons.append("unverified_artifact_provenance")
     if sample_manifest:
         blocked_reasons.append("sample_manifest")
 
@@ -1339,6 +1434,10 @@ def _build_pingan_implemented_status_promotion_decision(
         "evidence_contract_status": {
             "status": evidence_contract_status.get("status"),
             "invalid_source_kinds": invalid_contract_sources,
+        },
+        "artifact_provenance_status": {
+            "status": artifact_provenance_status.get("status"),
+            "invalid_source_kinds": artifact_provenance_status.get("invalid_source_kinds", []),
         },
         "sample_manifest": sample_manifest,
         "manual_status_review_required": True,
@@ -1505,6 +1604,13 @@ def _build_pingan_promotion_readiness_rollup(
         acceptance_status=acceptance_status,
         source_paths=source_paths,
     )
+    artifact_provenance_status = _build_pingan_artifact_provenance_status(
+        preflight_payload=preflight_payload,
+        dialog_payload=dialog_payload,
+        acceptance_payload=acceptance_payload,
+        source_paths=source_paths,
+        evidence_contract_status=evidence_contract_status,
+    )
     evidence_manifest_status = copy.deepcopy(
         evidence_manifest
         or {
@@ -1533,6 +1639,7 @@ def _build_pingan_promotion_readiness_rollup(
         stale_evidence_paths=stale_evidence_paths,
         evidence_manifest=evidence_manifest_status,
         evidence_contract_status=evidence_contract_status,
+        artifact_provenance_status=artifact_provenance_status,
     )
     return {
         "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA,
@@ -1554,6 +1661,7 @@ def _build_pingan_promotion_readiness_rollup(
         "stale_evidence_paths": stale_evidence_paths,
         "evidence_manifest": evidence_manifest_status,
         "evidence_contract_status": evidence_contract_status,
+        "artifact_provenance_status": artifact_provenance_status,
         "implemented_status_promotion_decision": implemented_status_promotion_decision,
         "boundary": (
             "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "
