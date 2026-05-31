@@ -162,6 +162,48 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(result.data["trade_safety"]["submission_key"], "submit-once-20260428-001")
         self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
 
+    def test_pingan_buy_submit_once_requires_broker_readiness_before_desktop_execution(self) -> None:
+        broker_health = Result(
+            ok=False,
+            code=ErrorCode.CONTROL_NOT_FOUND,
+            message="runtime path resolved but trading window was not found",
+            data={"runtime": {"ok": True}, "window": {"ok": False}},
+            next_action="Bring Ping An to the foreground and retry.",
+        )
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTradeManager(
+                profile="submit_once",
+                state_path=str(Path(temp_dir) / "state.json"),
+                event_log_path=str(Path(temp_dir) / "events.jsonl"),
+                submission_ledger_path=str(Path(temp_dir) / "submission-ledger.jsonl"),
+            )
+            with (
+                patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health) as mocked_health,
+                patch("tdxquant.trade.manager.run_pingan_buy_submit_once") as mocked_buy,
+            ):
+                result = manager.pingan.buy_submit_once(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="buy-submit-once-broker-readiness-required-001",
+                    max_price=10.50,
+                    require_broker_readiness=True,
+                )
+
+        mocked_health.assert_called_once()
+        mocked_buy.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        risk_gate = result.data["trade_safety"]["risk_gate"]
+        self.assertFalse(risk_gate["passed"])
+        readiness = risk_gate["broker_readiness_required_status"]
+        self.assertTrue(readiness["required"])
+        self.assertEqual(readiness["requirement_status"], "failed")
+        self.assertFalse(readiness["broker_health_ok"])
+        self.assertFalse(readiness["control_dispatch_executed"])
+        self.assertFalse(readiness["order_submitted"])
+
     def test_pingan_sell_submit_once_uses_sell_flow_with_submit_once_identity(self) -> None:
         expected = Result(
             ok=True,
@@ -193,6 +235,48 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(result.data["trade_profile"]["name"], "submit_once")
         self.assertEqual(result.data["trade_safety"]["submission_key"], "sell-submit-once-20260428-001")
         self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
+
+    def test_pingan_sell_submit_once_requires_broker_readiness_before_desktop_execution(self) -> None:
+        broker_health = Result(
+            ok=False,
+            code=ErrorCode.CONTROL_NOT_FOUND,
+            message="runtime path resolved but trading window was not found",
+            data={"runtime": {"ok": True}, "window": {"ok": False}},
+            next_action="Bring Ping An to the foreground and retry.",
+        )
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTradeManager(
+                profile="submit_once",
+                state_path=str(Path(temp_dir) / "state.json"),
+                event_log_path=str(Path(temp_dir) / "events.jsonl"),
+                submission_ledger_path=str(Path(temp_dir) / "submission-ledger.jsonl"),
+            )
+            with (
+                patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health) as mocked_health,
+                patch("tdxquant.trade.manager.run_pingan_sell_fast") as mocked_sell,
+            ):
+                result = manager.pingan.sell_submit_once(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="sell-submit-once-broker-readiness-required-001",
+                    max_price=10.50,
+                    require_broker_readiness=True,
+                )
+
+        mocked_health.assert_called_once()
+        mocked_sell.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        risk_gate = result.data["trade_safety"]["risk_gate"]
+        self.assertFalse(risk_gate["passed"])
+        readiness = risk_gate["broker_readiness_required_status"]
+        self.assertTrue(readiness["required"])
+        self.assertEqual(readiness["requirement_status"], "failed")
+        self.assertFalse(readiness["broker_health_ok"])
+        self.assertFalse(readiness["control_dispatch_executed"])
+        self.assertFalse(readiness["order_submitted"])
 
     def test_pingan_sell_attaches_metadata_and_writes_artifacts(self) -> None:
         expected = Result(

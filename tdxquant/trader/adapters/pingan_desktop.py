@@ -71,6 +71,7 @@ class PingAnDesktopTraderGateway:
                 lifecycle_owner_token=self.lifecycle_owner_token,
                 lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
+                require_broker_readiness=self.require_broker_readiness,
             )
             adapter_step = "pingan_sell_submit_once"
         elif side == OrderSide.SELL:
@@ -108,6 +109,7 @@ class PingAnDesktopTraderGateway:
                 lifecycle_owner_token=self.lifecycle_owner_token,
                 lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
+                require_broker_readiness=self.require_broker_readiness,
             )
             adapter_step = "pingan_buy_submit_once"
         else:

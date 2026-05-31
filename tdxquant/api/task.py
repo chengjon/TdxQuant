@@ -3616,6 +3616,7 @@ class TdxTaskManager:
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
         require_lifecycle_owner_lock: bool = False,
+        require_broker_readiness: bool = False,
     ) -> Result:
         def run() -> Result:
             normalized_side = str(side or "buy").strip().lower()
@@ -3624,6 +3625,9 @@ class TdxTaskManager:
                 lifecycle_owner_token=lifecycle_owner_token,
                 lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
+            broker_readiness_guard_kwargs = _build_task_broker_readiness_guard_kwargs(
+                require_broker_readiness=require_broker_readiness
             )
             common_input = {
                 "port": port,
@@ -3638,6 +3642,7 @@ class TdxTaskManager:
                 "submission_key": submission_key,
                 "max_price": max_price,
                 **lifecycle_guard_kwargs,
+                **broker_readiness_guard_kwargs,
             }
             if normalized_side not in {"buy", "sell"}:
                 return Result(
@@ -3688,6 +3693,7 @@ class TdxTaskManager:
                 "submission_key": submission_key,
                 "max_price": max_price,
                 **lifecycle_guard_kwargs,
+                **broker_readiness_guard_kwargs,
             }
             if normalized_side == "sell":
                 trade_result = self.trade_manager.pingan.sell_submit_once(**trade_kwargs)

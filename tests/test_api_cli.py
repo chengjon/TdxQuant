@@ -1949,6 +1949,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "--lifecycle-stale-after-seconds",
                 "42.5",
                 "--require-lifecycle-owner-lock",
+                "--require-broker-readiness",
             ]
         )
         self.assertEqual(args.command, "task")
@@ -1961,6 +1962,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.lifecycle_owner_token, "task-owner")
         self.assertEqual(args.lifecycle_stale_after_seconds, 42.5)
         self.assertTrue(args.require_lifecycle_owner_lock)
+        self.assertTrue(args.require_broker_readiness)
 
     def test_task_trade_submit_once_sell_side_command_parses(self) -> None:
         parser = build_parser()
@@ -2269,7 +2271,30 @@ class ApiCliParserTests(unittest.TestCase):
         )
         with TemporaryDirectory() as temp_dir:
             args.store_dir = temp_dir
-            service = _build_trader_service(args, execution_mode="buy")
+        service = _build_trader_service(args, execution_mode="buy")
+        gateway = service.registry.resolve("pingan_desktop")
+        self.assertTrue(gateway.require_broker_readiness)
+
+    def test_build_trader_service_forwards_submit_once_broker_readiness_guard_to_gateway(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "submit-once",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--require-broker-readiness",
+            ]
+        )
+        with TemporaryDirectory() as temp_dir:
+            args.store_dir = temp_dir
+            service = _build_trader_service(args, execution_mode="submit_once")
         gateway = service.registry.resolve("pingan_desktop")
         self.assertTrue(gateway.require_broker_readiness)
 
@@ -2319,6 +2344,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "trade-submit-20260428-001",
                 "--max-price",
                 "10.50",
+                "--require-broker-readiness",
             ]
         )
         self.assertEqual(args.command, "trade")
@@ -2327,6 +2353,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertTrue(args.close_result_dialog)
         self.assertEqual(args.submission_key, "trade-submit-20260428-001")
         self.assertEqual(args.max_price, 10.50)
+        self.assertTrue(args.require_broker_readiness)
 
     def test_trade_submit_once_sell_side_command_parses(self) -> None:
         parser = build_parser()
@@ -10877,6 +10904,35 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(manager.trade_submit_once.call_args.kwargs["lifecycle_owner_token"], "task-owner")
         self.assertEqual(manager.trade_submit_once.call_args.kwargs["lifecycle_stale_after_seconds"], 42.5)
         self.assertTrue(manager.trade_submit_once.call_args.kwargs["require_lifecycle_owner_lock"])
+
+    def test_handle_task_trade_submit_once_forwards_broker_readiness_guard(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-submit-once",
+                "--side",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--require-broker-readiness",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_submit_once.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+
+        self.assertIs(result, expected)
+        self.assertEqual(manager.trade_submit_once.call_args.kwargs["side"], "sell")
+        self.assertTrue(manager.trade_submit_once.call_args.kwargs["require_broker_readiness"])
 
     def test_handle_task_trade_submit_ready_uses_task_manager(self) -> None:
         parser = build_parser()

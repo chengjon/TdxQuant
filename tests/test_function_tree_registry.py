@@ -237,6 +237,20 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("production readiness", combined)
         self.assertIn("桌面执行原语", combined)
 
+    def test_pingan_submit_once_broker_readiness_guard_is_registered_without_status_change(self) -> None:
+        row = _current_function_tree_rows()["D-08"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("pingan-submit-once-broker-readiness-guard", combined)
+        self.assertIn("trade submit-once --require-broker-readiness", combined)
+        self.assertIn("task trade-submit-once --require-broker-readiness", combined)
+        self.assertIn("TdxTradeManager.pingan.buy_submit_once/sell_submit_once", combined)
+        self.assertIn("submit-once 只做 broker runtime health guard 校验", combined)
+        self.assertIn("不 start/stop/restart/kill/supervise/backoff", combined)
+        self.assertIn("不 retry/backoff/recovery", combined)
+        self.assertIn("production trading readiness", combined)
+
     def test_pingan_trading_implemented_promotion_plan_is_registered_without_status_change(self) -> None:
         rows = _current_function_tree_rows()
 

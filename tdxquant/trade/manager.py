@@ -1449,6 +1449,7 @@ class _PingAnTradeProxy:
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
         require_lifecycle_owner_lock: bool = False,
+        require_broker_readiness: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         idempotency = self._manager._evaluate_idempotency(
@@ -1491,6 +1492,12 @@ class _PingAnTradeProxy:
                 request_context={"code": code, "price": price, "quantity": quantity},
             )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_broker_readiness_required_guard(
+            risk_gate,
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            require_broker_readiness=require_broker_readiness,
+        )
         risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
             risk_gate,
             lifecycle_statefile_path=lifecycle_statefile_path,
@@ -1694,6 +1701,7 @@ class _PingAnTradeProxy:
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
         require_lifecycle_owner_lock: bool = False,
+        require_broker_readiness: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         idempotency = self._manager._evaluate_idempotency(
@@ -1736,6 +1744,12 @@ class _PingAnTradeProxy:
                 request_context={"code": code, "price": price, "quantity": quantity},
             )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_broker_readiness_required_guard(
+            risk_gate,
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            require_broker_readiness=require_broker_readiness,
+        )
         risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
             risk_gate,
             lifecycle_statefile_path=lifecycle_statefile_path,

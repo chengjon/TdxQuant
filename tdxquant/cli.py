@@ -1558,6 +1558,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     _add_trade_common_arguments(task_trade_submit_once_parser)
     task_trade_submit_once_parser.add_argument("--side", choices=["buy", "sell"], default="buy")
     _add_trade_lifecycle_owner_guard_arguments(task_trade_submit_once_parser)
+    _add_trade_broker_readiness_guard_arguments(task_trade_submit_once_parser)
     task_trade_submit_once_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_submit_once_parser.add_argument("--refresh-market")
     task_trade_submit_once_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -1720,6 +1721,7 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     _add_trade_common_arguments(trade_submit_once_parser)
     trade_submit_once_parser.add_argument("--side", choices=["buy", "sell"], default="buy")
     _add_trade_lifecycle_owner_guard_arguments(trade_submit_once_parser)
+    _add_trade_broker_readiness_guard_arguments(trade_submit_once_parser)
     _add_trade_submit_once_profile_arguments(trade_submit_once_parser)
     trade_submit_once_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -6066,6 +6068,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
             **_get_lifecycle_owner_guard_kwargs(args),
+            **_get_broker_readiness_guard_kwargs(args),
         )
     if args.task_command == "trade-submit-ready":
         return manager.trade_submit_ready(
