@@ -267,6 +267,10 @@ def _add_trade_lifecycle_owner_guard_arguments(subparser: argparse.ArgumentParse
     subparser.add_argument("--require-lifecycle-owner-lock", action="store_true")
 
 
+def _add_trade_broker_readiness_guard_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--require-broker-readiness", action="store_true")
+
+
 def _get_lifecycle_owner_guard_kwargs(args: argparse.Namespace) -> dict[str, Any]:
     lifecycle_statefile_path = getattr(args, "lifecycle_statefile_path", None)
     lifecycle_owner_token = getattr(args, "lifecycle_owner_token", None)
@@ -288,6 +292,12 @@ def _get_lifecycle_owner_guard_kwargs(args: argparse.Namespace) -> dict[str, Any
         "lifecycle_stale_after_seconds": lifecycle_stale_after_seconds,
         "require_lifecycle_owner_lock": require_lifecycle_owner_lock,
     }
+
+
+def _get_broker_readiness_guard_kwargs(args: argparse.Namespace) -> dict[str, Any]:
+    if not bool(getattr(args, "require_broker_readiness", False)):
+        return {}
+    return {"require_broker_readiness": True}
 
 
 def _add_trade_order_place_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -1529,6 +1539,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_trade_buy_parser = task_subparsers.add_parser("trade-buy")
     _add_trade_common_arguments(task_trade_buy_parser)
     _add_trade_lifecycle_owner_guard_arguments(task_trade_buy_parser)
+    _add_trade_broker_readiness_guard_arguments(task_trade_buy_parser)
     task_trade_buy_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_buy_parser.add_argument("--refresh-market")
     task_trade_buy_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -1537,6 +1548,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_trade_sell_parser = task_subparsers.add_parser("trade-sell")
     _add_trade_common_arguments(task_trade_sell_parser)
     _add_trade_lifecycle_owner_guard_arguments(task_trade_sell_parser)
+    _add_trade_broker_readiness_guard_arguments(task_trade_sell_parser)
     task_trade_sell_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_sell_parser.add_argument("--refresh-market")
     task_trade_sell_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -1693,12 +1705,14 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     trade_buy_parser = trade_subparsers.add_parser("buy")
     _add_trade_common_arguments(trade_buy_parser)
     _add_trade_lifecycle_owner_guard_arguments(trade_buy_parser)
+    _add_trade_broker_readiness_guard_arguments(trade_buy_parser)
     _add_trade_buy_profile_arguments(trade_buy_parser)
     trade_buy_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_sell_parser = trade_subparsers.add_parser("sell")
     _add_trade_common_arguments(trade_sell_parser)
     _add_trade_lifecycle_owner_guard_arguments(trade_sell_parser)
+    _add_trade_broker_readiness_guard_arguments(trade_sell_parser)
     _add_trade_buy_profile_arguments(trade_sell_parser)
     trade_sell_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -2731,6 +2745,7 @@ def _build_trader_service(args: argparse.Namespace, *, execution_mode: str = "bu
             lifecycle_owner_token=getattr(args, "lifecycle_owner_token", None),
             lifecycle_stale_after_seconds=float(getattr(args, "lifecycle_stale_after_seconds", 300.0) or 300.0),
             require_lifecycle_owner_lock=bool(getattr(args, "require_lifecycle_owner_lock", False)),
+            require_broker_readiness=bool(getattr(args, "require_broker_readiness", False)),
         ),
     )
     store_dir = Path(getattr(args, "store_dir", None) or TRADER_RUNTIME_DIR)
@@ -6014,6 +6029,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
             **_get_lifecycle_owner_guard_kwargs(args),
+            **_get_broker_readiness_guard_kwargs(args),
         )
     if args.task_command == "trade-sell":
         return manager.trade_sell(
@@ -6031,6 +6047,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
             **_get_lifecycle_owner_guard_kwargs(args),
+            **_get_broker_readiness_guard_kwargs(args),
         )
     if args.task_command == "trade-submit-once":
         return manager.trade_submit_once(

@@ -3377,6 +3377,7 @@ class TdxTaskManager:
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
         require_lifecycle_owner_lock: bool = False,
+        require_broker_readiness: bool = False,
     ) -> Result:
         def run() -> Result:
             lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
@@ -3384,6 +3385,9 @@ class TdxTaskManager:
                 lifecycle_owner_token=lifecycle_owner_token,
                 lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
+            broker_readiness_guard_kwargs = _build_task_broker_readiness_guard_kwargs(
+                require_broker_readiness=require_broker_readiness
             )
             resolved_refresh_first = bool(
                 self.profile_options.get("refresh_before_trade", False)
@@ -3415,6 +3419,7 @@ class TdxTaskManager:
                                 "refresh_market": resolved_refresh_market,
                                 "refresh_force": resolved_refresh_force,
                                 **lifecycle_guard_kwargs,
+                                **broker_readiness_guard_kwargs,
                             },
                             "refresh_result": refresh_result.to_dict(),
                         },
@@ -3433,6 +3438,7 @@ class TdxTaskManager:
                 submission_key=submission_key,
                 max_price=max_price,
                 **lifecycle_guard_kwargs,
+                **broker_readiness_guard_kwargs,
             )
             if not trade_result.ok:
                 return trade_result
@@ -3456,6 +3462,7 @@ class TdxTaskManager:
                         "refresh_market": resolved_refresh_market,
                         "refresh_force": resolved_refresh_force,
                         **lifecycle_guard_kwargs,
+                        **broker_readiness_guard_kwargs,
                     },
                     "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
                     "trade_result": trade_result.to_dict(),
@@ -3489,6 +3496,7 @@ class TdxTaskManager:
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
         require_lifecycle_owner_lock: bool = False,
+        require_broker_readiness: bool = False,
     ) -> Result:
         def run() -> Result:
             lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
@@ -3496,6 +3504,9 @@ class TdxTaskManager:
                 lifecycle_owner_token=lifecycle_owner_token,
                 lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
+            broker_readiness_guard_kwargs = _build_task_broker_readiness_guard_kwargs(
+                require_broker_readiness=require_broker_readiness
             )
             resolved_refresh_first = bool(
                 self.profile_options.get("refresh_before_trade", False)
@@ -3527,6 +3538,7 @@ class TdxTaskManager:
                                 "refresh_market": resolved_refresh_market,
                                 "refresh_force": resolved_refresh_force,
                                 **lifecycle_guard_kwargs,
+                                **broker_readiness_guard_kwargs,
                             },
                             "refresh_result": refresh_result.to_dict(),
                         },
@@ -3545,6 +3557,7 @@ class TdxTaskManager:
                 submission_key=submission_key,
                 max_price=max_price,
                 **lifecycle_guard_kwargs,
+                **broker_readiness_guard_kwargs,
             )
             if not trade_result.ok:
                 return trade_result
@@ -3568,6 +3581,7 @@ class TdxTaskManager:
                         "refresh_market": resolved_refresh_market,
                         "refresh_force": resolved_refresh_force,
                         **lifecycle_guard_kwargs,
+                        **broker_readiness_guard_kwargs,
                     },
                     "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
                     "trade_result": trade_result.to_dict(),

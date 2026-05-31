@@ -431,6 +431,23 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("不 retry/backoff/recovery", combined)
         self.assertIn("live/manual acceptance", combined)
 
+    def test_pingan_buy_sell_broker_readiness_guard_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+        row = rows["D-07"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("pingan-buy-sell-broker-readiness-guard", combined)
+        self.assertIn("trade buy --require-broker-readiness", combined)
+        self.assertIn("trade sell --require-broker-readiness", combined)
+        self.assertIn("task trade-buy --require-broker-readiness", combined)
+        self.assertIn("task trade-sell --require-broker-readiness", combined)
+        self.assertIn("TdxTradeManager.pingan.buy/sell", combined)
+        self.assertIn("buy/sell 只做 broker runtime health guard 校验", combined)
+        self.assertIn("不 start/stop/restart/kill/supervise/backoff", combined)
+        self.assertIn("不 retry/backoff/recovery", combined)
+        self.assertIn("production trading readiness", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"

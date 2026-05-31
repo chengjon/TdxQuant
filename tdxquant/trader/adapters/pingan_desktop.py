@@ -26,6 +26,7 @@ class PingAnDesktopTraderGateway:
     lifecycle_owner_token: str | None = None
     lifecycle_stale_after_seconds: float = 300.0
     require_lifecycle_owner_lock: bool = False
+    require_broker_readiness: bool = False
     manager: TdxTradeManager | None = None
     capabilities: GatewayCapabilities = field(init=False)
 
@@ -88,6 +89,7 @@ class PingAnDesktopTraderGateway:
                 lifecycle_owner_token=self.lifecycle_owner_token,
                 lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
+                require_broker_readiness=self.require_broker_readiness,
             )
             adapter_step = "pingan_sell"
         elif self.execution_mode == "submit_once":
@@ -124,6 +126,7 @@ class PingAnDesktopTraderGateway:
                 lifecycle_owner_token=self.lifecycle_owner_token,
                 lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
+                require_broker_readiness=self.require_broker_readiness,
             )
             adapter_step = "pingan_buy"
         snapshot = self._build_snapshot(request=request, result=result)
