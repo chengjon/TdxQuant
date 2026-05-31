@@ -142,6 +142,7 @@ def _build_pingan_promotion_gate_status(
     idempotency: dict[str, Any],
     submission_key: str | None,
     max_price: float | None,
+    lifecycle_owner_lock_status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     max_price_guard = _build_max_price_guard_status(risk_gate=risk_gate, max_price=max_price)
     submission_key_status = "provided" if submission_key else "missing"
@@ -187,6 +188,12 @@ def _build_pingan_promotion_gate_status(
                 "boundary": "Preflight cannot grant live trade approval; execution requires an explicit trade command.",
             },
         },
+        "lifecycle_owner_lock_status": lifecycle_owner_lock_status
+        or _build_pingan_preflight_lifecycle_owner_lock_status(
+            lifecycle_statefile_path=None,
+            lifecycle_owner_token=None,
+            lifecycle_stale_after_seconds=300.0,
+        ),
         "completed_gates": ["provider_broker_ownership", "safety_gates"],
         "remaining_gates": ["desktop_lifecycle", "audit_evidence", "acceptance_evidence"],
         "boundary": (
@@ -462,6 +469,112 @@ def _build_pingan_lifecycle_owner_lock_payload(
             "kill, supervise, back off, claim desktop PID ownership, submit orders, or write trade artifacts."
         ),
     }
+
+
+def _build_pingan_preflight_lifecycle_owner_lock_status(
+    *,
+    lifecycle_statefile_path: str | None,
+    lifecycle_owner_token: str | None,
+    lifecycle_stale_after_seconds: float,
+) -> dict[str, Any]:
+    normalized_statefile_path = str(lifecycle_statefile_path or "").strip()
+    normalized_owner_token = str(lifecycle_owner_token or "").strip()
+    configured = bool(normalized_statefile_path and normalized_owner_token)
+    lock_path = str(Path(f"{normalized_statefile_path}.lock")) if normalized_statefile_path else None
+    summary: dict[str, Any] = {
+        "schema_version": "tdx.desktop_trade.pingan_preflight_lifecycle_owner_lock_status.v1",
+        "configured": configured,
+        "status": "not_configured",
+        "status_check_executed": False,
+        "execution_mode": "readonly_preflight",
+        "statefile_path": normalized_statefile_path or None,
+        "lock_path": lock_path,
+        "owner_token": normalized_owner_token or None,
+        "current_owner_token": None,
+        "owner_pid": None,
+        "owner_pid_alive": None,
+        "owner_pid_status": "missing",
+        "pid_validation_executed": False,
+        "stale_after_seconds": float(lifecycle_stale_after_seconds),
+        "stale_detected": False,
+        "statefile_present": False,
+        "lock_file_present": False,
+        "pid_ownership_claimed": False,
+        "statefile_write_executed": False,
+        "lock_file_write_executed": False,
+        "lock_file_removed": False,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "start_executed": False,
+        "stop_executed": False,
+        "restart_executed": False,
+        "supervisor_owned": False,
+        "backoff_executed": False,
+        "process_kill_executed": False,
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only local PingAn lifecycle owner lock status for preflight; this does not acquire "
+            "or release locks, start, stop, restart, kill, supervise, back off, claim real desktop PID "
+            "ownership, submit orders, or write trade artifacts."
+        ),
+    }
+    if not configured:
+        return summary
+
+    status_result = _run_pingan_lifecycle_owner_lock(
+        action="status",
+        statefile_path=normalized_statefile_path,
+        owner_token=normalized_owner_token,
+        stale_after_seconds=float(lifecycle_stale_after_seconds),
+    )
+    payload = status_result.data.get("lifecycle_owner_lock") if isinstance(status_result.data, dict) else None
+    if not isinstance(payload, dict):
+        summary.update(
+            {
+                "status": "status_check_failed",
+                "status_check_executed": True,
+                "status_result_ok": status_result.ok,
+                "status_result_code": status_result.code.value if hasattr(status_result.code, "value") else str(status_result.code),
+                "status_result_message": status_result.message,
+            }
+        )
+        return summary
+
+    summary.update(
+        {
+            "status": payload.get("status"),
+            "status_check_executed": True,
+            "status_result_ok": status_result.ok,
+            "status_result_code": status_result.code.value if hasattr(status_result.code, "value") else str(status_result.code),
+            "status_result_message": status_result.message,
+            "statefile_path": payload.get("statefile_path"),
+            "lock_path": payload.get("lock_path"),
+            "owner_token": payload.get("owner_token"),
+            "current_owner_token": payload.get("current_owner_token"),
+            "owner_pid": payload.get("owner_pid"),
+            "owner_pid_alive": payload.get("owner_pid_alive"),
+            "owner_pid_status": payload.get("owner_pid_status"),
+            "pid_validation_executed": payload.get("pid_validation_executed"),
+            "stale_after_seconds": payload.get("stale_after_seconds"),
+            "stale_detected": payload.get("stale_detected"),
+            "statefile_present": payload.get("statefile_present"),
+            "lock_file_present": payload.get("lock_file_present"),
+            "statefile_write_executed": False,
+            "lock_file_write_executed": False,
+            "lock_file_removed": False,
+            "order_submitted": False,
+            "control_dispatch_executed": False,
+            "start_executed": False,
+            "stop_executed": False,
+            "restart_executed": False,
+            "supervisor_owned": False,
+            "backoff_executed": False,
+            "process_kill_executed": False,
+            "pid_ownership_claimed": False,
+            "side_effect_level": "none",
+        }
+    )
+    return summary
 
 
 def _build_pingan_lifecycle_owner_state_payload(
@@ -1595,6 +1708,9 @@ class _PingAnTradeProxy:
         pre_delay: float = 0.0,
         submission_key: str | None = None,
         max_price: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
 
@@ -1712,6 +1828,11 @@ class _PingAnTradeProxy:
                 message = "stable trade preflight completed with warnings"
             else:
                 message = "stable trade preflight found failures"
+            lifecycle_owner_lock_status = _build_pingan_preflight_lifecycle_owner_lock_status(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            )
             promotion_gate_status = _build_pingan_promotion_gate_status(
                 broker_health=broker_health,
                 detect_result=detect_result,
@@ -1719,6 +1840,7 @@ class _PingAnTradeProxy:
                 idempotency=idempotency,
                 submission_key=submission_key,
                 max_price=max_price,
+                lifecycle_owner_lock_status=lifecycle_owner_lock_status,
             )
 
             return Result(

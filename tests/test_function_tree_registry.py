@@ -256,6 +256,24 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("交易安全审批", combined)
                 self.assertIn("production readiness", combined)
 
+    def test_pingan_preflight_owner_lock_status_gate_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-preflight-owner-lock-status-gate", combined)
+                self.assertIn("promotion_gate_status.lifecycle_owner_lock_status", combined)
+                self.assertIn("owner_pid_status/owner_pid_alive", combined)
+                self.assertIn("pid_ownership_claimed=false", combined)
+                self.assertIn("side_effect_level=none", combined)
+                self.assertIn("不 acquire/release owner lock", combined)
+                self.assertIn("不写 lifecycle statefile/lock", combined)
+                self.assertIn("broker readiness", combined)
+                self.assertIn("live/manual acceptance", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"

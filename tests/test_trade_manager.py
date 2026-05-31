@@ -453,6 +453,89 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(event_log_path.exists())
         self.assertFalse(ledger_path.exists())
 
+    def test_pingan_preflight_reports_lifecycle_owner_lock_status_without_side_effects(self) -> None:
+        broker_health = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="health-check passed",
+            data={"runtime": {"ok": True}, "window": {"ok": True}},
+        )
+        detect_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="detected Ping An buy-page controls",
+            data={"detection": {"code_hwnd": 1, "quantity_hwnd": 2, "buy_button_hwnd": 3}},
+        )
+        hid_ping = Result(ok=True, code=ErrorCode.OK, message="hid bridge ping completed", data={"response": "OK"})
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "pingan-last-order.json"
+            event_log_path = Path(temp_dir) / "pingan-order-events.jsonl"
+            ledger_path = Path(temp_dir) / "pingan-submission-ledger.jsonl"
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            lifecycle_lock_path = Path(f"{lifecycle_statefile_path}.lock")
+            manager = TdxTradeManager(
+                profile="balanced",
+                state_path=str(state_path),
+                event_log_path=str(event_log_path),
+                submission_ledger_path=str(ledger_path),
+            )
+            acquire_result = manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(lifecycle_statefile_path),
+                owner_token="preflight-owner",
+                stale_after_seconds=999.0,
+            )
+            self.assertTrue(acquire_result.ok)
+            before_statefile = lifecycle_statefile_path.read_text(encoding="utf-8")
+            before_lock_file = lifecycle_lock_path.read_text(encoding="utf-8")
+            with (
+                patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health),
+                patch("tdxquant.trade.manager.PingAnBrokerAdapter.detect", return_value=detect_result),
+                patch("tdxquant.trade.manager.run_hid_ping", return_value=hid_ping),
+            ):
+                result = manager.pingan.preflight(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="preflight-owner-lock-001",
+                    max_price=10.50,
+                    lifecycle_statefile_path=str(lifecycle_statefile_path),
+                    lifecycle_owner_token="preflight-owner",
+                    lifecycle_stale_after_seconds=999.0,
+                )
+            after_statefile = lifecycle_statefile_path.read_text(encoding="utf-8")
+            after_lock_file = lifecycle_lock_path.read_text(encoding="utf-8")
+            state_path_exists = state_path.exists()
+            event_log_path_exists = event_log_path.exists()
+            ledger_path_exists = ledger_path.exists()
+
+        self.assertTrue(result.ok)
+        owner_lock_status = result.data["promotion_gate_status"]["lifecycle_owner_lock_status"]
+        self.assertTrue(owner_lock_status["configured"])
+        self.assertTrue(owner_lock_status["status_check_executed"])
+        self.assertEqual(owner_lock_status["status"], "owned")
+        self.assertEqual(owner_lock_status["statefile_path"], str(lifecycle_statefile_path))
+        self.assertEqual(owner_lock_status["lock_path"], str(lifecycle_lock_path))
+        self.assertEqual(owner_lock_status["owner_token"], "preflight-owner")
+        self.assertEqual(owner_lock_status["current_owner_token"], "preflight-owner")
+        self.assertTrue(owner_lock_status["statefile_present"])
+        self.assertTrue(owner_lock_status["lock_file_present"])
+        self.assertFalse(owner_lock_status["stale_detected"])
+        self.assertTrue(owner_lock_status["owner_pid_alive"])
+        self.assertEqual(owner_lock_status["owner_pid_status"], "alive")
+        self.assertFalse(owner_lock_status["pid_ownership_claimed"])
+        self.assertEqual(owner_lock_status["side_effect_level"], "none")
+        self.assertFalse(owner_lock_status["statefile_write_executed"])
+        self.assertFalse(owner_lock_status["lock_file_write_executed"])
+        self.assertFalse(owner_lock_status["order_submitted"])
+        self.assertFalse(owner_lock_status["control_dispatch_executed"])
+        self.assertEqual(after_statefile, before_statefile)
+        self.assertEqual(after_lock_file, before_lock_file)
+        self.assertFalse(state_path_exists)
+        self.assertFalse(event_log_path_exists)
+        self.assertFalse(ledger_path_exists)
+
     def test_pingan_preflight_fails_on_conflicting_submission_key_without_writing_ledger(self) -> None:
         expected = Result(
             ok=True,
