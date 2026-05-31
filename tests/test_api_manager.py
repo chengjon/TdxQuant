@@ -4082,7 +4082,28 @@ class TdxTaskManagerTests(unittest.TestCase):
                 ),
                 "automated_outcome_coverage_complete": True,
                 "live_manual_acceptance_complete": True,
+                "live_manual_acceptance": cls._pingan_live_manual_acceptance_status(
+                    artifact_provenance_status="verified"
+                ),
                 "acceptance_complete": True,
+            },
+        }
+
+    @classmethod
+    def _pingan_live_manual_acceptance_status(cls, *, artifact_provenance_status: str) -> dict:
+        return {
+            "schema": "tdx.desktop_trade.pingan_live_manual_acceptance.v1",
+            "status": "complete" if artifact_provenance_status == "verified" else "incomplete",
+            "source_path": "manual-acceptance.json",
+            "covered_outcomes": ["confirmed", "exception", "failed", "rejected"],
+            "missing_outcomes": [],
+            "artifact_provenance_status": {
+                "status": artifact_provenance_status,
+                "source_kind": "live_manual_acceptance",
+                "producer": "task pingan-live-manual-acceptance"
+                if artifact_provenance_status == "verified"
+                else None,
+                "invalid_reasons": [] if artifact_provenance_status == "verified" else ["missing_artifact_provenance"],
             },
         }
 
@@ -4208,6 +4229,7 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(rollup["missing_evidence_kinds"], [])
         self.assertEqual(rollup["evidence_contract_status"]["status"], "verified")
         self.assertEqual(rollup["evidence_contract_status"]["invalid_source_kinds"], [])
+        self.assertEqual(rollup["live_manual_acceptance_provenance_status"]["status"], "verified")
         decision = rollup["implemented_status_promotion_decision"]
         self.assertEqual(
             decision["schema"],
@@ -4222,6 +4244,43 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertFalse(decision["sample_manifest"])
         self.assertTrue(decision["manual_status_review_required"])
         self.assertFalse(decision["function_tree_status_transition_executed"])
+        self.assertFalse(rollup["promotion_status_transition_executed"])
+        self.assertFalse(rollup["order_submitted"])
+
+    def test_task_pingan_promotion_readiness_rollup_blocks_unverified_live_manual_acceptance_provenance(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            acceptance_payload = self._pingan_acceptance_coverage_evidence()
+            acceptance_payload["acceptance_outcome_coverage_status"][
+                "live_manual_acceptance"
+            ] = self._pingan_live_manual_acceptance_status(artifact_provenance_status="unverified")
+            preflight_path.write_text(
+                json.dumps(self._pingan_preflight_evidence()),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(self._pingan_dialog_readiness_evidence(wrap_data=True)),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(json.dumps(acceptance_payload), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(
+                preflight_path=str(preflight_path),
+                dialog_readiness_path=str(dialog_path),
+                acceptance_coverage_path=str(acceptance_path),
+            )
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["live_manual_acceptance_provenance_status"]["status"], "unverified")
+        self.assertFalse(rollup["gate_statuses"]["live_manual_acceptance"]["complete"])
+        decision = rollup["implemented_status_promotion_decision"]
+        self.assertEqual(decision["decision"], "blocked")
+        self.assertFalse(decision["implemented_status_eligible"])
+        self.assertIn("unverified_live_manual_acceptance_artifact_provenance", decision["blocked_reasons"])
         self.assertFalse(rollup["promotion_status_transition_executed"])
         self.assertFalse(rollup["order_submitted"])
 
@@ -5963,6 +6022,11 @@ class TdxTaskManagerTests(unittest.TestCase):
                     {
                         "schema": "tdx.desktop_trade.pingan_live_manual_acceptance.v1",
                         "broker": "pingan_desktop",
+                        "artifact_provenance": self._pingan_artifact_provenance(
+                            "live_manual_acceptance",
+                            "task pingan-live-manual-acceptance",
+                            "tdx.desktop_trade.pingan_live_manual_acceptance.v1",
+                        ),
                         "operator": "qa-operator",
                         "environment": {"account_mode": "manual_live_acceptance"},
                         "outcomes": [
@@ -5995,11 +6059,71 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(manual_status["source_path"], str(evidence_path))
         self.assertEqual(manual_status["missing_outcomes"], [])
         self.assertEqual(manual_status["covered_outcomes"], ["confirmed", "exception", "failed", "rejected"])
+        self.assertEqual(manual_status["artifact_provenance_status"]["status"], "verified")
         self.assertEqual(manual_status["operator"], "qa-operator")
         self.assertEqual(coverage_status["execution_mode"], "readonly_report")
         self.assertEqual(coverage_status["side_effect_level"], "none")
         self.assertFalse(coverage_status["order_submitted"])
         self.assertFalse(coverage_status["control_dispatch_executed"])
+
+    def test_task_trade_audit_daily_report_blocks_provenance_less_live_manual_acceptance_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "trade-audits"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            for index, status in enumerate(("confirmed", "rejected", "failed", "exception"), start=1):
+                (audit_dir / f"a{index}.json").write_text(
+                    json.dumps(
+                        {
+                            "trade_audit": {
+                                "audit_id": f"a{index}",
+                                "recorded_at": "2026-04-29T03:00:00+00:00",
+                                "status": status,
+                                "method": "buy_submit_once",
+                                "contract_no": f"B20260429{index:04d}",
+                                "submission_key": f"submit-{index}",
+                            },
+                            "result": {"data": {"code": "000001"}},
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
+            evidence_path = Path(temp_dir) / "manual-acceptance.json"
+            evidence_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "tdx.desktop_trade.pingan_live_manual_acceptance.v1",
+                        "operator": "qa-operator",
+                        "environment": "paper-live-review",
+                        "outcomes": [
+                            {"status": status, "accepted": True, "evidence": f"manual {status}"}
+                            for status in ("confirmed", "rejected", "failed", "exception")
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="trade_audit_daily_report",
+                strategy_path="strategy.py",
+                profile_overrides={"export_dir": temp_dir, "audit_dir": str(audit_dir)},
+            )
+            result = manager.trade_audit_daily_report(
+                report_date="2026-04-29",
+                timezone_name="UTC",
+                live_manual_acceptance_path=str(evidence_path),
+            )
+
+        self.assertTrue(result.ok)
+        coverage_status = result.data["acceptance_outcome_coverage_status"]
+        self.assertTrue(coverage_status["automated_outcome_coverage_complete"])
+        self.assertFalse(coverage_status["live_manual_acceptance_complete"])
+        self.assertFalse(coverage_status["acceptance_complete"])
+        manual_status = coverage_status["live_manual_acceptance"]
+        self.assertEqual(manual_status["status"], "incomplete")
+        self.assertEqual(manual_status["artifact_provenance_status"]["status"], "unverified")
+        self.assertIn("missing_artifact_provenance", manual_status["artifact_provenance_status"]["invalid_reasons"])
 
     def test_task_trade_audit_period_report_marks_incomplete_live_manual_acceptance_evidence(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -6314,6 +6438,15 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(record["execution_mode"], "manual_acceptance_record")
         self.assertEqual(record["side_effect_level"], "file_write")
         self.assertEqual(artifact["schema"], "tdx.desktop_trade.pingan_live_manual_acceptance.v1")
+        self.assertEqual(
+            artifact["artifact_provenance"],
+            {
+                "schema": "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1",
+                "source_kind": "live_manual_acceptance",
+                "producer": "task pingan-live-manual-acceptance",
+                "evidence_schema": "tdx.desktop_trade.pingan_live_manual_acceptance.v1",
+            },
+        )
         self.assertEqual(artifact["operator"], "ops-reviewer")
         self.assertEqual(artifact["environment"], "paper-live-review")
         self.assertEqual(artifact["accepted_at"], "2026-05-31T10:00:00+00:00")

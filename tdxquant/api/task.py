@@ -909,6 +909,41 @@ def _build_pingan_readiness_evidence_artifact_provenance(
     }
 
 
+def _build_pingan_live_manual_acceptance_artifact_provenance_status(payload: dict[str, Any]) -> dict[str, Any]:
+    provenance = payload.get("artifact_provenance")
+    provenance = provenance if isinstance(provenance, dict) else None
+    observed_schema = provenance.get("schema") if provenance else None
+    observed_source_kind = provenance.get("source_kind") if provenance else None
+    observed_producer = provenance.get("producer") if provenance else None
+    observed_evidence_schema = provenance.get("evidence_schema") if provenance else None
+
+    invalid_reasons: list[str] = []
+    if provenance is None:
+        invalid_reasons.append("missing_artifact_provenance")
+    elif observed_schema != _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA:
+        invalid_reasons.append("invalid_artifact_provenance_schema")
+    if provenance is not None and observed_source_kind != "live_manual_acceptance":
+        invalid_reasons.append("source_kind_mismatch")
+    if provenance is not None and observed_evidence_schema != _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA:
+        invalid_reasons.append("evidence_schema_mismatch")
+    if provenance is not None and observed_producer != "task pingan-live-manual-acceptance":
+        invalid_reasons.append("unsupported_producer")
+
+    verified = not invalid_reasons
+    return {
+        "status": "verified" if verified else "unverified",
+        "schema": observed_schema,
+        "expected_schema": _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA,
+        "source_kind": observed_source_kind,
+        "expected_source_kind": "live_manual_acceptance",
+        "producer": observed_producer,
+        "expected_producer": "task pingan-live-manual-acceptance",
+        "evidence_schema": observed_evidence_schema,
+        "expected_evidence_schema": _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA,
+        "invalid_reasons": invalid_reasons,
+    }
+
+
 def _normalize_pingan_live_manual_acceptance_outcomes(outcomes: list[str] | None) -> tuple[list[str], list[str], list[str]]:
     normalized = sorted({str(item).strip() for item in outcomes or [] if str(item).strip()})
     invalid = [status for status in normalized if status not in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES]
@@ -926,6 +961,11 @@ def _build_pingan_live_manual_acceptance_artifact(
 ) -> dict[str, Any]:
     artifact: dict[str, Any] = {
         "schema": _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA,
+        "artifact_provenance": _build_pingan_readiness_evidence_artifact_provenance(
+            source_kind="live_manual_acceptance",
+            producer="task pingan-live-manual-acceptance",
+            evidence_schema=_PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA,
+        ),
         "operator": operator,
         "environment": environment,
         "accepted_at": accepted_at,
@@ -951,6 +991,7 @@ def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str
             "covered_outcomes": [],
             "missing_outcomes": required_outcomes,
             "invalid_outcome_count": 0,
+            "artifact_provenance_status": {"status": "not_provided", "invalid_reasons": []},
             "operator": None,
             "environment": None,
             "boundary": (
@@ -965,6 +1006,7 @@ def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str
         "covered_outcomes": [],
         "missing_outcomes": required_outcomes,
         "invalid_outcome_count": 0,
+        "artifact_provenance_status": {"status": "not_provided", "invalid_reasons": []},
         "operator": None,
         "environment": None,
         "boundary": (
@@ -1009,7 +1051,13 @@ def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str
         status for status in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES if status not in covered_outcomes
     ]
     schema_valid = schema == _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA
-    status = "complete" if schema_valid and not missing_outcomes and invalid_outcome_count == 0 else "incomplete"
+    artifact_provenance_status = _build_pingan_live_manual_acceptance_artifact_provenance_status(payload)
+    artifact_provenance_verified = artifact_provenance_status.get("status") == "verified"
+    status = (
+        "complete"
+        if schema_valid and not missing_outcomes and invalid_outcome_count == 0 and artifact_provenance_verified
+        else "incomplete"
+    )
     result = {
         **base_status,
         "status": status,
@@ -1018,6 +1066,8 @@ def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str
         "covered_outcomes": sorted(covered_outcomes),
         "missing_outcomes": missing_outcomes,
         "invalid_outcome_count": invalid_outcome_count,
+        "artifact_provenance": payload.get("artifact_provenance"),
+        "artifact_provenance_status": artifact_provenance_status,
         "operator": payload.get("operator"),
         "environment": payload.get("environment"),
         "accepted_at": payload.get("accepted_at"),
@@ -1047,6 +1097,10 @@ def _build_pingan_acceptance_outcome_coverage_status(
     automated_outcome_coverage_complete = not missing_automated_statuses
     live_manual_acceptance_status = _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path)
     live_manual_acceptance_complete = live_manual_acceptance_status.get("status") == "complete"
+    live_manual_acceptance_provenance_status = live_manual_acceptance_status.get(
+        "artifact_provenance_status",
+        {"status": "not_provided", "invalid_reasons": []},
+    )
 
     return {
         "schema": _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA,
@@ -1068,6 +1122,7 @@ def _build_pingan_acceptance_outcome_coverage_status(
         "automated_outcome_coverage_complete": automated_outcome_coverage_complete,
         "live_manual_acceptance_required": True,
         "live_manual_acceptance_complete": live_manual_acceptance_complete,
+        "live_manual_acceptance_provenance_status": live_manual_acceptance_provenance_status,
         "live_manual_acceptance": live_manual_acceptance_status,
         "acceptance_complete": bool(automated_outcome_coverage_complete and live_manual_acceptance_complete),
         "order_submitted": False,
@@ -1441,6 +1496,7 @@ def _build_pingan_implemented_status_promotion_decision(
     evidence_manifest: dict[str, Any],
     evidence_contract_status: dict[str, Any],
     artifact_provenance_status: dict[str, Any],
+    live_manual_acceptance_provenance_status: dict[str, Any],
 ) -> dict[str, Any]:
     missing_expected_gates = evidence_manifest.get("missing_expected_gates")
     if not isinstance(missing_expected_gates, list):
@@ -1465,6 +1521,8 @@ def _build_pingan_implemented_status_promotion_decision(
         blocked_reasons.append("unverified_evidence_contract")
     if artifact_provenance_status.get("status") != "verified":
         blocked_reasons.append("unverified_artifact_provenance")
+    if live_manual_acceptance_provenance_status.get("status") == "unverified":
+        blocked_reasons.append("unverified_live_manual_acceptance_artifact_provenance")
     if sample_manifest:
         blocked_reasons.append("sample_manifest")
 
@@ -1491,6 +1549,10 @@ def _build_pingan_implemented_status_promotion_decision(
             "status": artifact_provenance_status.get("status"),
             "invalid_source_kinds": artifact_provenance_status.get("invalid_source_kinds", []),
         },
+        "live_manual_acceptance_provenance_status": {
+            "status": live_manual_acceptance_provenance_status.get("status"),
+            "invalid_reasons": live_manual_acceptance_provenance_status.get("invalid_reasons", []),
+        },
         "sample_manifest": sample_manifest,
         "manual_status_review_required": True,
         "function_tree_status_transition_executed": False,
@@ -1502,6 +1564,28 @@ def _build_pingan_implemented_status_promotion_decision(
             "readiness, and does not automatically edit FUNCTION_TREE status."
         ),
     }
+
+
+def _extract_live_manual_acceptance_provenance_status(
+    acceptance_status: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if acceptance_status is None:
+        return {"status": "not_provided", "invalid_reasons": []}
+    live_manual_acceptance = acceptance_status.get("live_manual_acceptance")
+    if not isinstance(live_manual_acceptance, dict):
+        if acceptance_status.get("live_manual_acceptance_complete") is True:
+            return {
+                "status": "unverified",
+                "invalid_reasons": ["missing_live_manual_acceptance_status"],
+            }
+        return {"status": "not_provided", "invalid_reasons": []}
+    provenance_status = live_manual_acceptance.get("artifact_provenance_status")
+    if not isinstance(provenance_status, dict):
+        return {
+            "status": "unverified",
+            "invalid_reasons": ["missing_artifact_provenance_status"],
+        }
+    return copy.deepcopy(provenance_status)
 
 
 def _build_pingan_promotion_readiness_rollup(
@@ -1563,11 +1647,19 @@ def _build_pingan_promotion_readiness_rollup(
     audit_evidence_complete = bool(
         acceptance_status is not None and acceptance_status.get("automated_outcome_coverage_complete") is True
     )
+    live_manual_acceptance_provenance_status = _extract_live_manual_acceptance_provenance_status(acceptance_status)
+    live_manual_acceptance_provenance_verified = (
+        live_manual_acceptance_provenance_status.get("status") == "verified"
+    )
     live_manual_acceptance_complete = bool(
-        acceptance_status is not None and acceptance_status.get("live_manual_acceptance_complete") is True
+        acceptance_status is not None
+        and acceptance_status.get("live_manual_acceptance_complete") is True
+        and live_manual_acceptance_provenance_verified
     )
     acceptance_evidence_complete = bool(
-        acceptance_status is not None and acceptance_status.get("acceptance_complete") is True
+        acceptance_status is not None
+        and acceptance_status.get("acceptance_complete") is True
+        and live_manual_acceptance_provenance_verified
     )
 
     gate_statuses = {
@@ -1692,6 +1784,7 @@ def _build_pingan_promotion_readiness_rollup(
         evidence_manifest=evidence_manifest_status,
         evidence_contract_status=evidence_contract_status,
         artifact_provenance_status=artifact_provenance_status,
+        live_manual_acceptance_provenance_status=live_manual_acceptance_provenance_status,
     )
     return {
         "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA,
@@ -1714,6 +1807,7 @@ def _build_pingan_promotion_readiness_rollup(
         "evidence_manifest": evidence_manifest_status,
         "evidence_contract_status": evidence_contract_status,
         "artifact_provenance_status": artifact_provenance_status,
+        "live_manual_acceptance_provenance_status": live_manual_acceptance_provenance_status,
         "implemented_status_promotion_decision": implemented_status_promotion_decision,
         "boundary": (
             "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "

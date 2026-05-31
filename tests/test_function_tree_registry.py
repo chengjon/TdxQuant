@@ -661,6 +661,22 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
+    def test_pingan_live_manual_acceptance_provenance_rollup_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-live-manual-acceptance-provenance-rollup", combined)
+                self.assertIn("live_manual_acceptance_provenance_status", combined)
+                self.assertIn("unverified_live_manual_acceptance_artifact_provenance", combined)
+                self.assertIn("read-only recorder provenance validation", combined)
+                self.assertIn("不执行 PingAn workflow", combined)
+                self.assertIn("不证明 production readiness", combined)
+                self.assertIn("不证明 implemented status", combined)
+
     def test_pingan_readiness_evidence_producer_provenance_is_registered_without_status_change(self) -> None:
         rows = _current_function_tree_rows()
 
