@@ -1033,6 +1033,9 @@ _PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA = "tdx.desktop_trade.pingan_promotio
 _PINGAN_IMPLEMENTED_STATUS_PROMOTION_DECISION_SCHEMA = (
     "tdx.desktop_trade.pingan_implemented_status_promotion_decision.v1"
 )
+_PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA = (
+    "tdx.desktop_trade.pingan_promotion_readiness_evidence_contract.v1"
+)
 _PINGAN_PROMOTION_READINESS_GATE_ORDER = (
     "provider_broker_ownership",
     "safety_gates",
@@ -1215,6 +1218,73 @@ def _apply_stale_evidence_to_rollup_gates(
             gate["reason"] = f"{source_kind} evidence is stale or unreadable"
 
 
+def _build_pingan_evidence_contract_status(
+    *,
+    preflight_status: dict[str, Any] | None,
+    desktop_lifecycle_status: dict[str, Any] | None,
+    acceptance_status: dict[str, Any] | None,
+    source_paths: dict[str, str],
+) -> dict[str, Any]:
+    requirements = {
+        "preflight": {
+            "payload": preflight_status,
+            "schema_key": "schema_version",
+            "expected_schema": "tdx.desktop_trade.pingan_promotion_gate_status.v1",
+        },
+        "dialog_readiness": {
+            "payload": desktop_lifecycle_status,
+            "schema_key": "schema_version",
+            "expected_schema": "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1",
+        },
+        "acceptance_coverage": {
+            "payload": acceptance_status,
+            "schema_key": "schema",
+            "expected_schema": _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA,
+        },
+    }
+    source_statuses: dict[str, dict[str, Any]] = {}
+    invalid_source_kinds: list[str] = []
+    for source_kind, requirement in requirements.items():
+        payload = requirement["payload"]
+        schema_key = str(requirement["schema_key"])
+        expected_schema = str(requirement["expected_schema"])
+        observed_schema = payload.get(schema_key) if isinstance(payload, dict) else None
+        schema_valid = observed_schema == expected_schema
+        if payload is None:
+            status = "missing_evidence"
+            reason = f"{source_kind} evidence is missing"
+        elif schema_valid:
+            status = "verified"
+            reason = f"{source_kind} evidence schema matches expected producer contract"
+        else:
+            status = "unverified"
+            reason = f"{source_kind} evidence schema is missing or does not match expected producer contract"
+        if not schema_valid:
+            invalid_source_kinds.append(source_kind)
+        source_statuses[source_kind] = {
+            "source_kind": source_kind,
+            "source_path": source_paths.get(source_kind),
+            "schema_key": schema_key,
+            "expected_schema": expected_schema,
+            "observed_schema": observed_schema,
+            "schema_valid": schema_valid,
+            "status": status,
+            "reason": reason,
+        }
+    return {
+        "schema": _PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA,
+        "status": "verified" if not invalid_source_kinds else "unverified",
+        "invalid_source_kinds": invalid_source_kinds,
+        "source_statuses": source_statuses,
+        "execution_mode": "readonly_evidence_contract_validation",
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only source evidence schema-contract validation; does not execute PingAn workflows "
+            "and does not prove production readiness or implemented status by itself."
+        ),
+    }
+
+
 def _build_pingan_implemented_status_promotion_decision(
     *,
     gate_statuses: dict[str, dict[str, Any]],
@@ -1225,10 +1295,14 @@ def _build_pingan_implemented_status_promotion_decision(
     stale_evidence_kinds: list[str],
     stale_evidence_paths: dict[str, str],
     evidence_manifest: dict[str, Any],
+    evidence_contract_status: dict[str, Any],
 ) -> dict[str, Any]:
     missing_expected_gates = evidence_manifest.get("missing_expected_gates")
     if not isinstance(missing_expected_gates, list):
         missing_expected_gates = []
+    invalid_contract_sources = evidence_contract_status.get("invalid_source_kinds")
+    if not isinstance(invalid_contract_sources, list):
+        invalid_contract_sources = []
     sample_manifest = bool(evidence_manifest.get("example_only") is True or evidence_manifest.get("sample_only") is True)
 
     blocked_reasons: list[str] = []
@@ -1242,6 +1316,8 @@ def _build_pingan_implemented_status_promotion_decision(
         blocked_reasons.append("stale_evidence")
     if missing_expected_gates:
         blocked_reasons.append("missing_expected_gates")
+    if evidence_contract_status.get("status") != "verified":
+        blocked_reasons.append("unverified_evidence_contract")
     if sample_manifest:
         blocked_reasons.append("sample_manifest")
 
@@ -1260,6 +1336,10 @@ def _build_pingan_implemented_status_promotion_decision(
         "stale_evidence_kinds": stale_evidence_kinds,
         "stale_evidence_paths": stale_evidence_paths,
         "missing_expected_gates": missing_expected_gates,
+        "evidence_contract_status": {
+            "status": evidence_contract_status.get("status"),
+            "invalid_source_kinds": invalid_contract_sources,
+        },
         "sample_manifest": sample_manifest,
         "manual_status_review_required": True,
         "function_tree_status_transition_executed": False,
@@ -1419,6 +1499,12 @@ def _build_pingan_promotion_readiness_rollup(
     _apply_stale_evidence_to_rollup_gates(gate_statuses, stale_evidence_kinds)
     completed_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if gate_statuses[name]["complete"]]
     incomplete_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if not gate_statuses[name]["complete"]]
+    evidence_contract_status = _build_pingan_evidence_contract_status(
+        preflight_status=preflight_status,
+        desktop_lifecycle_status=desktop_lifecycle_status,
+        acceptance_status=acceptance_status,
+        source_paths=source_paths,
+    )
     evidence_manifest_status = copy.deepcopy(
         evidence_manifest
         or {
@@ -1446,6 +1532,7 @@ def _build_pingan_promotion_readiness_rollup(
         stale_evidence_kinds=stale_evidence_kinds,
         stale_evidence_paths=stale_evidence_paths,
         evidence_manifest=evidence_manifest_status,
+        evidence_contract_status=evidence_contract_status,
     )
     return {
         "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA,
@@ -1466,6 +1553,7 @@ def _build_pingan_promotion_readiness_rollup(
         "stale_evidence_kinds": stale_evidence_kinds,
         "stale_evidence_paths": stale_evidence_paths,
         "evidence_manifest": evidence_manifest_status,
+        "evidence_contract_status": evidence_contract_status,
         "implemented_status_promotion_decision": implemented_status_promotion_decision,
         "boundary": (
             "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "
