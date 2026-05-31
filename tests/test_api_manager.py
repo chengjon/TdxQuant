@@ -5865,6 +5865,28 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["input"]["submission_key"], "task-buy-001")
         self.assertEqual(result.data["input"]["max_price"], 10.50)
 
+    def test_task_trade_buy_forwards_lifecycle_owner_lock_guard(self) -> None:
+        trade_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"artifacts": {}, "result_dialog": {}})
+        manager = TdxTaskManager(profile="trade_buy", strategy_path="strategy.py")
+        with patch.object(type(manager.trade_manager.pingan), "buy", return_value=trade_result) as mocked_trade:
+            result = manager.trade_buy(
+                port="COM3",
+                code="000001",
+                price="10.00",
+                quantity=100,
+                lifecycle_statefile_path="/tmp/pingan-owner.json",
+                lifecycle_owner_token="task-owner",
+                lifecycle_stale_after_seconds=42.5,
+                require_lifecycle_owner_lock=True,
+            )
+
+        self.assertTrue(result.ok)
+        call = mocked_trade.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "task-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
+
     def test_task_trade_sell_can_refresh_before_trade(self) -> None:
         refresh_result = Result(ok=True, code=ErrorCode.OK, message="refreshed", data={})
         trade_result = Result(
@@ -5908,6 +5930,28 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["result_dialog"]["contract_no"], "S202604260003")
         self.assertEqual(result.data["input"]["submission_key"], "task-sell-001")
         self.assertEqual(result.data["input"]["max_price"], 10.50)
+
+    def test_task_trade_sell_forwards_lifecycle_owner_lock_guard(self) -> None:
+        trade_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"artifacts": {}, "result_dialog": {}})
+        manager = TdxTaskManager(profile="trade_buy", strategy_path="strategy.py")
+        with patch.object(type(manager.trade_manager.pingan), "sell", return_value=trade_result) as mocked_trade:
+            result = manager.trade_sell(
+                port="COM3",
+                code="000001",
+                price="10.00",
+                quantity=100,
+                lifecycle_statefile_path="/tmp/pingan-owner.json",
+                lifecycle_owner_token="task-owner",
+                lifecycle_stale_after_seconds=42.5,
+                require_lifecycle_owner_lock=True,
+            )
+
+        self.assertTrue(result.ok)
+        call = mocked_trade.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "task-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
 
     def test_task_trade_sell_aborts_when_refresh_fails(self) -> None:
         refresh_result = Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message="refresh failed", data={})
@@ -5966,6 +6010,29 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["input"]["side"], "buy")
         self.assertEqual(result.data["input"]["submission_key"], "task-submit-001")
         self.assertEqual(result.data["input"]["max_price"], 10.50)
+
+    def test_task_trade_submit_once_forwards_lifecycle_owner_lock_guard_to_sell_side(self) -> None:
+        trade_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"artifacts": {}, "result_dialog": {}})
+        manager = TdxTaskManager(profile="trade_submit_once", strategy_path="strategy.py")
+        with patch.object(type(manager.trade_manager.pingan), "sell_submit_once", return_value=trade_result) as mocked_trade:
+            result = manager.trade_submit_once(
+                side="sell",
+                port="COM3",
+                code="000001",
+                price="10.00",
+                quantity=100,
+                lifecycle_statefile_path="/tmp/pingan-owner.json",
+                lifecycle_owner_token="task-owner",
+                lifecycle_stale_after_seconds=42.5,
+                require_lifecycle_owner_lock=True,
+            )
+
+        self.assertTrue(result.ok)
+        call = mocked_trade.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "task-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
 
     def test_task_trade_submit_once_sell_side_uses_sell_submit_once_identity(self) -> None:
         trade_result = Result(

@@ -74,6 +74,28 @@ def _capture_task_timing(step_name: str, fn: Any) -> tuple[Any, dict[str, Any]]:
     return value, {"task_call": {"name": step_name, "total_ms": total_ms}}
 
 
+def _build_task_lifecycle_owner_lock_guard_kwargs(
+    *,
+    lifecycle_statefile_path: str | None,
+    lifecycle_owner_token: str | None,
+    lifecycle_stale_after_seconds: float,
+    require_lifecycle_owner_lock: bool,
+) -> dict[str, Any]:
+    if not (
+        require_lifecycle_owner_lock
+        or lifecycle_statefile_path is not None
+        or lifecycle_owner_token is not None
+        or lifecycle_stale_after_seconds != 300.0
+    ):
+        return {}
+    return {
+        "lifecycle_statefile_path": lifecycle_statefile_path,
+        "lifecycle_owner_token": lifecycle_owner_token,
+        "lifecycle_stale_after_seconds": lifecycle_stale_after_seconds,
+        "require_lifecycle_owner_lock": require_lifecycle_owner_lock,
+    }
+
+
 def _extract_stock_codes(payload: Any) -> list[str]:
     if isinstance(payload, list):
         codes: list[str] = []
@@ -3345,8 +3367,18 @@ class TdxTaskManager:
         refresh_before_trade: bool | None = None,
         refresh_market: str | None = None,
         refresh_force: bool | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         def run() -> Result:
+            lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
             resolved_refresh_first = bool(
                 self.profile_options.get("refresh_before_trade", False)
                 if refresh_before_trade is None
@@ -3376,6 +3408,7 @@ class TdxTaskManager:
                                 "refresh_before_trade": resolved_refresh_first,
                                 "refresh_market": resolved_refresh_market,
                                 "refresh_force": resolved_refresh_force,
+                                **lifecycle_guard_kwargs,
                             },
                             "refresh_result": refresh_result.to_dict(),
                         },
@@ -3393,6 +3426,7 @@ class TdxTaskManager:
                 close_result_dialog=close_result_dialog,
                 submission_key=submission_key,
                 max_price=max_price,
+                **lifecycle_guard_kwargs,
             )
             if not trade_result.ok:
                 return trade_result
@@ -3415,6 +3449,7 @@ class TdxTaskManager:
                         "refresh_before_trade": resolved_refresh_first,
                         "refresh_market": resolved_refresh_market,
                         "refresh_force": resolved_refresh_force,
+                        **lifecycle_guard_kwargs,
                     },
                     "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
                     "trade_result": trade_result.to_dict(),
@@ -3444,8 +3479,18 @@ class TdxTaskManager:
         refresh_before_trade: bool | None = None,
         refresh_market: str | None = None,
         refresh_force: bool | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         def run() -> Result:
+            lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
             resolved_refresh_first = bool(
                 self.profile_options.get("refresh_before_trade", False)
                 if refresh_before_trade is None
@@ -3475,6 +3520,7 @@ class TdxTaskManager:
                                 "refresh_before_trade": resolved_refresh_first,
                                 "refresh_market": resolved_refresh_market,
                                 "refresh_force": resolved_refresh_force,
+                                **lifecycle_guard_kwargs,
                             },
                             "refresh_result": refresh_result.to_dict(),
                         },
@@ -3492,6 +3538,7 @@ class TdxTaskManager:
                 close_result_dialog=close_result_dialog,
                 submission_key=submission_key,
                 max_price=max_price,
+                **lifecycle_guard_kwargs,
             )
             if not trade_result.ok:
                 return trade_result
@@ -3514,6 +3561,7 @@ class TdxTaskManager:
                         "refresh_before_trade": resolved_refresh_first,
                         "refresh_market": resolved_refresh_market,
                         "refresh_force": resolved_refresh_force,
+                        **lifecycle_guard_kwargs,
                     },
                     "refresh_result": refresh_result.to_dict() if refresh_result is not None else None,
                     "trade_result": trade_result.to_dict(),
@@ -3544,9 +3592,19 @@ class TdxTaskManager:
         refresh_before_trade: bool | None = None,
         refresh_market: str | None = None,
         refresh_force: bool | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         def run() -> Result:
             normalized_side = str(side or "buy").strip().lower()
+            lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
             common_input = {
                 "port": port,
                 "side": normalized_side,
@@ -3559,6 +3617,7 @@ class TdxTaskManager:
                 "close_result_dialog": close_result_dialog,
                 "submission_key": submission_key,
                 "max_price": max_price,
+                **lifecycle_guard_kwargs,
             }
             if normalized_side not in {"buy", "sell"}:
                 return Result(
@@ -3608,6 +3667,7 @@ class TdxTaskManager:
                 "close_result_dialog": close_result_dialog,
                 "submission_key": submission_key,
                 "max_price": max_price,
+                **lifecycle_guard_kwargs,
             }
             if normalized_side == "sell":
                 trade_result = self.trade_manager.pingan.sell_submit_once(**trade_kwargs)

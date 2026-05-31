@@ -7,7 +7,7 @@ import sys
 import time
 from decimal import Decimal
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 from uuid import uuid4
 
 from .brokers import PingAnBrokerAdapter
@@ -265,6 +265,26 @@ def _add_trade_lifecycle_owner_guard_arguments(subparser: argparse.ArgumentParse
     subparser.add_argument("--lifecycle-owner-token")
     subparser.add_argument("--lifecycle-stale-after-seconds", type=float, default=300.0)
     subparser.add_argument("--require-lifecycle-owner-lock", action="store_true")
+
+
+def _get_lifecycle_owner_guard_kwargs(args: argparse.Namespace) -> dict[str, Any]:
+    lifecycle_statefile_path = getattr(args, "lifecycle_statefile_path", None)
+    lifecycle_owner_token = getattr(args, "lifecycle_owner_token", None)
+    lifecycle_stale_after_seconds = float(getattr(args, "lifecycle_stale_after_seconds", 300.0))
+    require_lifecycle_owner_lock = bool(getattr(args, "require_lifecycle_owner_lock", False))
+    if not (
+        require_lifecycle_owner_lock
+        or lifecycle_statefile_path is not None
+        or lifecycle_owner_token is not None
+        or lifecycle_stale_after_seconds != 300.0
+    ):
+        return {}
+    return {
+        "lifecycle_statefile_path": lifecycle_statefile_path,
+        "lifecycle_owner_token": lifecycle_owner_token,
+        "lifecycle_stale_after_seconds": lifecycle_stale_after_seconds,
+        "require_lifecycle_owner_lock": require_lifecycle_owner_lock,
+    }
 
 
 def _add_trade_order_place_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -1490,6 +1510,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
     task_trade_buy_parser = task_subparsers.add_parser("trade-buy")
     _add_trade_common_arguments(task_trade_buy_parser)
+    _add_trade_lifecycle_owner_guard_arguments(task_trade_buy_parser)
     task_trade_buy_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_buy_parser.add_argument("--refresh-market")
     task_trade_buy_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -1497,6 +1518,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
     task_trade_sell_parser = task_subparsers.add_parser("trade-sell")
     _add_trade_common_arguments(task_trade_sell_parser)
+    _add_trade_lifecycle_owner_guard_arguments(task_trade_sell_parser)
     task_trade_sell_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_sell_parser.add_argument("--refresh-market")
     task_trade_sell_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -1505,6 +1527,7 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_trade_submit_once_parser = task_subparsers.add_parser("trade-submit-once")
     _add_trade_common_arguments(task_trade_submit_once_parser)
     task_trade_submit_once_parser.add_argument("--side", choices=["buy", "sell"], default="buy")
+    _add_trade_lifecycle_owner_guard_arguments(task_trade_submit_once_parser)
     task_trade_submit_once_parser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     task_trade_submit_once_parser.add_argument("--refresh-market")
     task_trade_submit_once_parser.add_argument("--refresh-force", action=argparse.BooleanOptionalAction, default=None)
@@ -5940,6 +5963,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_before_trade=args.refresh_before_trade,
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
+            **_get_lifecycle_owner_guard_kwargs(args),
         )
     if args.task_command == "trade-sell":
         return manager.trade_sell(
@@ -5956,6 +5980,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_before_trade=args.refresh_before_trade,
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
+            **_get_lifecycle_owner_guard_kwargs(args),
         )
     if args.task_command == "trade-submit-once":
         return manager.trade_submit_once(
@@ -5973,6 +5998,7 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             refresh_before_trade=args.refresh_before_trade,
             refresh_market=args.refresh_market,
             refresh_force=args.refresh_force,
+            **_get_lifecycle_owner_guard_kwargs(args),
         )
     if args.task_command == "trade-submit-ready":
         return manager.trade_submit_ready(

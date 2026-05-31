@@ -1863,6 +1863,13 @@ class ApiCliParserTests(unittest.TestCase):
                 "task-buy-001",
                 "--max-price",
                 "10.50",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "task-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
             ]
         )
         self.assertEqual(args.command, "task")
@@ -1870,6 +1877,10 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertIsNone(args.refresh_before_trade)
         self.assertEqual(args.submission_key, "task-buy-001")
         self.assertEqual(args.max_price, 10.50)
+        self.assertEqual(args.lifecycle_statefile_path, "/tmp/pingan-owner.json")
+        self.assertEqual(args.lifecycle_owner_token, "task-owner")
+        self.assertEqual(args.lifecycle_stale_after_seconds, 42.5)
+        self.assertTrue(args.require_lifecycle_owner_lock)
 
     def test_task_trade_sell_command_parses(self) -> None:
         parser = build_parser()
@@ -1889,6 +1900,13 @@ class ApiCliParserTests(unittest.TestCase):
                 "task-sell-001",
                 "--max-price",
                 "10.50",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "task-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
             ]
         )
         self.assertEqual(args.command, "task")
@@ -1896,6 +1914,10 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertIsNone(args.refresh_before_trade)
         self.assertEqual(args.submission_key, "task-sell-001")
         self.assertEqual(args.max_price, 10.50)
+        self.assertEqual(args.lifecycle_statefile_path, "/tmp/pingan-owner.json")
+        self.assertEqual(args.lifecycle_owner_token, "task-owner")
+        self.assertEqual(args.lifecycle_stale_after_seconds, 42.5)
+        self.assertTrue(args.require_lifecycle_owner_lock)
 
     def test_task_trade_submit_once_command_parses(self) -> None:
         parser = build_parser()
@@ -1915,6 +1937,13 @@ class ApiCliParserTests(unittest.TestCase):
                 "task-submit-001",
                 "--max-price",
                 "10.50",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "task-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
             ]
         )
         self.assertEqual(args.command, "task")
@@ -1923,6 +1952,10 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertIsNone(args.refresh_before_trade)
         self.assertEqual(args.submission_key, "task-submit-001")
         self.assertEqual(args.max_price, 10.50)
+        self.assertEqual(args.lifecycle_statefile_path, "/tmp/pingan-owner.json")
+        self.assertEqual(args.lifecycle_owner_token, "task-owner")
+        self.assertEqual(args.lifecycle_stale_after_seconds, 42.5)
+        self.assertTrue(args.require_lifecycle_owner_lock)
 
     def test_task_trade_submit_once_sell_side_command_parses(self) -> None:
         parser = build_parser()
@@ -10428,6 +10461,41 @@ class TaskCliDispatchTests(unittest.TestCase):
             refresh_force=None,
         )
 
+    def test_handle_task_trade_buy_forwards_lifecycle_owner_lock_guard(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "task-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_buy.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+
+        self.assertIs(result, expected)
+        self.assertEqual(manager.trade_buy.call_args.kwargs["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(manager.trade_buy.call_args.kwargs["lifecycle_owner_token"], "task-owner")
+        self.assertEqual(manager.trade_buy.call_args.kwargs["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(manager.trade_buy.call_args.kwargs["require_lifecycle_owner_lock"])
+
     def test_handle_task_trade_sell_uses_task_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "trade-sell", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
@@ -10512,6 +10580,44 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertIs(result, expected)
         self.assertEqual(manager.trade_submit_once.call_args.kwargs["side"], "sell")
+
+    def test_handle_task_trade_submit_once_forwards_lifecycle_owner_lock_guard(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-submit-once",
+                "--side",
+                "sell",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "task-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_submit_once.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+
+        self.assertIs(result, expected)
+        self.assertEqual(manager.trade_submit_once.call_args.kwargs["side"], "sell")
+        self.assertEqual(manager.trade_submit_once.call_args.kwargs["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(manager.trade_submit_once.call_args.kwargs["lifecycle_owner_token"], "task-owner")
+        self.assertEqual(manager.trade_submit_once.call_args.kwargs["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(manager.trade_submit_once.call_args.kwargs["require_lifecycle_owner_lock"])
 
     def test_handle_task_trade_submit_ready_uses_task_manager(self) -> None:
         parser = build_parser()

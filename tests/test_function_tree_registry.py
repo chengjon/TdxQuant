@@ -314,6 +314,24 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("broker readiness", combined)
                 self.assertIn("live/manual acceptance", combined)
 
+    def test_pingan_task_execution_owner_lock_required_guard_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-task-execution-owner-lock-required-guard", combined)
+                self.assertIn("task trade-buy/trade-sell/trade-submit-once --require-lifecycle-owner-lock", combined)
+                self.assertIn("TdxTaskManager.trade_buy/trade_sell/trade_submit_once", combined)
+                self.assertIn("task layer 只转发", combined)
+                self.assertIn("不 acquire/release owner lock", combined)
+                self.assertIn("不直接写 lifecycle statefile/lock", combined)
+                self.assertIn("不 start/stop/restart/kill/supervise/backoff", combined)
+                self.assertIn("broker readiness", combined)
+                self.assertIn("live/manual acceptance", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"
