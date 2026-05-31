@@ -24,6 +24,7 @@ from tdxquant.cli import (
     _run_trade_sell,
     _run_trade_submit_ready,
     _run_trade_dialog_readiness,
+    _run_trade_lifecycle_owner_lock,
     _run_trade_health,
     _run_trade_preflight,
     _run_trade_submit_once,
@@ -2311,6 +2312,31 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
         self.assertEqual(args.confirm_timeout, 1.2)
         self.assertEqual(args.result_timeout, 1.8)
+
+    def test_trade_lifecycle_owner_lock_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-owner-lock",
+                "--action",
+                "acquire",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+                "--stale-after-seconds",
+                "45",
+                "--force-stale",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "lifecycle-owner-lock")
+        self.assertEqual(args.action, "acquire")
+        self.assertEqual(args.statefile_path, "runtime/pingan/lifecycle-owner.json")
+        self.assertEqual(args.owner_token, "operator-a")
+        self.assertEqual(args.stale_after_seconds, 45.0)
+        self.assertTrue(args.force_stale)
 
     def test_trade_submit_ready_command_parses(self) -> None:
         parser = build_parser()
@@ -10795,6 +10821,26 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)
 
+    def test_handle_trade_lifecycle_owner_lock_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-owner-lock",
+                "--action",
+                "status",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"lifecycle_owner_lock": {"status": "owned"}})
+        with patch("tdxquant.cli._run_trade_lifecycle_owner_lock", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
     def test_handle_trade_submit_ready_uses_trade_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["trade", "submit-ready", "--port", "COM3", "--code", "000001", "--price", "10.00", "--quantity", "100"])
@@ -11057,6 +11103,36 @@ class TradeCliDispatchTests(unittest.TestCase):
             dialog_lookup_mode="win32_experimental",
             confirm_timeout=1.2,
             result_timeout=1.8,
+        )
+
+    def test_run_trade_lifecycle_owner_lock_forwards_owner_lock_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-owner-lock",
+                "--action",
+                "release",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+                "--stale-after-seconds",
+                "90",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"lifecycle_owner_lock": {"status": "released"}})
+        manager = MagicMock()
+        manager.pingan.lifecycle_owner_lock.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_lifecycle_owner_lock(args)
+        self.assertIs(result, expected)
+        manager.pingan.lifecycle_owner_lock.assert_called_once_with(
+            action="release",
+            statefile_path="runtime/pingan/lifecycle-owner.json",
+            owner_token="operator-a",
+            stale_after_seconds=90.0,
+            force_stale=False,
         )
 
     def test_run_trade_submit_ready_forwards_boundary_arguments(self) -> None:

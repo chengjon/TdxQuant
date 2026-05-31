@@ -396,6 +396,15 @@ def _add_trade_dialog_readiness_arguments(subparser: argparse.ArgumentParser) ->
     subparser.add_argument("--result-timeout", type=float)
 
 
+def _add_trade_lifecycle_owner_lock_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--profile", default="balanced")
+    subparser.add_argument("--action", choices=["status", "acquire", "release"], default="status")
+    subparser.add_argument("--statefile-path", required=True)
+    subparser.add_argument("--owner-token", required=True)
+    subparser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    subparser.add_argument("--force-stale", action=argparse.BooleanOptionalAction, default=False)
+
+
 def _add_task_trade_submit_ready_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--port", required=True)
     subparser.add_argument("--baudrate", type=int, default=115200)
@@ -1611,6 +1620,10 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     _add_trade_dialog_readiness_arguments(trade_dialog_readiness_parser)
     trade_dialog_readiness_parser.add_argument("--output", help="Optional path to write the JSON result")
 
+    trade_lifecycle_owner_lock_parser = trade_subparsers.add_parser("lifecycle-owner-lock")
+    _add_trade_lifecycle_owner_lock_arguments(trade_lifecycle_owner_lock_parser)
+    trade_lifecycle_owner_lock_parser.add_argument("--output", help="Optional path to write the JSON result")
+
     trade_broker_capabilities_parser = trade_subparsers.add_parser("broker-capabilities")
     trade_broker_capabilities_parser.add_argument("--broker", default="pingan_desktop")
     trade_broker_capabilities_parser.add_argument("--profile", default="balanced")
@@ -2587,6 +2600,21 @@ def _run_trade_dialog_readiness(args: argparse.Namespace) -> Result:
         dialog_lookup_mode=args.dialog_lookup_mode,
         confirm_timeout=args.confirm_timeout,
         result_timeout=args.result_timeout,
+    )
+
+
+def _run_trade_lifecycle_owner_lock(args: argparse.Namespace) -> Result:
+    trade_manager = TdxTradeManager(
+        profile=getattr(args, "profile", None) or "balanced",
+        title_keyword=args.title_key,
+        exe_path=args.exe_path,
+    )
+    return trade_manager.pingan.lifecycle_owner_lock(
+        action=args.action,
+        statefile_path=args.statefile_path,
+        owner_token=args.owner_token,
+        stale_after_seconds=args.stale_after_seconds,
+        force_stale=args.force_stale,
     )
 
 
@@ -6032,6 +6060,8 @@ def _handle_trade_subcommand(args: argparse.Namespace) -> Result:
         return _run_trade_confirm_current(args)
     if args.trade_command == "dialog-readiness":
         return _run_trade_dialog_readiness(args)
+    if args.trade_command == "lifecycle-owner-lock":
+        return _run_trade_lifecycle_owner_lock(args)
     if args.trade_command == "broker-capabilities":
         return _run_trade_broker_capabilities(args)
     return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported trade subcommand: {args.trade_command}")

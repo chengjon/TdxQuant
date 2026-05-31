@@ -212,3 +212,13 @@ PingAn lifecycle owner PID validation SHALL remain a local diagnostic for the ow
 - **WHEN** D-07 or D-08 evidence includes PingAn owner PID validation
 - **THEN** the node MUST remain `[部分实现]`
 - **AND** the boundary MUST state that owner PID liveness is only a local statefile diagnostic, not real PingAn desktop process ownership or live/manual acceptance.
+
+### Requirement: PingAn lifecycle owner lock CLI SHALL remain partial lifecycle evidence
+
+The PingAn lifecycle owner lock CLI entry SHALL be treated as explicit local statefile control and SHALL NOT be treated as proof of live trading readiness.
+
+#### Scenario: Lifecycle owner lock CLI is registered without implemented trading status
+
+- **WHEN** D-07 or D-08 evidence includes the `trade lifecycle-owner-lock` CLI entry
+- **THEN** the node MUST remain `[部分实现]`
+- **AND** the boundary MUST state that the CLI writes only local owner lock state when requested and does not start, stop, restart, kill, supervise, back off, submit orders, claim real desktop PID ownership, or provide live/manual acceptance.
