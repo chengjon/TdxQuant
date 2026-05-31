@@ -1029,6 +1029,7 @@ _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA = "tdx.desktop_trade.pingan_promotion_
 _PINGAN_PROMOTION_READINESS_ROLLUP_ARTIFACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_rollup_artifact.v1"
 )
+_PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA = "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1"
 _PINGAN_PROMOTION_READINESS_GATE_ORDER = (
     "provider_broker_ownership",
     "safety_gates",
@@ -1049,6 +1050,48 @@ def _load_json_evidence(path: str | None) -> tuple[dict[str, Any] | None, str | 
     if not isinstance(payload, dict):
         return None, "evidence JSON must contain an object"
     return payload, None
+
+
+def _load_pingan_promotion_readiness_manifest(
+    path: str | None,
+) -> tuple[dict[str, Any], dict[str, Any], str | None]:
+    metadata: dict[str, Any] = {
+        "schema": _PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA,
+        "source_path": path,
+        "loaded": False,
+        "expected_gates": [],
+        "missing_expected_gates": [],
+        "resolved_overrides": [],
+    }
+    if path is None:
+        return {}, metadata, None
+    payload, error = _load_json_evidence(path)
+    if error is not None:
+        metadata["error"] = error
+        return {}, metadata, error
+    if payload is None:
+        metadata["error"] = "manifest is missing"
+        return {}, metadata, "manifest is missing"
+    schema = payload.get("schema")
+    metadata["schema"] = schema
+    if schema != _PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA:
+        error = f"expected schema {_PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA}"
+        metadata["error"] = error
+        return {}, metadata, error
+
+    values: dict[str, Any] = {}
+    for key in ("preflight_path", "dialog_readiness_path", "acceptance_coverage_path"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            values[key] = value.strip()
+    max_age = payload.get("max_evidence_age_seconds")
+    if isinstance(max_age, (int, float)):
+        values["max_evidence_age_seconds"] = max_age
+    expected_gates = payload.get("expected_gates")
+    if isinstance(expected_gates, list):
+        metadata["expected_gates"] = [str(gate).strip() for gate in expected_gates if str(gate).strip()]
+    metadata["loaded"] = True
+    return values, metadata, None
 
 
 def _find_json_object(payload: dict[str, Any] | None, key: str) -> dict[str, Any] | None:
@@ -1171,6 +1214,7 @@ def _build_pingan_promotion_readiness_rollup(
     dialog_readiness_path: str | None = None,
     acceptance_coverage_path: str | None = None,
     max_evidence_age_seconds: float | None = None,
+    evidence_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     source_paths = {
         key: value
@@ -1310,6 +1354,24 @@ def _build_pingan_promotion_readiness_rollup(
     _apply_stale_evidence_to_rollup_gates(gate_statuses, stale_evidence_kinds)
     completed_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if gate_statuses[name]["complete"]]
     incomplete_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if not gate_statuses[name]["complete"]]
+    evidence_manifest_status = copy.deepcopy(
+        evidence_manifest
+        or {
+            "schema": _PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA,
+            "source_path": None,
+            "loaded": False,
+            "expected_gates": [],
+            "missing_expected_gates": [],
+            "resolved_overrides": [],
+        }
+    )
+    expected_gates = evidence_manifest_status.get("expected_gates")
+    if not isinstance(expected_gates, list):
+        expected_gates = []
+    evidence_manifest_status["expected_gates"] = expected_gates
+    evidence_manifest_status["missing_expected_gates"] = [
+        gate_name for gate_name in expected_gates if gate_name not in gate_statuses
+    ]
     return {
         "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA,
         "status": "complete" if not incomplete_gates else "partial",
@@ -1328,6 +1390,7 @@ def _build_pingan_promotion_readiness_rollup(
         "evidence_freshness_status": evidence_freshness_status,
         "stale_evidence_kinds": stale_evidence_kinds,
         "stale_evidence_paths": stale_evidence_paths,
+        "evidence_manifest": evidence_manifest_status,
         "boundary": (
             "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "
             "broker/desktop/trade/report/catalog workflows and does not prove production readiness "
@@ -1785,6 +1848,7 @@ class TdxTaskManager:
     def pingan_promotion_readiness_rollup(
         self,
         *,
+        evidence_manifest_path: str | None = None,
         preflight_path: str | None = None,
         dialog_readiness_path: str | None = None,
         acceptance_coverage_path: str | None = None,
@@ -1792,16 +1856,48 @@ class TdxTaskManager:
         json_output_path: str | None = None,
     ) -> Result:
         def run() -> Result:
+            manifest_values, manifest_metadata, manifest_error = _load_pingan_promotion_readiness_manifest(
+                evidence_manifest_path
+            )
+            if manifest_error is not None:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"failed to load PingAn promotion readiness evidence manifest: {manifest_error}",
+                    data={"evidence_manifest": manifest_metadata},
+                    next_action="Fix the evidence manifest JSON and retry.",
+                )
+            resolved_overrides: list[str] = []
+            resolved_preflight_path = str(manifest_values.get("preflight_path") or "") or None
+            resolved_dialog_readiness_path = str(manifest_values.get("dialog_readiness_path") or "") or None
+            resolved_acceptance_coverage_path = str(manifest_values.get("acceptance_coverage_path") or "") or None
+            resolved_max_evidence_age_seconds = manifest_values.get("max_evidence_age_seconds")
+            if preflight_path is not None:
+                resolved_preflight_path = preflight_path
+                resolved_overrides.append("preflight_path")
+            if dialog_readiness_path is not None:
+                resolved_dialog_readiness_path = dialog_readiness_path
+                resolved_overrides.append("dialog_readiness_path")
+            if acceptance_coverage_path is not None:
+                resolved_acceptance_coverage_path = acceptance_coverage_path
+                resolved_overrides.append("acceptance_coverage_path")
+            if max_evidence_age_seconds is not None:
+                resolved_max_evidence_age_seconds = max_evidence_age_seconds
+                resolved_overrides.append("max_evidence_age_seconds")
+            if not isinstance(resolved_max_evidence_age_seconds, (int, float)):
+                resolved_max_evidence_age_seconds = None
+            manifest_metadata["resolved_overrides"] = resolved_overrides
             return Result(
                 ok=True,
                 code=ErrorCode.OK,
                 message="summarized PingAn promotion readiness",
                 data={
                     "promotion_readiness_rollup": _build_pingan_promotion_readiness_rollup(
-                        preflight_path=preflight_path,
-                        dialog_readiness_path=dialog_readiness_path,
-                        acceptance_coverage_path=acceptance_coverage_path,
-                        max_evidence_age_seconds=max_evidence_age_seconds,
+                        preflight_path=resolved_preflight_path,
+                        dialog_readiness_path=resolved_dialog_readiness_path,
+                        acceptance_coverage_path=resolved_acceptance_coverage_path,
+                        max_evidence_age_seconds=resolved_max_evidence_age_seconds,
+                        evidence_manifest=manifest_metadata,
                     )
                 },
             )

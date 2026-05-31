@@ -4295,6 +4295,162 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertFalse(artifact["promotion_readiness_rollup"]["order_submitted"])
         self.assertFalse(artifact["promotion_readiness_rollup"]["control_dispatch_executed"])
 
+    def test_task_pingan_promotion_readiness_rollup_loads_evidence_manifest(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            manifest_path = root / "promotion-readiness-manifest.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {
+                        "promotion_gate_status": {
+                            "provider_broker_ownership": {"status": "ready"},
+                            "safety_gates": {"status": "ready"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(
+                    {
+                        "desktop_lifecycle_gate_status": {
+                            "status": "complete",
+                            "remaining_lifecycle_gates": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "acceptance_outcome_coverage_status": {
+                            "automated_outcome_coverage_complete": True,
+                            "live_manual_acceptance_complete": True,
+                            "acceptance_complete": True,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1",
+                        "preflight_path": str(preflight_path),
+                        "dialog_readiness_path": str(dialog_path),
+                        "acceptance_coverage_path": str(acceptance_path),
+                        "max_evidence_age_seconds": 3600,
+                        "expected_gates": [
+                            "provider_broker_ownership",
+                            "safety_gates",
+                            "desktop_lifecycle",
+                            "audit_evidence",
+                            "live_manual_acceptance",
+                            "acceptance_evidence",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(evidence_manifest_path=str(manifest_path))
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["status"], "complete")
+        self.assertEqual(rollup["source_paths"]["preflight"], str(preflight_path))
+        self.assertEqual(rollup["source_paths"]["dialog_readiness"], str(dialog_path))
+        self.assertEqual(rollup["source_paths"]["acceptance_coverage"], str(acceptance_path))
+        self.assertEqual(rollup["evidence_freshness_cutoff_seconds"], 3600)
+        manifest = rollup["evidence_manifest"]
+        self.assertTrue(manifest["loaded"])
+        self.assertEqual(manifest["source_path"], str(manifest_path))
+        self.assertEqual(manifest["schema"], "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1")
+        self.assertEqual(manifest["expected_gates"], list(rollup["gate_statuses"]))
+        self.assertEqual(manifest["missing_expected_gates"], [])
+        self.assertFalse(rollup["order_submitted"])
+        self.assertFalse(rollup["control_dispatch_executed"])
+
+    def test_task_pingan_promotion_readiness_rollup_manifest_allows_direct_overrides(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest_preflight_path = root / "manifest-preflight.json"
+            override_preflight_path = root / "override-preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            manifest_path = root / "promotion-readiness-manifest.json"
+            manifest_preflight_path.write_text(
+                json.dumps(
+                    {
+                        "promotion_gate_status": {
+                            "provider_broker_ownership": {"status": "ready"},
+                            "safety_gates": {"status": "incomplete"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            override_preflight_path.write_text(
+                json.dumps(
+                    {
+                        "promotion_gate_status": {
+                            "provider_broker_ownership": {"status": "ready"},
+                            "safety_gates": {"status": "ready"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(
+                    {
+                        "desktop_lifecycle_gate_status": {
+                            "status": "complete",
+                            "remaining_lifecycle_gates": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "acceptance_outcome_coverage_status": {
+                            "automated_outcome_coverage_complete": True,
+                            "live_manual_acceptance_complete": True,
+                            "acceptance_complete": True,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1",
+                        "preflight_path": str(manifest_preflight_path),
+                        "dialog_readiness_path": str(dialog_path),
+                        "acceptance_coverage_path": str(acceptance_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(
+                evidence_manifest_path=str(manifest_path),
+                preflight_path=str(override_preflight_path),
+            )
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["status"], "complete")
+        self.assertEqual(rollup["source_paths"]["preflight"], str(override_preflight_path))
+        self.assertEqual(rollup["evidence_manifest"]["resolved_overrides"], ["preflight_path"])
+
     def test_task_block_sync_attaches_task_metadata_and_forwards_symbols(self) -> None:
         expected = Result(
             ok=True,

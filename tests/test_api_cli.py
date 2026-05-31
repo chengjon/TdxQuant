@@ -1839,6 +1839,8 @@ class ApiCliParserTests(unittest.TestCase):
             [
                 "task",
                 "pingan-promotion-readiness-rollup",
+                "--evidence-manifest-path",
+                "runtime/pingan/promotion-readiness-manifest.json",
                 "--preflight-path",
                 "runtime/pingan/preflight.json",
                 "--dialog-readiness-path",
@@ -1853,6 +1855,7 @@ class ApiCliParserTests(unittest.TestCase):
         )
         self.assertEqual(args.command, "task")
         self.assertEqual(args.task_command, "pingan-promotion-readiness-rollup")
+        self.assertEqual(args.evidence_manifest_path, "runtime/pingan/promotion-readiness-manifest.json")
         self.assertEqual(args.preflight_path, "runtime/pingan/preflight.json")
         self.assertEqual(args.dialog_readiness_path, "runtime/pingan/dialog-readiness.json")
         self.assertEqual(args.acceptance_coverage_path, "runtime/pingan/acceptance-coverage.json")
@@ -10753,6 +10756,8 @@ class TaskCliDispatchTests(unittest.TestCase):
             [
                 "task",
                 "pingan-promotion-readiness-rollup",
+                "--evidence-manifest-path",
+                "runtime/pingan/promotion-readiness-manifest.json",
                 "--preflight-path",
                 "runtime/pingan/preflight.json",
                 "--dialog-readiness-path",
@@ -10772,6 +10777,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             result = _handle_task_subcommand(args)
         self.assertIs(result, expected)
         manager.pingan_promotion_readiness_rollup.assert_called_once_with(
+            evidence_manifest_path="runtime/pingan/promotion-readiness-manifest.json",
             preflight_path="runtime/pingan/preflight.json",
             dialog_readiness_path="runtime/pingan/dialog-readiness.json",
             acceptance_coverage_path="runtime/pingan/acceptance-coverage.json",

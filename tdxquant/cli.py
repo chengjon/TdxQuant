@@ -652,6 +652,7 @@ def _add_trade_audit_period_report_arguments(subparser: argparse.ArgumentParser)
 
 
 def _add_pingan_promotion_readiness_rollup_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--evidence-manifest-path")
     subparser.add_argument("--preflight-path")
     subparser.add_argument("--dialog-readiness-path")
     subparser.add_argument("--acceptance-coverage-path")
@@ -5810,6 +5811,7 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
         return manager.trade_audit_period_report(**period_kwargs)
     if command_name == "pingan-promotion-readiness-rollup":
         return manager.pingan_promotion_readiness_rollup(
+            evidence_manifest_path=args.evidence_manifest_path,
             preflight_path=args.preflight_path,
             dialog_readiness_path=args.dialog_readiness_path,
             acceptance_coverage_path=args.acceptance_coverage_path,
