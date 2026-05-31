@@ -25,6 +25,7 @@ from tdxquant.cli import (
     _run_trade_sell,
     _run_trade_submit_ready,
     _run_trade_dialog_readiness,
+    _run_trade_exception_popup,
     _run_trade_lifecycle_owner_lock,
     _run_trade_health,
     _run_trade_preflight,
@@ -2401,6 +2402,31 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
         self.assertEqual(args.confirm_timeout, 1.2)
         self.assertEqual(args.result_timeout, 1.8)
+
+    def test_trade_exception_popup_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "exception-popup",
+                "--action",
+                "close",
+                "--confirm-close",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--result-timeout",
+                "1.8",
+                "--result-close-pre-delay",
+                "0.2",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "exception-popup")
+        self.assertEqual(args.action, "close")
+        self.assertTrue(args.confirm_close)
+        self.assertEqual(args.dialog_lookup_mode, "win32_experimental")
+        self.assertEqual(args.result_timeout, 1.8)
+        self.assertEqual(args.result_close_pre_delay, 0.2)
 
     def test_trade_lifecycle_owner_lock_command_parses(self) -> None:
         parser = build_parser()
@@ -11194,6 +11220,15 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)
 
+    def test_handle_trade_exception_popup_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "exception-popup", "--action", "inspect"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"exception_popup_control": {"status": "detected"}})
+        with patch("tdxquant.cli._run_trade_exception_popup", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
     def test_handle_trade_lifecycle_owner_lock_uses_trade_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -11520,6 +11555,37 @@ class TradeCliDispatchTests(unittest.TestCase):
             dialog_lookup_mode="win32_experimental",
             confirm_timeout=1.2,
             result_timeout=1.8,
+        )
+
+    def test_run_trade_exception_popup_forwards_control_arguments(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "exception-popup",
+                "--action",
+                "close",
+                "--confirm-close",
+                "--dialog-lookup-mode",
+                "win32_experimental",
+                "--result-timeout",
+                "1.8",
+                "--result-close-pre-delay",
+                "0.2",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"exception_popup_control": {"close_executed": True}})
+        manager = MagicMock()
+        manager.pingan.exception_popup.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_exception_popup(args)
+        self.assertIs(result, expected)
+        manager.pingan.exception_popup.assert_called_once_with(
+            action="close",
+            confirm_close=True,
+            dialog_lookup_mode="win32_experimental",
+            result_timeout=1.8,
+            result_close_pre_delay=0.2,
         )
 
     def test_run_trade_lifecycle_owner_lock_forwards_owner_lock_arguments(self) -> None:

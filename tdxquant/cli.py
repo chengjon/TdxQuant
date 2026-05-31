@@ -430,6 +430,15 @@ def _add_trade_dialog_readiness_arguments(subparser: argparse.ArgumentParser) ->
     subparser.add_argument("--result-timeout", type=float)
 
 
+def _add_trade_exception_popup_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--profile", default="balanced")
+    subparser.add_argument("--action", choices=["inspect", "close"], default="inspect")
+    subparser.add_argument("--confirm-close", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--dialog-lookup-mode", choices=["uia", "win32_experimental"])
+    subparser.add_argument("--result-timeout", type=float)
+    subparser.add_argument("--result-close-pre-delay", type=float)
+
+
 def _add_trade_lifecycle_owner_lock_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--profile", default="balanced")
     subparser.add_argument("--action", choices=["status", "acquire", "release"], default="status")
@@ -1666,6 +1675,10 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     _add_trade_dialog_readiness_arguments(trade_dialog_readiness_parser)
     trade_dialog_readiness_parser.add_argument("--output", help="Optional path to write the JSON result")
 
+    trade_exception_popup_parser = trade_subparsers.add_parser("exception-popup")
+    _add_trade_exception_popup_arguments(trade_exception_popup_parser)
+    trade_exception_popup_parser.add_argument("--output", help="Optional path to write the JSON result")
+
     trade_lifecycle_owner_lock_parser = trade_subparsers.add_parser("lifecycle-owner-lock")
     _add_trade_lifecycle_owner_lock_arguments(trade_lifecycle_owner_lock_parser)
     trade_lifecycle_owner_lock_parser.add_argument("--output", help="Optional path to write the JSON result")
@@ -2656,6 +2669,25 @@ def _run_trade_dialog_readiness(args: argparse.Namespace) -> Result:
         confirm_timeout=args.confirm_timeout,
         result_timeout=args.result_timeout,
     )
+
+
+def _run_trade_exception_popup(args: argparse.Namespace) -> Result:
+    trade_manager = TdxTradeManager(
+        profile=getattr(args, "profile", None) or "balanced",
+        title_keyword=args.title_key,
+        exe_path=args.exe_path,
+        state_path=str(PINGAN_LAST_ORDER_STATE_PATH),
+        submission_ledger_path=str(PINGAN_SUBMISSION_LEDGER_PATH),
+    )
+    kwargs: dict[str, Any] = {
+        "action": args.action,
+        "confirm_close": args.confirm_close,
+        "dialog_lookup_mode": args.dialog_lookup_mode,
+        "result_timeout": args.result_timeout,
+    }
+    if args.result_close_pre_delay is not None:
+        kwargs["result_close_pre_delay"] = args.result_close_pre_delay
+    return trade_manager.pingan.exception_popup(**kwargs)
 
 
 def _run_trade_lifecycle_owner_lock(args: argparse.Namespace) -> Result:
@@ -6125,6 +6157,8 @@ def _handle_trade_subcommand(args: argparse.Namespace) -> Result:
         return _run_trade_confirm_current(args)
     if args.trade_command == "dialog-readiness":
         return _run_trade_dialog_readiness(args)
+    if args.trade_command == "exception-popup":
+        return _run_trade_exception_popup(args)
     if args.trade_command == "lifecycle-owner-lock":
         return _run_trade_lifecycle_owner_lock(args)
     if args.trade_command == "broker-capabilities":

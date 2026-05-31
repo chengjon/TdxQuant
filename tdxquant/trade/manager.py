@@ -2257,6 +2257,338 @@ class _PingAnTradeProxy:
         )
         return result
 
+    def exception_popup(
+        self,
+        *,
+        action: str = "inspect",
+        confirm_close: bool = False,
+        dialog_lookup_mode: str | None = None,
+        result_timeout: float | None = None,
+        result_close_pre_delay: float | None = None,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+        resolved_action = str(action or "inspect")
+        resolved_lookup_mode = str(dialog_lookup_mode or effective_profile["dialog_lookup_mode"])
+        resolved_result_timeout = float(
+            effective_profile["result_timeout"] if result_timeout is None else result_timeout
+        )
+        resolved_result_close_pre_delay = float(
+            effective_profile["result_close_pre_delay"]
+            if result_close_pre_delay is None
+            else result_close_pre_delay
+        )
+
+        def run() -> Result:
+            checks: list[dict[str, Any]] = []
+            if resolved_action not in {"inspect", "close"}:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="unsupported pingan exception-popup action",
+                    data={
+                        "input": {"action": resolved_action},
+                        "exception_popup_control": {
+                            "action": resolved_action,
+                            "overall_status": "failed",
+                            "close_executed": False,
+                            "confirm_click_executed": False,
+                            "order_submitted": False,
+                            "retry_executed": False,
+                            "recovery_executed": False,
+                            "resubmission_executed": False,
+                            "side_effect_level": "none",
+                            "checks": [],
+                        },
+                    },
+                )
+
+            result_dialog = _find_result_dialog_for_lookup(
+                title_keyword=self._manager.title_keyword,
+                lookup_mode=resolved_lookup_mode,
+                timeout=resolved_result_timeout,
+            )
+            result_dialog_ok = bool(result_dialog.get("ok"))
+            checks.append(
+                _build_trade_health_check(
+                    "result_dialog_lookup",
+                    "ok" if result_dialog_ok else ("failed" if resolved_action == "close" else "warning"),
+                    "result dialog lookup matched the current dialog"
+                    if result_dialog_ok
+                    else "result dialog is not currently visible through the stable lookup path",
+                    detail=_serialize_dialog_lookup_target(result_dialog),
+                    recommended_action=(
+                        None
+                        if result_dialog_ok
+                        else "Keep the exception result dialog visible and retry the exception-popup control."
+                    ),
+                )
+            )
+
+            exception_detail: dict[str, Any] = {
+                "ok": False,
+                "skipped": True,
+                "exception_detected": None,
+                "matched_keywords": [],
+                "text_payload": {},
+            }
+            result_dialog_payload: dict[str, Any] = {}
+            if result_dialog_ok:
+                result_info = result_dialog.get("info")
+                result_hwnd = getattr(result_info, "handle", result_dialog.get("hwnd", None))
+                try:
+                    text_payload = _extract_dialog_text_payload_from_sources(
+                        hwnd=result_hwnd,
+                        element=result_dialog.get("element"),
+                    )
+                    exception_detail = _build_pingan_exception_popup_lookup_detail(text_payload)
+                except Exception as exc:
+                    exception_detail = {
+                        "ok": False,
+                        "exception_detected": None,
+                        "matched_keywords": [],
+                        "passive_texts": [],
+                        "text_payload": {},
+                        "last_error": str(exc),
+                    }
+                result_dialog_payload = _serialize_dialog_lookup_target(result_dialog)
+                result_dialog_payload["text_payload"] = exception_detail.get("text_payload", {})
+
+            exception_detected = bool(exception_detail.get("exception_detected"))
+            checks.append(
+                _build_trade_health_check(
+                    "exception_popup_lookup",
+                    "warning" if exception_detected else ("ok" if result_dialog_ok else "skipped"),
+                    "exception-like result popup text detected"
+                    if exception_detected
+                    else (
+                        "no exception-like result popup text detected"
+                        if result_dialog_ok
+                        else "exception popup lookup skipped because the result dialog was not detected"
+                    ),
+                    detail=exception_detail,
+                    recommended_action=(
+                        "Use --action close --confirm-close only after verifying this exception popup should be closed."
+                        if exception_detected
+                        else None
+                    ),
+                )
+            )
+
+            result_confirm_target: dict[str, Any] = {"ok": False, "skipped": True}
+            result_confirm_ok = False
+            if result_dialog_ok:
+                result_confirm_target = _find_result_confirm_target_for_lookup(
+                    title_keyword=self._manager.title_keyword,
+                    lookup_mode=resolved_lookup_mode,
+                    timeout=min(1.0, resolved_result_timeout),
+                )
+                result_confirm_ok = bool(result_confirm_target.get("ok"))
+                checks.append(
+                    _build_trade_health_check(
+                        "result_confirm_lookup",
+                        "ok"
+                        if result_confirm_ok
+                        else ("failed" if resolved_action == "close" and exception_detected else "warning"),
+                        "result confirm-button lookup matched the current dialog"
+                        if result_confirm_ok
+                        else "result confirm button is not currently visible through the stable lookup path",
+                        detail=_serialize_dialog_lookup_target(result_confirm_target),
+                        recommended_action=(
+                            None
+                            if result_confirm_ok
+                            else "Close the visible exception popup manually before retrying desktop trading."
+                        ),
+                    )
+                )
+            else:
+                checks.append(
+                    _build_trade_health_check(
+                        "result_confirm_lookup",
+                        "skipped",
+                        "result confirm-button lookup skipped because the result dialog was not detected",
+                        detail={"ok": False, "skipped": True},
+                    )
+                )
+
+            close_executed = False
+            confirm_click_executed = False
+            click_payload: dict[str, Any] = {"ok": False, "skipped": True}
+            side_effect_level = "none"
+            code = ErrorCode.OK
+            message = "stable trade exception-popup inspect completed"
+            if resolved_action == "close":
+                if not confirm_close:
+                    checks.append(
+                        _build_trade_health_check(
+                            "exception_popup_close_confirmation",
+                            "failed",
+                            "exception popup close requires explicit confirm_close",
+                            detail={"confirm_close": confirm_close},
+                            critical=True,
+                            recommended_action="Re-run with --confirm-close after verifying the exception popup should be closed.",
+                        )
+                    )
+                    code = ErrorCode.INVALID_REQUEST
+                    message = "stable trade exception-popup close rejected before desktop click"
+                elif not result_dialog_ok:
+                    checks.append(
+                        _build_trade_health_check(
+                            "exception_popup_close",
+                            "failed",
+                            "exception popup close skipped because no result dialog was detected",
+                            detail={"ok": False, "skipped": True},
+                            critical=True,
+                            recommended_action="Keep the exception popup visible and retry the close control.",
+                        )
+                    )
+                    code = ErrorCode.CONTROL_NOT_FOUND
+                    message = "stable trade exception-popup close could not locate the result dialog"
+                elif not exception_detected:
+                    checks.append(
+                        _build_trade_health_check(
+                            "exception_popup_close",
+                            "failed",
+                            "exception popup close skipped because the visible result dialog was not classified as an exception popup",
+                            detail=exception_detail,
+                            critical=True,
+                            recommended_action="Review the dialog manually; this control only closes recognized exception-like popups.",
+                        )
+                    )
+                    code = ErrorCode.CONTROL_NOT_FOUND
+                    message = "stable trade exception-popup close skipped non-exception result dialog"
+                elif not result_confirm_ok:
+                    checks.append(
+                        _build_trade_health_check(
+                            "exception_popup_close",
+                            "failed",
+                            "exception popup close skipped because the result confirm control was not detected",
+                            detail=_serialize_dialog_lookup_target(result_confirm_target),
+                            critical=True,
+                            recommended_action="Close the visible exception popup manually before retrying desktop trading.",
+                        )
+                    )
+                    code = ErrorCode.CONTROL_NOT_FOUND
+                    message = "stable trade exception-popup close could not locate the result confirm control"
+                else:
+                    close_result = _click_lookup_target(
+                        result_confirm_target,
+                        post_delay=max(0.05, resolved_result_close_pre_delay),
+                    )
+                    confirm_click_executed = True
+                    close_executed = bool(close_result.ok)
+                    click_payload = close_result.to_dict()
+                    side_effect_level = "live_side_effecting"
+                    checks.append(
+                        _build_trade_health_check(
+                            "exception_popup_close",
+                            "ok" if close_result.ok else "failed",
+                            close_result.message,
+                            detail=click_payload,
+                            critical=True,
+                            recommended_action=close_result.next_action,
+                        )
+                    )
+                    code = ErrorCode.OK if close_result.ok else close_result.code
+                    message = (
+                        "stable trade exception-popup close completed"
+                        if close_result.ok
+                        else "stable trade exception-popup close failed"
+                    )
+            else:
+                checks.append(
+                    _build_trade_health_check(
+                        "exception_popup_close",
+                        "skipped",
+                        "exception popup close skipped because action=inspect",
+                        detail={"ok": False, "skipped": True},
+                    )
+                )
+
+            overall_status, summarized_ok, warnings, next_action = _summarize_trade_health_checks(checks)
+            ok = summarized_ok and (code == ErrorCode.OK)
+            handling_status = (
+                "closed"
+                if close_executed
+                else ("manual_required" if exception_detected else ("not_triggered" if result_dialog_ok else "unknown"))
+            )
+            result = Result(
+                ok=ok,
+                code=code if not ok else ErrorCode.OK,
+                message=message,
+                data={
+                    "input": {
+                        "action": resolved_action,
+                        "confirm_close": confirm_close,
+                        "dialog_lookup_mode": resolved_lookup_mode,
+                        "result_timeout": resolved_result_timeout,
+                        "result_close_pre_delay": resolved_result_close_pre_delay,
+                    },
+                    "exception_popup_control": {
+                        "overall_status": overall_status,
+                        "action": resolved_action,
+                        "confirm_close": confirm_close,
+                        "handling_status": handling_status,
+                        "handling_available": True,
+                        "exception_detected": exception_detected,
+                        "matched_keywords": exception_detail.get("matched_keywords", []),
+                        "close_executed": close_executed,
+                        "confirm_click_executed": confirm_click_executed,
+                        "click_result": click_payload,
+                        "order_submitted": False,
+                        "retry_executed": False,
+                        "recovery_executed": False,
+                        "resubmission_executed": False,
+                        "side_effect_level": side_effect_level,
+                        "checks": checks,
+                    },
+                    "result_dialog": result_dialog_payload,
+                },
+                warnings=warnings,
+                next_action=next_action,
+            )
+            return result
+
+        result, timing = capture_trade_timing("pingan.exception_popup", run)
+        side_effect_level = str(
+            result.data.get("exception_popup_control", {}).get("side_effect_level", "none")
+        )
+        attach_trade_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            broker="pingan",
+            method="exception_popup",
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            timing=timing,
+        )
+        attach_trade_safety_metadata(
+            result,
+            submission_key=None,
+            risk_gate={
+                "passed": bool(result.ok),
+                "checks": [
+                    {
+                        "name": "exception_popup_manual_close",
+                        "passed": bool(result.ok),
+                        "issues": [] if result.ok else [result.message],
+                        "action": resolved_action,
+                        "confirm_close": confirm_close,
+                    }
+                ],
+                "requested_price": None,
+                "max_price": None,
+                "rejection_reason": None if result.ok else result.message,
+            },
+            idempotency={
+                "decision": "not_applicable",
+                "fingerprint": None,
+                "ledger_consulted": False,
+            },
+            side_effect_level=side_effect_level,
+        )
+        return result
+
     def submit_ready(
         self,
         *,

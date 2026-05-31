@@ -855,6 +855,133 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(ledger_path.exists())
         self.assertFalse(audit_dir.exists())
 
+    def test_pingan_exception_popup_inspect_reports_lookup_without_side_effects(self) -> None:
+        result_dialog = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1001, "name": "提示", "class_name": "#32770", "automation_id": "", "control_type": "Pane"})()}
+        result_confirm = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1002, "name": "确认", "class_name": "Button", "automation_id": "7015", "control_type": "Button"})()}
+        text_payload = {
+            "merged_texts": ["系统异常：委托失败", "请联系柜台"],
+            "contract_no": None,
+            "uia_texts": ["系统异常：委托失败"],
+            "win32_child_texts": [{"text": "请联系柜台"}],
+        }
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "state.json"
+            event_log_path = Path(temp_dir) / "events.jsonl"
+            ledger_path = Path(temp_dir) / "submission-ledger.jsonl"
+            audit_dir = Path(temp_dir) / "trade-audits"
+            with (
+                patch("tdxquant.trade.manager._find_result_dialog_for_lookup", return_value=result_dialog),
+                patch("tdxquant.trade.manager._find_result_confirm_target_for_lookup", return_value=result_confirm),
+                patch("tdxquant.trade.manager._extract_dialog_text_payload_from_sources", return_value=text_payload),
+                patch("tdxquant.trade.manager._click_lookup_target") as mocked_click,
+            ):
+                manager = TdxTradeManager(
+                    profile="balanced",
+                    state_path=str(state_path),
+                    event_log_path=str(event_log_path),
+                    submission_ledger_path=str(ledger_path),
+                    trade_audit_dir=str(audit_dir),
+                )
+                result = manager.pingan.exception_popup(action="inspect", dialog_lookup_mode="uia", result_timeout=1.8)
+
+        mocked_click.assert_not_called()
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["manager"]["method"], "exception_popup")
+        control = result.data["exception_popup_control"]
+        self.assertEqual(control["action"], "inspect")
+        self.assertTrue(control["exception_detected"])
+        self.assertFalse(control["close_executed"])
+        self.assertFalse(control["confirm_click_executed"])
+        self.assertFalse(control["retry_executed"])
+        self.assertFalse(control["recovery_executed"])
+        self.assertFalse(control["resubmission_executed"])
+        self.assertFalse(control["order_submitted"])
+        self.assertEqual(control["side_effect_level"], "none")
+        self.assertEqual(result.data["trade_safety"]["side_effect_level"], "none")
+        self.assertNotIn("artifacts", result.data)
+        self.assertFalse(state_path.exists())
+        self.assertFalse(event_log_path.exists())
+        self.assertFalse(ledger_path.exists())
+        self.assertFalse(audit_dir.exists())
+
+    def test_pingan_exception_popup_close_requires_explicit_confirmation(self) -> None:
+        result_dialog = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1001, "name": "提示", "class_name": "#32770", "automation_id": "", "control_type": "Pane"})()}
+        result_confirm = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1002, "name": "确认", "class_name": "Button", "automation_id": "7015", "control_type": "Button"})()}
+        text_payload = {"merged_texts": ["系统异常：委托失败"]}
+        with (
+            patch("tdxquant.trade.manager._find_result_dialog_for_lookup", return_value=result_dialog),
+            patch("tdxquant.trade.manager._find_result_confirm_target_for_lookup", return_value=result_confirm),
+            patch("tdxquant.trade.manager._extract_dialog_text_payload_from_sources", return_value=text_payload),
+            patch("tdxquant.trade.manager._click_lookup_target") as mocked_click,
+        ):
+            manager = TdxTradeManager(profile="balanced")
+            result = manager.pingan.exception_popup(action="close", confirm_close=False)
+
+        mocked_click.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        control = result.data["exception_popup_control"]
+        self.assertEqual(control["action"], "close")
+        self.assertTrue(control["exception_detected"])
+        self.assertFalse(control["close_executed"])
+        self.assertFalse(control["confirm_click_executed"])
+        self.assertFalse(control["retry_executed"])
+        self.assertFalse(control["recovery_executed"])
+        self.assertFalse(control["resubmission_executed"])
+        self.assertEqual(result.data["trade_safety"]["side_effect_level"], "none")
+
+    def test_pingan_exception_popup_confirmed_close_clicks_recognized_popup_only(self) -> None:
+        result_dialog = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1001, "name": "提示", "class_name": "#32770", "automation_id": "", "control_type": "Pane"})()}
+        result_confirm = {"ok": True, "hwnd": 1002, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1002, "name": "确认", "class_name": "Button", "automation_id": "7015", "control_type": "Button"})()}
+        text_payload = {"merged_texts": ["系统异常：委托失败"]}
+        click_result = Result(ok=True, code=ErrorCode.OK, message="clicked result confirm", data={"strategy": "wm_command"})
+        with (
+            patch("tdxquant.trade.manager._find_result_dialog_for_lookup", return_value=result_dialog),
+            patch("tdxquant.trade.manager._find_result_confirm_target_for_lookup", return_value=result_confirm),
+            patch("tdxquant.trade.manager._extract_dialog_text_payload_from_sources", return_value=text_payload),
+            patch("tdxquant.trade.manager._click_lookup_target", return_value=click_result) as mocked_click,
+        ):
+            manager = TdxTradeManager(profile="balanced")
+            result = manager.pingan.exception_popup(action="close", confirm_close=True, result_close_pre_delay=0.2)
+
+        mocked_click.assert_called_once_with(result_confirm, post_delay=0.2)
+        self.assertTrue(result.ok)
+        control = result.data["exception_popup_control"]
+        self.assertEqual(control["action"], "close")
+        self.assertTrue(control["exception_detected"])
+        self.assertTrue(control["close_executed"])
+        self.assertTrue(control["confirm_click_executed"])
+        self.assertFalse(control["retry_executed"])
+        self.assertFalse(control["recovery_executed"])
+        self.assertFalse(control["resubmission_executed"])
+        self.assertFalse(control["order_submitted"])
+        self.assertEqual(control["side_effect_level"], "live_side_effecting")
+        self.assertEqual(result.data["trade_safety"]["side_effect_level"], "live_side_effecting")
+
+    def test_pingan_exception_popup_close_skips_non_exception_result_dialog(self) -> None:
+        result_dialog = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1001, "name": "提示", "class_name": "#32770", "automation_id": "", "control_type": "Pane"})()}
+        result_confirm = {"ok": True, "hwnd": 1002, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1002, "name": "确认", "class_name": "Button", "automation_id": "7015", "control_type": "Button"})()}
+        text_payload = {"merged_texts": ["委托已提交"]}
+        with (
+            patch("tdxquant.trade.manager._find_result_dialog_for_lookup", return_value=result_dialog),
+            patch("tdxquant.trade.manager._find_result_confirm_target_for_lookup", return_value=result_confirm),
+            patch("tdxquant.trade.manager._extract_dialog_text_payload_from_sources", return_value=text_payload),
+            patch("tdxquant.trade.manager._click_lookup_target") as mocked_click,
+        ):
+            manager = TdxTradeManager(profile="balanced")
+            result = manager.pingan.exception_popup(action="close", confirm_close=True)
+
+        mocked_click.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.CONTROL_NOT_FOUND)
+        control = result.data["exception_popup_control"]
+        self.assertFalse(control["exception_detected"])
+        self.assertFalse(control["close_executed"])
+        self.assertFalse(control["confirm_click_executed"])
+        self.assertFalse(control["retry_executed"])
+        self.assertFalse(control["recovery_executed"])
+        self.assertFalse(control["resubmission_executed"])
+
     def test_pingan_dialog_readiness_reports_desktop_lifecycle_gate_status(self) -> None:
         confirm_target = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1000, "name": "确认买入", "class_name": "Button", "automation_id": "1", "control_type": "Button"})()}
         result_dialog = {"ok": True, "lookup_mode": "uia", "info": type("Info", (), {"handle": 1001, "name": "提示", "class_name": "#32770", "automation_id": "", "control_type": "Pane"})()}

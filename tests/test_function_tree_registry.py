@@ -398,6 +398,24 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("broker readiness", combined)
         self.assertIn("live/manual acceptance", combined)
 
+    def test_pingan_exception_popup_manual_close_control_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-exception-popup-manual-close-control", combined)
+                self.assertIn("TdxTradeManager.pingan.exception_popup", combined)
+                self.assertIn("trade exception-popup --action inspect", combined)
+                self.assertIn("trade exception-popup --action close --confirm-close", combined)
+                self.assertIn("只做 exception popup inspect/close", combined)
+                self.assertIn("不 retry/recover/resubmit", combined)
+                self.assertIn("broker readiness", combined)
+                self.assertIn("live/manual acceptance", combined)
+                self.assertIn("workflow/lifecycle governance", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"
