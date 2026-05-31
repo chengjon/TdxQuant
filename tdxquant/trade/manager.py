@@ -378,6 +378,29 @@ def _resolve_pingan_lifecycle_owner_lock_status(
     return "not_acquired", False, None if current_owner is None else str(current_owner)
 
 
+def _coerce_owner_pid(value: Any) -> int | None:
+    try:
+        pid = int(value)
+    except (TypeError, ValueError):
+        return None
+    return pid if pid > 0 else None
+
+
+def _validate_pingan_lifecycle_owner_pid(
+    state_payload: dict[str, Any] | None,
+) -> tuple[int | None, bool | None, str]:
+    owner_pid = _coerce_owner_pid(state_payload.get("owner_pid") if state_payload else None)
+    if owner_pid is None:
+        return None, None, "missing"
+    try:
+        os.kill(owner_pid, 0)
+    except PermissionError:
+        return owner_pid, True, "alive"
+    except OSError:
+        return owner_pid, False, "not_alive"
+    return owner_pid, True, "alive"
+
+
 def _build_pingan_lifecycle_owner_lock_payload(
     *,
     action: str,
@@ -388,6 +411,9 @@ def _build_pingan_lifecycle_owner_lock_payload(
     current_owner_token: str | None,
     stale_after_seconds: float,
     stale_detected: bool,
+    owner_pid: int | None = None,
+    owner_pid_alive: bool | None = None,
+    owner_pid_status: str = "missing",
     statefile_write_executed: bool = False,
     lock_file_write_executed: bool = False,
     lock_acquired: bool = False,
@@ -404,6 +430,10 @@ def _build_pingan_lifecycle_owner_lock_payload(
         "lock_path": str(lock_path),
         "owner_token": owner_token,
         "current_owner_token": current_owner_token,
+        "owner_pid": owner_pid,
+        "owner_pid_alive": owner_pid_alive,
+        "owner_pid_status": owner_pid_status,
+        "pid_validation_executed": True,
         "stale_after_seconds": stale_after_seconds,
         "stale_detected": stale_detected,
         "stale_replaced": stale_replaced,
@@ -478,6 +508,7 @@ def _run_pingan_lifecycle_owner_lock(
     resolved_lock_path = Path(f"{resolved_statefile_path}.lock")
     now = _utc_now()
     state_payload = _read_json_object(resolved_statefile_path)
+    owner_pid, owner_pid_alive, owner_pid_status = _validate_pingan_lifecycle_owner_pid(state_payload)
     current_status, stale_detected, current_owner = _resolve_pingan_lifecycle_owner_lock_status(
         statefile_path=resolved_statefile_path,
         lock_path=resolved_lock_path,
@@ -494,6 +525,9 @@ def _run_pingan_lifecycle_owner_lock(
             lock_path=resolved_lock_path,
             owner_token=normalized_owner_token,
             current_owner_token=current_owner,
+            owner_pid=owner_pid,
+            owner_pid_alive=owner_pid_alive,
+            owner_pid_status=owner_pid_status,
             stale_after_seconds=float(stale_after_seconds),
             stale_detected=stale_detected,
         )
@@ -508,6 +542,9 @@ def _run_pingan_lifecycle_owner_lock(
                 lock_path=resolved_lock_path,
                 owner_token=normalized_owner_token,
                 current_owner_token=current_owner,
+                owner_pid=owner_pid,
+                owner_pid_alive=owner_pid_alive,
+                owner_pid_status=owner_pid_status,
                 stale_after_seconds=float(stale_after_seconds),
                 stale_detected=stale_detected,
             )
@@ -522,6 +559,9 @@ def _run_pingan_lifecycle_owner_lock(
                     lock_path=resolved_lock_path,
                     owner_token=normalized_owner_token,
                     current_owner_token=current_owner,
+                    owner_pid=owner_pid,
+                    owner_pid_alive=owner_pid_alive,
+                    owner_pid_status=owner_pid_status,
                     stale_after_seconds=float(stale_after_seconds),
                     stale_detected=True,
                 )
@@ -551,6 +591,9 @@ def _run_pingan_lifecycle_owner_lock(
                 lock_path=resolved_lock_path,
                 owner_token=normalized_owner_token,
                 current_owner_token=current_owner,
+                owner_pid=owner_pid,
+                owner_pid_alive=owner_pid_alive,
+                owner_pid_status=owner_pid_status,
                 stale_after_seconds=float(stale_after_seconds),
                 stale_detected=stale_detected,
             )
@@ -570,6 +613,9 @@ def _run_pingan_lifecycle_owner_lock(
             lock_path=resolved_lock_path,
             owner_token=normalized_owner_token,
             current_owner_token=normalized_owner_token,
+            owner_pid=os.getpid(),
+            owner_pid_alive=True,
+            owner_pid_status="alive",
             stale_after_seconds=float(stale_after_seconds),
             stale_detected=stale_detected,
             statefile_write_executed=True,
@@ -587,6 +633,9 @@ def _run_pingan_lifecycle_owner_lock(
             lock_path=resolved_lock_path,
             owner_token=normalized_owner_token,
             current_owner_token=current_owner,
+            owner_pid=owner_pid,
+            owner_pid_alive=owner_pid_alive,
+            owner_pid_status=owner_pid_status,
             stale_after_seconds=float(stale_after_seconds),
             stale_detected=stale_detected,
         )
@@ -612,6 +661,9 @@ def _run_pingan_lifecycle_owner_lock(
         lock_path=resolved_lock_path,
         owner_token=normalized_owner_token,
         current_owner_token=normalized_owner_token,
+        owner_pid=os.getpid(),
+        owner_pid_alive=True,
+        owner_pid_status="alive",
         stale_after_seconds=float(stale_after_seconds),
         stale_detected=stale_detected,
         statefile_write_executed=True,
