@@ -690,6 +690,11 @@ class TdxTradeManagerTests(unittest.TestCase):
                 )
 
         self.assertTrue(result.ok)
+        provenance = result.data["artifact_provenance"]
+        self.assertEqual(provenance["schema"], "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1")
+        self.assertEqual(provenance["source_kind"], "preflight")
+        self.assertEqual(provenance["producer"], "trade preflight")
+        self.assertEqual(provenance["evidence_schema"], "tdx.desktop_trade.pingan_promotion_gate_status.v1")
         gate_status = result.data["promotion_gate_status"]
         self.assertEqual(gate_status["schema_version"], "tdx.desktop_trade.pingan_promotion_gate_status.v1")
         self.assertEqual(gate_status["status"], "partial")
@@ -1734,6 +1739,11 @@ class TdxTradeManagerTests(unittest.TestCase):
                 )
 
         self.assertTrue(result.ok)
+        provenance = result.data["artifact_provenance"]
+        self.assertEqual(provenance["schema"], "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1")
+        self.assertEqual(provenance["source_kind"], "dialog_readiness")
+        self.assertEqual(provenance["producer"], "trade dialog-readiness")
+        self.assertEqual(provenance["evidence_schema"], "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1")
         lifecycle = result.data["desktop_lifecycle_gate_status"]
         self.assertEqual(lifecycle["schema_version"], "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1")
         self.assertEqual(lifecycle["status"], "partial")

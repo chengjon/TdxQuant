@@ -4073,13 +4073,13 @@ class TdxTaskManagerTests(unittest.TestCase):
     @classmethod
     def _pingan_acceptance_coverage_evidence(cls) -> dict:
         return {
-            "artifact_provenance": cls._pingan_artifact_provenance(
-                "acceptance_coverage",
-                "task trade-audit-daily-report",
-                "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
-            ),
             "acceptance_outcome_coverage_status": {
                 "schema": "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
+                "artifact_provenance": cls._pingan_artifact_provenance(
+                    "acceptance_coverage",
+                    "task trade-audit-daily-report",
+                    "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
+                ),
                 "automated_outcome_coverage_complete": True,
                 "live_manual_acceptance_complete": True,
                 "acceptance_complete": True,
@@ -5920,6 +5920,11 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(coverage_status["schema"], "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1")
         self.assertEqual(coverage_status["execution_mode"], "readonly_report")
         self.assertEqual(coverage_status["side_effect_level"], "none")
+        provenance = coverage_status["artifact_provenance"]
+        self.assertEqual(provenance["schema"], "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1")
+        self.assertEqual(provenance["source_kind"], "acceptance_coverage")
+        self.assertEqual(provenance["producer"], "task trade-audit-daily-report")
+        self.assertEqual(provenance["evidence_schema"], "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1")
         self.assertEqual(coverage_status["covered_outcome_statuses"], ["confirmed"])
         self.assertEqual(coverage_status["covered_outcome_status_counts"], {"confirmed": 1})
         self.assertEqual(
@@ -6220,6 +6225,14 @@ class TdxTaskManagerTests(unittest.TestCase):
             coverage_status = result.data["acceptance_outcome_coverage_status"]
             self.assertEqual(coverage_status["schema"], "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1")
             self.assertEqual(coverage_status["source_kind"], "period_report")
+            provenance = coverage_status["artifact_provenance"]
+            self.assertEqual(provenance["schema"], "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1")
+            self.assertEqual(provenance["source_kind"], "acceptance_coverage")
+            self.assertEqual(provenance["producer"], "task trade-audit-period-report")
+            self.assertEqual(
+                provenance["evidence_schema"],
+                "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1",
+            )
             self.assertEqual(coverage_status["covered_outcome_statuses"], ["confirmed", "rejected", "replayed"])
             self.assertEqual(
                 coverage_status["covered_outcome_status_counts"],

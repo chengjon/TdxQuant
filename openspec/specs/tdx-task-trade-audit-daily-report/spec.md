@@ -72,3 +72,16 @@ The daily trade audit report SHALL include a read-only `acceptance_outcome_cover
 - **AND** it SHALL state `side_effect_level=none`
 - **AND** it SHALL NOT claim order submission, desktop control dispatch, broker readiness, production readiness, or D-07/D-08 implemented status.
 
+### Requirement: Daily trade audit report SHALL identify acceptance coverage provenance
+
+`TdxTaskManager.trade_audit_daily_report(...)` SHALL include artifact provenance metadata in its acceptance outcome coverage status.
+
+#### Scenario: Daily report acceptance coverage carries provenance accepted by promotion readiness rollup
+
+- **WHEN** `TdxTaskManager.trade_audit_daily_report(...)` returns `acceptance_outcome_coverage_status`
+- **THEN** `acceptance_outcome_coverage_status.artifact_provenance.schema` SHALL be `tdx.desktop_trade.pingan_readiness_evidence_artifact.v1`
+- **AND** `acceptance_outcome_coverage_status.artifact_provenance.source_kind` SHALL be `acceptance_coverage`
+- **AND** `acceptance_outcome_coverage_status.artifact_provenance.producer` SHALL be `task trade-audit-daily-report`
+- **AND** `acceptance_outcome_coverage_status.artifact_provenance.evidence_schema` SHALL match `tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1`
+- **AND** the report SHALL remain read-only and SHALL NOT execute trade workflows.
+

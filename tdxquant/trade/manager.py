@@ -86,6 +86,7 @@ def _summarize_trade_health_checks(checks: list[dict[str, Any]]) -> tuple[str, b
 
 PINGAN_PROMOTION_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_promotion_gate_status.v1"
 PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_desktop_lifecycle_gate_status.v1"
+PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA = "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1"
 PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_trade_audit_gate_status.v1"
 PINGAN_LIFECYCLE_OWNER_LOCK_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_lock.v1"
 PINGAN_LIFECYCLE_OWNER_STATE_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_state.v1"
@@ -103,6 +104,17 @@ PINGAN_EXCEPTION_POPUP_KEYWORDS = (
     "failed",
     "timeout",
 )
+
+
+def _build_pingan_readiness_evidence_artifact_provenance(
+    *, source_kind: str, producer: str, evidence_schema: str
+) -> dict[str, Any]:
+    return {
+        "schema": PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA,
+        "source_kind": source_kind,
+        "producer": producer,
+        "evidence_schema": evidence_schema,
+    }
 
 
 def _collect_dialog_text_payload_strings(value: Any) -> list[str]:
@@ -2993,6 +3005,11 @@ class _PingAnTradeProxy:
                             **self._manager._artifact_targets(),
                         },
                     },
+                    "artifact_provenance": _build_pingan_readiness_evidence_artifact_provenance(
+                        source_kind="preflight",
+                        producer="trade preflight",
+                        evidence_schema=PINGAN_PROMOTION_GATE_STATUS_SCHEMA,
+                    ),
                     "promotion_gate_status": promotion_gate_status,
                 },
                 warnings=warnings,
@@ -3220,6 +3237,11 @@ class _PingAnTradeProxy:
                             **artifact_targets,
                         },
                     },
+                    "artifact_provenance": _build_pingan_readiness_evidence_artifact_provenance(
+                        source_kind="dialog_readiness",
+                        producer="trade dialog-readiness",
+                        evidence_schema=PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA,
+                    ),
                     "desktop_lifecycle_gate_status": lifecycle_gate_status,
                 },
                 warnings=warnings,

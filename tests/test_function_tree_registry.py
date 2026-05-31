@@ -644,6 +644,24 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
+    def test_pingan_readiness_evidence_producer_provenance_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-readiness-evidence-producer-provenance", combined)
+                self.assertIn("trade preflight", combined)
+                self.assertIn("trade dialog-readiness", combined)
+                self.assertIn("task trade-audit-daily-report", combined)
+                self.assertIn("task trade-audit-period-report", combined)
+                self.assertIn("producer-emitted artifact provenance", combined)
+                self.assertIn("不执行 PingAn workflow", combined)
+                self.assertIn("不证明 production readiness", combined)
+                self.assertIn("不证明 implemented status", combined)
+
     def test_pingan_promotion_readiness_freshness_gate_is_registered_without_status_change(self) -> None:
         rows = _current_function_tree_rows()
 

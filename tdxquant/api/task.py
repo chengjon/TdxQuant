@@ -891,7 +891,21 @@ def _build_trade_audit_value_diagnostics(entries: list[dict[str, Any]], *, scope
 
 _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA = "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1"
 _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA = "tdx.desktop_trade.pingan_live_manual_acceptance.v1"
+_PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA = (
+    "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1"
+)
 _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES = ("confirmed", "rejected", "failed", "exception")
+
+
+def _build_pingan_readiness_evidence_artifact_provenance(
+    *, source_kind: str, producer: str, evidence_schema: str
+) -> dict[str, Any]:
+    return {
+        "schema": _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA,
+        "source_kind": source_kind,
+        "producer": producer,
+        "evidence_schema": evidence_schema,
+    }
 
 
 def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str | None) -> dict[str, Any]:
@@ -982,7 +996,11 @@ def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str
 
 
 def _build_pingan_acceptance_outcome_coverage_status(
-    entries: list[dict[str, Any]], *, source_kind: str, live_manual_acceptance_path: str | None = None
+    entries: list[dict[str, Any]],
+    *,
+    source_kind: str,
+    producer: str,
+    live_manual_acceptance_path: str | None = None,
 ) -> dict[str, Any]:
     status_counts: dict[str, int] = {}
     for entry in entries:
@@ -1002,6 +1020,11 @@ def _build_pingan_acceptance_outcome_coverage_status(
         "schema": _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA,
         "status": "partial",
         "source_kind": source_kind,
+        "artifact_provenance": _build_pingan_readiness_evidence_artifact_provenance(
+            source_kind="acceptance_coverage",
+            producer=producer,
+            evidence_schema=_PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA,
+        ),
         "evidence_scope": "selected_trade_audit_entries",
         "execution_mode": "readonly_report",
         "side_effect_level": "none",
@@ -1035,9 +1058,6 @@ _PINGAN_IMPLEMENTED_STATUS_PROMOTION_DECISION_SCHEMA = (
 )
 _PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_evidence_contract.v1"
-)
-_PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA = (
-    "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1"
 )
 _PINGAN_PROMOTION_READINESS_GATE_ORDER = (
     "provider_broker_ownership",
@@ -1321,7 +1341,7 @@ def _build_pingan_artifact_provenance_status(
     invalid_source_kinds: list[str] = []
     for source_kind, requirement in requirements.items():
         payload = requirement["payload"]
-        provenance = payload.get("artifact_provenance") if isinstance(payload, dict) else None
+        provenance = _find_json_object(payload, "artifact_provenance") if isinstance(payload, dict) else None
         provenance = provenance if isinstance(provenance, dict) else None
         contract = contract_sources.get(source_kind)
         contract = contract if isinstance(contract, dict) else {}
@@ -3649,6 +3669,7 @@ class TdxTaskManager:
                 "acceptance_outcome_coverage_status": _build_pingan_acceptance_outcome_coverage_status(
                     report_entries,
                     source_kind="daily_report",
+                    producer="task trade-audit-daily-report",
                     live_manual_acceptance_path=live_manual_acceptance_path,
                 ),
                 "entries": recent_entries,
@@ -3855,6 +3876,7 @@ class TdxTaskManager:
                 "acceptance_outcome_coverage_status": _build_pingan_acceptance_outcome_coverage_status(
                     report_entries,
                     source_kind="period_report",
+                    producer="task trade-audit-period-report",
                     live_manual_acceptance_path=live_manual_acceptance_path,
                 ),
                 "entries": recent_entries,
