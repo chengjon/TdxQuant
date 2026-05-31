@@ -4096,6 +4096,13 @@ class TdxTaskManagerTests(unittest.TestCase):
         )
         self.assertEqual(rollup["gate_statuses"]["safety_gates"]["status"], "incomplete")
         self.assertEqual(rollup["gate_statuses"]["desktop_lifecycle"]["source_kind"], "dialog_readiness")
+        decision = rollup["implemented_status_promotion_decision"]
+        self.assertEqual(decision["decision"], "blocked")
+        self.assertFalse(decision["implemented_status_eligible"])
+        self.assertIn("incomplete_required_gates", decision["blocked_reasons"])
+        self.assertEqual(decision["target_nodes"], ["D-07", "D-08"])
+        self.assertTrue(decision["manual_status_review_required"])
+        self.assertFalse(decision["function_tree_status_transition_executed"])
         self.assertEqual(
             rollup["source_paths"],
             {
@@ -4161,6 +4168,20 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(rollup["completed_gates"], list(rollup["gate_statuses"]))
         self.assertEqual(rollup["incomplete_gates"], [])
         self.assertEqual(rollup["missing_evidence_kinds"], [])
+        decision = rollup["implemented_status_promotion_decision"]
+        self.assertEqual(
+            decision["schema"],
+            "tdx.desktop_trade.pingan_implemented_status_promotion_decision.v1",
+        )
+        self.assertEqual(decision["decision"], "eligible_for_review")
+        self.assertTrue(decision["implemented_status_eligible"])
+        self.assertEqual(decision["required_gates"], list(rollup["gate_statuses"]))
+        self.assertEqual(decision["completed_gates"], list(rollup["gate_statuses"]))
+        self.assertEqual(decision["incomplete_gates"], [])
+        self.assertEqual(decision["blocked_reasons"], [])
+        self.assertFalse(decision["sample_manifest"])
+        self.assertTrue(decision["manual_status_review_required"])
+        self.assertFalse(decision["function_tree_status_transition_executed"])
         self.assertFalse(rollup["promotion_status_transition_executed"])
         self.assertFalse(rollup["order_submitted"])
 
@@ -4226,6 +4247,11 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertFalse(rollup["gate_statuses"]["safety_gates"]["complete"])
         self.assertIn("provider_broker_ownership", rollup["incomplete_gates"])
         self.assertIn("safety_gates", rollup["incomplete_gates"])
+        decision = rollup["implemented_status_promotion_decision"]
+        self.assertEqual(decision["decision"], "blocked")
+        self.assertFalse(decision["implemented_status_eligible"])
+        self.assertIn("stale_evidence", decision["blocked_reasons"])
+        self.assertIn("incomplete_required_gates", decision["blocked_reasons"])
         self.assertFalse(rollup["order_submitted"])
         self.assertFalse(rollup["control_dispatch_executed"])
 
@@ -4372,8 +4398,80 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(manifest["schema"], "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1")
         self.assertEqual(manifest["expected_gates"], list(rollup["gate_statuses"]))
         self.assertEqual(manifest["missing_expected_gates"], [])
+        decision = rollup["implemented_status_promotion_decision"]
+        self.assertEqual(decision["decision"], "eligible_for_review")
+        self.assertTrue(decision["implemented_status_eligible"])
+        self.assertEqual(decision["blocked_reasons"], [])
         self.assertFalse(rollup["order_submitted"])
         self.assertFalse(rollup["control_dispatch_executed"])
+
+    def test_task_pingan_promotion_readiness_rollup_blocks_sample_manifest_promotion(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            manifest_path = root / "promotion-readiness-manifest.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {
+                        "promotion_gate_status": {
+                            "provider_broker_ownership": {"status": "ready"},
+                            "safety_gates": {"status": "ready"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(
+                    {
+                        "desktop_lifecycle_gate_status": {
+                            "status": "complete",
+                            "remaining_lifecycle_gates": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "acceptance_outcome_coverage_status": {
+                            "automated_outcome_coverage_complete": True,
+                            "live_manual_acceptance_complete": True,
+                            "acceptance_complete": True,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1",
+                        "example_only": True,
+                        "preflight_path": str(preflight_path),
+                        "dialog_readiness_path": str(dialog_path),
+                        "acceptance_coverage_path": str(acceptance_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(evidence_manifest_path=str(manifest_path))
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["status"], "complete")
+        self.assertTrue(rollup["evidence_manifest"]["example_only"])
+        decision = rollup["implemented_status_promotion_decision"]
+        self.assertEqual(decision["decision"], "blocked")
+        self.assertFalse(decision["implemented_status_eligible"])
+        self.assertTrue(decision["sample_manifest"])
+        self.assertIn("sample_manifest", decision["blocked_reasons"])
+        self.assertIn("sample evidence cannot satisfy D-07/D-08 implemented status", decision["boundary"])
+        self.assertFalse(decision["function_tree_status_transition_executed"])
 
     def test_task_pingan_promotion_readiness_rollup_manifest_allows_direct_overrides(self) -> None:
         with TemporaryDirectory() as temp_dir:

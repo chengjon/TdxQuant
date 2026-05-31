@@ -1030,6 +1030,9 @@ _PINGAN_PROMOTION_READINESS_ROLLUP_ARTIFACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_rollup_artifact.v1"
 )
 _PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA = "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1"
+_PINGAN_IMPLEMENTED_STATUS_PROMOTION_DECISION_SCHEMA = (
+    "tdx.desktop_trade.pingan_implemented_status_promotion_decision.v1"
+)
 _PINGAN_PROMOTION_READINESS_GATE_ORDER = (
     "provider_broker_ownership",
     "safety_gates",
@@ -1090,6 +1093,10 @@ def _load_pingan_promotion_readiness_manifest(
     expected_gates = payload.get("expected_gates")
     if isinstance(expected_gates, list):
         metadata["expected_gates"] = [str(gate).strip() for gate in expected_gates if str(gate).strip()]
+    for key in ("example_only", "sample_only"):
+        value = payload.get(key)
+        if isinstance(value, bool):
+            metadata[key] = value
     metadata["loaded"] = True
     return values, metadata, None
 
@@ -1206,6 +1213,64 @@ def _apply_stale_evidence_to_rollup_gates(
             gate["complete"] = False
             gate["status"] = "stale_evidence"
             gate["reason"] = f"{source_kind} evidence is stale or unreadable"
+
+
+def _build_pingan_implemented_status_promotion_decision(
+    *,
+    gate_statuses: dict[str, dict[str, Any]],
+    completed_gates: list[str],
+    incomplete_gates: list[str],
+    missing_evidence_kinds: list[str],
+    source_errors: dict[str, str],
+    stale_evidence_kinds: list[str],
+    stale_evidence_paths: dict[str, str],
+    evidence_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    missing_expected_gates = evidence_manifest.get("missing_expected_gates")
+    if not isinstance(missing_expected_gates, list):
+        missing_expected_gates = []
+    sample_manifest = bool(evidence_manifest.get("example_only") is True or evidence_manifest.get("sample_only") is True)
+
+    blocked_reasons: list[str] = []
+    if incomplete_gates:
+        blocked_reasons.append("incomplete_required_gates")
+    if missing_evidence_kinds:
+        blocked_reasons.append("missing_evidence")
+    if source_errors:
+        blocked_reasons.append("source_errors")
+    if stale_evidence_kinds:
+        blocked_reasons.append("stale_evidence")
+    if missing_expected_gates:
+        blocked_reasons.append("missing_expected_gates")
+    if sample_manifest:
+        blocked_reasons.append("sample_manifest")
+
+    implemented_status_eligible = not blocked_reasons
+    return {
+        "schema": _PINGAN_IMPLEMENTED_STATUS_PROMOTION_DECISION_SCHEMA,
+        "target_nodes": ["D-07", "D-08"],
+        "decision": "eligible_for_review" if implemented_status_eligible else "blocked",
+        "implemented_status_eligible": implemented_status_eligible,
+        "required_gates": list(_PINGAN_PROMOTION_READINESS_GATE_ORDER),
+        "completed_gates": completed_gates,
+        "incomplete_gates": incomplete_gates,
+        "blocked_reasons": blocked_reasons,
+        "missing_evidence_kinds": missing_evidence_kinds,
+        "source_errors": source_errors,
+        "stale_evidence_kinds": stale_evidence_kinds,
+        "stale_evidence_paths": stale_evidence_paths,
+        "missing_expected_gates": missing_expected_gates,
+        "sample_manifest": sample_manifest,
+        "manual_status_review_required": True,
+        "function_tree_status_transition_executed": False,
+        "execution_mode": "readonly_evidence_decision",
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only fail-closed decision over caller-provided evidence artifacts; sample evidence cannot "
+            "satisfy D-07/D-08 implemented status. Does not execute PingAn workflows, does not claim production "
+            "readiness, and does not automatically edit FUNCTION_TREE status."
+        ),
+    }
 
 
 def _build_pingan_promotion_readiness_rollup(
@@ -1372,6 +1437,16 @@ def _build_pingan_promotion_readiness_rollup(
     evidence_manifest_status["missing_expected_gates"] = [
         gate_name for gate_name in expected_gates if gate_name not in gate_statuses
     ]
+    implemented_status_promotion_decision = _build_pingan_implemented_status_promotion_decision(
+        gate_statuses=gate_statuses,
+        completed_gates=completed_gates,
+        incomplete_gates=incomplete_gates,
+        missing_evidence_kinds=missing_evidence_kinds,
+        source_errors=source_errors,
+        stale_evidence_kinds=stale_evidence_kinds,
+        stale_evidence_paths=stale_evidence_paths,
+        evidence_manifest=evidence_manifest_status,
+    )
     return {
         "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA,
         "status": "complete" if not incomplete_gates else "partial",
@@ -1391,6 +1466,7 @@ def _build_pingan_promotion_readiness_rollup(
         "stale_evidence_kinds": stale_evidence_kinds,
         "stale_evidence_paths": stale_evidence_paths,
         "evidence_manifest": evidence_manifest_status,
+        "implemented_status_promotion_decision": implemented_status_promotion_decision,
         "boundary": (
             "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "
             "broker/desktop/trade/report/catalog workflows and does not prove production readiness "
