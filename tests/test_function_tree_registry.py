@@ -521,6 +521,24 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 UI login readiness", combined)
                 self.assertIn("production trading readiness", combined)
 
+    def test_pingan_supervisor_restart_readiness_summary_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-supervisor-restart-readiness-summary", combined)
+                self.assertIn("process_restart_recheck_enabled", combined)
+                self.assertIn("lifecycle_recovery_status", combined)
+                self.assertIn("post-restart broker health recheck", combined)
+                self.assertIn("immediate lifecycle evidence", combined)
+                self.assertIn("不证明 order readiness", combined)
+                self.assertIn("不证明 broker production readiness", combined)
+                self.assertIn("不证明 UI login readiness", combined)
+                self.assertIn("live/manual acceptance", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"

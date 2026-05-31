@@ -419,3 +419,14 @@ PingAn supervisor process restart integration SHALL remain explicit lifecycle co
 - **THEN** returned evidence MUST state that process restart is delegated to the recorded-PID guarded lifecycle process controller
 - **AND** returned evidence MUST include `order_submitted=false`
 - **AND** returned evidence MUST not claim broker readiness, UI login readiness, retry/resubmit readiness, or live/manual acceptance.
+
+### Requirement: PingAn post-restart readiness summary SHALL remain evidence-only
+
+PingAn post-restart readiness summary SHALL remain lifecycle evidence and MUST NOT imply order readiness, broker production readiness, UI login readiness, or live/manual acceptance.
+
+#### Scenario: Recheck summary preserves readiness boundaries
+
+- **WHEN** post-restart broker health recheck evidence is returned
+- **THEN** it MUST include `order_submitted=false`
+- **AND** it MUST state that `lifecycle_recovery_status=recovered` only means immediate broker health recheck returned OK
+- **AND** it MUST not execute task/report/catalog workflows, submit orders, retry submissions, or promote D-07/D-08 implementation status.

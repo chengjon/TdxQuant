@@ -469,6 +469,8 @@ def _add_trade_lifecycle_supervisor_arguments(subparser: argparse.ArgumentParser
     subparser.add_argument("--process-restart", action=argparse.BooleanOptionalAction, default=False)
     subparser.add_argument("--process-exe-path")
     subparser.add_argument("--force-process-restart", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--process-restart-recheck", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--process-restart-recheck-delay-seconds", type=float, default=0.0)
 
 
 def _add_trade_lifecycle_process_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -2792,6 +2794,8 @@ def _run_trade_lifecycle_supervisor_tick(args: argparse.Namespace) -> Result:
         process_restart_enabled=args.process_restart,
         process_restart_exe_path=args.process_exe_path,
         force_process_restart=args.force_process_restart,
+        process_restart_recheck_enabled=args.process_restart_recheck,
+        process_restart_recheck_delay_seconds=args.process_restart_recheck_delay_seconds,
     )
 
 
@@ -2812,6 +2816,8 @@ def _run_trade_lifecycle_supervisor_run(args: argparse.Namespace) -> Result:
         process_restart_enabled=args.process_restart,
         process_restart_exe_path=args.process_exe_path,
         force_process_restart=args.force_process_restart,
+        process_restart_recheck_enabled=args.process_restart_recheck,
+        process_restart_recheck_delay_seconds=args.process_restart_recheck_delay_seconds,
     )
 
 
