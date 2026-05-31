@@ -4027,6 +4027,142 @@ class TdxTaskManagerTests(unittest.TestCase):
         manager = TdxTaskManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
 
+    def test_task_pingan_promotion_readiness_rollup_reports_partial_gates(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {
+                        "data": {
+                            "promotion_gate_status": {
+                                "provider_broker_ownership": {"status": "ready"},
+                                "safety_gates": {"status": "incomplete"},
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(
+                    {
+                        "desktop_lifecycle_gate_status": {
+                            "status": "partial",
+                            "remaining_lifecycle_gates": ["retry_policy"],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "acceptance_outcome_coverage_status": {
+                            "automated_outcome_coverage_complete": True,
+                            "live_manual_acceptance_complete": False,
+                            "acceptance_complete": False,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(
+                preflight_path=str(preflight_path),
+                dialog_readiness_path=str(dialog_path),
+                acceptance_coverage_path=str(acceptance_path),
+            )
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["schema"], "tdx.desktop_trade.pingan_promotion_readiness_rollup.v1")
+        self.assertEqual(rollup["status"], "partial")
+        self.assertEqual(rollup["execution_mode"], "readonly_evidence_rollup")
+        self.assertEqual(rollup["side_effect_level"], "none")
+        self.assertFalse(rollup["order_submitted"])
+        self.assertFalse(rollup["control_dispatch_executed"])
+        self.assertFalse(rollup["promotion_status_transition_executed"])
+        self.assertEqual(
+            rollup["completed_gates"],
+            ["provider_broker_ownership", "audit_evidence"],
+        )
+        self.assertEqual(
+            rollup["incomplete_gates"],
+            ["safety_gates", "desktop_lifecycle", "live_manual_acceptance", "acceptance_evidence"],
+        )
+        self.assertEqual(rollup["gate_statuses"]["safety_gates"]["status"], "incomplete")
+        self.assertEqual(rollup["gate_statuses"]["desktop_lifecycle"]["source_kind"], "dialog_readiness")
+        self.assertEqual(
+            rollup["source_paths"],
+            {
+                "preflight": str(preflight_path),
+                "dialog_readiness": str(dialog_path),
+                "acceptance_coverage": str(acceptance_path),
+            },
+        )
+        self.assertEqual(result.data["task"]["name"], "pingan_promotion_readiness_rollup")
+
+    def test_task_pingan_promotion_readiness_rollup_reports_complete_gates(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {
+                        "promotion_gate_status": {
+                            "provider_broker_ownership": {"status": "ready"},
+                            "safety_gates": {"status": "ready"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(
+                    {
+                        "data": {
+                            "desktop_lifecycle_gate_status": {
+                                "status": "complete",
+                                "remaining_lifecycle_gates": [],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "acceptance_outcome_coverage_status": {
+                            "automated_outcome_coverage_complete": True,
+                            "live_manual_acceptance_complete": True,
+                            "acceptance_complete": True,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(
+                preflight_path=str(preflight_path),
+                dialog_readiness_path=str(dialog_path),
+                acceptance_coverage_path=str(acceptance_path),
+            )
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["status"], "complete")
+        self.assertEqual(rollup["completed_gates"], list(rollup["gate_statuses"]))
+        self.assertEqual(rollup["incomplete_gates"], [])
+        self.assertEqual(rollup["missing_evidence_kinds"], [])
+        self.assertFalse(rollup["promotion_status_transition_executed"])
+        self.assertFalse(rollup["order_submitted"])
+
     def test_task_block_sync_attaches_task_metadata_and_forwards_symbols(self) -> None:
         expected = Result(
             ok=True,

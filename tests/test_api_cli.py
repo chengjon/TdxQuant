@@ -1833,6 +1833,26 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.end_date, "2026-04-29")
         self.assertEqual(args.live_manual_acceptance_path, "runtime/pingan/manual-acceptance.json")
 
+    def test_task_pingan_promotion_readiness_rollup_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-promotion-readiness-rollup",
+                "--preflight-path",
+                "runtime/pingan/preflight.json",
+                "--dialog-readiness-path",
+                "runtime/pingan/dialog-readiness.json",
+                "--acceptance-coverage-path",
+                "runtime/pingan/acceptance-coverage.json",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "pingan-promotion-readiness-rollup")
+        self.assertEqual(args.preflight_path, "runtime/pingan/preflight.json")
+        self.assertEqual(args.dialog_readiness_path, "runtime/pingan/dialog-readiness.json")
+        self.assertEqual(args.acceptance_coverage_path, "runtime/pingan/acceptance-coverage.json")
+
     def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -10719,6 +10739,32 @@ class TaskCliDispatchTests(unittest.TestCase):
             json_output_path=None,
             csv_output_path=None,
             live_manual_acceptance_path=None,
+        )
+
+    def test_handle_task_pingan_promotion_readiness_rollup_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-promotion-readiness-rollup",
+                "--preflight-path",
+                "runtime/pingan/preflight.json",
+                "--dialog-readiness-path",
+                "runtime/pingan/dialog-readiness.json",
+                "--acceptance-coverage-path",
+                "runtime/pingan/acceptance-coverage.json",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.pingan_promotion_readiness_rollup.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.pingan_promotion_readiness_rollup.assert_called_once_with(
+            preflight_path="runtime/pingan/preflight.json",
+            dialog_readiness_path="runtime/pingan/dialog-readiness.json",
+            acceptance_coverage_path="runtime/pingan/acceptance-coverage.json",
         )
 
     def test_handle_task_trade_audit_daily_report_rejects_mixed_status_filters(self) -> None:

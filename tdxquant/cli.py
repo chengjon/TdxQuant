@@ -651,6 +651,12 @@ def _add_trade_audit_period_report_arguments(subparser: argparse.ArgumentParser)
     subparser.add_argument("--live-manual-acceptance-path")
 
 
+def _add_pingan_promotion_readiness_rollup_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--preflight-path")
+    subparser.add_argument("--dialog-readiness-path")
+    subparser.add_argument("--acceptance-coverage-path")
+
+
 def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--audit-id")
     subparser.add_argument("--contract-no")
@@ -1524,6 +1530,10 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_trade_audit_period_report_parser = task_subparsers.add_parser("trade-audit-period-report")
     _add_trade_audit_period_report_arguments(task_trade_audit_period_report_parser)
     _add_task_common_arguments(task_trade_audit_period_report_parser)
+
+    task_pingan_promotion_readiness_rollup_parser = task_subparsers.add_parser("pingan-promotion-readiness-rollup")
+    _add_pingan_promotion_readiness_rollup_arguments(task_pingan_promotion_readiness_rollup_parser)
+    _add_task_common_arguments(task_pingan_promotion_readiness_rollup_parser)
 
     task_trade_audit_cross_ledger_query_parser = task_subparsers.add_parser("trade-audit-cross-ledger-query")
     _add_trade_audit_cross_ledger_query_arguments(task_trade_audit_cross_ledger_query_parser)
@@ -5796,6 +5806,12 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
         if methods is not None:
             period_kwargs["methods"] = methods
         return manager.trade_audit_period_report(**period_kwargs)
+    if command_name == "pingan-promotion-readiness-rollup":
+        return manager.pingan_promotion_readiness_rollup(
+            preflight_path=args.preflight_path,
+            dialog_readiness_path=args.dialog_readiness_path,
+            acceptance_coverage_path=args.acceptance_coverage_path,
+        )
     if command_name == "trade-audit-cross-ledger-query":
         return manager.trade_audit_cross_ledger_query(
             audit_dir=args.audit_dir,

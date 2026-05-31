@@ -1025,6 +1025,244 @@ def _build_pingan_acceptance_outcome_coverage_status(
     }
 
 
+_PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA = "tdx.desktop_trade.pingan_promotion_readiness_rollup.v1"
+_PINGAN_PROMOTION_READINESS_GATE_ORDER = (
+    "provider_broker_ownership",
+    "safety_gates",
+    "desktop_lifecycle",
+    "audit_evidence",
+    "live_manual_acceptance",
+    "acceptance_evidence",
+)
+
+
+def _load_json_evidence(path: str | None) -> tuple[dict[str, Any] | None, str | None]:
+    if path is None:
+        return None, None
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, str(exc)
+    if not isinstance(payload, dict):
+        return None, "evidence JSON must contain an object"
+    return payload, None
+
+
+def _find_json_object(payload: dict[str, Any] | None, key: str) -> dict[str, Any] | None:
+    if payload is None:
+        return None
+    stack: list[dict[str, Any]] = [payload]
+    while stack:
+        current = stack.pop()
+        value = current.get(key)
+        if isinstance(value, dict):
+            return value
+        for child in current.values():
+            if isinstance(child, dict):
+                stack.append(child)
+    return None
+
+
+def _json_status_text(payload: dict[str, Any] | None, *, default: str) -> str:
+    if payload is None:
+        return default
+    status = payload.get("status")
+    if isinstance(status, str) and status.strip():
+        return status.strip()
+    return default
+
+
+def _json_status_is_ready(payload: dict[str, Any] | None) -> bool:
+    if payload is None:
+        return False
+    status = _json_status_text(payload, default="").lower()
+    if status in {"ready", "complete", "passed", "ok"}:
+        return True
+    if payload.get("complete") is True:
+        return True
+    return payload.get("ready") is True
+
+
+def _build_rollup_gate_status(
+    *,
+    status: str,
+    complete: bool,
+    source_kind: str,
+    source_path: str | None,
+    reason: str,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status": status,
+        "complete": complete,
+        "source_kind": source_kind,
+        "reason": reason,
+    }
+    if source_path is not None:
+        payload["source_path"] = source_path
+    return payload
+
+
+def _build_pingan_promotion_readiness_rollup(
+    *,
+    preflight_path: str | None = None,
+    dialog_readiness_path: str | None = None,
+    acceptance_coverage_path: str | None = None,
+) -> dict[str, Any]:
+    source_paths = {
+        key: value
+        for key, value in {
+            "preflight": preflight_path,
+            "dialog_readiness": dialog_readiness_path,
+            "acceptance_coverage": acceptance_coverage_path,
+        }.items()
+        if value is not None
+    }
+    source_errors: dict[str, str] = {}
+    missing_evidence_kinds: list[str] = []
+
+    preflight_payload, error = _load_json_evidence(preflight_path)
+    if error is not None:
+        source_errors["preflight"] = error
+    dialog_payload, error = _load_json_evidence(dialog_readiness_path)
+    if error is not None:
+        source_errors["dialog_readiness"] = error
+    acceptance_payload, error = _load_json_evidence(acceptance_coverage_path)
+    if error is not None:
+        source_errors["acceptance_coverage"] = error
+
+    preflight_status = _find_json_object(preflight_payload, "promotion_gate_status")
+    desktop_lifecycle_status = _find_json_object(dialog_payload, "desktop_lifecycle_gate_status")
+    acceptance_status = _find_json_object(acceptance_payload, "acceptance_outcome_coverage_status")
+
+    if preflight_status is None:
+        missing_evidence_kinds.append("preflight")
+    if desktop_lifecycle_status is None:
+        missing_evidence_kinds.append("dialog_readiness")
+    if acceptance_status is None:
+        missing_evidence_kinds.append("acceptance_coverage")
+
+    provider_broker = preflight_status.get("provider_broker_ownership") if preflight_status else None
+    safety_gates = preflight_status.get("safety_gates") if preflight_status else None
+    provider_broker = provider_broker if isinstance(provider_broker, dict) else None
+    safety_gates = safety_gates if isinstance(safety_gates, dict) else None
+
+    provider_broker_complete = _json_status_is_ready(provider_broker)
+    safety_gates_complete = _json_status_is_ready(safety_gates)
+    desktop_remaining = (
+        desktop_lifecycle_status.get("remaining_lifecycle_gates") if desktop_lifecycle_status is not None else None
+    )
+    desktop_lifecycle_complete = _json_status_is_ready(desktop_lifecycle_status) or desktop_remaining == []
+    audit_evidence_complete = bool(
+        acceptance_status is not None and acceptance_status.get("automated_outcome_coverage_complete") is True
+    )
+    live_manual_acceptance_complete = bool(
+        acceptance_status is not None and acceptance_status.get("live_manual_acceptance_complete") is True
+    )
+    acceptance_evidence_complete = bool(
+        acceptance_status is not None and acceptance_status.get("acceptance_complete") is True
+    )
+
+    gate_statuses = {
+        "provider_broker_ownership": _build_rollup_gate_status(
+            status=_json_status_text(
+                provider_broker,
+                default="missing_evidence" if preflight_status is None else "missing_gate",
+            ),
+            complete=provider_broker_complete,
+            source_kind="preflight",
+            source_path=source_paths.get("preflight"),
+            reason=(
+                "provider/broker ownership evidence reports ready"
+                if provider_broker_complete
+                else "provider/broker ownership evidence is missing or not ready"
+            ),
+        ),
+        "safety_gates": _build_rollup_gate_status(
+            status=_json_status_text(
+                safety_gates,
+                default="missing_evidence" if preflight_status is None else "missing_gate",
+            ),
+            complete=safety_gates_complete,
+            source_kind="preflight",
+            source_path=source_paths.get("preflight"),
+            reason=(
+                "safety gate evidence reports ready"
+                if safety_gates_complete
+                else "safety gate evidence is missing or not ready"
+            ),
+        ),
+        "desktop_lifecycle": _build_rollup_gate_status(
+            status=_json_status_text(
+                desktop_lifecycle_status,
+                default="complete" if desktop_lifecycle_complete else "missing_evidence",
+            ),
+            complete=desktop_lifecycle_complete,
+            source_kind="dialog_readiness",
+            source_path=source_paths.get("dialog_readiness"),
+            reason=(
+                "desktop lifecycle evidence reports complete"
+                if desktop_lifecycle_complete
+                else "desktop lifecycle evidence is missing or incomplete"
+            ),
+        ),
+        "audit_evidence": _build_rollup_gate_status(
+            status="complete" if audit_evidence_complete else "incomplete",
+            complete=audit_evidence_complete,
+            source_kind="acceptance_coverage",
+            source_path=source_paths.get("acceptance_coverage"),
+            reason=(
+                "automated audit outcome coverage is complete"
+                if audit_evidence_complete
+                else "automated audit outcome coverage is missing or incomplete"
+            ),
+        ),
+        "live_manual_acceptance": _build_rollup_gate_status(
+            status="complete" if live_manual_acceptance_complete else "incomplete",
+            complete=live_manual_acceptance_complete,
+            source_kind="acceptance_coverage",
+            source_path=source_paths.get("acceptance_coverage"),
+            reason=(
+                "live/manual acceptance evidence is complete"
+                if live_manual_acceptance_complete
+                else "live/manual acceptance evidence is missing or incomplete"
+            ),
+        ),
+        "acceptance_evidence": _build_rollup_gate_status(
+            status="complete" if acceptance_evidence_complete else "incomplete",
+            complete=acceptance_evidence_complete,
+            source_kind="acceptance_coverage",
+            source_path=source_paths.get("acceptance_coverage"),
+            reason=(
+                "combined acceptance evidence is complete"
+                if acceptance_evidence_complete
+                else "combined acceptance evidence is missing or incomplete"
+            ),
+        ),
+    }
+    completed_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if gate_statuses[name]["complete"]]
+    incomplete_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if not gate_statuses[name]["complete"]]
+    return {
+        "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA,
+        "status": "complete" if not incomplete_gates else "partial",
+        "execution_mode": "readonly_evidence_rollup",
+        "side_effect_level": "none",
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "promotion_status_transition_executed": False,
+        "gate_statuses": gate_statuses,
+        "completed_gates": completed_gates,
+        "incomplete_gates": incomplete_gates,
+        "missing_evidence_kinds": missing_evidence_kinds,
+        "source_paths": source_paths,
+        "source_errors": source_errors,
+        "boundary": (
+            "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "
+            "broker/desktop/trade/report/catalog workflows and does not prove production readiness "
+            "or implemented status."
+        ),
+    }
+
+
 def _extract_trade_audit_local_date_iso(entry: dict[str, Any], tzinfo: ZoneInfo) -> str | None:
     parsed = _parse_iso_datetime(entry.get("trade_audit", {}).get("recorded_at"))
     if parsed is None:
@@ -1470,6 +1708,30 @@ class TdxTaskManager:
 
         result, timing = _capture_task_timing("task.block_watchlist_import", run)
         return self._attach_task_metadata(result, task_name="block_watchlist_import", timing=timing)
+
+    def pingan_promotion_readiness_rollup(
+        self,
+        *,
+        preflight_path: str | None = None,
+        dialog_readiness_path: str | None = None,
+        acceptance_coverage_path: str | None = None,
+    ) -> Result:
+        def run() -> Result:
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="summarized PingAn promotion readiness",
+                data={
+                    "promotion_readiness_rollup": _build_pingan_promotion_readiness_rollup(
+                        preflight_path=preflight_path,
+                        dialog_readiness_path=dialog_readiness_path,
+                        acceptance_coverage_path=acceptance_coverage_path,
+                    )
+                },
+            )
+
+        result, timing = _capture_task_timing("task.pingan_promotion_readiness_rollup", run)
+        return self._attach_task_metadata(result, task_name="pingan_promotion_readiness_rollup", timing=timing)
 
     def block_read_watchlist(
         self,
