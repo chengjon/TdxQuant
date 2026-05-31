@@ -1,0 +1,23 @@
+{
+  "schema": "tdx.desktop_trade.pingan_promotion_readiness_manifest.v1",
+  "description": "Example-only PingAn promotion readiness evidence manifest for read-only task/catalog discovery.",
+  "example_only": true,
+  "preflight_path": "runtime/pingan/preflight.example.json",
+  "dialog_readiness_path": "runtime/pingan/dialog-readiness.example.json",
+  "acceptance_coverage_path": "runtime/pingan/acceptance-coverage.example.json",
+  "max_evidence_age_seconds": 86400,
+  "expected_gates": [
+    "provider_broker_ownership",
+    "safety_gates",
+    "desktop_lifecycle",
+    "audit_evidence",
+    "live_manual_acceptance",
+    "acceptance_evidence"
+  ],
+  "boundary": {
+    "execution_mode": "sample_manifest_only",
+    "dispatch_executed": false,
+    "contains_live_account_data": false,
+    "proves_production_readiness": false
+  }
+}

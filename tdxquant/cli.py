@@ -5977,6 +5977,19 @@ def _build_task_preset_namespace(args: argparse.Namespace) -> argparse.Namespace
         merged["dry_run"] = True if merged.get("dry_run") is None else merged["dry_run"]
         merged["show"] = True if merged.get("show") is None else merged["show"]
 
+    if command_name == "pingan-promotion-readiness-rollup":
+        missing_required = [name for name in ("evidence_manifest_path",) if merged.get(name) in (None, "")]
+        if missing_required:
+            raise ValueError(f"task preset execution requires: {', '.join(missing_required)}")
+        for name in (
+            "preflight_path",
+            "dialog_readiness_path",
+            "acceptance_coverage_path",
+            "max_evidence_age_seconds",
+            "json_output_path",
+        ):
+            merged[name] = None if merged.get(name) is None else merged[name]
+
     if command_name == "block-read-full":
         missing_required = [name for name in ("block_code",) if merged.get(name) in (None, "")]
         if missing_required:

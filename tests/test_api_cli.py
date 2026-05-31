@@ -5646,6 +5646,20 @@ class ApiCliDispatchTests(unittest.TestCase):
         entry_names = [row["name"] for row in result.data["entries"]]
         self.assertIn("plan-zxg-watchlist-import", entry_names)
 
+    def test_handle_catalog_list_includes_pingan_readiness_manifest_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "readiness"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entries = {row["name"]: row for row in result.data["entries"]}
+        self.assertIn("plan-pingan-promotion-readiness", entries)
+        labels = entries["plan-pingan-promotion-readiness"]["labels"]
+        self.assertIn("task", labels)
+        self.assertIn("pingan", labels)
+        self.assertIn("readiness", labels)
+        self.assertIn("manifest", labels)
+        self.assertIn("readonly", labels)
+
     def test_handle_catalog_list_includes_block_sync_write_policy_entry(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "sync"])
@@ -7296,6 +7310,29 @@ class ApiCliDispatchTests(unittest.TestCase):
         )
         self.assertTrue(result.data["resolved_args"]["dry_run"])
         self.assertTrue(result.data["resolved_args"]["show"])
+        mocked_task_handler.assert_not_called()
+
+    def test_handle_catalog_plan_pingan_readiness_manifest_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "plan-pingan-promotion-readiness"])
+        with patch("tdxquant.cli._handle_task_subcommand") as mocked_task_handler:
+            result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["name"], "plan-pingan-promotion-readiness")
+        self.assertEqual(result.data["dispatch"]["source"], "task")
+        self.assertEqual(result.data["dispatch"]["command_group"], "task")
+        self.assertEqual(result.data["dispatch"]["command_name"], "pingan-promotion-readiness-rollup")
+        self.assertEqual(
+            result.data["resolved_args"]["evidence_manifest_path"],
+            "runtime/pingan/promotion-readiness-manifest.example.json",
+        )
+        self.assertIsNone(result.data["resolved_args"]["preflight_path"])
+        self.assertIsNone(result.data["resolved_args"]["dialog_readiness_path"])
+        self.assertIsNone(result.data["resolved_args"]["acceptance_coverage_path"])
+        self.assertIsNone(result.data["resolved_args"]["json_output_path"])
+        self.assertEqual(result.data["constraints"]["execution_mode"], "non_executing")
+        self.assertFalse(result.data["constraints"]["dispatch_executed"])
+        self.assertTrue(result.data["summary_view"]["plan_summary"]["non_execution"])
         mocked_task_handler.assert_not_called()
 
     def test_handle_catalog_plan_block_sync_write_policy_entry_without_execution(self) -> None:
@@ -10165,6 +10202,24 @@ class TaskCliDispatchTests(unittest.TestCase):
             dry_run=True,
             show=True,
             audit_dir=None,
+        )
+
+    def test_handle_task_run_uses_pingan_promotion_readiness_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "plan-pingan-promotion-readiness"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.pingan_promotion_readiness_rollup.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.pingan_promotion_readiness_rollup.assert_called_once_with(
+            evidence_manifest_path="runtime/pingan/promotion-readiness-manifest.example.json",
+            preflight_path=None,
+            dialog_readiness_path=None,
+            acceptance_coverage_path=None,
+            max_evidence_age_seconds=None,
+            json_output_path=None,
         )
 
     def test_handle_task_run_uses_block_sync_write_policy_preset_defaults(self) -> None:

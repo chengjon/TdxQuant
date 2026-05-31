@@ -156,6 +156,15 @@
       "show": true
     }
   },
+  "plan-pingan-promotion-readiness": {
+    "command": "pingan-promotion-readiness-rollup",
+    "description": "从示例 manifest 解析平安 promotion readiness 只读 evidence rollup 输入。",
+    "profile": "default",
+    "api_profile": "safe_read",
+    "options": {
+      "evidence_manifest_path": "runtime/pingan/promotion-readiness-manifest.example.json"
+    }
+  },
   "read-zxg-watchlist": {
     "command": "block-read-watchlist",
     "description": "读取 ZXG 板块标准化快照。",

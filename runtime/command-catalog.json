@@ -749,6 +749,12 @@
     "description": "统一入口下的 ZXG 自选板块 JSON 导入 dry-run 计划模板。",
     "labels": ["task", "block", "watchlist", "import", "dry-run"]
   },
+  "plan-pingan-promotion-readiness": {
+    "source": "task",
+    "preset": "plan-pingan-promotion-readiness",
+    "description": "统一入口下的平安 promotion readiness manifest 只读解析模板。",
+    "labels": ["task", "pingan", "readiness", "manifest", "readonly"]
+  },
   "read-zxg-full": {
     "source": "task",
     "preset": "read-zxg-full",
