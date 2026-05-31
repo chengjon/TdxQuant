@@ -134,6 +134,75 @@ def _build_pingan_exception_popup_lookup_detail(text_payload: dict[str, Any]) ->
     }
 
 
+def _build_pingan_broker_readiness_required_status(
+    *,
+    title_keyword: str,
+    exe_path: str | None,
+    require_broker_readiness: bool,
+) -> dict[str, Any]:
+    if not require_broker_readiness:
+        return {
+            "required": False,
+            "requirement_status": "not_required",
+            "broker_health_ok": None,
+            "control_dispatch_executed": False,
+            "order_submitted": False,
+            "side_effect_level": "none",
+        }
+    try:
+        broker_health = PingAnBrokerAdapter(title_keyword=title_keyword, exe_path=exe_path).health_check()
+    except Exception as exc:
+        broker_health = Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message=f"PingAn broker readiness check failed: {exc}",
+            data={"error": str(exc)},
+        )
+    return {
+        "required": True,
+        "requirement_status": "passed" if broker_health.ok else "failed",
+        "requirement_reason": None if broker_health.ok else broker_health.message,
+        "broker_health_ok": bool(broker_health.ok),
+        "broker_health": broker_health.to_dict(),
+        "control_dispatch_executed": False,
+        "order_submitted": False,
+        "side_effect_level": "none",
+    }
+
+
+def _apply_pingan_broker_readiness_required_guard(
+    risk_gate: dict[str, Any],
+    *,
+    title_keyword: str,
+    exe_path: str | None,
+    require_broker_readiness: bool,
+) -> dict[str, Any]:
+    if not require_broker_readiness:
+        return risk_gate
+    status = _build_pingan_broker_readiness_required_status(
+        title_keyword=title_keyword,
+        exe_path=exe_path,
+        require_broker_readiness=require_broker_readiness,
+    )
+    updated = dict(risk_gate)
+    checks = list(updated.get("checks", []))
+    requirement_passed = status.get("requirement_status") == "passed"
+    checks.append(
+        {
+            "name": "broker_readiness_required",
+            "passed": requirement_passed,
+            "issues": [] if requirement_passed else [str(status.get("requirement_reason") or "broker readiness requirement failed")],
+            "detail": status,
+        }
+    )
+    updated["checks"] = checks
+    updated["broker_readiness_required_status"] = status
+    if not requirement_passed:
+        updated["passed"] = False
+        updated["rejection_reason"] = str(status.get("requirement_reason") or "broker readiness requirement failed")
+    return updated
+
+
 def _build_pingan_promotion_gate_status(
     *,
     broker_health: Result,
@@ -2775,6 +2844,7 @@ class _PingAnTradeProxy:
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
         require_lifecycle_owner_lock: bool = False,
+        require_broker_readiness: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         resolved_lookup_mode = str(dialog_lookup_mode or effective_profile["dialog_lookup_mode"])
@@ -2803,6 +2873,12 @@ class _PingAnTradeProxy:
             "max_price": None,
             "rejection_reason": None,
         }
+        boundary_risk_gate = _apply_pingan_broker_readiness_required_guard(
+            boundary_risk_gate,
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            require_broker_readiness=require_broker_readiness,
+        )
         boundary_risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
             boundary_risk_gate,
             lifecycle_statefile_path=lifecycle_statefile_path,
@@ -2811,11 +2887,39 @@ class _PingAnTradeProxy:
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
         )
         if not boundary_risk_gate["passed"]:
+            broker_readiness_status = boundary_risk_gate.get("broker_readiness_required_status", {})
             owner_lock_status = boundary_risk_gate.get("lifecycle_owner_lock_required_status", {})
+            failed_broker_readiness = (
+                isinstance(broker_readiness_status, dict)
+                and broker_readiness_status.get("requirement_status") == "failed"
+            )
+            failed_status = broker_readiness_status if failed_broker_readiness else owner_lock_status
+            failed_check_name = "broker_readiness_required" if failed_broker_readiness else "lifecycle_owner_lock_required"
+            failed_message = (
+                "stable trade confirm-current rejected by broker readiness requirement"
+                if failed_broker_readiness
+                else "stable trade confirm-current rejected by lifecycle owner-lock requirement"
+            )
+            failed_next_action = (
+                broker_readiness_status.get("broker_health", {}).get("next_action")
+                if failed_broker_readiness and isinstance(broker_readiness_status.get("broker_health"), dict)
+                else None
+            ) or (
+                "Bring Ping An to the foreground and retry confirm-current."
+                if failed_broker_readiness
+                else "Acquire the PingAn lifecycle owner lock and retry confirm-current."
+            )
+            failed_code = (
+                ErrorCode(str(broker_readiness_status.get("broker_health", {}).get("code")))
+                if failed_broker_readiness
+                and isinstance(broker_readiness_status.get("broker_health"), dict)
+                and broker_readiness_status.get("broker_health", {}).get("code") in ErrorCode._value2member_map_
+                else ErrorCode.INVALID_REQUEST
+            )
             result = Result(
                 ok=False,
-                code=ErrorCode.INVALID_REQUEST,
-                message="stable trade confirm-current rejected by lifecycle owner-lock requirement",
+                code=failed_code,
+                message=failed_message,
                 data={
                     "input": {
                         "boundary": "confirm_current",
@@ -2827,6 +2931,7 @@ class _PingAnTradeProxy:
                         "lifecycle_owner_token": lifecycle_owner_token,
                         "lifecycle_stale_after_seconds": lifecycle_stale_after_seconds,
                         "require_lifecycle_owner_lock": require_lifecycle_owner_lock,
+                        "require_broker_readiness": require_broker_readiness,
                     },
                     "confirm_current": {
                         "overall_status": "failed",
@@ -2841,24 +2946,25 @@ class _PingAnTradeProxy:
                         },
                         "checks": [
                             _build_trade_health_check(
-                                "lifecycle_owner_lock_required",
+                                failed_check_name,
                                 "failed",
                                 str(
-                                    owner_lock_status.get("requirement_reason")
-                                    or "lifecycle owner lock requirement failed"
+                                    failed_status.get("requirement_reason")
+                                    or (
+                                        "broker readiness requirement failed"
+                                        if failed_broker_readiness
+                                        else "lifecycle owner lock requirement failed"
+                                    )
                                 ),
-                                detail=owner_lock_status,
+                                detail=failed_status,
                                 critical=True,
-                                recommended_action=(
-                                    "Acquire the PingAn lifecycle owner lock with the expected owner token before "
-                                    "running confirm-current."
-                                ),
+                                recommended_action=failed_next_action,
                             )
                         ],
                     },
                     "result_dialog": {},
                 },
-                next_action="Acquire the PingAn lifecycle owner lock and retry confirm-current.",
+                next_action=failed_next_action,
             )
             attach_trade_metadata(
                 result,

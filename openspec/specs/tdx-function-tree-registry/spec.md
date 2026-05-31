@@ -359,3 +359,12 @@ The FUNCTION_TREE registry SHALL cite guarded trade-buy owner-lock guard forward
 - **THEN** the row MUST remain `[部分实现]`
 - **AND** the row MUST cite `TdxTradeManager.pingan.exception_popup`, `trade exception-popup --action inspect`, and `trade exception-popup --action close --confirm-close`
 - **AND** the row boundary MUST state that the control is explicit exception-popup inspect/close only and does not retry, recover, resubmit, prove broker readiness/live acceptance, or complete workflow/lifecycle governance.
+
+### Requirement: D-07 confirm-current broker readiness guard evidence SHALL remain partial
+`FUNCTION_TREE.md` SHALL register confirm-current broker readiness guard coverage as D-07 partial safety evidence without promoting PingAn trading to implemented status.
+
+#### Scenario: D-07 registers confirm-current broker readiness guard without status promotion
+- **WHEN** D-07 cites `pingan-confirm-current-broker-readiness-guard`
+- **THEN** D-07 MUST remain `[部分实现]`
+- **AND** the row MUST cite `trade confirm-current --require-broker-readiness`, `task trade-confirm-current --require-broker-readiness`, and `TdxTradeManager.pingan.confirm_current`
+- **AND** the row boundary MUST state that this is opt-in broker runtime health guard evaluation only and does not prove lifecycle control, retry/backoff/recovery, live/manual acceptance, or production trading readiness.

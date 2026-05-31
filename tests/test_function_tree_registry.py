@@ -416,6 +416,21 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("live/manual acceptance", combined)
                 self.assertIn("workflow/lifecycle governance", combined)
 
+    def test_pingan_confirm_current_broker_readiness_guard_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+        row = rows["D-07"]
+        combined = f"{row['evidence']} {row['boundary']}"
+
+        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertIn("pingan-confirm-current-broker-readiness-guard", combined)
+        self.assertIn("trade confirm-current --require-broker-readiness", combined)
+        self.assertIn("task trade-confirm-current --require-broker-readiness", combined)
+        self.assertIn("TdxTradeManager.pingan.confirm_current", combined)
+        self.assertIn("confirm-current 只做 broker runtime health guard 校验", combined)
+        self.assertIn("不 start/stop/restart/kill/supervise/backoff", combined)
+        self.assertIn("不 retry/backoff/recovery", combined)
+        self.assertIn("live/manual acceptance", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"

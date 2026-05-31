@@ -96,6 +96,12 @@ def _build_task_lifecycle_owner_lock_guard_kwargs(
     }
 
 
+def _build_task_broker_readiness_guard_kwargs(*, require_broker_readiness: bool) -> dict[str, Any]:
+    if not require_broker_readiness:
+        return {}
+    return {"require_broker_readiness": True}
+
+
 def _extract_stock_codes(payload: Any) -> list[str]:
     if isinstance(payload, list):
         codes: list[str] = []
@@ -3824,6 +3830,7 @@ class TdxTaskManager:
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
         require_lifecycle_owner_lock: bool = False,
+        require_broker_readiness: bool = False,
     ) -> Result:
         def run() -> Result:
             lifecycle_guard_kwargs = _build_task_lifecycle_owner_lock_guard_kwargs(
@@ -3831,6 +3838,9 @@ class TdxTaskManager:
                 lifecycle_owner_token=lifecycle_owner_token,
                 lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
                 require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
+            broker_readiness_guard_kwargs = _build_task_broker_readiness_guard_kwargs(
+                require_broker_readiness=require_broker_readiness
             )
             kwargs: dict[str, Any] = {
                 "dialog_lookup_mode": dialog_lookup_mode,
@@ -3841,6 +3851,7 @@ class TdxTaskManager:
             if result_close_pre_delay is not None:
                 kwargs["result_close_pre_delay"] = result_close_pre_delay
             kwargs.update(lifecycle_guard_kwargs)
+            kwargs.update(broker_readiness_guard_kwargs)
             trade_result = self.trade_manager.pingan.confirm_current(**kwargs)
             if not trade_result.ok:
                 return trade_result
@@ -3852,6 +3863,7 @@ class TdxTaskManager:
                 "result_close_pre_delay": result_close_pre_delay,
             }
             input_payload.update(lifecycle_guard_kwargs)
+            input_payload.update(broker_readiness_guard_kwargs)
             return Result(
                 ok=True,
                 code=ErrorCode.OK,

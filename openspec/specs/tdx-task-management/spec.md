@@ -517,3 +517,11 @@ Guarded trade-buy owner-lock forwarding SHALL remain argument forwarding to the 
 #### Scenario: Task submit-ready default dispatch remains unchanged
 - **WHEN** a caller executes `TdxTaskManager.trade_submit_ready(...)` without lifecycle owner-lock guard options
 - **THEN** the task MUST keep the existing submit-ready manager call shape.
+
+### Requirement: Task confirm-current SHALL forward broker readiness guard
+Task confirm-current SHALL accept the broker readiness guard option and forward it to the PingAn manager confirm-current method without evaluating broker health in the task layer.
+
+#### Scenario: Task confirm-current forwards broker readiness guard
+- **WHEN** `TdxTaskManager.trade_confirm_current(...)` is called with `require_broker_readiness=true`
+- **THEN** it MUST pass `require_broker_readiness=true` to `TdxTradeManager.pingan.confirm_current(...)`
+- **AND** it MUST NOT start, stop, restart, supervise, retry, recover, or resubmit orders directly.

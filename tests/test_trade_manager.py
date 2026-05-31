@@ -1676,6 +1676,40 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(lifecycle_statefile_path.exists())
         self.assertFalse(lifecycle_lock_path.exists())
 
+    def test_pingan_confirm_current_requires_broker_readiness_before_ui_side_effects(self) -> None:
+        broker_health = Result(
+            ok=False,
+            code=ErrorCode.CONTROL_NOT_FOUND,
+            message="runtime path resolved but trading window was not found",
+            data={"runtime": {"ok": True}, "window": {"ok": False}},
+            next_action="Bring Ping An to the foreground and retry.",
+        )
+        manager = TdxTradeManager(profile="balanced")
+        with (
+            patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health) as mocked_health,
+            patch("tdxquant.trade.manager._find_confirm_target_for_lookup") as mocked_lookup,
+            patch("tdxquant.trade.manager._click_lookup_target") as mocked_click,
+        ):
+            result = manager.pingan.confirm_current(require_broker_readiness=True)
+
+        mocked_health.assert_called_once()
+        mocked_lookup.assert_not_called()
+        mocked_click.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.CONTROL_NOT_FOUND)
+        self.assertEqual(result.data["manager"]["method"], "confirm_current")
+        self.assertEqual(result.data["trade_safety"]["side_effect_level"], "none")
+        risk_gate = result.data["trade_safety"]["risk_gate"]
+        self.assertFalse(risk_gate["passed"])
+        readiness = risk_gate["broker_readiness_required_status"]
+        self.assertTrue(readiness["required"])
+        self.assertEqual(readiness["requirement_status"], "failed")
+        self.assertFalse(readiness["broker_health_ok"])
+        self.assertFalse(readiness["control_dispatch_executed"])
+        self.assertFalse(result.data["confirm_current"]["confirmation_advanced"])
+        self.assertFalse(result.data["confirm_current"]["result_dialog_closed"])
+        self.assertEqual(result.next_action, "Bring Ping An to the foreground and retry.")
+
     def test_pingan_confirm_current_warns_when_result_dialog_is_not_detected(self) -> None:
         confirm_target = {
             "ok": True,

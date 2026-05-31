@@ -419,6 +419,7 @@ def _add_trade_confirm_current_arguments(subparser: argparse.ArgumentParser) -> 
     subparser.add_argument("--result-timeout", type=float)
     subparser.add_argument("--close-result-dialog", action=argparse.BooleanOptionalAction, default=True)
     subparser.add_argument("--result-close-pre-delay", type=float)
+    subparser.add_argument("--require-broker-readiness", action="store_true")
 
 
 def _add_trade_dialog_readiness_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -470,6 +471,7 @@ def _add_task_trade_confirm_current_arguments(subparser: argparse.ArgumentParser
     subparser.add_argument("--result-timeout", type=float)
     subparser.add_argument("--close-result-dialog", action=argparse.BooleanOptionalAction, default=True)
     subparser.add_argument("--result-close-pre-delay", type=float)
+    subparser.add_argument("--require-broker-readiness", action="store_true")
 
 
 def _add_task_run_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -2651,6 +2653,8 @@ def _run_trade_confirm_current(args: argparse.Namespace) -> Result:
     if args.result_close_pre_delay is not None:
         kwargs["result_close_pre_delay"] = args.result_close_pre_delay
     kwargs.update(_get_lifecycle_owner_guard_kwargs(args))
+    if getattr(args, "require_broker_readiness", False):
+        kwargs["require_broker_readiness"] = True
     return trade_manager.pingan.confirm_current(**kwargs)
 
 
@@ -6064,14 +6068,17 @@ def _handle_task_subcommand(args: argparse.Namespace) -> Result:
             **_get_lifecycle_owner_guard_kwargs(args),
         )
     if args.task_command == "trade-confirm-current":
-        return manager.trade_confirm_current(
-            dialog_lookup_mode=args.dialog_lookup_mode,
-            confirm_timeout=args.confirm_timeout,
-            result_timeout=args.result_timeout,
-            close_result_dialog=args.close_result_dialog,
-            result_close_pre_delay=args.result_close_pre_delay,
+        kwargs: dict[str, Any] = {
+            "dialog_lookup_mode": args.dialog_lookup_mode,
+            "confirm_timeout": args.confirm_timeout,
+            "result_timeout": args.result_timeout,
+            "close_result_dialog": args.close_result_dialog,
+            "result_close_pre_delay": args.result_close_pre_delay,
             **_get_lifecycle_owner_guard_kwargs(args),
-        )
+        }
+        if getattr(args, "require_broker_readiness", False):
+            kwargs["require_broker_readiness"] = True
+        return manager.trade_confirm_current(**kwargs)
     if args.task_command == "guarded-trade-buy":
         return manager.guarded_trade_buy(
             port=args.port,

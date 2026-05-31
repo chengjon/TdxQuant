@@ -2043,6 +2043,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "--lifecycle-stale-after-seconds",
                 "45.0",
                 "--require-lifecycle-owner-lock",
+                "--require-broker-readiness",
             ]
         )
         self.assertEqual(args.command, "task")
@@ -2056,6 +2057,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.lifecycle_owner_token, "task-confirm-owner")
         self.assertEqual(args.lifecycle_stale_after_seconds, 45.0)
         self.assertTrue(args.require_lifecycle_owner_lock)
+        self.assertTrue(args.require_broker_readiness)
 
     def test_task_guarded_trade_buy_command_parses(self) -> None:
         parser = build_parser()
@@ -2513,6 +2515,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "--lifecycle-stale-after-seconds",
                 "60.0",
                 "--require-lifecycle-owner-lock",
+                "--require-broker-readiness",
             ]
         )
         self.assertEqual(args.command, "trade")
@@ -2525,6 +2528,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.lifecycle_owner_token, "confirm-owner")
         self.assertEqual(args.lifecycle_stale_after_seconds, 60.0)
         self.assertTrue(args.require_lifecycle_owner_lock)
+        self.assertTrue(args.require_broker_readiness)
 
     def test_trade_presets_command_parses(self) -> None:
         parser = build_parser()
@@ -10929,6 +10933,17 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(call["lifecycle_stale_after_seconds"], 45.0)
         self.assertTrue(call["require_lifecycle_owner_lock"])
 
+    def test_handle_task_trade_confirm_current_forwards_broker_readiness_guard(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "trade-confirm-current", "--require-broker-readiness"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_confirm_current.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        self.assertTrue(manager.trade_confirm_current.call_args.kwargs["require_broker_readiness"])
+
     def test_handle_task_guarded_trade_buy_uses_task_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -11775,6 +11790,17 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertEqual(call["lifecycle_owner_token"], "confirm-owner")
         self.assertEqual(call["lifecycle_stale_after_seconds"], 60.0)
         self.assertTrue(call["require_lifecycle_owner_lock"])
+
+    def test_run_trade_confirm_current_forwards_broker_readiness_guard(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "confirm-current", "--require-broker-readiness"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"confirm_current": {"overall_status": "ok"}})
+        manager = MagicMock()
+        manager.pingan.confirm_current.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_confirm_current(args)
+        self.assertIs(result, expected)
+        self.assertTrue(manager.pingan.confirm_current.call_args.kwargs["require_broker_readiness"])
 
 
 class ReportCliDispatchTests(unittest.TestCase):
