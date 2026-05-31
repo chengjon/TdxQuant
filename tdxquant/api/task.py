@@ -1102,11 +1102,72 @@ def _build_rollup_gate_status(
     return payload
 
 
+def _build_evidence_freshness_status(
+    source_paths: dict[str, str],
+    *,
+    max_evidence_age_seconds: float | None,
+) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, str]]:
+    source_kinds = ("preflight", "dialog_readiness", "acceptance_coverage")
+    freshness: dict[str, dict[str, Any]] = {}
+    stale_kinds: list[str] = []
+    stale_paths: dict[str, str] = {}
+    now = time.time()
+    for source_kind in source_kinds:
+        source_path = source_paths.get(source_kind)
+        entry: dict[str, Any] = {
+            "source_kind": source_kind,
+            "source_path": source_path,
+            "max_evidence_age_seconds": max_evidence_age_seconds,
+        }
+        if source_path is None:
+            entry["status"] = "missing"
+        elif max_evidence_age_seconds is None:
+            entry["status"] = "not_checked"
+        else:
+            try:
+                modified_at = Path(source_path).stat().st_mtime
+            except OSError as exc:
+                entry["status"] = "unreadable"
+                entry["error"] = str(exc)
+                stale_kinds.append(source_kind)
+                stale_paths[source_kind] = source_path
+            else:
+                age_seconds = max(0.0, now - modified_at)
+                entry["modified_at_epoch"] = modified_at
+                entry["age_seconds"] = round(age_seconds, 3)
+                if age_seconds > max_evidence_age_seconds:
+                    entry["status"] = "stale"
+                    stale_kinds.append(source_kind)
+                    stale_paths[source_kind] = source_path
+                else:
+                    entry["status"] = "fresh"
+        freshness[source_kind] = entry
+    return freshness, stale_kinds, stale_paths
+
+
+def _apply_stale_evidence_to_rollup_gates(
+    gate_statuses: dict[str, dict[str, Any]],
+    stale_evidence_kinds: list[str],
+) -> None:
+    affected_gates = {
+        "preflight": ("provider_broker_ownership", "safety_gates"),
+        "dialog_readiness": ("desktop_lifecycle",),
+        "acceptance_coverage": ("audit_evidence", "live_manual_acceptance", "acceptance_evidence"),
+    }
+    for source_kind in stale_evidence_kinds:
+        for gate_name in affected_gates.get(source_kind, ()):
+            gate = gate_statuses[gate_name]
+            gate["complete"] = False
+            gate["status"] = "stale_evidence"
+            gate["reason"] = f"{source_kind} evidence is stale or unreadable"
+
+
 def _build_pingan_promotion_readiness_rollup(
     *,
     preflight_path: str | None = None,
     dialog_readiness_path: str | None = None,
     acceptance_coverage_path: str | None = None,
+    max_evidence_age_seconds: float | None = None,
 ) -> dict[str, Any]:
     source_paths = {
         key: value
@@ -1117,6 +1178,10 @@ def _build_pingan_promotion_readiness_rollup(
         }.items()
         if value is not None
     }
+    evidence_freshness_status, stale_evidence_kinds, stale_evidence_paths = _build_evidence_freshness_status(
+        source_paths,
+        max_evidence_age_seconds=max_evidence_age_seconds,
+    )
     source_errors: dict[str, str] = {}
     missing_evidence_kinds: list[str] = []
 
@@ -1239,6 +1304,7 @@ def _build_pingan_promotion_readiness_rollup(
             ),
         ),
     }
+    _apply_stale_evidence_to_rollup_gates(gate_statuses, stale_evidence_kinds)
     completed_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if gate_statuses[name]["complete"]]
     incomplete_gates = [name for name in _PINGAN_PROMOTION_READINESS_GATE_ORDER if not gate_statuses[name]["complete"]]
     return {
@@ -1255,6 +1321,10 @@ def _build_pingan_promotion_readiness_rollup(
         "missing_evidence_kinds": missing_evidence_kinds,
         "source_paths": source_paths,
         "source_errors": source_errors,
+        "evidence_freshness_cutoff_seconds": max_evidence_age_seconds,
+        "evidence_freshness_status": evidence_freshness_status,
+        "stale_evidence_kinds": stale_evidence_kinds,
+        "stale_evidence_paths": stale_evidence_paths,
         "boundary": (
             "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "
             "broker/desktop/trade/report/catalog workflows and does not prove production readiness "
@@ -1715,6 +1785,7 @@ class TdxTaskManager:
         preflight_path: str | None = None,
         dialog_readiness_path: str | None = None,
         acceptance_coverage_path: str | None = None,
+        max_evidence_age_seconds: float | None = None,
     ) -> Result:
         def run() -> Result:
             return Result(
@@ -1726,6 +1797,7 @@ class TdxTaskManager:
                         preflight_path=preflight_path,
                         dialog_readiness_path=dialog_readiness_path,
                         acceptance_coverage_path=acceptance_coverage_path,
+                        max_evidence_age_seconds=max_evidence_age_seconds,
                     )
                 },
             )

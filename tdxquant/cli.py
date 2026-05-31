@@ -655,6 +655,7 @@ def _add_pingan_promotion_readiness_rollup_arguments(subparser: argparse.Argumen
     subparser.add_argument("--preflight-path")
     subparser.add_argument("--dialog-readiness-path")
     subparser.add_argument("--acceptance-coverage-path")
+    subparser.add_argument("--max-evidence-age-seconds", type=int)
 
 
 def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -5811,6 +5812,7 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
             preflight_path=args.preflight_path,
             dialog_readiness_path=args.dialog_readiness_path,
             acceptance_coverage_path=args.acceptance_coverage_path,
+            max_evidence_age_seconds=args.max_evidence_age_seconds,
         )
     if command_name == "trade-audit-cross-ledger-query":
         return manager.trade_audit_cross_ledger_query(

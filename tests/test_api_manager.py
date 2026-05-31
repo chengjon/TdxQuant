@@ -1,4 +1,5 @@
 import json
+import os
 import unittest
 from importlib import import_module
 from pathlib import Path
@@ -4162,6 +4163,71 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(rollup["missing_evidence_kinds"], [])
         self.assertFalse(rollup["promotion_status_transition_executed"])
         self.assertFalse(rollup["order_submitted"])
+
+    def test_task_pingan_promotion_readiness_rollup_rejects_stale_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            preflight_path = root / "preflight.json"
+            dialog_path = root / "dialog-readiness.json"
+            acceptance_path = root / "acceptance-coverage.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {
+                        "promotion_gate_status": {
+                            "provider_broker_ownership": {"status": "ready"},
+                            "safety_gates": {"status": "ready"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dialog_path.write_text(
+                json.dumps(
+                    {
+                        "desktop_lifecycle_gate_status": {
+                            "status": "complete",
+                            "remaining_lifecycle_gates": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "acceptance_outcome_coverage_status": {
+                            "automated_outcome_coverage_complete": True,
+                            "live_manual_acceptance_complete": True,
+                            "acceptance_complete": True,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            os.utime(preflight_path, (1, 1))
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+            result = manager.pingan_promotion_readiness_rollup(
+                preflight_path=str(preflight_path),
+                dialog_readiness_path=str(dialog_path),
+                acceptance_coverage_path=str(acceptance_path),
+                max_evidence_age_seconds=60,
+            )
+
+        self.assertTrue(result.ok)
+        rollup = result.data["promotion_readiness_rollup"]
+        self.assertEqual(rollup["status"], "partial")
+        self.assertEqual(rollup["evidence_freshness_cutoff_seconds"], 60)
+        self.assertEqual(rollup["evidence_freshness_status"]["preflight"]["status"], "stale")
+        self.assertEqual(rollup["evidence_freshness_status"]["dialog_readiness"]["status"], "fresh")
+        self.assertEqual(rollup["evidence_freshness_status"]["acceptance_coverage"]["status"], "fresh")
+        self.assertEqual(rollup["stale_evidence_kinds"], ["preflight"])
+        self.assertEqual(rollup["stale_evidence_paths"], {"preflight": str(preflight_path)})
+        self.assertFalse(rollup["gate_statuses"]["provider_broker_ownership"]["complete"])
+        self.assertFalse(rollup["gate_statuses"]["safety_gates"]["complete"])
+        self.assertIn("provider_broker_ownership", rollup["incomplete_gates"])
+        self.assertIn("safety_gates", rollup["incomplete_gates"])
+        self.assertFalse(rollup["order_submitted"])
+        self.assertFalse(rollup["control_dispatch_executed"])
 
     def test_task_block_sync_attaches_task_metadata_and_forwards_symbols(self) -> None:
         expected = Result(

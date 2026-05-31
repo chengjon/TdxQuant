@@ -466,3 +466,13 @@ PingAn promotion readiness rollup SHALL aggregate existing evidence only and SHA
 - **WHEN** the rollup includes a complete gate
 - **THEN** the rollup SHALL identify the evidence source kind
 - **AND** the rollup SHALL keep boundary text stating that source files can be stale or operator-provided.
+
+### Requirement: PingAn promotion readiness freshness gating SHALL remain read-only
+
+The evidence freshness gate SHALL only classify evidence freshness and SHALL NOT execute any PingAn trading workflow or desktop lifecycle action.
+
+#### Scenario: Stale evidence does not trigger workflow execution
+
+- **WHEN** the freshness gate marks evidence stale
+- **THEN** it SHALL still remain a read-only classification
+- **AND** it SHALL not call broker, desktop, trade, report, or catalog execution paths.
