@@ -117,6 +117,34 @@ class PingAnDesktopTraderGatewayTests(unittest.TestCase):
         self.assertEqual(manager.pingan.buy_calls[0]["quantity"], 100)
         self.assertEqual(placement.adapter_events[0]["step"], "pingan_buy")
 
+    def test_place_order_forwards_lifecycle_owner_lock_guard_options(self) -> None:
+        manager = _FakeTradeManager()
+        gateway = PingAnDesktopTraderGateway(
+            manager=manager,
+            port="COM3",
+            lifecycle_statefile_path="/tmp/pingan-owner.json",
+            lifecycle_owner_token="execution-owner",
+            lifecycle_stale_after_seconds=42.5,
+            require_lifecycle_owner_lock=True,
+        )
+        request = SecurityOrderRequest(
+            broker="pingan_desktop",
+            client_order_id="client-owner-lock",
+            symbol="000001",
+            market="SZ",
+            side=OrderSide.BUY,
+            quantity=100,
+            limit_price=Decimal("10.50"),
+        )
+
+        gateway.place_order(request)
+
+        call = manager.pingan.buy_calls[0]
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "execution-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
+
     def test_place_order_maps_successful_sell_to_submitted_snapshot(self) -> None:
         manager = _FakeTradeManager()
         gateway = PingAnDesktopTraderGateway(manager=manager, port="COM3")

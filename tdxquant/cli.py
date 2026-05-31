@@ -260,6 +260,13 @@ def _add_trade_safety_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--max-price", type=float)
 
 
+def _add_trade_lifecycle_owner_guard_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--lifecycle-statefile-path")
+    subparser.add_argument("--lifecycle-owner-token")
+    subparser.add_argument("--lifecycle-stale-after-seconds", type=float, default=300.0)
+    subparser.add_argument("--require-lifecycle-owner-lock", action="store_true")
+
+
 def _add_trade_order_place_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--broker", default="pingan_desktop")
     subparser.add_argument("--profile", default="balanced")
@@ -1635,17 +1642,20 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
 
     trade_buy_parser = trade_subparsers.add_parser("buy")
     _add_trade_common_arguments(trade_buy_parser)
+    _add_trade_lifecycle_owner_guard_arguments(trade_buy_parser)
     _add_trade_buy_profile_arguments(trade_buy_parser)
     trade_buy_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_sell_parser = trade_subparsers.add_parser("sell")
     _add_trade_common_arguments(trade_sell_parser)
+    _add_trade_lifecycle_owner_guard_arguments(trade_sell_parser)
     _add_trade_buy_profile_arguments(trade_sell_parser)
     trade_sell_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_submit_once_parser = trade_subparsers.add_parser("submit-once")
     _add_trade_common_arguments(trade_submit_once_parser)
     trade_submit_once_parser.add_argument("--side", choices=["buy", "sell"], default="buy")
+    _add_trade_lifecycle_owner_guard_arguments(trade_submit_once_parser)
     _add_trade_submit_once_profile_arguments(trade_submit_once_parser)
     trade_submit_once_parser.add_argument("--output", help="Optional path to write the JSON result")
 
@@ -2644,6 +2654,10 @@ def _build_trader_service(args: argparse.Namespace, *, execution_mode: str = "bu
             title_keyword=str(getattr(args, "title_key", "平安证券")),
             exe_path=getattr(args, "exe_path", None),
             max_price=getattr(args, "max_price", None),
+            lifecycle_statefile_path=getattr(args, "lifecycle_statefile_path", None),
+            lifecycle_owner_token=getattr(args, "lifecycle_owner_token", None),
+            lifecycle_stale_after_seconds=float(getattr(args, "lifecycle_stale_after_seconds", 300.0) or 300.0),
+            require_lifecycle_owner_lock=bool(getattr(args, "require_lifecycle_owner_lock", False)),
         ),
     )
     store_dir = Path(getattr(args, "store_dir", None) or TRADER_RUNTIME_DIR)

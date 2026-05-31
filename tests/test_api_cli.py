@@ -18,6 +18,7 @@ from tdxquant.cli import (
     _run_flat_replay_provider_command,
     _handle_task_subcommand,
     _handle_trade_subcommand,
+    _build_trader_service,
     _run_trade_buy,
     _run_trade_broker_capabilities,
     _run_trade_confirm_current,
@@ -2155,6 +2156,13 @@ class ApiCliParserTests(unittest.TestCase):
                 "trade-20260428-001",
                 "--max-price",
                 "10.50",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "execution-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
             ]
         )
         self.assertEqual(args.command, "trade")
@@ -2162,6 +2170,10 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.profile, "balanced")
         self.assertEqual(args.submission_key, "trade-20260428-001")
         self.assertEqual(args.max_price, 10.50)
+        self.assertEqual(args.lifecycle_statefile_path, "/tmp/pingan-owner.json")
+        self.assertEqual(args.lifecycle_owner_token, "execution-owner")
+        self.assertEqual(args.lifecycle_stale_after_seconds, 42.5)
+        self.assertTrue(args.require_lifecycle_owner_lock)
 
     def test_trade_sell_command_parses(self) -> None:
         parser = build_parser()
@@ -10913,6 +10925,39 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.data["order"]["gateway_order_id"], "gw-001")
         self.assertEqual(result.data["execution_profile"]["name"], "balanced")
+
+    def test_build_trader_service_forwards_lifecycle_owner_lock_guard_to_gateway(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "buy",
+                "--port",
+                "COM3",
+                "--code",
+                "000001",
+                "--price",
+                "10.00",
+                "--quantity",
+                "100",
+                "--lifecycle-statefile-path",
+                "/tmp/pingan-owner.json",
+                "--lifecycle-owner-token",
+                "execution-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
+            ]
+        )
+
+        with patch("tdxquant.cli.PingAnDesktopTraderGateway") as gateway_cls:
+            _build_trader_service(args, execution_mode="buy")
+
+        gateway_kwargs = gateway_cls.call_args.kwargs
+        self.assertEqual(gateway_kwargs["lifecycle_statefile_path"], "/tmp/pingan-owner.json")
+        self.assertEqual(gateway_kwargs["lifecycle_owner_token"], "execution-owner")
+        self.assertEqual(gateway_kwargs["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(gateway_kwargs["require_lifecycle_owner_lock"])
 
     def test_run_trade_sell_forwards_safety_controls(self) -> None:
         parser = build_parser()

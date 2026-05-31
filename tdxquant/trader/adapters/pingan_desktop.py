@@ -22,6 +22,10 @@ class PingAnDesktopTraderGateway:
     title_keyword: str = "平安证券"
     exe_path: str | None = None
     max_price: float | None = None
+    lifecycle_statefile_path: str | None = None
+    lifecycle_owner_token: str | None = None
+    lifecycle_stale_after_seconds: float = 300.0
+    require_lifecycle_owner_lock: bool = False
     manager: TdxTradeManager | None = None
     capabilities: GatewayCapabilities = field(init=False)
 
@@ -62,6 +66,10 @@ class PingAnDesktopTraderGateway:
                 close_result_dialog=self.close_result_dialog,
                 submission_key=request.submission_key,
                 max_price=self.max_price,
+                lifecycle_statefile_path=self.lifecycle_statefile_path,
+                lifecycle_owner_token=self.lifecycle_owner_token,
+                lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
             )
             adapter_step = "pingan_sell_submit_once"
         elif side == OrderSide.SELL:
@@ -76,6 +84,10 @@ class PingAnDesktopTraderGateway:
                 close_result_dialog=self.close_result_dialog,
                 submission_key=request.submission_key,
                 max_price=self.max_price,
+                lifecycle_statefile_path=self.lifecycle_statefile_path,
+                lifecycle_owner_token=self.lifecycle_owner_token,
+                lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
             )
             adapter_step = "pingan_sell"
         elif self.execution_mode == "submit_once":
@@ -90,6 +102,10 @@ class PingAnDesktopTraderGateway:
                 close_result_dialog=self.close_result_dialog,
                 submission_key=request.submission_key,
                 max_price=self.max_price,
+                lifecycle_statefile_path=self.lifecycle_statefile_path,
+                lifecycle_owner_token=self.lifecycle_owner_token,
+                lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
             )
             adapter_step = "pingan_buy_submit_once"
         else:
@@ -104,6 +120,10 @@ class PingAnDesktopTraderGateway:
                 close_result_dialog=self.close_result_dialog,
                 submission_key=request.submission_key,
                 max_price=self.max_price,
+                lifecycle_statefile_path=self.lifecycle_statefile_path,
+                lifecycle_owner_token=self.lifecycle_owner_token,
+                lifecycle_stale_after_seconds=self.lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=self.require_lifecycle_owner_lock,
             )
             adapter_step = "pingan_buy"
         snapshot = self._build_snapshot(request=request, result=result)

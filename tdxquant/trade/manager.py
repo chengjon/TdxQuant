@@ -609,6 +609,41 @@ def _build_pingan_preflight_lifecycle_owner_lock_status(
     return summary
 
 
+def _apply_pingan_lifecycle_owner_lock_required_guard(
+    risk_gate: dict[str, Any],
+    *,
+    lifecycle_statefile_path: str | None,
+    lifecycle_owner_token: str | None,
+    lifecycle_stale_after_seconds: float,
+    require_lifecycle_owner_lock: bool,
+) -> dict[str, Any]:
+    if not require_lifecycle_owner_lock:
+        return risk_gate
+    guarded = dict(risk_gate)
+    guarded["checks"] = list(risk_gate.get("checks", []))
+    owner_lock_status = _build_pingan_preflight_lifecycle_owner_lock_status(
+        lifecycle_statefile_path=lifecycle_statefile_path,
+        lifecycle_owner_token=lifecycle_owner_token,
+        lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+        require_lifecycle_owner_lock=True,
+    )
+    requirement_passed = owner_lock_status.get("requirement_status") == "passed"
+    reason = str(owner_lock_status.get("requirement_reason") or "lifecycle_owner_lock_requirement_failed")
+    guarded["lifecycle_owner_lock_required_status"] = owner_lock_status
+    guarded["checks"].append(
+        {
+            "name": "lifecycle_owner_lock_required",
+            "passed": requirement_passed,
+            "issues": [] if requirement_passed else [reason],
+        }
+    )
+    if not requirement_passed:
+        existing_reason = str(guarded.get("rejection_reason") or "").strip()
+        guarded["passed"] = False
+        guarded["rejection_reason"] = f"{existing_reason}; {reason}" if existing_reason else reason
+    return guarded
+
+
 def _build_pingan_lifecycle_owner_state_payload(
     *,
     status: str,
@@ -1214,6 +1249,10 @@ class _PingAnTradeProxy:
         close_result_dialog: bool = True,
         submission_key: str | None = None,
         max_price: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         idempotency = self._manager._evaluate_idempotency(
@@ -1256,6 +1295,13 @@ class _PingAnTradeProxy:
                 request_context={"code": code, "price": price, "quantity": quantity},
             )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
         if not risk_gate["passed"]:
             result = self._manager._build_trade_risk_rejection_result(
                 code=code,
@@ -1323,6 +1369,10 @@ class _PingAnTradeProxy:
         close_result_dialog: bool = True,
         submission_key: str | None = None,
         max_price: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         idempotency = self._manager._evaluate_idempotency(
@@ -1365,6 +1415,13 @@ class _PingAnTradeProxy:
                 request_context={"code": code, "price": price, "quantity": quantity},
             )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
         if not risk_gate["passed"]:
             result = self._manager._build_trade_risk_rejection_result(
                 code=code,
@@ -1430,6 +1487,10 @@ class _PingAnTradeProxy:
         close_result_dialog: bool = True,
         submission_key: str | None = None,
         max_price: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         idempotency = self._manager._evaluate_idempotency(
@@ -1472,6 +1533,13 @@ class _PingAnTradeProxy:
                 request_context={"code": code, "price": price, "quantity": quantity},
             )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
         if not risk_gate["passed"]:
             result = self._manager._build_trade_risk_rejection_result(
                 code=code,
@@ -1539,6 +1607,10 @@ class _PingAnTradeProxy:
         close_result_dialog: bool = True,
         submission_key: str | None = None,
         max_price: float | None = None,
+        lifecycle_statefile_path: str | None = None,
+        lifecycle_owner_token: str | None = None,
+        lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
         idempotency = self._manager._evaluate_idempotency(
@@ -1581,6 +1653,13 @@ class _PingAnTradeProxy:
                 request_context={"code": code, "price": price, "quantity": quantity},
             )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
         if not risk_gate["passed"]:
             result = self._manager._build_trade_risk_rejection_result(
                 code=code,

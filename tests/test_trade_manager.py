@@ -244,6 +244,96 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(result.data["trade_safety"]["submission_key"], "sell-20260430-001")
         self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
 
+    def test_pingan_buy_rejects_required_lifecycle_owner_lock_before_desktop_execution(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            state_path = Path(temp_dir) / "state.json"
+            event_log_path = Path(temp_dir) / "events.jsonl"
+            ledger_path = Path(temp_dir) / "submission-ledger.jsonl"
+            with patch("tdxquant.trade.manager.run_pingan_buy_fast") as mocked:
+                manager = TdxTradeManager(
+                    profile="balanced",
+                    state_path=str(state_path),
+                    event_log_path=str(event_log_path),
+                    submission_ledger_path=str(ledger_path),
+                )
+                result = manager.pingan.buy(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="buy-owner-lock-required-001",
+                    max_price=10.50,
+                    lifecycle_statefile_path=str(lifecycle_statefile_path),
+                    lifecycle_owner_token="execution-owner",
+                    lifecycle_stale_after_seconds=999.0,
+                    require_lifecycle_owner_lock=True,
+                )
+
+        mocked.assert_not_called()
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        risk_gate = result.data["trade_safety"]["risk_gate"]
+        self.assertFalse(risk_gate["passed"])
+        self.assertEqual(risk_gate["rejection_reason"], "lifecycle_owner_lock_status_not_acquired")
+        owner_lock = risk_gate["lifecycle_owner_lock_required_status"]
+        self.assertTrue(owner_lock["required"])
+        self.assertEqual(owner_lock["requirement_status"], "failed")
+        self.assertEqual(owner_lock["status"], "not_acquired")
+        self.assertFalse(owner_lock["owner_token_matches"])
+        self.assertFalse(owner_lock["statefile_write_executed"])
+        self.assertFalse(owner_lock["lock_file_write_executed"])
+        self.assertFalse(owner_lock["pid_ownership_claimed"])
+        self.assertFalse(lifecycle_statefile_path.exists())
+
+    def test_pingan_buy_submit_once_allows_required_lifecycle_owner_lock_when_owned(self) -> None:
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "input": {"code": "000001", "price": "10.00", "quantity": 100},
+                "result_dialog": {"contract_no": "B202604260099"},
+            },
+        )
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            manager = TdxTradeManager(
+                profile="submit_once",
+                state_path=str(Path(temp_dir) / "state.json"),
+                event_log_path=str(Path(temp_dir) / "events.jsonl"),
+                submission_ledger_path=str(Path(temp_dir) / "submission-ledger.jsonl"),
+            )
+            acquire_result = manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(lifecycle_statefile_path),
+                owner_token="execution-owner",
+                stale_after_seconds=999.0,
+            )
+            self.assertTrue(acquire_result.ok)
+            with patch("tdxquant.trade.manager.run_pingan_buy_submit_once", return_value=expected) as mocked:
+                result = manager.pingan.buy_submit_once(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="submit-owner-lock-required-001",
+                    max_price=10.50,
+                    lifecycle_statefile_path=str(lifecycle_statefile_path),
+                    lifecycle_owner_token="execution-owner",
+                    lifecycle_stale_after_seconds=999.0,
+                    require_lifecycle_owner_lock=True,
+                )
+
+        mocked.assert_called_once()
+        self.assertTrue(result.ok)
+        owner_lock = result.data["trade_safety"]["risk_gate"]["lifecycle_owner_lock_required_status"]
+        self.assertTrue(owner_lock["required"])
+        self.assertEqual(owner_lock["requirement_status"], "passed")
+        self.assertEqual(owner_lock["status"], "owned")
+        self.assertTrue(owner_lock["owner_token_matches"])
+        self.assertFalse(owner_lock["pid_ownership_claimed"])
+
     def test_pingan_buy_rejects_invalid_order_before_desktop_execution(self) -> None:
         with TemporaryDirectory() as temp_dir:
             with patch("tdxquant.trade.manager.run_pingan_buy_fast") as mocked:
