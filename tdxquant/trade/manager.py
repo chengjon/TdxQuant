@@ -476,6 +476,7 @@ def _build_pingan_preflight_lifecycle_owner_lock_status(
     lifecycle_statefile_path: str | None,
     lifecycle_owner_token: str | None,
     lifecycle_stale_after_seconds: float,
+    require_lifecycle_owner_lock: bool = False,
 ) -> dict[str, Any]:
     normalized_statefile_path = str(lifecycle_statefile_path or "").strip()
     normalized_owner_token = str(lifecycle_owner_token or "").strip()
@@ -484,8 +485,12 @@ def _build_pingan_preflight_lifecycle_owner_lock_status(
     summary: dict[str, Any] = {
         "schema_version": "tdx.desktop_trade.pingan_preflight_lifecycle_owner_lock_status.v1",
         "configured": configured,
+        "required": bool(require_lifecycle_owner_lock),
         "status": "not_configured",
         "status_check_executed": False,
+        "requirement_status": "failed" if require_lifecycle_owner_lock else "not_required",
+        "requirement_reason": "lifecycle_owner_lock_not_configured" if require_lifecycle_owner_lock else None,
+        "owner_token_matches": False,
         "execution_mode": "readonly_preflight",
         "statefile_path": normalized_statefile_path or None,
         "lock_path": lock_path,
@@ -572,6 +577,33 @@ def _build_pingan_preflight_lifecycle_owner_lock_status(
             "process_kill_executed": False,
             "pid_ownership_claimed": False,
             "side_effect_level": "none",
+        }
+    )
+    status = str(summary.get("status") or "")
+    owner_token_matches = summary.get("current_owner_token") == normalized_owner_token
+    stale_detected = summary.get("stale_detected") is True
+    requirement_passed = status == "owned" and owner_token_matches and not stale_detected
+    if require_lifecycle_owner_lock:
+        if requirement_passed:
+            requirement_status = "passed"
+            requirement_reason = None
+        elif status != "owned":
+            requirement_status = "failed"
+            requirement_reason = f"lifecycle_owner_lock_status_{status or 'unknown'}"
+        elif not owner_token_matches:
+            requirement_status = "failed"
+            requirement_reason = "lifecycle_owner_token_mismatch"
+        else:
+            requirement_status = "failed"
+            requirement_reason = "lifecycle_owner_lock_stale"
+    else:
+        requirement_status = "not_required"
+        requirement_reason = None
+    summary.update(
+        {
+            "owner_token_matches": owner_token_matches,
+            "requirement_status": requirement_status,
+            "requirement_reason": requirement_reason,
         }
     )
     return summary
@@ -1711,6 +1743,7 @@ class _PingAnTradeProxy:
         lifecycle_statefile_path: str | None = None,
         lifecycle_owner_token: str | None = None,
         lifecycle_stale_after_seconds: float = 300.0,
+        require_lifecycle_owner_lock: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
 
@@ -1821,6 +1854,44 @@ class _PingAnTradeProxy:
             if not hid_result.ok and result_code == ErrorCode.OK:
                 result_code = hid_result.code
 
+            lifecycle_owner_lock_status = _build_pingan_preflight_lifecycle_owner_lock_status(
+                lifecycle_statefile_path=lifecycle_statefile_path,
+                lifecycle_owner_token=lifecycle_owner_token,
+                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+                require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            )
+            if require_lifecycle_owner_lock:
+                requirement_passed = lifecycle_owner_lock_status.get("requirement_status") == "passed"
+                checks.append(
+                    _build_trade_health_check(
+                        "lifecycle_owner_lock",
+                        "ok" if requirement_passed else "failed",
+                        "lifecycle owner lock requirement passed"
+                        if requirement_passed
+                        else str(
+                            lifecycle_owner_lock_status.get("requirement_reason")
+                            or "lifecycle owner lock requirement failed"
+                        ),
+                        detail=lifecycle_owner_lock_status,
+                        critical=True,
+                        recommended_action=None
+                        if requirement_passed
+                        else "Acquire the local PingAn lifecycle owner lock with the same owner token, then rerun preflight.",
+                    )
+                )
+                if not requirement_passed and result_code == ErrorCode.OK:
+                    result_code = ErrorCode.INVALID_REQUEST
+            elif lifecycle_owner_lock_status.get("configured"):
+                checks.append(
+                    _build_trade_health_check(
+                        "lifecycle_owner_lock",
+                        "ok",
+                        "lifecycle owner lock status inspected without requiring ownership",
+                        detail=lifecycle_owner_lock_status,
+                        critical=False,
+                    )
+                )
+
             overall_status, ok, warnings, next_action = _summarize_trade_health_checks(checks)
             if overall_status == "ok":
                 message = "stable trade preflight passed"
@@ -1828,11 +1899,6 @@ class _PingAnTradeProxy:
                 message = "stable trade preflight completed with warnings"
             else:
                 message = "stable trade preflight found failures"
-            lifecycle_owner_lock_status = _build_pingan_preflight_lifecycle_owner_lock_status(
-                lifecycle_statefile_path=lifecycle_statefile_path,
-                lifecycle_owner_token=lifecycle_owner_token,
-                lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
-            )
             promotion_gate_status = _build_pingan_promotion_gate_status(
                 broker_health=broker_health,
                 detect_result=detect_result,

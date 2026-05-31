@@ -364,6 +364,7 @@ def _add_trade_preflight_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--lifecycle-statefile-path")
     subparser.add_argument("--lifecycle-owner-token")
     subparser.add_argument("--lifecycle-stale-after-seconds", type=float, default=300.0)
+    subparser.add_argument("--require-lifecycle-owner-lock", action="store_true")
     _add_trade_safety_arguments(subparser)
 
 
@@ -2548,6 +2549,7 @@ def _run_trade_preflight(args: argparse.Namespace) -> Result:
         lifecycle_statefile_path=args.lifecycle_statefile_path,
         lifecycle_owner_token=args.lifecycle_owner_token,
         lifecycle_stale_after_seconds=args.lifecycle_stale_after_seconds,
+        require_lifecycle_owner_lock=args.require_lifecycle_owner_lock,
     )
 
 

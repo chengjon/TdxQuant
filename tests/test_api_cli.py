@@ -2285,6 +2285,7 @@ class ApiCliParserTests(unittest.TestCase):
                 "preflight-owner",
                 "--lifecycle-stale-after-seconds",
                 "42.5",
+                "--require-lifecycle-owner-lock",
             ]
         )
         self.assertEqual(args.command, "trade")
@@ -2292,6 +2293,7 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.lifecycle_statefile_path, "/tmp/pingan-owner.json")
         self.assertEqual(args.lifecycle_owner_token, "preflight-owner")
         self.assertEqual(args.lifecycle_stale_after_seconds, 42.5)
+        self.assertTrue(args.require_lifecycle_owner_lock)
         self.assertEqual(args.port, "COM3")
         self.assertEqual(args.code, "000001")
         self.assertEqual(args.submission_key, "preflight-001")
@@ -11069,6 +11071,7 @@ class TradeCliDispatchTests(unittest.TestCase):
                 "preflight-owner",
                 "--lifecycle-stale-after-seconds",
                 "42.5",
+                "--require-lifecycle-owner-lock",
             ]
         )
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"preflight": {"overall_status": "ok"}})
@@ -11090,6 +11093,7 @@ class TradeCliDispatchTests(unittest.TestCase):
             lifecycle_statefile_path="/tmp/pingan-owner.json",
             lifecycle_owner_token="preflight-owner",
             lifecycle_stale_after_seconds=42.5,
+            require_lifecycle_owner_lock=True,
         )
 
     def test_run_trade_dialog_readiness_forwards_lookup_arguments(self) -> None:
