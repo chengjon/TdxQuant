@@ -5356,6 +5356,130 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(coverage_status["live_manual_acceptance"]["status"], "not_provided")
         self.assertEqual(result.data["task"]["name"], "trade_audit_daily_report")
 
+    def test_task_trade_audit_daily_report_accepts_complete_live_manual_acceptance_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "trade-audits"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            for index, status in enumerate(("confirmed", "rejected", "failed", "exception"), start=1):
+                (audit_dir / f"a{index}.json").write_text(
+                    json.dumps(
+                        {
+                            "trade_audit": {
+                                "audit_id": f"a{index}",
+                                "recorded_at": "2026-04-29T03:00:00+00:00",
+                                "status": status,
+                                "method": "buy_submit_once",
+                                "contract_no": f"B20260429{index:04d}",
+                                "submission_key": f"submit-{index}",
+                            },
+                            "result": {"data": {"code": "000001"}},
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
+            evidence_path = Path(temp_dir) / "manual-acceptance.json"
+            evidence_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "tdx.desktop_trade.pingan_live_manual_acceptance.v1",
+                        "broker": "pingan_desktop",
+                        "operator": "qa-operator",
+                        "environment": {"account_mode": "manual_live_acceptance"},
+                        "outcomes": [
+                            {"status": status, "accepted": True, "evidence": f"manual {status}"}
+                            for status in ("confirmed", "rejected", "failed", "exception")
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="trade_audit_daily_report",
+                strategy_path="strategy.py",
+                profile_overrides={"export_dir": temp_dir, "audit_dir": str(audit_dir)},
+            )
+            result = manager.trade_audit_daily_report(
+                report_date="2026-04-29",
+                timezone_name="UTC",
+                live_manual_acceptance_path=str(evidence_path),
+            )
+
+        self.assertTrue(result.ok)
+        coverage_status = result.data["acceptance_outcome_coverage_status"]
+        self.assertTrue(coverage_status["automated_outcome_coverage_complete"])
+        self.assertTrue(coverage_status["live_manual_acceptance_complete"])
+        self.assertTrue(coverage_status["acceptance_complete"])
+        manual_status = coverage_status["live_manual_acceptance"]
+        self.assertEqual(manual_status["status"], "complete")
+        self.assertEqual(manual_status["source_path"], str(evidence_path))
+        self.assertEqual(manual_status["missing_outcomes"], [])
+        self.assertEqual(manual_status["covered_outcomes"], ["confirmed", "exception", "failed", "rejected"])
+        self.assertEqual(manual_status["operator"], "qa-operator")
+        self.assertEqual(coverage_status["execution_mode"], "readonly_report")
+        self.assertEqual(coverage_status["side_effect_level"], "none")
+        self.assertFalse(coverage_status["order_submitted"])
+        self.assertFalse(coverage_status["control_dispatch_executed"])
+
+    def test_task_trade_audit_period_report_marks_incomplete_live_manual_acceptance_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "trade-audits"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            for index, status in enumerate(("confirmed", "rejected", "failed", "exception"), start=1):
+                (audit_dir / f"a{index}.json").write_text(
+                    json.dumps(
+                        {
+                            "trade_audit": {
+                                "audit_id": f"a{index}",
+                                "recorded_at": "2026-04-29T03:00:00+00:00",
+                                "status": status,
+                                "method": "buy_submit_once",
+                                "contract_no": f"B20260429{index:04d}",
+                            },
+                            "result": {"data": {"code": "000001"}},
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
+            evidence_path = Path(temp_dir) / "manual-acceptance.json"
+            evidence_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "tdx.desktop_trade.pingan_live_manual_acceptance.v1",
+                        "outcomes": [
+                            {"status": status, "accepted": True, "evidence": f"manual {status}"}
+                            for status in ("confirmed", "rejected", "failed")
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="trade_audit_period_report",
+                strategy_path="strategy.py",
+                profile_overrides={"export_dir": temp_dir, "audit_dir": str(audit_dir)},
+            )
+            result = manager.trade_audit_period_report(
+                start_date="2026-04-29",
+                end_date="2026-04-29",
+                timezone_name="UTC",
+                live_manual_acceptance_path=str(evidence_path),
+            )
+
+        self.assertTrue(result.ok)
+        coverage_status = result.data["acceptance_outcome_coverage_status"]
+        self.assertTrue(coverage_status["automated_outcome_coverage_complete"])
+        self.assertFalse(coverage_status["live_manual_acceptance_complete"])
+        self.assertFalse(coverage_status["acceptance_complete"])
+        manual_status = coverage_status["live_manual_acceptance"]
+        self.assertEqual(manual_status["status"], "incomplete")
+        self.assertEqual(manual_status["missing_outcomes"], ["exception"])
+        self.assertEqual(manual_status["covered_outcomes"], ["confirmed", "failed", "rejected"])
+        self.assertEqual(manual_status["invalid_outcome_count"], 0)
+
     def test_task_trade_audit_daily_report_supports_multi_status_filter(self) -> None:
         with TemporaryDirectory() as temp_dir:
             audit_dir = Path(temp_dir) / "trade-audits"

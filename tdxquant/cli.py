@@ -630,6 +630,7 @@ def _add_trade_audit_daily_report_arguments(subparser: argparse.ArgumentParser) 
     subparser.add_argument("--audit-dir")
     subparser.add_argument("--json-output-path")
     subparser.add_argument("--csv-output-path")
+    subparser.add_argument("--live-manual-acceptance-path")
 
 
 def _add_trade_audit_period_report_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -647,6 +648,7 @@ def _add_trade_audit_period_report_arguments(subparser: argparse.ArgumentParser)
     subparser.add_argument("--audit-dir")
     subparser.add_argument("--json-output-path")
     subparser.add_argument("--csv-output-path")
+    subparser.add_argument("--live-manual-acceptance-path")
 
 
 def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -5769,6 +5771,7 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
             audit_dir=getattr(args, "audit_dir", None),
             json_output_path=args.json_output_path,
             csv_output_path=args.csv_output_path,
+            live_manual_acceptance_path=getattr(args, "live_manual_acceptance_path", None),
         )
         if methods is not None:
             daily_kwargs["methods"] = methods
@@ -5788,6 +5791,7 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
             audit_dir=getattr(args, "audit_dir", None),
             json_output_path=args.json_output_path,
             csv_output_path=args.csv_output_path,
+            live_manual_acceptance_path=getattr(args, "live_manual_acceptance_path", None),
         )
         if methods is not None:
             period_kwargs["methods"] = methods

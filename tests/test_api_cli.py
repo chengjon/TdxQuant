@@ -1777,11 +1777,23 @@ class ApiCliParserTests(unittest.TestCase):
 
     def test_task_trade_audit_daily_report_command_parses(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["task", "trade-audit-daily-report", "--date", "2026-04-29", "--status", "confirmed"])
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-audit-daily-report",
+                "--date",
+                "2026-04-29",
+                "--status",
+                "confirmed",
+                "--live-manual-acceptance-path",
+                "runtime/pingan/manual-acceptance.json",
+            ]
+        )
         self.assertEqual(args.command, "task")
         self.assertEqual(args.task_command, "trade-audit-daily-report")
         self.assertEqual(args.date, "2026-04-29")
         self.assertEqual(args.status, "confirmed")
+        self.assertEqual(args.live_manual_acceptance_path, "runtime/pingan/manual-acceptance.json")
 
     def test_task_trade_audit_daily_report_command_parses_multi_status(self) -> None:
         parser = build_parser()
@@ -1803,11 +1815,23 @@ class ApiCliParserTests(unittest.TestCase):
 
     def test_task_trade_audit_period_report_command_parses(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["task", "trade-audit-period-report", "--start-date", "2026-04-28", "--end-date", "2026-04-29"])
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-audit-period-report",
+                "--start-date",
+                "2026-04-28",
+                "--end-date",
+                "2026-04-29",
+                "--live-manual-acceptance-path",
+                "runtime/pingan/manual-acceptance.json",
+            ]
+        )
         self.assertEqual(args.command, "task")
         self.assertEqual(args.task_command, "trade-audit-period-report")
         self.assertEqual(args.start_date, "2026-04-28")
         self.assertEqual(args.end_date, "2026-04-29")
+        self.assertEqual(args.live_manual_acceptance_path, "runtime/pingan/manual-acceptance.json")
 
     def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
         parser = build_parser()
@@ -10608,7 +10632,18 @@ class TaskCliDispatchTests(unittest.TestCase):
 
     def test_handle_task_trade_audit_daily_report_uses_task_manager(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["task", "trade-audit-daily-report", "--date", "2026-04-29", "--status", "confirmed"])
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-audit-daily-report",
+                "--date",
+                "2026-04-29",
+                "--status",
+                "confirmed",
+                "--live-manual-acceptance-path",
+                "runtime/pingan/manual-acceptance.json",
+            ]
+        )
         expected = Result(ok=True, code=ErrorCode.OK, message="ok")
         manager = MagicMock()
         manager.trade_audit_daily_report.return_value = expected
@@ -10628,6 +10663,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path="runtime/pingan/manual-acceptance.json",
         )
 
     def test_handle_task_trade_audit_daily_report_uses_multi_statuses(self) -> None:
@@ -10654,6 +10690,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_task_trade_audit_daily_report_uses_multi_methods(self) -> None:
@@ -10681,6 +10718,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_task_trade_audit_daily_report_rejects_mixed_status_filters(self) -> None:
@@ -10709,7 +10747,18 @@ class TaskCliDispatchTests(unittest.TestCase):
 
     def test_handle_task_trade_audit_period_report_uses_task_manager(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["task", "trade-audit-period-report", "--start-date", "2026-04-28", "--end-date", "2026-04-29"])
+        args = parser.parse_args(
+            [
+                "task",
+                "trade-audit-period-report",
+                "--start-date",
+                "2026-04-28",
+                "--end-date",
+                "2026-04-29",
+                "--live-manual-acceptance-path",
+                "runtime/pingan/manual-acceptance.json",
+            ]
+        )
         expected = Result(ok=True, code=ErrorCode.OK, message="ok")
         manager = MagicMock()
         manager.trade_audit_period_report.return_value = expected
@@ -10730,6 +10779,7 @@ class TaskCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path="runtime/pingan/manual-acceptance.json",
         )
 
     def test_handle_task_trade_period_report_uses_task_manager(self) -> None:
@@ -12202,6 +12252,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_run_uses_confirm_oriented_audit_exception_preset_defaults(self) -> None:
@@ -12241,6 +12292,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_run_uses_submit_once_audit_exception_preset_defaults(self) -> None:
@@ -12280,6 +12332,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_run_uses_buy_audit_exception_preset_defaults(self) -> None:
@@ -12319,6 +12372,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_run_uses_submit_path_audit_exception_preset_defaults(self) -> None:
@@ -12359,6 +12413,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_run_uses_pingan_submit_path_audit_exception_preset_defaults(self) -> None:
@@ -12400,6 +12455,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_run_prefers_explicit_cli_overrides(self) -> None:
@@ -12543,6 +12599,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_audit_period_uses_task_manager(self) -> None:
@@ -12568,6 +12625,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_audit_period_uses_multi_statuses(self) -> None:
@@ -12595,6 +12653,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_audit_period_uses_multi_methods(self) -> None:
@@ -12623,6 +12682,7 @@ class ReportCliDispatchTests(unittest.TestCase):
             audit_dir=None,
             json_output_path=None,
             csv_output_path=None,
+            live_manual_acceptance_path=None,
         )
 
     def test_handle_report_period_uses_task_manager(self) -> None:

@@ -890,11 +890,99 @@ def _build_trade_audit_value_diagnostics(entries: list[dict[str, Any]], *, scope
 
 
 _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA = "tdx.desktop_trade.pingan_acceptance_outcome_coverage_status.v1"
+_PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA = "tdx.desktop_trade.pingan_live_manual_acceptance.v1"
 _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES = ("confirmed", "rejected", "failed", "exception")
 
 
+def _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path: str | None) -> dict[str, Any]:
+    required_outcomes = list(_PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES)
+    if not live_manual_acceptance_path:
+        return {
+            "status": "not_provided",
+            "required_for_implemented_status": True,
+            "source_path": None,
+            "schema": None,
+            "covered_outcomes": [],
+            "missing_outcomes": required_outcomes,
+            "invalid_outcome_count": 0,
+            "operator": None,
+            "environment": None,
+            "boundary": (
+                "Live/manual acceptance evidence was not provided; D-07/D-08 cannot be treated as implemented."
+            ),
+        }
+
+    source_path = Path(live_manual_acceptance_path)
+    base_status: dict[str, Any] = {
+        "required_for_implemented_status": True,
+        "source_path": str(source_path),
+        "covered_outcomes": [],
+        "missing_outcomes": required_outcomes,
+        "invalid_outcome_count": 0,
+        "operator": None,
+        "environment": None,
+        "boundary": (
+            "Live/manual acceptance evidence is operator-provided read-only report evidence; it does not "
+            "execute trades, control the desktop, prove broker production readiness, or promote D-07/D-08 status."
+        ),
+    }
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            **base_status,
+            "status": "invalid",
+            "schema": None,
+            "error": str(exc),
+        }
+    if not isinstance(payload, dict):
+        return {
+            **base_status,
+            "status": "invalid",
+            "schema": None,
+            "error": "live/manual acceptance evidence must be a JSON object",
+        }
+
+    schema = payload.get("schema")
+    outcomes = payload.get("outcomes")
+    if not isinstance(outcomes, list):
+        outcomes = []
+    covered_outcomes: set[str] = set()
+    invalid_outcome_count = 0
+    for item in outcomes:
+        if not isinstance(item, dict):
+            invalid_outcome_count += 1
+            continue
+        status = str(item.get("status") or "").strip()
+        accepted = bool(item.get("accepted"))
+        if status in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES and accepted:
+            covered_outcomes.add(status)
+        else:
+            invalid_outcome_count += 1
+    missing_outcomes = [
+        status for status in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES if status not in covered_outcomes
+    ]
+    schema_valid = schema == _PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA
+    status = "complete" if schema_valid and not missing_outcomes and invalid_outcome_count == 0 else "incomplete"
+    result = {
+        **base_status,
+        "status": status,
+        "schema": schema,
+        "schema_valid": schema_valid,
+        "covered_outcomes": sorted(covered_outcomes),
+        "missing_outcomes": missing_outcomes,
+        "invalid_outcome_count": invalid_outcome_count,
+        "operator": payload.get("operator"),
+        "environment": payload.get("environment"),
+        "accepted_at": payload.get("accepted_at"),
+    }
+    if not schema_valid:
+        result["error"] = f"expected schema {_PINGAN_LIVE_MANUAL_ACCEPTANCE_SCHEMA}"
+    return result
+
+
 def _build_pingan_acceptance_outcome_coverage_status(
-    entries: list[dict[str, Any]], *, source_kind: str
+    entries: list[dict[str, Any]], *, source_kind: str, live_manual_acceptance_path: str | None = None
 ) -> dict[str, Any]:
     status_counts: dict[str, int] = {}
     for entry in entries:
@@ -907,6 +995,8 @@ def _build_pingan_acceptance_outcome_coverage_status(
         status for status in _PINGAN_REQUIRED_AUTOMATED_OUTCOME_STATUSES if status_counts.get(status, 0) <= 0
     ]
     automated_outcome_coverage_complete = not missing_automated_statuses
+    live_manual_acceptance_status = _build_pingan_live_manual_acceptance_status(live_manual_acceptance_path)
+    live_manual_acceptance_complete = live_manual_acceptance_status.get("status") == "complete"
 
     return {
         "schema": _PINGAN_ACCEPTANCE_OUTCOME_COVERAGE_SCHEMA,
@@ -922,17 +1012,15 @@ def _build_pingan_acceptance_outcome_coverage_status(
         "missing_automated_outcome_statuses": missing_automated_statuses,
         "automated_outcome_coverage_complete": automated_outcome_coverage_complete,
         "live_manual_acceptance_required": True,
-        "live_manual_acceptance_complete": False,
-        "live_manual_acceptance": {
-            "status": "not_provided",
-            "required_for_implemented_status": True,
-        },
-        "acceptance_complete": False,
+        "live_manual_acceptance_complete": live_manual_acceptance_complete,
+        "live_manual_acceptance": live_manual_acceptance_status,
+        "acceptance_complete": bool(automated_outcome_coverage_complete and live_manual_acceptance_complete),
         "order_submitted": False,
         "control_dispatch_executed": False,
         "boundary": (
-            "Read-only report coverage from selected immutable audit artifacts; does not execute trades or prove "
-            "live/manual acceptance, broker readiness, production readiness, or D-07/D-08 implemented status."
+            "Read-only report coverage from selected immutable audit artifacts and optional operator-provided "
+            "live/manual acceptance evidence; does not execute trades or prove broker readiness, production "
+            "readiness, or D-07/D-08 implemented status."
         ),
     }
 
@@ -2697,6 +2785,7 @@ class TdxTaskManager:
         audit_dir: str | None = None,
         json_output_path: str | None = None,
         csv_output_path: str | None = None,
+        live_manual_acceptance_path: str | None = None,
     ) -> Result:
         def run() -> Result:
             try:
@@ -2800,6 +2889,7 @@ class TdxTaskManager:
                     "broker": broker,
                     "submission_key": submission_key,
                     "audit_dir": str(audit_source["source_path"]),
+                    "live_manual_acceptance_path": live_manual_acceptance_path,
                 },
                 "source": {
                     "path": str(audit_source["source_path"]),
@@ -2820,6 +2910,7 @@ class TdxTaskManager:
                 "acceptance_outcome_coverage_status": _build_pingan_acceptance_outcome_coverage_status(
                     report_entries,
                     source_kind="daily_report",
+                    live_manual_acceptance_path=live_manual_acceptance_path,
                 ),
                 "entries": recent_entries,
             }
@@ -2878,6 +2969,7 @@ class TdxTaskManager:
         audit_dir: str | None = None,
         json_output_path: str | None = None,
         csv_output_path: str | None = None,
+        live_manual_acceptance_path: str | None = None,
     ) -> Result:
         def run() -> Result:
             try:
@@ -3001,6 +3093,7 @@ class TdxTaskManager:
                     "broker": broker,
                     "submission_key": submission_key,
                     "audit_dir": str(audit_source["source_path"]),
+                    "live_manual_acceptance_path": live_manual_acceptance_path,
                 },
                 "source": {
                     "path": str(audit_source["source_path"]),
@@ -3023,6 +3116,7 @@ class TdxTaskManager:
                 "acceptance_outcome_coverage_status": _build_pingan_acceptance_outcome_coverage_status(
                     report_entries,
                     source_kind="period_report",
+                    live_manual_acceptance_path=live_manual_acceptance_path,
                 ),
                 "entries": recent_entries,
             }

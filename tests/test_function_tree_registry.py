@@ -169,6 +169,23 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("交易安全审批", combined)
         self.assertIn("production readiness", combined)
 
+    def test_pingan_live_manual_acceptance_evidence_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-live-manual-acceptance-evidence", combined)
+                self.assertIn("live_manual_acceptance_complete", combined)
+                self.assertIn("acceptance_complete", combined)
+                self.assertIn("read-only report evidence", combined)
+                self.assertIn("不执行 trades/workflows", combined)
+                self.assertIn("不证明 broker production readiness", combined)
+                self.assertIn("不证明 UI login readiness", combined)
+                self.assertIn("不证明 implemented status", combined)
+
     def test_submit_once_task_plan_preview_boundary_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
