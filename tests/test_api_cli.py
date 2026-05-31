@@ -27,6 +27,8 @@ from tdxquant.cli import (
     _run_trade_dialog_readiness,
     _run_trade_exception_popup,
     _run_trade_lifecycle_owner_lock,
+    _run_trade_lifecycle_supervisor_run,
+    _run_trade_lifecycle_supervisor_tick,
     _run_trade_health,
     _run_trade_preflight,
     _run_trade_submit_once,
@@ -2512,6 +2514,64 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.owner_token, "operator-a")
         self.assertEqual(args.stale_after_seconds, 45.0)
         self.assertTrue(args.force_stale)
+
+    def test_trade_lifecycle_supervisor_tick_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-supervisor-tick",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+                "--stale-after-seconds",
+                "45",
+                "--max-restart-attempts",
+                "3",
+                "--backoff-seconds",
+                "12",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "lifecycle-supervisor-tick")
+        self.assertEqual(args.statefile_path, "runtime/pingan/lifecycle-owner.json")
+        self.assertEqual(args.owner_token, "operator-a")
+        self.assertEqual(args.stale_after_seconds, 45.0)
+        self.assertEqual(args.max_restart_attempts, 3)
+        self.assertEqual(args.backoff_seconds, 12.0)
+
+    def test_trade_lifecycle_supervisor_run_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-supervisor-run",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+                "--stale-after-seconds",
+                "45",
+                "--max-restart-attempts",
+                "3",
+                "--backoff-seconds",
+                "12",
+                "--max-ticks",
+                "2",
+                "--interval-seconds",
+                "0",
+            ]
+        )
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "lifecycle-supervisor-run")
+        self.assertEqual(args.statefile_path, "runtime/pingan/lifecycle-owner.json")
+        self.assertEqual(args.owner_token, "operator-a")
+        self.assertEqual(args.stale_after_seconds, 45.0)
+        self.assertEqual(args.max_restart_attempts, 3)
+        self.assertEqual(args.backoff_seconds, 12.0)
+        self.assertEqual(args.max_ticks, 2)
+        self.assertEqual(args.interval_seconds, 0.0)
 
     def test_trade_submit_ready_command_parses(self) -> None:
         parser = build_parser()
@@ -11399,6 +11459,44 @@ class TradeCliDispatchTests(unittest.TestCase):
         )
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"lifecycle_owner_lock": {"status": "owned"}})
         with patch("tdxquant.cli._run_trade_lifecycle_owner_lock", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_lifecycle_supervisor_tick_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-supervisor-tick",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"lifecycle_supervisor": {"status": "healthy"}})
+        with patch("tdxquant.cli._run_trade_lifecycle_supervisor_tick", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
+    def test_handle_trade_lifecycle_supervisor_run_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "trade",
+                "lifecycle-supervisor-run",
+                "--statefile-path",
+                "runtime/pingan/lifecycle-owner.json",
+                "--owner-token",
+                "operator-a",
+                "--max-ticks",
+                "2",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"lifecycle_supervisor_run": {"tick_count": 2}})
+        with patch("tdxquant.cli._run_trade_lifecycle_supervisor_run", return_value=expected) as mocked:
             result = _handle_trade_subcommand(args)
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)

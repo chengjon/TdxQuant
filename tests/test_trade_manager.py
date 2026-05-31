@@ -861,6 +861,137 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(event_log_path.exists())
         self.assertFalse(ledger_path.exists())
 
+    def test_pingan_lifecycle_supervisor_tick_rejects_missing_owner_lock_without_health_check(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            manager = TdxTradeManager(profile="balanced")
+
+            with patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check") as mocked_health:
+                result = manager.pingan.lifecycle_supervisor_tick(
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    stale_after_seconds=999.0,
+                    max_restart_attempts=2,
+                    backoff_seconds=30.0,
+                )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        supervisor = result.data["lifecycle_supervisor"]
+        self.assertEqual(supervisor["status"], "owner_lock_not_owned")
+        self.assertFalse(supervisor["supervisor_owned"])
+        self.assertFalse(supervisor["control_dispatch_executed"])
+        self.assertFalse(supervisor["restart_executed"])
+        self.assertFalse(supervisor["backoff_executed"])
+        self.assertFalse(supervisor["statefile_write_executed"])
+        self.assertFalse(supervisor["order_submitted"])
+        self.assertFalse(supervisor["process_kill_executed"])
+        self.assertFalse(supervisor["pid_ownership_claimed"])
+        self.assertEqual(supervisor["side_effect_level"], "none")
+        self.assertFalse(lifecycle_statefile_path.exists())
+        mocked_health.assert_not_called()
+
+    def test_pingan_lifecycle_supervisor_tick_records_restart_then_backoff(self) -> None:
+        unhealthy = Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message="PingAn broker health failed",
+            data={"runtime": {"ok": False}, "window": {"ok": False}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            manager = TdxTradeManager(profile="balanced")
+            acquire_result = manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(lifecycle_statefile_path),
+                owner_token="operator-a",
+                stale_after_seconds=999.0,
+            )
+            self.assertTrue(acquire_result.ok)
+
+            with patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=unhealthy) as mocked_health:
+                first = manager.pingan.lifecycle_supervisor_tick(
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    stale_after_seconds=999.0,
+                    max_restart_attempts=2,
+                    backoff_seconds=600.0,
+                )
+                second = manager.pingan.lifecycle_supervisor_tick(
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    stale_after_seconds=999.0,
+                    max_restart_attempts=2,
+                    backoff_seconds=600.0,
+                )
+            state_payload = json.loads(lifecycle_statefile_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(first.ok)
+        first_payload = first.data["lifecycle_supervisor"]
+        self.assertEqual(first_payload["status"], "restart_recorded")
+        self.assertTrue(first_payload["supervisor_owned"])
+        self.assertTrue(first_payload["control_dispatch_executed"])
+        self.assertFalse(first_payload["broker_health_ok"])
+        self.assertTrue(first_payload["restart_executed"])
+        self.assertFalse(first_payload["backoff_executed"])
+        self.assertTrue(first_payload["statefile_write_executed"])
+        self.assertEqual(first_payload["restart_attempt_count"], 1)
+        self.assertFalse(first_payload["order_submitted"])
+        self.assertFalse(first_payload["process_kill_executed"])
+        self.assertFalse(first_payload["pid_ownership_claimed"])
+        self.assertEqual(first_payload["side_effect_level"], "local_lifecycle_statefile")
+
+        self.assertTrue(second.ok)
+        second_payload = second.data["lifecycle_supervisor"]
+        self.assertEqual(second_payload["status"], "backoff_waiting")
+        self.assertTrue(second_payload["supervisor_owned"])
+        self.assertTrue(second_payload["backoff_executed"])
+        self.assertFalse(second_payload["restart_executed"])
+        self.assertEqual(second_payload["restart_attempt_count"], 1)
+        self.assertEqual(state_payload["supervisor"]["status"], "backoff_waiting")
+        self.assertEqual(state_payload["supervisor"]["restart_attempt_count"], 1)
+        self.assertEqual(mocked_health.call_count, 2)
+
+    def test_pingan_lifecycle_supervisor_run_bounds_ticks(self) -> None:
+        healthy = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="PingAn broker health ok",
+            data={"runtime": {"ok": True}, "window": {"ok": True}},
+        )
+        with TemporaryDirectory() as temp_dir:
+            lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
+            manager = TdxTradeManager(profile="balanced")
+            acquire_result = manager.pingan.lifecycle_owner_lock(
+                action="acquire",
+                statefile_path=str(lifecycle_statefile_path),
+                owner_token="operator-a",
+                stale_after_seconds=999.0,
+            )
+            self.assertTrue(acquire_result.ok)
+
+            with patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=healthy) as mocked_health:
+                result = manager.pingan.lifecycle_supervisor_run(
+                    statefile_path=str(lifecycle_statefile_path),
+                    owner_token="operator-a",
+                    stale_after_seconds=999.0,
+                    max_restart_attempts=2,
+                    backoff_seconds=30.0,
+                    max_ticks=3,
+                    interval_seconds=0.0,
+                )
+
+        self.assertTrue(result.ok)
+        run = result.data["lifecycle_supervisor_run"]
+        self.assertEqual(run["tick_count"], 3)
+        self.assertEqual(run["max_ticks"], 3)
+        self.assertEqual(run["execution_mode"], "explicit_operator_lifecycle_supervisor_control")
+        self.assertEqual([item["status"] for item in run["ticks"]], ["healthy", "healthy", "healthy"])
+        self.assertFalse(run["order_submitted"])
+        self.assertFalse(run["process_kill_executed"])
+        self.assertFalse(run["pid_ownership_claimed"])
+        self.assertEqual(mocked_health.call_count, 3)
+
     def test_pingan_preflight_fails_on_conflicting_submission_key_without_writing_ledger(self) -> None:
         expected = Result(
             ok=True,

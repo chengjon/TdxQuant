@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,7 @@ PINGAN_DESKTOP_LIFECYCLE_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_desktop_
 PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_trade_audit_gate_status.v1"
 PINGAN_LIFECYCLE_OWNER_LOCK_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_lock.v1"
 PINGAN_LIFECYCLE_OWNER_STATE_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_state.v1"
+PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_supervisor.v1"
 PINGAN_REQUIRED_AUDIT_GATE_STATUSES = ("confirmed", "rejected", "failed", "exception")
 PINGAN_EXCEPTION_POPUP_KEYWORDS = (
     "异常",
@@ -922,6 +924,276 @@ def _run_pingan_lifecycle_owner_lock(
     return Result(ok=True, code=ErrorCode.OK, message="released PingAn lifecycle owner lock", data={"lifecycle_owner_lock": payload})
 
 
+def _coerce_non_negative_int(value: Any, *, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
+
+
+def _run_pingan_lifecycle_supervisor_tick(
+    *,
+    statefile_path: str,
+    owner_token: str,
+    title_keyword: str,
+    exe_path: str | None,
+    stale_after_seconds: float = 300.0,
+    max_restart_attempts: int = 1,
+    backoff_seconds: float = 30.0,
+) -> Result:
+    normalized_owner_token = str(owner_token or "").strip()
+    if not normalized_owner_token:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="owner_token is required for PingAn lifecycle supervisor control")
+    if not statefile_path:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="statefile_path is required for PingAn lifecycle supervisor control")
+
+    resolved_statefile_path = Path(statefile_path)
+    resolved_lock_path = Path(f"{resolved_statefile_path}.lock")
+    normalized_max_restart_attempts = _coerce_non_negative_int(max_restart_attempts, default=1)
+    normalized_backoff_seconds = max(0.0, float(backoff_seconds))
+    now = _utc_now()
+    status_result = _run_pingan_lifecycle_owner_lock(
+        action="status",
+        statefile_path=str(resolved_statefile_path),
+        owner_token=normalized_owner_token,
+        stale_after_seconds=float(stale_after_seconds),
+    )
+    owner_payload = status_result.data.get("lifecycle_owner_lock") if isinstance(status_result.data, dict) else None
+    owner_status = str(owner_payload.get("status") or "status_check_failed") if isinstance(owner_payload, dict) else "status_check_failed"
+    owner_token_matches = bool(
+        isinstance(owner_payload, dict) and owner_payload.get("current_owner_token") == normalized_owner_token
+    )
+    owner_pid_alive = owner_payload.get("owner_pid_alive") if isinstance(owner_payload, dict) else None
+    stale_detected = bool(owner_payload.get("stale_detected")) if isinstance(owner_payload, dict) else False
+    supervisor_owned = (
+        status_result.ok
+        and owner_status == "owned"
+        and owner_token_matches
+        and not stale_detected
+        and owner_pid_alive is True
+    )
+
+    if not supervisor_owned:
+        if owner_status != "owned":
+            status = "owner_lock_not_owned"
+        elif not owner_token_matches:
+            status = "owner_token_mismatch"
+        elif stale_detected:
+            status = "owner_lock_stale"
+        else:
+            status = "owner_pid_not_alive"
+        payload = {
+            "schema_version": PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA,
+            "action": "tick",
+            "status": status,
+            "execution_mode": "explicit_operator_lifecycle_supervisor_control",
+            "statefile_path": str(resolved_statefile_path),
+            "lock_path": str(resolved_lock_path),
+            "owner_token": normalized_owner_token,
+            "current_owner_token": owner_payload.get("current_owner_token") if isinstance(owner_payload, dict) else None,
+            "owner_lock_status": owner_payload,
+            "owner_token_matches": owner_token_matches,
+            "owner_pid_alive": owner_pid_alive,
+            "owner_pid_status": owner_payload.get("owner_pid_status") if isinstance(owner_payload, dict) else "missing",
+            "stale_after_seconds": float(stale_after_seconds),
+            "stale_detected": stale_detected,
+            "supervisor_owned": False,
+            "broker_health_ok": None,
+            "control_dispatch_executed": False,
+            "statefile_write_executed": False,
+            "restart_executed": False,
+            "backoff_executed": False,
+            "restart_attempt_count": 0,
+            "max_restart_attempts": normalized_max_restart_attempts,
+            "backoff_seconds": normalized_backoff_seconds,
+            "last_restart_attempt_at": None,
+            "next_allowed_restart_at": None,
+            "order_submitted": False,
+            "process_kill_executed": False,
+            "pid_ownership_claimed": False,
+            "side_effect_level": "none",
+            "boundary": (
+                "Explicit local PingAn lifecycle supervisor tick requires an owned lifecycle statefile; "
+                "this rejected tick does not observe broker health, write lifecycle state, submit orders, "
+                "execute workflows, kill/start processes, or claim real desktop PID ownership."
+            ),
+        }
+        return Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message="PingAn lifecycle supervisor requires an owned lifecycle owner lock",
+            data={"lifecycle_supervisor": payload},
+        )
+
+    broker_health = PingAnBrokerAdapter(title_keyword=title_keyword, exe_path=exe_path).health_check()
+    broker_health_ok = bool(broker_health.ok)
+    state_payload = _read_json_object(resolved_statefile_path) or {}
+    previous_supervisor = state_payload.get("supervisor") if isinstance(state_payload.get("supervisor"), dict) else {}
+    restart_attempt_count = _coerce_non_negative_int(previous_supervisor.get("restart_attempt_count"), default=0)
+    previous_last_restart_at = _parse_timestamp(previous_supervisor.get("last_restart_attempt_at"))
+    last_restart_at = previous_last_restart_at
+    restart_executed = False
+    backoff_executed = False
+    next_allowed_restart_at: datetime | None = None
+
+    if broker_health_ok:
+        status = "healthy"
+        restart_attempt_count = 0
+        last_restart_at = None
+    else:
+        if previous_last_restart_at is not None and normalized_backoff_seconds > 0:
+            next_allowed_restart_at = previous_last_restart_at + timedelta(seconds=normalized_backoff_seconds)
+        inside_backoff = (
+            next_allowed_restart_at is not None
+            and now < next_allowed_restart_at
+        )
+        if inside_backoff:
+            status = "backoff_waiting"
+            backoff_executed = True
+        elif restart_attempt_count >= normalized_max_restart_attempts:
+            status = "max_restart_attempts_reached"
+        else:
+            status = "restart_recorded"
+            restart_attempt_count += 1
+            restart_executed = True
+            last_restart_at = now
+            if normalized_backoff_seconds > 0:
+                next_allowed_restart_at = now + timedelta(seconds=normalized_backoff_seconds)
+
+    supervisor_state = {
+        "schema_version": PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA,
+        "status": status,
+        "execution_mode": "explicit_operator_lifecycle_supervisor_control",
+        "updated_at": _format_timestamp(now),
+        "owner_token": normalized_owner_token,
+        "broker_health_ok": broker_health_ok,
+        "broker_health_message": broker_health.message,
+        "broker_health_code": broker_health.code.value if hasattr(broker_health.code, "value") else str(broker_health.code),
+        "control_dispatch_executed": True,
+        "restart_executed": restart_executed,
+        "backoff_executed": backoff_executed,
+        "restart_attempt_count": restart_attempt_count,
+        "max_restart_attempts": normalized_max_restart_attempts,
+        "backoff_seconds": normalized_backoff_seconds,
+        "last_restart_attempt_at": _format_timestamp(last_restart_at) if last_restart_at is not None else None,
+        "next_allowed_restart_at": _format_timestamp(next_allowed_restart_at) if next_allowed_restart_at is not None else None,
+        "order_submitted": False,
+        "process_kill_executed": False,
+        "pid_ownership_claimed": False,
+        "side_effect_level": "local_lifecycle_statefile",
+    }
+    updated_state = dict(state_payload)
+    updated_state.update(
+        {
+            "status": "owned",
+            "broker": "pingan",
+            "owner_token": normalized_owner_token,
+            "owner_pid": os.getpid(),
+            "statefile_path": str(resolved_statefile_path),
+            "lock_path": str(resolved_lock_path),
+            "updated_at": _format_timestamp(now),
+            "supervisor": supervisor_state,
+        }
+    )
+    _write_json_object(resolved_statefile_path, updated_state)
+
+    payload = {
+        **supervisor_state,
+        "action": "tick",
+        "statefile_path": str(resolved_statefile_path),
+        "lock_path": str(resolved_lock_path),
+        "current_owner_token": normalized_owner_token,
+        "owner_lock_status": owner_payload,
+        "owner_token_matches": True,
+        "owner_pid_alive": owner_pid_alive,
+        "owner_pid_status": owner_payload.get("owner_pid_status") if isinstance(owner_payload, dict) else "missing",
+        "stale_after_seconds": float(stale_after_seconds),
+        "stale_detected": False,
+        "supervisor_owned": True,
+        "statefile_write_executed": True,
+        "boundary": (
+            "Local statefile-backed lifecycle control only: records PingAn broker health, restart, "
+            "and backoff decisions under an explicit owner lock; it does not submit orders, execute "
+            "catalog/task/report/bundle workflows, kill/start the real PingAn process, or claim real "
+            "desktop PID ownership."
+        ),
+    }
+    return Result(
+        ok=True,
+        code=ErrorCode.OK,
+        message=f"completed PingAn lifecycle supervisor tick: {status}",
+        data={"lifecycle_supervisor": payload},
+    )
+
+
+def _run_pingan_lifecycle_supervisor_run(
+    *,
+    statefile_path: str,
+    owner_token: str,
+    title_keyword: str,
+    exe_path: str | None,
+    stale_after_seconds: float = 300.0,
+    max_restart_attempts: int = 1,
+    backoff_seconds: float = 30.0,
+    max_ticks: int = 1,
+    interval_seconds: float = 0.0,
+) -> Result:
+    normalized_max_ticks = _coerce_non_negative_int(max_ticks, default=1)
+    if normalized_max_ticks < 1:
+        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="max_ticks must be at least 1 for PingAn lifecycle supervisor run")
+    normalized_interval_seconds = max(0.0, float(interval_seconds))
+    ticks: list[dict[str, Any]] = []
+    all_ok = True
+    for index in range(normalized_max_ticks):
+        tick_result = _run_pingan_lifecycle_supervisor_tick(
+            statefile_path=statefile_path,
+            owner_token=owner_token,
+            title_keyword=title_keyword,
+            exe_path=exe_path,
+            stale_after_seconds=stale_after_seconds,
+            max_restart_attempts=max_restart_attempts,
+            backoff_seconds=backoff_seconds,
+        )
+        tick_payload = tick_result.data.get("lifecycle_supervisor") if isinstance(tick_result.data, dict) else None
+        if isinstance(tick_payload, dict):
+            ticks.append(tick_payload)
+        else:
+            ticks.append({"status": "missing_tick_payload", "ok": tick_result.ok, "message": tick_result.message})
+        if not tick_result.ok:
+            all_ok = False
+            break
+        if normalized_interval_seconds > 0 and index + 1 < normalized_max_ticks:
+            time.sleep(normalized_interval_seconds)
+
+    run_payload = {
+        "schema_version": PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA,
+        "action": "run",
+        "status": "completed" if all_ok and len(ticks) == normalized_max_ticks else "stopped",
+        "execution_mode": "explicit_operator_lifecycle_supervisor_control",
+        "statefile_path": statefile_path,
+        "owner_token": owner_token,
+        "tick_count": len(ticks),
+        "max_ticks": normalized_max_ticks,
+        "interval_seconds": normalized_interval_seconds,
+        "ticks": ticks,
+        "order_submitted": False,
+        "process_kill_executed": False,
+        "pid_ownership_claimed": False,
+        "boundary": (
+            "Bounded foreground PingAn lifecycle supervisor run only; each tick is local statefile-backed "
+            "lifecycle control and does not submit orders, execute workflows, kill/start processes, or "
+            "claim real desktop PID ownership."
+        ),
+    }
+    return Result(
+        ok=all_ok,
+        code=ErrorCode.OK if all_ok else ErrorCode.INVALID_REQUEST,
+        message=f"completed PingAn lifecycle supervisor run with {len(ticks)} tick(s)",
+        data={"lifecycle_supervisor_run": run_payload},
+    )
+
+
 def _build_pingan_lifecycle_control_status(*, title_keyword: str, exe_path: str | None) -> dict[str, Any]:
     return {
         "status": "not_owned",
@@ -1299,6 +1571,80 @@ class _PingAnTradeProxy:
             profile_options=effective_profile,
             broker="pingan",
             method="lifecycle_owner_lock",
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            timing=timing,
+        )
+        return result
+
+    def lifecycle_supervisor_tick(
+        self,
+        *,
+        statefile_path: str,
+        owner_token: str,
+        stale_after_seconds: float = 300.0,
+        max_restart_attempts: int = 1,
+        backoff_seconds: float = 30.0,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+
+        def run() -> Result:
+            return _run_pingan_lifecycle_supervisor_tick(
+                statefile_path=statefile_path,
+                owner_token=owner_token,
+                title_keyword=self._manager.title_keyword,
+                exe_path=self._manager.exe_path,
+                stale_after_seconds=stale_after_seconds,
+                max_restart_attempts=max_restart_attempts,
+                backoff_seconds=backoff_seconds,
+            )
+
+        result, timing = capture_trade_timing("pingan.lifecycle_supervisor_tick", run)
+        attach_trade_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            broker="pingan",
+            method="lifecycle_supervisor_tick",
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            timing=timing,
+        )
+        return result
+
+    def lifecycle_supervisor_run(
+        self,
+        *,
+        statefile_path: str,
+        owner_token: str,
+        stale_after_seconds: float = 300.0,
+        max_restart_attempts: int = 1,
+        backoff_seconds: float = 30.0,
+        max_ticks: int = 1,
+        interval_seconds: float = 0.0,
+    ) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+
+        def run() -> Result:
+            return _run_pingan_lifecycle_supervisor_run(
+                statefile_path=statefile_path,
+                owner_token=owner_token,
+                title_keyword=self._manager.title_keyword,
+                exe_path=self._manager.exe_path,
+                stale_after_seconds=stale_after_seconds,
+                max_restart_attempts=max_restart_attempts,
+                backoff_seconds=backoff_seconds,
+                max_ticks=max_ticks,
+                interval_seconds=interval_seconds,
+            )
+
+        result, timing = capture_trade_timing("pingan.lifecycle_supervisor_run", run)
+        attach_trade_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            broker="pingan",
+            method="lifecycle_supervisor_run",
             title_keyword=self._manager.title_keyword,
             exe_path=self._manager.exe_path,
             timing=timing,

@@ -462,6 +462,26 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("不 retry/backoff/recovery", combined)
         self.assertIn("production trading readiness", combined)
 
+    def test_pingan_lifecycle_supervisor_control_is_registered_without_status_change(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertIn("pingan-lifecycle-supervisor-control", combined)
+                self.assertIn("TdxTradeManager.pingan.lifecycle_supervisor_tick", combined)
+                self.assertIn("TdxTradeManager.pingan.lifecycle_supervisor_run", combined)
+                self.assertIn("trade lifecycle-supervisor-tick", combined)
+                self.assertIn("trade lifecycle-supervisor-run", combined)
+                self.assertIn("restart/backoff", combined)
+                self.assertIn("statefile-backed lifecycle control", combined)
+                self.assertIn("不提交订单", combined)
+                self.assertIn("不执行 catalog/task/report/bundle workflow", combined)
+                self.assertIn("不 own/kill/start 真实 PingAn 进程", combined)
+                self.assertIn("production trading readiness", combined)
+
     def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"

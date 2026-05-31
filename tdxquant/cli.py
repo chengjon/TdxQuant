@@ -459,6 +459,15 @@ def _add_trade_lifecycle_owner_lock_arguments(subparser: argparse.ArgumentParser
     subparser.add_argument("--force-stale", action=argparse.BooleanOptionalAction, default=False)
 
 
+def _add_trade_lifecycle_supervisor_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--profile", default="balanced")
+    subparser.add_argument("--statefile-path", required=True)
+    subparser.add_argument("--owner-token", required=True)
+    subparser.add_argument("--stale-after-seconds", type=float, default=300.0)
+    subparser.add_argument("--max-restart-attempts", type=int, default=1)
+    subparser.add_argument("--backoff-seconds", type=float, default=30.0)
+
+
 def _add_task_trade_submit_ready_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--port", required=True)
     subparser.add_argument("--baudrate", type=int, default=115200)
@@ -1698,6 +1707,16 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     _add_trade_lifecycle_owner_lock_arguments(trade_lifecycle_owner_lock_parser)
     trade_lifecycle_owner_lock_parser.add_argument("--output", help="Optional path to write the JSON result")
 
+    trade_lifecycle_supervisor_tick_parser = trade_subparsers.add_parser("lifecycle-supervisor-tick")
+    _add_trade_lifecycle_supervisor_arguments(trade_lifecycle_supervisor_tick_parser)
+    trade_lifecycle_supervisor_tick_parser.add_argument("--output", help="Optional path to write the JSON result")
+
+    trade_lifecycle_supervisor_run_parser = trade_subparsers.add_parser("lifecycle-supervisor-run")
+    _add_trade_lifecycle_supervisor_arguments(trade_lifecycle_supervisor_run_parser)
+    trade_lifecycle_supervisor_run_parser.add_argument("--max-ticks", type=int, default=1)
+    trade_lifecycle_supervisor_run_parser.add_argument("--interval-seconds", type=float, default=0.0)
+    trade_lifecycle_supervisor_run_parser.add_argument("--output", help="Optional path to write the JSON result")
+
     trade_broker_capabilities_parser = trade_subparsers.add_parser("broker-capabilities")
     trade_broker_capabilities_parser.add_argument("--broker", default="pingan_desktop")
     trade_broker_capabilities_parser.add_argument("--profile", default="balanced")
@@ -2722,6 +2741,38 @@ def _run_trade_lifecycle_owner_lock(args: argparse.Namespace) -> Result:
         owner_token=args.owner_token,
         stale_after_seconds=args.stale_after_seconds,
         force_stale=args.force_stale,
+    )
+
+
+def _run_trade_lifecycle_supervisor_tick(args: argparse.Namespace) -> Result:
+    trade_manager = TdxTradeManager(
+        profile=getattr(args, "profile", None) or "balanced",
+        title_keyword=args.title_key,
+        exe_path=args.exe_path,
+    )
+    return trade_manager.pingan.lifecycle_supervisor_tick(
+        statefile_path=args.statefile_path,
+        owner_token=args.owner_token,
+        stale_after_seconds=args.stale_after_seconds,
+        max_restart_attempts=args.max_restart_attempts,
+        backoff_seconds=args.backoff_seconds,
+    )
+
+
+def _run_trade_lifecycle_supervisor_run(args: argparse.Namespace) -> Result:
+    trade_manager = TdxTradeManager(
+        profile=getattr(args, "profile", None) or "balanced",
+        title_keyword=args.title_key,
+        exe_path=args.exe_path,
+    )
+    return trade_manager.pingan.lifecycle_supervisor_run(
+        statefile_path=args.statefile_path,
+        owner_token=args.owner_token,
+        stale_after_seconds=args.stale_after_seconds,
+        max_restart_attempts=args.max_restart_attempts,
+        backoff_seconds=args.backoff_seconds,
+        max_ticks=args.max_ticks,
+        interval_seconds=args.interval_seconds,
     )
 
 
@@ -6188,6 +6239,10 @@ def _handle_trade_subcommand(args: argparse.Namespace) -> Result:
         return _run_trade_exception_popup(args)
     if args.trade_command == "lifecycle-owner-lock":
         return _run_trade_lifecycle_owner_lock(args)
+    if args.trade_command == "lifecycle-supervisor-tick":
+        return _run_trade_lifecycle_supervisor_tick(args)
+    if args.trade_command == "lifecycle-supervisor-run":
+        return _run_trade_lifecycle_supervisor_run(args)
     if args.trade_command == "broker-capabilities":
         return _run_trade_broker_capabilities(args)
     return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported trade subcommand: {args.trade_command}")
