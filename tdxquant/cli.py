@@ -270,7 +270,10 @@ def _add_trade_lifecycle_owner_guard_arguments(subparser: argparse.ArgumentParse
 def _get_lifecycle_owner_guard_kwargs(args: argparse.Namespace) -> dict[str, Any]:
     lifecycle_statefile_path = getattr(args, "lifecycle_statefile_path", None)
     lifecycle_owner_token = getattr(args, "lifecycle_owner_token", None)
-    lifecycle_stale_after_seconds = float(getattr(args, "lifecycle_stale_after_seconds", 300.0))
+    raw_lifecycle_stale_after_seconds = getattr(args, "lifecycle_stale_after_seconds", None)
+    lifecycle_stale_after_seconds = (
+        300.0 if raw_lifecycle_stale_after_seconds is None else float(raw_lifecycle_stale_after_seconds)
+    )
     require_lifecycle_owner_lock = bool(getattr(args, "require_lifecycle_owner_lock", False))
     if not (
         require_lifecycle_owner_lock
@@ -483,6 +486,10 @@ def _add_task_run_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--confirm-timeout", type=float)
     subparser.add_argument("--result-timeout", type=float)
     subparser.add_argument("--result-close-pre-delay", type=float)
+    subparser.add_argument("--lifecycle-statefile-path")
+    subparser.add_argument("--lifecycle-owner-token")
+    subparser.add_argument("--lifecycle-stale-after-seconds", type=float)
+    subparser.add_argument("--require-lifecycle-owner-lock", action=argparse.BooleanOptionalAction, default=None)
     _add_trade_safety_arguments(subparser)
     subparser.add_argument("--refresh-before-trade", action=argparse.BooleanOptionalAction, default=None)
     subparser.add_argument("--refresh-market")

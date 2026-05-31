@@ -9435,6 +9435,97 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertEqual(manager.guarded_trade_buy.call_args.kwargs["submission_key"], "cli-submission-key")
         self.assertEqual(manager.guarded_trade_buy.call_args.kwargs["max_price"], 10.20)
 
+    def test_handle_task_run_prefers_lifecycle_owner_lock_cli_overrides(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "run",
+                "--preset",
+                "task-buy-owner-lock",
+                "--lifecycle-statefile-path",
+                "/tmp/cli-owner.json",
+                "--lifecycle-owner-token",
+                "cli-owner",
+                "--lifecycle-stale-after-seconds",
+                "42.5",
+                "--require-lifecycle-owner-lock",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_buy.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "trade-buy",
+                    "profile": "trade_buy",
+                    "api_profile": "safe_read",
+                    "trade_profile": "balanced",
+                    "strategy_path": None,
+                    "options": {
+                        "port": "COM3",
+                        "code": "000001",
+                        "price": "10.00",
+                        "quantity": 100,
+                        "lifecycle_statefile_path": "/tmp/preset-owner.json",
+                        "lifecycle_owner_token": "preset-owner",
+                        "lifecycle_stale_after_seconds": 12.0,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+
+        self.assertIs(result, expected)
+        call = manager.trade_buy.call_args.kwargs
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/cli-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "cli-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 42.5)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
+
+    def test_handle_task_run_preserves_lifecycle_owner_lock_preset_defaults(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["task", "run", "--preset", "sell-submit-owner-lock"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.trade_submit_once.return_value = expected
+        with (
+            patch(
+                "tdxquant.cli.resolve_task_preset",
+                return_value={
+                    "command": "trade-submit-once",
+                    "profile": "trade_submit_once",
+                    "api_profile": "safe_read",
+                    "trade_profile": "balanced",
+                    "strategy_path": None,
+                    "options": {
+                        "side": "sell",
+                        "port": "COM3",
+                        "code": "000001",
+                        "price": "10.00",
+                        "quantity": 100,
+                        "lifecycle_statefile_path": "/tmp/preset-owner.json",
+                        "lifecycle_owner_token": "preset-owner",
+                        "lifecycle_stale_after_seconds": 12.0,
+                        "require_lifecycle_owner_lock": True,
+                    },
+                },
+            ),
+            patch("tdxquant.cli.TdxTaskManager", return_value=manager),
+        ):
+            result = _handle_task_subcommand(args)
+
+        self.assertIs(result, expected)
+        call = manager.trade_submit_once.call_args.kwargs
+        self.assertEqual(call["side"], "sell")
+        self.assertEqual(call["lifecycle_statefile_path"], "/tmp/preset-owner.json")
+        self.assertEqual(call["lifecycle_owner_token"], "preset-owner")
+        self.assertEqual(call["lifecycle_stale_after_seconds"], 12.0)
+        self.assertTrue(call["require_lifecycle_owner_lock"])
+
     def test_handle_task_run_uses_refresh_preset(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["task", "run", "--preset", "refresh-default"])
