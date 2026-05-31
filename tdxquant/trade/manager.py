@@ -1288,6 +1288,9 @@ def _run_pingan_lifecycle_supervisor_tick(
     stale_after_seconds: float = 300.0,
     max_restart_attempts: int = 1,
     backoff_seconds: float = 30.0,
+    process_restart_enabled: bool = False,
+    process_restart_exe_path: str | None = None,
+    force_process_restart: bool = False,
 ) -> Result:
     normalized_owner_token = str(owner_token or "").strip()
     if not normalized_owner_token:
@@ -1351,6 +1354,11 @@ def _run_pingan_lifecycle_supervisor_tick(
             "statefile_write_executed": False,
             "restart_executed": False,
             "backoff_executed": False,
+            "process_restart_enabled": bool(process_restart_enabled),
+            "process_restart_requested": False,
+            "process_restart_executed": False,
+            "process_restart_status": None,
+            "process_restart_result": None,
             "restart_attempt_count": 0,
             "max_restart_attempts": normalized_max_restart_attempts,
             "backoff_seconds": normalized_backoff_seconds,
@@ -1382,6 +1390,13 @@ def _run_pingan_lifecycle_supervisor_tick(
     last_restart_at = previous_last_restart_at
     restart_executed = False
     backoff_executed = False
+    process_restart_requested = False
+    process_restart_executed = False
+    process_restart_status: str | None = None
+    process_restart_result_payload: dict[str, Any] | None = None
+    process_restart_result_ok: bool | None = None
+    process_restart_result_code: str | None = None
+    process_restart_result_message: str | None = None
     next_allowed_restart_at: datetime | None = None
 
     if broker_health_ok:
@@ -1405,6 +1420,7 @@ def _run_pingan_lifecycle_supervisor_tick(
             restart_attempt_count += 1
             restart_executed = True
             last_restart_at = now
+            process_restart_requested = bool(process_restart_enabled)
             if normalized_backoff_seconds > 0:
                 next_allowed_restart_at = now + timedelta(seconds=normalized_backoff_seconds)
 
@@ -1420,6 +1436,11 @@ def _run_pingan_lifecycle_supervisor_tick(
         "control_dispatch_executed": True,
         "restart_executed": restart_executed,
         "backoff_executed": backoff_executed,
+        "process_restart_enabled": bool(process_restart_enabled),
+        "process_restart_requested": process_restart_requested,
+        "process_restart_executed": False,
+        "process_restart_status": None,
+        "process_restart_result": None,
         "restart_attempt_count": restart_attempt_count,
         "max_restart_attempts": normalized_max_restart_attempts,
         "backoff_seconds": normalized_backoff_seconds,
@@ -1445,6 +1466,52 @@ def _run_pingan_lifecycle_supervisor_tick(
     )
     _write_json_object(resolved_statefile_path, updated_state)
 
+    if process_restart_requested:
+        process_restart_result = _run_pingan_lifecycle_process(
+            action="restart",
+            statefile_path=str(resolved_statefile_path),
+            owner_token=normalized_owner_token,
+            exe_path=process_restart_exe_path or exe_path,
+            stale_after_seconds=float(stale_after_seconds),
+            force_restart=force_process_restart,
+        )
+        process_restart_result_payload = (
+            process_restart_result.data.get("lifecycle_process")
+            if isinstance(process_restart_result.data, dict)
+            else None
+        )
+        process_restart_result_payload = process_restart_result_payload if isinstance(process_restart_result_payload, dict) else None
+        process_restart_result_ok = process_restart_result.ok
+        process_restart_result_code = process_restart_result.code.value if hasattr(process_restart_result.code, "value") else str(process_restart_result.code)
+        process_restart_result_message = process_restart_result.message
+        process_restart_status = (
+            str(process_restart_result_payload.get("status"))
+            if isinstance(process_restart_result_payload, dict) and process_restart_result_payload.get("status") is not None
+            else "missing_process_restart_result"
+        )
+        process_restart_executed = bool(process_restart_result.ok and process_restart_status == "restarted")
+        status = "process_restarted" if process_restart_executed else "process_restart_failed"
+        supervisor_state.update(
+            {
+                "status": status,
+                "process_restart_executed": process_restart_executed,
+                "process_restart_status": process_restart_status,
+                "process_restart_result": process_restart_result_payload,
+                "process_restart_result_ok": process_restart_result_ok,
+                "process_restart_result_code": process_restart_result_code,
+                "process_restart_result_message": process_restart_result_message,
+                "process_restart_exe_path": process_restart_exe_path or exe_path,
+                "process_restart_boundary": (
+                    "Process restart is explicit opt-in and delegated to lifecycle_process(action=restart), "
+                    "which enforces recorded PID, owner-token, and command guards."
+                ),
+            }
+        )
+        latest_state = _read_json_object(resolved_statefile_path) or {}
+        latest_state["supervisor"] = supervisor_state
+        latest_state["updated_at"] = _format_timestamp(_utc_now())
+        _write_json_object(resolved_statefile_path, latest_state)
+
     payload = {
         **supervisor_state,
         "action": "tick",
@@ -1461,14 +1528,16 @@ def _run_pingan_lifecycle_supervisor_tick(
         "statefile_write_executed": True,
         "boundary": (
             "Local statefile-backed lifecycle control only: records PingAn broker health, restart, "
-            "and backoff decisions under an explicit owner lock; it does not submit orders, execute "
-            "catalog/task/report/bundle workflows, kill/start the real PingAn process, or claim real "
-            "desktop PID ownership."
+            "and backoff decisions under an explicit owner lock. Process restart is disabled by default; "
+            "when explicitly enabled it delegates to the recorded-PID guarded lifecycle process controller. "
+            "It does not submit orders, execute catalog/task/report/bundle workflows, prove broker readiness, "
+            "prove UI login readiness, or provide production trading readiness."
         ),
     }
+    result_ok = not (process_restart_requested and not process_restart_executed)
     return Result(
-        ok=True,
-        code=ErrorCode.OK,
+        ok=result_ok,
+        code=ErrorCode.OK if result_ok else ErrorCode.EXECUTION_FAILED,
         message=f"completed PingAn lifecycle supervisor tick: {status}",
         data={"lifecycle_supervisor": payload},
     )
@@ -1485,6 +1554,9 @@ def _run_pingan_lifecycle_supervisor_run(
     backoff_seconds: float = 30.0,
     max_ticks: int = 1,
     interval_seconds: float = 0.0,
+    process_restart_enabled: bool = False,
+    process_restart_exe_path: str | None = None,
+    force_process_restart: bool = False,
 ) -> Result:
     normalized_max_ticks = _coerce_non_negative_int(max_ticks, default=1)
     if normalized_max_ticks < 1:
@@ -1501,6 +1573,9 @@ def _run_pingan_lifecycle_supervisor_run(
             stale_after_seconds=stale_after_seconds,
             max_restart_attempts=max_restart_attempts,
             backoff_seconds=backoff_seconds,
+            process_restart_enabled=process_restart_enabled,
+            process_restart_exe_path=process_restart_exe_path,
+            force_process_restart=force_process_restart,
         )
         tick_payload = tick_result.data.get("lifecycle_supervisor") if isinstance(tick_result.data, dict) else None
         if isinstance(tick_payload, dict):
@@ -1523,14 +1598,17 @@ def _run_pingan_lifecycle_supervisor_run(
         "tick_count": len(ticks),
         "max_ticks": normalized_max_ticks,
         "interval_seconds": normalized_interval_seconds,
+        "process_restart_enabled": bool(process_restart_enabled),
+        "process_restart_exe_path": process_restart_exe_path,
+        "force_process_restart": bool(force_process_restart),
         "ticks": ticks,
         "order_submitted": False,
         "process_kill_executed": False,
         "pid_ownership_claimed": False,
         "boundary": (
             "Bounded foreground PingAn lifecycle supervisor run only; each tick is local statefile-backed "
-            "lifecycle control and does not submit orders, execute workflows, kill/start processes, or "
-            "claim real desktop PID ownership."
+            "lifecycle control. Process restart is explicit opt-in and delegated to recorded-PID lifecycle "
+            "process guards; the run does not submit orders or execute workflows."
         ),
     }
     return Result(
@@ -1967,6 +2045,9 @@ class _PingAnTradeProxy:
         stale_after_seconds: float = 300.0,
         max_restart_attempts: int = 1,
         backoff_seconds: float = 30.0,
+        process_restart_enabled: bool = False,
+        process_restart_exe_path: str | None = None,
+        force_process_restart: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
 
@@ -1979,6 +2060,9 @@ class _PingAnTradeProxy:
                 stale_after_seconds=stale_after_seconds,
                 max_restart_attempts=max_restart_attempts,
                 backoff_seconds=backoff_seconds,
+                process_restart_enabled=process_restart_enabled,
+                process_restart_exe_path=process_restart_exe_path,
+                force_process_restart=force_process_restart,
             )
 
         result, timing = capture_trade_timing("pingan.lifecycle_supervisor_tick", run)
@@ -2004,6 +2088,9 @@ class _PingAnTradeProxy:
         backoff_seconds: float = 30.0,
         max_ticks: int = 1,
         interval_seconds: float = 0.0,
+        process_restart_enabled: bool = False,
+        process_restart_exe_path: str | None = None,
+        force_process_restart: bool = False,
     ) -> Result:
         effective_profile = self._manager._build_effective_profile({})
 
@@ -2018,6 +2105,9 @@ class _PingAnTradeProxy:
                 backoff_seconds=backoff_seconds,
                 max_ticks=max_ticks,
                 interval_seconds=interval_seconds,
+                process_restart_enabled=process_restart_enabled,
+                process_restart_exe_path=process_restart_exe_path,
+                force_process_restart=force_process_restart,
             )
 
         result, timing = capture_trade_timing("pingan.lifecycle_supervisor_run", run)

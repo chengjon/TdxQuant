@@ -1,0 +1,7 @@
+- [x] 1.1 Add OpenSpec proposal, design, and delta specs for opt-in PingAn supervisor process restart control.
+- [x] 1.2 Add focused red tests for successful opt-in supervisor recorded-PID restart, backoff preventing process restart, CLI parsing, and FUNCTION_TREE registration.
+- [x] 1.3 Implement supervisor tick/run process restart opt-in and surface process restart result fields.
+- [x] 1.4 Add `trade lifecycle-supervisor-*` CLI flags for process restart opt-in.
+- [x] 1.5 Update `FUNCTION_TREE.md` D-07/D-08 evidence and boundary without promoting status.
+- [x] 1.6 Run focused pytest, `openspec validate --all --strict`, `git diff --check`, and `python scripts/validate_function_tree_registry.py`.
+- [x] 1.7 Archive the OpenSpec change, re-run verification, and commit only this slice.

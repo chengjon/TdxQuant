@@ -2532,6 +2532,10 @@ class ApiCliParserTests(unittest.TestCase):
                 "3",
                 "--backoff-seconds",
                 "12",
+                "--process-restart",
+                "--process-exe-path",
+                "C:/tdx/TdxW.exe",
+                "--force-process-restart",
             ]
         )
         self.assertEqual(args.command, "trade")
@@ -2541,6 +2545,9 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.stale_after_seconds, 45.0)
         self.assertEqual(args.max_restart_attempts, 3)
         self.assertEqual(args.backoff_seconds, 12.0)
+        self.assertTrue(args.process_restart)
+        self.assertEqual(args.process_exe_path, "C:/tdx/TdxW.exe")
+        self.assertTrue(args.force_process_restart)
 
     def test_trade_lifecycle_supervisor_run_command_parses(self) -> None:
         parser = build_parser()
@@ -2562,6 +2569,9 @@ class ApiCliParserTests(unittest.TestCase):
                 "2",
                 "--interval-seconds",
                 "0",
+                "--process-restart",
+                "--process-exe-path",
+                "C:/tdx/TdxW.exe",
             ]
         )
         self.assertEqual(args.command, "trade")
@@ -2573,6 +2583,8 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.backoff_seconds, 12.0)
         self.assertEqual(args.max_ticks, 2)
         self.assertEqual(args.interval_seconds, 0.0)
+        self.assertTrue(args.process_restart)
+        self.assertEqual(args.process_exe_path, "C:/tdx/TdxW.exe")
 
     def test_trade_lifecycle_process_command_parses(self) -> None:
         parser = build_parser()

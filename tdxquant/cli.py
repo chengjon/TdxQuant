@@ -466,6 +466,9 @@ def _add_trade_lifecycle_supervisor_arguments(subparser: argparse.ArgumentParser
     subparser.add_argument("--stale-after-seconds", type=float, default=300.0)
     subparser.add_argument("--max-restart-attempts", type=int, default=1)
     subparser.add_argument("--backoff-seconds", type=float, default=30.0)
+    subparser.add_argument("--process-restart", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--process-exe-path")
+    subparser.add_argument("--force-process-restart", action=argparse.BooleanOptionalAction, default=False)
 
 
 def _add_trade_lifecycle_process_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -2786,6 +2789,9 @@ def _run_trade_lifecycle_supervisor_tick(args: argparse.Namespace) -> Result:
         stale_after_seconds=args.stale_after_seconds,
         max_restart_attempts=args.max_restart_attempts,
         backoff_seconds=args.backoff_seconds,
+        process_restart_enabled=args.process_restart,
+        process_restart_exe_path=args.process_exe_path,
+        force_process_restart=args.force_process_restart,
     )
 
 
@@ -2803,6 +2809,9 @@ def _run_trade_lifecycle_supervisor_run(args: argparse.Namespace) -> Result:
         backoff_seconds=args.backoff_seconds,
         max_ticks=args.max_ticks,
         interval_seconds=args.interval_seconds,
+        process_restart_enabled=args.process_restart,
+        process_restart_exe_path=args.process_exe_path,
+        force_process_restart=args.force_process_restart,
     )
 
 
