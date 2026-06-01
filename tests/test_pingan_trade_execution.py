@@ -4,9 +4,11 @@ import unittest
 
 from tdxquant.models import ErrorCode, Result
 from tdxquant.trade.pingan_execution import (
+    PingAnConfirmCurrentDispatchContext,
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
+    build_pingan_confirm_current_dispatch_result,
     build_pingan_confirm_current_boundary_rejection_result,
     execute_pingan_confirm_current,
     execute_pingan_order,
@@ -332,3 +334,71 @@ class PingAnTradeExecutionTests(unittest.TestCase):
         self.assertEqual(check["name"], "broker_readiness_required")
         self.assertEqual(check["summary"], "broker window missing")
         self.assertEqual(check["recommended_action"], "Bring Ping An to the foreground.")
+
+    def _confirm_dispatch_context(self):
+        return PingAnConfirmCurrentDispatchContext(
+            close_result_dialog=True,
+            dialog_lookup_mode="uia",
+            confirm_timeout=3.0,
+            result_timeout=2.0,
+            result_close_pre_delay=0.1,
+        )
+
+    def test_build_pingan_confirm_current_dispatch_result_for_lookup_failure(self) -> None:
+        checks = [{"name": "confirm_lookup", "status": "failed", "summary": "confirm dialog missing"}]
+
+        result = build_pingan_confirm_current_dispatch_result(
+            context=self._confirm_dispatch_context(),
+            ok=False,
+            code=ErrorCode.CONTROL_NOT_FOUND,
+            message="stable trade confirm-current could not locate the current confirm dialog",
+            checks=checks,
+            overall_status="failed",
+            confirmation_advanced=False,
+            result_dialog_closed=False,
+            result_dialog_payload={},
+            warnings=["confirm dialog missing"],
+            next_action="Keep the current confirm dialog visible.",
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.CONTROL_NOT_FOUND)
+        self.assertEqual(result.message, "stable trade confirm-current could not locate the current confirm dialog")
+        self.assertEqual(result.warnings, ["confirm dialog missing"])
+        self.assertEqual(result.next_action, "Keep the current confirm dialog visible.")
+        self.assertEqual(result.data["input"]["boundary"], "confirm_current")
+        self.assertEqual(result.data["input"]["dialog_lookup_mode"], "uia")
+        confirm_current = result.data["confirm_current"]
+        self.assertEqual(confirm_current["overall_status"], "failed")
+        self.assertFalse(confirm_current["confirmation_advanced"])
+        self.assertFalse(confirm_current["result_dialog_closed"])
+        self.assertEqual(confirm_current["checks"], checks)
+        self.assertEqual(result.data["result_dialog"], {})
+
+    def test_build_pingan_confirm_current_dispatch_result_for_advanced_warning(self) -> None:
+        checks = [{"name": "result_dialog_lookup", "status": "warning", "summary": "result dialog missing"}]
+        result_dialog_payload = {"contract_no": "B202606010001", "lookup_mode": "uia"}
+
+        result = build_pingan_confirm_current_dispatch_result(
+            context=self._confirm_dispatch_context(),
+            ok=True,
+            code=ErrorCode.OK,
+            message="stable trade confirm-current completed with warnings",
+            checks=checks,
+            overall_status="warning",
+            confirmation_advanced=True,
+            result_dialog_closed=False,
+            result_dialog_payload=result_dialog_payload,
+            warnings=["result dialog missing"],
+            next_action="Verify the order outcome manually.",
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.code, ErrorCode.OK)
+        self.assertEqual(result.data["input"]["close_result_dialog"], True)
+        confirm_current = result.data["confirm_current"]
+        self.assertEqual(confirm_current["overall_status"], "warning")
+        self.assertTrue(confirm_current["confirmation_advanced"])
+        self.assertFalse(confirm_current["result_dialog_closed"])
+        self.assertEqual(confirm_current["requested"]["result_close_pre_delay"], 0.1)
+        self.assertEqual(result.data["result_dialog"], result_dialog_payload)

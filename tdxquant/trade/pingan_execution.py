@@ -52,6 +52,15 @@ class PingAnConfirmCurrentRejectionContext:
     require_broker_readiness: bool
 
 
+@dataclass(frozen=True)
+class PingAnConfirmCurrentDispatchContext:
+    close_result_dialog: bool
+    dialog_lookup_mode: str
+    confirm_timeout: float
+    result_timeout: float
+    result_close_pre_delay: float
+
+
 def _confirm_health_check(
     name: str,
     status: str,
@@ -161,6 +170,52 @@ def build_pingan_confirm_current_boundary_rejection_result(
             "result_dialog": {},
         },
         next_action=failed_next_action,
+    )
+
+
+def build_pingan_confirm_current_dispatch_result(
+    *,
+    context: PingAnConfirmCurrentDispatchContext,
+    ok: bool,
+    code: ErrorCode,
+    message: str,
+    checks: list[dict[str, Any]],
+    overall_status: str,
+    confirmation_advanced: bool,
+    result_dialog_closed: bool,
+    result_dialog_payload: dict[str, Any] | None = None,
+    warnings: list[str] | None = None,
+    next_action: str | None = None,
+) -> Result:
+    return Result(
+        ok=ok,
+        code=code,
+        message=message,
+        data={
+            "input": {
+                "boundary": "confirm_current",
+                "close_result_dialog": context.close_result_dialog,
+                "dialog_lookup_mode": context.dialog_lookup_mode,
+                "confirm_timeout": context.confirm_timeout,
+                "result_timeout": context.result_timeout,
+            },
+            "confirm_current": {
+                "overall_status": overall_status,
+                "confirmation_advanced": confirmation_advanced,
+                "result_dialog_closed": result_dialog_closed,
+                "requested": {
+                    "close_result_dialog": context.close_result_dialog,
+                    "dialog_lookup_mode": context.dialog_lookup_mode,
+                    "confirm_timeout": context.confirm_timeout,
+                    "result_timeout": context.result_timeout,
+                    "result_close_pre_delay": context.result_close_pre_delay,
+                },
+                "checks": checks,
+            },
+            "result_dialog": dict(result_dialog_payload or {}),
+        },
+        warnings=list(warnings or []),
+        next_action=next_action,
     )
 
 

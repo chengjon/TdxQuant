@@ -48,10 +48,12 @@ from .context import (
 )
 from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
 from .pingan_execution import (
+    PingAnConfirmCurrentDispatchContext,
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
     build_pingan_confirm_current_boundary_rejection_result,
+    build_pingan_confirm_current_dispatch_result,
     execute_pingan_confirm_current,
     execute_pingan_order,
 )
@@ -3669,6 +3671,13 @@ class _PingAnTradeProxy:
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
             require_broker_readiness=require_broker_readiness,
         )
+        dispatch_context = PingAnConfirmCurrentDispatchContext(
+            close_result_dialog=close_result_dialog,
+            dialog_lookup_mode=resolved_lookup_mode,
+            confirm_timeout=resolved_confirm_timeout,
+            result_timeout=resolved_result_timeout,
+            result_close_pre_delay=resolved_result_close_pre_delay,
+        )
 
         def run() -> Result:
             checks: list[dict[str, Any]] = []
@@ -3695,33 +3704,16 @@ class _PingAnTradeProxy:
             )
             if not confirm_ok:
                 overall_status, ok, warnings, next_action = _summarize_trade_health_checks(checks)
-                return Result(
+                return build_pingan_confirm_current_dispatch_result(
+                    context=dispatch_context,
                     ok=ok,
                     code=ErrorCode.CONTROL_NOT_FOUND,
                     message="stable trade confirm-current could not locate the current confirm dialog",
-                    data={
-                        "input": {
-                            "boundary": "confirm_current",
-                            "close_result_dialog": close_result_dialog,
-                            "dialog_lookup_mode": resolved_lookup_mode,
-                            "confirm_timeout": resolved_confirm_timeout,
-                            "result_timeout": resolved_result_timeout,
-                        },
-                        "confirm_current": {
-                            "overall_status": overall_status,
-                            "confirmation_advanced": False,
-                            "result_dialog_closed": False,
-                            "requested": {
-                                "close_result_dialog": close_result_dialog,
-                                "dialog_lookup_mode": resolved_lookup_mode,
-                                "confirm_timeout": resolved_confirm_timeout,
-                                "result_timeout": resolved_result_timeout,
-                                "result_close_pre_delay": resolved_result_close_pre_delay,
-                            },
-                            "checks": checks,
-                        },
-                        "result_dialog": {},
-                    },
+                    checks=checks,
+                    overall_status=overall_status,
+                    confirmation_advanced=False,
+                    result_dialog_closed=False,
+                    result_dialog_payload={},
                     warnings=warnings,
                     next_action=next_action,
                 )
@@ -3739,33 +3731,16 @@ class _PingAnTradeProxy:
             )
             if not confirm_click.ok:
                 overall_status, ok, warnings, next_action = _summarize_trade_health_checks(checks)
-                return Result(
+                return build_pingan_confirm_current_dispatch_result(
+                    context=dispatch_context,
                     ok=ok,
                     code=confirm_click.code,
                     message="stable trade confirm-current failed while advancing the current confirm dialog",
-                    data={
-                        "input": {
-                            "boundary": "confirm_current",
-                            "close_result_dialog": close_result_dialog,
-                            "dialog_lookup_mode": resolved_lookup_mode,
-                            "confirm_timeout": resolved_confirm_timeout,
-                            "result_timeout": resolved_result_timeout,
-                        },
-                        "confirm_current": {
-                            "overall_status": overall_status,
-                            "confirmation_advanced": False,
-                            "result_dialog_closed": False,
-                            "requested": {
-                                "close_result_dialog": close_result_dialog,
-                                "dialog_lookup_mode": resolved_lookup_mode,
-                                "confirm_timeout": resolved_confirm_timeout,
-                                "result_timeout": resolved_result_timeout,
-                                "result_close_pre_delay": resolved_result_close_pre_delay,
-                            },
-                            "checks": checks,
-                        },
-                        "result_dialog": {},
-                    },
+                    checks=checks,
+                    overall_status=overall_status,
+                    confirmation_advanced=False,
+                    result_dialog_closed=False,
+                    result_dialog_payload={},
                     warnings=warnings,
                     next_action=next_action,
                 )
@@ -3869,33 +3844,16 @@ class _PingAnTradeProxy:
                 message = "stable trade confirm-current advanced the current confirmation"
             else:
                 message = "stable trade confirm-current completed with warnings"
-            return Result(
+            return build_pingan_confirm_current_dispatch_result(
+                context=dispatch_context,
                 ok=ok,
                 code=ErrorCode.OK if ok else ErrorCode.EXECUTION_FAILED,
                 message=message,
-                data={
-                    "input": {
-                        "boundary": "confirm_current",
-                        "close_result_dialog": close_result_dialog,
-                        "dialog_lookup_mode": resolved_lookup_mode,
-                        "confirm_timeout": resolved_confirm_timeout,
-                        "result_timeout": resolved_result_timeout,
-                    },
-                    "confirm_current": {
-                        "overall_status": overall_status,
-                        "confirmation_advanced": True,
-                        "result_dialog_closed": result_dialog_closed,
-                        "requested": {
-                            "close_result_dialog": close_result_dialog,
-                            "dialog_lookup_mode": resolved_lookup_mode,
-                            "confirm_timeout": resolved_confirm_timeout,
-                            "result_timeout": resolved_result_timeout,
-                            "result_close_pre_delay": resolved_result_close_pre_delay,
-                        },
-                        "checks": checks,
-                    },
-                    "result_dialog": result_dialog_payload,
-                },
+                checks=checks,
+                overall_status=overall_status,
+                confirmation_advanced=True,
+                result_dialog_closed=result_dialog_closed,
+                result_dialog_payload=result_dialog_payload,
                 warnings=warnings,
                 next_action=next_action,
             )
