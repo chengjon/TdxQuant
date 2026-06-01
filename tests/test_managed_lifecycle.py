@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from tdxquant.managed_lifecycle import (
+    acquire_lifecycle_file_lock,
     build_managed_lifecycle_provenance,
     build_process_liveness,
     build_process_ownership_diagnostics,
     build_restart_backoff_projection,
     coerce_process_pid,
+    release_lifecycle_file_lock,
 )
 
 
@@ -110,4 +112,57 @@ def test_restart_backoff_projection_is_pure_metadata() -> None:
         "retry_after_at": "2026-06-01T01:02:33+00:00",
         "backoff_seconds": 30.0,
         "boundary": "unit_test_backoff_projection_only",
+    }
+
+
+def test_lifecycle_file_lock_reports_acquire_block_and_release_with_provenance(tmp_path) -> None:
+    lock_path = tmp_path / "control.lock"
+
+    first = acquire_lifecycle_file_lock(lock_path, adapter="unit_test_adapter")
+    second = acquire_lifecycle_file_lock(lock_path, adapter="unit_test_adapter")
+
+    try:
+        assert first.lock_acquired is True
+        assert first.reason_code == "LOCK_ACQUIRED"
+        assert first.to_diagnostics() == {
+            "schema_version": "tdx.managed_process_lifecycle.file_lock.v1",
+            "path": str(lock_path),
+            "strategy": "advisory_flock",
+            "lock_attempted": True,
+            "lock_acquired": True,
+            "reason_code": "LOCK_ACQUIRED",
+            "managed_lifecycle": build_managed_lifecycle_provenance(
+                adapter="unit_test_adapter",
+                primitives=["file_lock"],
+            ),
+        }
+        assert second.lock_acquired is False
+        assert second.reason_code == "LOCK_HELD"
+        assert second.to_diagnostics()["lock_acquired"] is False
+        assert second.to_diagnostics()["managed_lifecycle"]["primitives"] == ["file_lock"]
+    finally:
+        second_release = release_lifecycle_file_lock(second)
+        first_release = release_lifecycle_file_lock(first)
+
+    assert second_release == {
+        "schema_version": "tdx.managed_process_lifecycle.file_lock_release.v1",
+        "path": str(lock_path),
+        "strategy": "advisory_flock",
+        "lock_released": False,
+        "reason_code": "LOCK_NOT_ACQUIRED",
+        "managed_lifecycle": build_managed_lifecycle_provenance(
+            adapter="unit_test_adapter",
+            primitives=["file_lock"],
+        ),
+    }
+    assert first_release == {
+        "schema_version": "tdx.managed_process_lifecycle.file_lock_release.v1",
+        "path": str(lock_path),
+        "strategy": "advisory_flock",
+        "lock_released": True,
+        "reason_code": "LOCK_RELEASED",
+        "managed_lifecycle": build_managed_lifecycle_provenance(
+            adapter="unit_test_adapter",
+            primitives=["file_lock"],
+        ),
     }

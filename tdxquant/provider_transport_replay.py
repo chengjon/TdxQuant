@@ -19,7 +19,12 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from .models import ErrorCode
-from .managed_lifecycle import build_process_ownership_diagnostics, process_pid_alive
+from .managed_lifecycle import (
+    acquire_lifecycle_file_lock,
+    build_process_ownership_diagnostics,
+    process_pid_alive,
+    release_lifecycle_file_lock,
+)
 from .replay_fixtures import list_provider_replay_fixtures
 from .replay_provider import (
     execute_sync_replay,
@@ -405,6 +410,7 @@ def write_provider_replay_lifecycle_statefile(
         "lock_attempted": False,
         "lock_acquired": False,
         "lock_released": False,
+        "lock_diagnostics": None,
         "statefile_path": config.lifecycle_state_file,
         "lock_path": None,
         "schema_version": None,
@@ -439,9 +445,13 @@ def write_provider_replay_lifecycle_statefile(
         )
         return base
 
-    try:
-        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
+    lock = acquire_lifecycle_file_lock(
+        lock_path,
+        adapter="provider_transport_replay",
+        strategy="exclusive_lockfile",
+    )
+    base["lock_diagnostics"] = lock.to_diagnostics()
+    if not lock.lock_acquired and lock.reason_code == "LOCK_HELD":
         base.update(
             {
                 "write_status": "locked",
@@ -450,11 +460,11 @@ def write_provider_replay_lifecycle_statefile(
             }
         )
         return base
-    except OSError as exc:
+    if not lock.lock_acquired:
         base.update(
             {
                 "write_status": "error",
-                "errors": [f"statefile_lock_unavailable:{exc.__class__.__name__}"],
+                "errors": [f"statefile_lock_unavailable:{lock.reason_code}"],
                 "error_count": 1,
             }
         )
@@ -480,10 +490,11 @@ def write_provider_replay_lifecycle_statefile(
             "statefile_path": str(state_path),
             "config_hash": payload["config_hash"],
         }
-        with os.fdopen(lock_fd, "w", encoding="utf-8") as fh:
-            json.dump(lock_payload, fh, ensure_ascii=False, sort_keys=True)
-            fh.write("\n")
-        lock_fd = -1
+        if lock.handle is None:
+            raise OSError("statefile lock handle unavailable")
+        json.dump(lock_payload, lock.handle, ensure_ascii=False, sort_keys=True)
+        lock.handle.write("\n")
+        lock.handle.flush()
         temp_path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -514,23 +525,13 @@ def write_provider_replay_lifecycle_statefile(
         )
         return base
     finally:
-        if lock_fd >= 0:
-            try:
-                os.close(lock_fd)
-            except OSError:
-                pass
         try:
             if temp_path.exists():
                 temp_path.unlink()
         except OSError:
             pass
-        try:
-            lock_path.unlink()
-            base["lock_released"] = True
-        except FileNotFoundError:
-            base["lock_released"] = bool(base["lock_acquired"])
-        except OSError:
-            base["lock_released"] = False
+        release_result = release_lifecycle_file_lock(lock)
+        base["lock_released"] = bool(release_result["lock_released"])
 
 
 def build_provider_replay_managed_daemon_command(

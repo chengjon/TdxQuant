@@ -605,6 +605,24 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(write_result["lock_attempted"], True)
         self.assertEqual(write_result["lock_acquired"], True)
         self.assertEqual(write_result["lock_released"], True)
+        self.assertEqual(
+            write_result["lock_diagnostics"],
+            {
+                "schema_version": "tdx.managed_process_lifecycle.file_lock.v1",
+                "path": str(Path(f"{state_path}.lock")),
+                "strategy": "exclusive_lockfile",
+                "lock_attempted": True,
+                "lock_acquired": True,
+                "reason_code": "LOCK_ACQUIRED",
+                "managed_lifecycle": {
+                    "schema_version": "tdx.managed_process_lifecycle.provenance.v1",
+                    "module": "tdxquant.managed_lifecycle",
+                    "adapter": "provider_transport_replay",
+                    "primitives": ["file_lock"],
+                    "boundary": "diagnostic_provenance_only; no_lifecycle_control",
+                },
+            },
+        )
         self.assertEqual(write_result["statefile_path"], str(state_path))
         self.assertEqual(write_result["schema_version"], "tdx.provider_replay.lifecycle_state.v1")
         self.assertEqual(write_result["provider_id"], "provider-replay-a")
@@ -677,6 +695,8 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
         self.assertEqual(result["lock_attempted"], True)
         self.assertEqual(result["lock_acquired"], False)
         self.assertEqual(result["lock_released"], False)
+        self.assertEqual(result["lock_diagnostics"]["reason_code"], "LOCK_HELD")
+        self.assertEqual(result["lock_diagnostics"]["managed_lifecycle"]["primitives"], ["file_lock"])
         self.assertEqual(result["errors"], ["statefile_lock_held"])
         self.assertEqual(result["error_count"], 1)
         self.assertEqual(final_payload, original_payload)

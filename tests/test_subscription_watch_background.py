@@ -12,6 +12,7 @@ from unittest.mock import Mock
 import pytest
 
 import tdxquant.subscription_watch_background as subscription_watch_background_module
+from tdxquant.managed_lifecycle import acquire_lifecycle_file_lock, release_lifecycle_file_lock
 from tdxquant.subscription_watch_background import (
     SubscriptionWatchBackgroundController,
     SubscriptionWatchBackgroundPaths,
@@ -60,6 +61,21 @@ def test_statefile_ownership_reports_managed_lifecycle_provenance(tmp_path: Path
         "primitives": ["pid_coercion", "process_liveness", "statefile_ownership"],
         "boundary": "diagnostic_provenance_only; no_lifecycle_control",
     }
+
+
+def test_start_respects_shared_lifecycle_control_lock(tmp_path: Path) -> None:
+    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    held_lock = acquire_lifecycle_file_lock(
+        controller.paths.lock_path,
+        adapter="subscription_watch_background",
+    )
+    try:
+        result = controller.start(stock_list=["000001.SZ"], max_events=1)
+    finally:
+        release_lifecycle_file_lock(held_lock)
+
+    assert held_lock.lock_acquired is True
+    assert result == {"ok": False, "error": {"code": "CONTROL_LOCKED"}}
 
 
 def test_reconcile_marks_missing_pid_as_failed(tmp_path: Path) -> None:

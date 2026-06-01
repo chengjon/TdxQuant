@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-import errno
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -16,9 +14,11 @@ from typing import Any
 from uuid import uuid4
 
 from .managed_lifecycle import (
+    acquire_lifecycle_file_lock,
     build_managed_lifecycle_provenance,
     coerce_process_pid,
     process_pid_alive,
+    release_lifecycle_file_lock,
 )
 from .subscription_watch_run import build_subscription_watch_run_paths
 
@@ -1105,16 +1105,11 @@ def _build_start_request_payload(
 
 
 def _acquire_path_lock(lock_path: Path) -> Any | None:
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    handle = lock_path.open("a+", encoding="utf-8")
-    try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError as exc:
-        handle.close()
-        if exc.errno in {errno.EACCES, errno.EAGAIN}:
-            return None
-        raise
-    return handle
+    lock = acquire_lifecycle_file_lock(
+        lock_path,
+        adapter="subscription_watch_background",
+    )
+    return lock if lock.lock_acquired else None
 
 
 def _acquire_control_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | None:
@@ -1126,10 +1121,7 @@ def _acquire_supervisor_lock(paths: SubscriptionWatchBackgroundPaths) -> Any | N
 
 
 def _release_control_lock(handle: Any) -> None:
-    try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-    finally:
-        handle.close()
+    release_lifecycle_file_lock(handle)
 
 
 def read_active_payload(paths: SubscriptionWatchBackgroundPaths) -> dict[str, Any] | None:

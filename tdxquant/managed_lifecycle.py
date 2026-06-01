@@ -1,19 +1,59 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+import errno
+import fcntl
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 MANAGED_LIFECYCLE_MODULE = "tdxquant.managed_lifecycle"
 MANAGED_LIFECYCLE_PROVENANCE_SCHEMA_VERSION = "tdx.managed_process_lifecycle.provenance.v1"
 PROCESS_LIVENESS_SCHEMA_VERSION = "tdx.managed_process_lifecycle.process_liveness.v1"
 PROCESS_OWNERSHIP_SCHEMA_VERSION = "tdx.managed_process_lifecycle.process_ownership.v1"
+FILE_LOCK_SCHEMA_VERSION = "tdx.managed_process_lifecycle.file_lock.v1"
+FILE_LOCK_RELEASE_SCHEMA_VERSION = "tdx.managed_process_lifecycle.file_lock_release.v1"
 RESTART_BACKOFF_PROJECTION_SCHEMA_VERSION = (
     "tdx.managed_process_lifecycle.restart_backoff_projection.v1"
 )
 PROCESS_LIVENESS_BOUNDARY = "read_only_process_liveness_probe; no_process_control"
 PROCESS_OWNERSHIP_BOUNDARY = "read_only_process_ownership_diagnostics; no_process_control"
 MANAGED_LIFECYCLE_PROVENANCE_BOUNDARY = "diagnostic_provenance_only; no_lifecycle_control"
+
+
+@dataclass
+class ManagedLifecycleFileLock:
+    path: Path
+    strategy: str
+    adapter: str
+    handle: Any | None = None
+    lock_acquired: bool = False
+    reason_code: str = "LOCK_NOT_ATTEMPTED"
+
+    def to_diagnostics(self) -> dict[str, Any]:
+        return {
+            "schema_version": FILE_LOCK_SCHEMA_VERSION,
+            "path": str(self.path),
+            "strategy": self.strategy,
+            "lock_attempted": True,
+            "lock_acquired": self.lock_acquired,
+            "reason_code": self.reason_code,
+            "managed_lifecycle": build_managed_lifecycle_provenance(
+                adapter=self.adapter,
+                primitives=["file_lock"],
+            ),
+        }
+
+    def fileno(self) -> int:
+        if self.handle is None:
+            raise ValueError("lock is not acquired")
+        return self.handle.fileno()
+
+    def close(self) -> None:
+        if self.handle is not None:
+            self.handle.close()
+            self.handle = None
 
 
 def coerce_process_pid(raw_pid: Any) -> int:
@@ -74,6 +114,131 @@ def build_managed_lifecycle_provenance(
         "adapter": adapter,
         "primitives": list(primitives),
         "boundary": MANAGED_LIFECYCLE_PROVENANCE_BOUNDARY,
+    }
+
+
+def acquire_lifecycle_file_lock(
+    lock_path: str | Path,
+    *,
+    adapter: str = "managed_process_lifecycle",
+    strategy: str = "advisory_flock",
+) -> ManagedLifecycleFileLock:
+    path = Path(lock_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if strategy == "exclusive_lockfile":
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return ManagedLifecycleFileLock(
+                path=path,
+                strategy=strategy,
+                adapter=adapter,
+                lock_acquired=False,
+                reason_code="LOCK_HELD",
+            )
+        except OSError as exc:
+            return ManagedLifecycleFileLock(
+                path=path,
+                strategy=strategy,
+                adapter=adapter,
+                lock_acquired=False,
+                reason_code=f"LOCK_UNAVAILABLE:{exc.__class__.__name__}",
+            )
+        try:
+            handle = os.fdopen(fd, "w", encoding="utf-8")
+        except OSError as exc:
+            os.close(fd)
+            return ManagedLifecycleFileLock(
+                path=path,
+                strategy=strategy,
+                adapter=adapter,
+                lock_acquired=False,
+                reason_code=f"LOCK_UNAVAILABLE:{exc.__class__.__name__}",
+            )
+        return ManagedLifecycleFileLock(
+            path=path,
+            strategy=strategy,
+            adapter=adapter,
+            handle=handle,
+            lock_acquired=True,
+            reason_code="LOCK_ACQUIRED",
+        )
+
+    if strategy != "advisory_flock":
+        raise ValueError(f"unsupported lifecycle file lock strategy: {strategy}")
+
+    handle = path.open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        handle.close()
+        if exc.errno in {errno.EACCES, errno.EAGAIN}:
+            return ManagedLifecycleFileLock(
+                path=path,
+                strategy=strategy,
+                adapter=adapter,
+                lock_acquired=False,
+                reason_code="LOCK_HELD",
+            )
+        return ManagedLifecycleFileLock(
+            path=path,
+            strategy=strategy,
+            adapter=adapter,
+            lock_acquired=False,
+            reason_code=f"LOCK_UNAVAILABLE:{exc.__class__.__name__}",
+        )
+    return ManagedLifecycleFileLock(
+        path=path,
+        strategy=strategy,
+        adapter=adapter,
+        handle=handle,
+        lock_acquired=True,
+        reason_code="LOCK_ACQUIRED",
+    )
+
+
+def release_lifecycle_file_lock(lock: ManagedLifecycleFileLock) -> dict[str, Any]:
+    released = False
+    reason_code = "LOCK_NOT_ACQUIRED"
+    if lock.lock_acquired:
+        try:
+            if lock.strategy == "advisory_flock":
+                if lock.handle is not None:
+                    fcntl.flock(lock.handle.fileno(), fcntl.LOCK_UN)
+                    released = True
+            elif lock.strategy == "exclusive_lockfile":
+                released = True
+            else:
+                reason_code = "LOCK_RELEASE_UNSUPPORTED"
+        except OSError as exc:
+            reason_code = f"LOCK_RELEASE_FAILED:{exc.__class__.__name__}"
+            released = False
+        finally:
+            try:
+                lock.close()
+            except OSError as exc:
+                reason_code = f"LOCK_RELEASE_FAILED:{exc.__class__.__name__}"
+                released = False
+            if lock.strategy == "exclusive_lockfile":
+                try:
+                    lock.path.unlink()
+                except FileNotFoundError:
+                    released = released or lock.lock_acquired
+                except OSError as exc:
+                    reason_code = f"LOCK_RELEASE_FAILED:{exc.__class__.__name__}"
+                    released = False
+        if released and reason_code != "LOCK_RELEASE_UNSUPPORTED":
+            reason_code = "LOCK_RELEASED"
+    return {
+        "schema_version": FILE_LOCK_RELEASE_SCHEMA_VERSION,
+        "path": str(lock.path),
+        "strategy": lock.strategy,
+        "lock_released": released,
+        "reason_code": reason_code,
+        "managed_lifecycle": build_managed_lifecycle_provenance(
+            adapter=lock.adapter,
+            primitives=["file_lock"],
+        ),
     }
 
 
