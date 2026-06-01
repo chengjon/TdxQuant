@@ -8,6 +8,7 @@ from tdxquant.trade.pingan_execution import (
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
+    PingAnOrderExecutionHandlers,
     build_pingan_confirm_current_dispatch_result,
     build_pingan_confirm_current_boundary_rejection_result,
     execute_pingan_confirm_current,
@@ -204,6 +205,51 @@ class PingAnTradeExecutionTests(unittest.TestCase):
         self.assertEqual(finalized["idempotency"], idempotency)
         self.assertEqual(finalized["request_context"], {"code": "000001", "price": "10.00", "quantity": 100})
         self.assertEqual(finalized["timing"], {})
+
+    def test_execute_pingan_order_accepts_handler_bundle(self) -> None:
+        request = self._request()
+        handlers = PingAnOrderExecutionHandlers(
+            build_duplicate_submission_result=lambda _prior_row: Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="duplicate",
+            ),
+            build_submission_key_conflict_result=lambda _idempotency: Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="conflict",
+            ),
+            build_trade_risk_rejection_result=lambda _risk_gate: Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="risk",
+            ),
+            finalize_result=lambda result, **kwargs: Result(
+                ok=result.ok,
+                code=result.code,
+                message=result.message,
+                data={"finalized": kwargs},
+            ),
+        )
+
+        result = execute_pingan_order(
+            request,
+            idempotency={"decision": "execute"},
+            risk_gate={"passed": True, "checks": ["max_price"]},
+            dispatch=lambda: Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="ok",
+                data={"result_dialog": {"contract_no": "B001"}},
+            ),
+            handlers=handlers,
+            capture_timing=lambda _label, runner: (runner(), {"manager_call": {"elapsed_ms": 1.0}}),
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["finalized"]["method"], "buy_submit_once")
+        self.assertEqual(result.data["finalized"]["submission_key"], "submit-once-001")
+        self.assertEqual(result.data["finalized"]["request_context"], {"code": "000001", "price": "10.00", "quantity": 100})
 
     def _confirm_request(self):
         return PingAnConfirmCurrentExecutionRequest(

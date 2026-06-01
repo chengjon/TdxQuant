@@ -148,6 +148,8 @@ TdxQuant
 
 > D-08 增量登记（状态仍为 `[已实现]`）：`execute_pingan_order` 现有 direct seam test 覆盖 `idempotency.decision=reject_conflict` 分支，验证 conflict result builder、无 desktop dispatch、conflict risk gate、normalized request context 与空 timing；证据为 `tests/test_pingan_trade_execution.py` 的 `test_execute_pingan_order_rejects_conflict_without_desktop_dispatch` 与 OpenSpec `pingan-order-seam-conflict-direct-coverage`。边界：这是 D-08 order seam 内部 branch coverage，不是生产行为变更，不新增公开 API、CLI/task/catalog entry、workflow builder 或桌面 primitive；仍不证明 live broker readiness 或 production trading readiness。
 
+> D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderExecutionHandlers` 现将 `execute_pingan_order` 的 duplicate/conflict/risk rejection/finalize callback bundle 收敛为内部 handler 对象，buy/sell/submit-once manager callsite 通过 `handlers=` 传递统一 handler；证据为 `tests/test_pingan_trade_execution.py` 的 `test_execute_pingan_order_accepts_handler_bundle`、既有 buy/sell/submit-once manager route tests 与 OpenSpec `pingan-order-seam-handler-bundle`。边界：这是 D-08 order seam 内部 call-shape/locality refactor，不是生产行为变更，不移除 legacy callback 参数，不新增公开 API、CLI/task/catalog entry、workflow builder 或桌面 primitive；仍不证明 live broker readiness 或 production trading readiness。
+
 ### E. 已设计/待实现能力
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |

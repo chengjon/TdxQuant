@@ -28,6 +28,14 @@ class PingAnExecutionRequest:
 
 
 @dataclass(frozen=True)
+class PingAnOrderExecutionHandlers:
+    build_duplicate_submission_result: Callable[[Any], Result]
+    build_submission_key_conflict_result: Callable[[dict[str, Any]], Result]
+    build_trade_risk_rejection_result: Callable[[dict[str, Any]], Result]
+    finalize_result: Callable[..., Result]
+
+
+@dataclass(frozen=True)
 class PingAnConfirmCurrentExecutionRequest:
     method: str
     timing_label: str
@@ -248,28 +256,43 @@ def execute_pingan_order(
     idempotency: dict[str, Any],
     risk_gate: dict[str, Any],
     dispatch: Callable[[], Result],
-    build_duplicate_submission_result: Callable[[Any], Result],
-    build_submission_key_conflict_result: Callable[[dict[str, Any]], Result],
-    build_trade_risk_rejection_result: Callable[[dict[str, Any]], Result],
-    finalize_result: Callable[..., Result],
+    handlers: PingAnOrderExecutionHandlers | None = None,
+    build_duplicate_submission_result: Callable[[Any], Result] | None = None,
+    build_submission_key_conflict_result: Callable[[dict[str, Any]], Result] | None = None,
+    build_trade_risk_rejection_result: Callable[[dict[str, Any]], Result] | None = None,
+    finalize_result: Callable[..., Result] | None = None,
     capture_timing: Callable[[str, Callable[[], Result]], tuple[Result, dict[str, Any]]] = capture_trade_timing,
 ) -> Result:
+    if handlers is None:
+        if (
+            build_duplicate_submission_result is None
+            or build_submission_key_conflict_result is None
+            or build_trade_risk_rejection_result is None
+            or finalize_result is None
+        ):
+            raise TypeError("execute_pingan_order requires handlers or all legacy result callbacks")
+        handlers = PingAnOrderExecutionHandlers(
+            build_duplicate_submission_result=build_duplicate_submission_result,
+            build_submission_key_conflict_result=build_submission_key_conflict_result,
+            build_trade_risk_rejection_result=build_trade_risk_rejection_result,
+            finalize_result=finalize_result,
+        )
     decision = str(idempotency.get("decision") or "execute")
     timing: dict[str, Any] = {}
     final_risk_gate = risk_gate
 
     if decision == "skip_duplicate":
-        result = build_duplicate_submission_result(idempotency.get("prior_row"))
+        result = handlers.build_duplicate_submission_result(idempotency.get("prior_row"))
         final_risk_gate = _duplicate_risk_gate(request)
     elif decision == "reject_conflict":
-        result = build_submission_key_conflict_result(idempotency)
+        result = handlers.build_submission_key_conflict_result(idempotency)
         final_risk_gate = _conflict_risk_gate(request, idempotency)
     elif not bool(risk_gate.get("passed")):
-        result = build_trade_risk_rejection_result(risk_gate)
+        result = handlers.build_trade_risk_rejection_result(risk_gate)
     else:
         result, timing = capture_timing(request.timing_label, dispatch)
 
-    return finalize_result(
+    return handlers.finalize_result(
         result,
         broker=request.broker,
         method=request.method,

@@ -52,6 +52,7 @@ from .pingan_execution import (
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
+    PingAnOrderExecutionHandlers,
     build_pingan_confirm_current_boundary_rejection_result,
     build_pingan_confirm_current_dispatch_result,
     execute_pingan_confirm_current,
@@ -2245,22 +2246,11 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            build_duplicate_submission_result=lambda prior_row: self._manager._build_duplicate_submission_result(
-                prior_row=prior_row
-            ),
-            build_submission_key_conflict_result=lambda conflict_idempotency: self._manager._build_submission_key_conflict_result(
+            handlers=self._manager._build_pingan_order_execution_handlers(
                 code=code,
                 price=price,
                 quantity=quantity,
-                idempotency=conflict_idempotency,
             ),
-            build_trade_risk_rejection_result=lambda failed_risk_gate: self._manager._build_trade_risk_rejection_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                risk_gate=failed_risk_gate,
-            ),
-            finalize_result=self._manager._finalize_result,
         )
 
     def buy_submit_once(
@@ -2338,22 +2328,11 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            build_duplicate_submission_result=lambda prior_row: self._manager._build_duplicate_submission_result(
-                prior_row=prior_row
-            ),
-            build_submission_key_conflict_result=lambda conflict_idempotency: self._manager._build_submission_key_conflict_result(
+            handlers=self._manager._build_pingan_order_execution_handlers(
                 code=code,
                 price=price,
                 quantity=quantity,
-                idempotency=conflict_idempotency,
             ),
-            build_trade_risk_rejection_result=lambda failed_risk_gate: self._manager._build_trade_risk_rejection_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                risk_gate=failed_risk_gate,
-            ),
-            finalize_result=self._manager._finalize_result,
         )
 
     def sell(
@@ -2433,22 +2412,11 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            build_duplicate_submission_result=lambda prior_row: self._manager._build_duplicate_submission_result(
-                prior_row=prior_row
-            ),
-            build_submission_key_conflict_result=lambda conflict_idempotency: self._manager._build_submission_key_conflict_result(
+            handlers=self._manager._build_pingan_order_execution_handlers(
                 code=code,
                 price=price,
                 quantity=quantity,
-                idempotency=conflict_idempotency,
             ),
-            build_trade_risk_rejection_result=lambda failed_risk_gate: self._manager._build_trade_risk_rejection_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                risk_gate=failed_risk_gate,
-            ),
-            finalize_result=self._manager._finalize_result,
         )
 
     def sell_submit_once(
@@ -2528,22 +2496,11 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            build_duplicate_submission_result=lambda prior_row: self._manager._build_duplicate_submission_result(
-                prior_row=prior_row
-            ),
-            build_submission_key_conflict_result=lambda conflict_idempotency: self._manager._build_submission_key_conflict_result(
+            handlers=self._manager._build_pingan_order_execution_handlers(
                 code=code,
                 price=price,
                 quantity=quantity,
-                idempotency=conflict_idempotency,
             ),
-            build_trade_risk_rejection_result=lambda failed_risk_gate: self._manager._build_trade_risk_rejection_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                risk_gate=failed_risk_gate,
-            ),
-            finalize_result=self._manager._finalize_result,
         )
 
     def health(
@@ -4076,6 +4033,32 @@ class TdxTradeManager:
         result = build_result_from_submission_ledger_row(prior_row or {})
         result.warnings.append("duplicate submission_key skipped; returning prior outcome")
         return result
+
+    def _build_pingan_order_execution_handlers(
+        self,
+        *,
+        code: str,
+        price: str,
+        quantity: int,
+    ) -> PingAnOrderExecutionHandlers:
+        return PingAnOrderExecutionHandlers(
+            build_duplicate_submission_result=lambda prior_row: self._build_duplicate_submission_result(
+                prior_row=prior_row
+            ),
+            build_submission_key_conflict_result=lambda idempotency: self._build_submission_key_conflict_result(
+                code=code,
+                price=price,
+                quantity=quantity,
+                idempotency=idempotency,
+            ),
+            build_trade_risk_rejection_result=lambda risk_gate: self._build_trade_risk_rejection_result(
+                code=code,
+                price=price,
+                quantity=quantity,
+                risk_gate=risk_gate,
+            ),
+            finalize_result=self._finalize_result,
+        )
 
     def _evaluate_idempotency(
         self,
