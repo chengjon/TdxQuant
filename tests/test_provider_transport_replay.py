@@ -849,6 +849,16 @@ class ProviderTransportReplayStatusTests(unittest.TestCase):
             diagnostics["boundary"],
             "read_only_process_ownership_diagnostics; no_process_control",
         )
+        self.assertEqual(
+            diagnostics["managed_lifecycle"],
+            {
+                "schema_version": "tdx.managed_process_lifecycle.provenance.v1",
+                "module": "tdxquant.managed_lifecycle",
+                "adapter": "provider_transport_replay",
+                "primitives": ["process_liveness", "process_ownership"],
+                "boundary": "diagnostic_provenance_only; no_lifecycle_control",
+            },
+        )
 
     def test_process_ownership_diagnostics_rejects_non_running_pid(self) -> None:
         with TemporaryDirectory() as temp_dir:

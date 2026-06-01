@@ -415,3 +415,15 @@ The worker-local background status read model SHALL include the supervisor daemo
 - **THEN** background watch status MUST report the missing or invalid daemon status as data
 - **AND** it MUST NOT create, repair, delete, lock, start, stop, or rewrite supervisor daemon files.
 
+### Requirement: Subscription watch background ownership SHALL use shared managed lifecycle provenance
+
+Subscription watch background statefile ownership diagnostics SHALL expose provenance showing that PID parsing, liveness, and ownership projection are backed by the shared managed-process lifecycle module.
+
+#### Scenario: Background statefile ownership includes managed lifecycle provenance
+
+- **WHEN** a caller builds subscription watch background statefile ownership
+- **THEN** the returned ownership payload MUST include `managed_lifecycle`
+- **AND** `managed_lifecycle.adapter` MUST be `subscription_watch_background`
+- **AND** `managed_lifecycle.primitives` MUST include `pid_coercion`, `process_liveness`, and `statefile_ownership`
+- **AND** the ownership payload MUST remain read-only and MUST NOT start, stop, restart, supervise, or signal a watch process.
+

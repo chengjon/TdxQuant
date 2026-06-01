@@ -16,6 +16,7 @@ from tdxquant.subscription_watch_background import (
     SubscriptionWatchBackgroundController,
     SubscriptionWatchBackgroundPaths,
     build_background_paths,
+    build_background_statefile_ownership,
     build_subscription_watch_status_summary,
     reconcile_background_state,
     read_active_payload,
@@ -34,6 +35,31 @@ def test_build_background_paths_uses_fixed_bridge_directory(tmp_path: Path) -> N
     assert paths.supervisor_state_path == tmp_path / "supervisor.json"
     assert paths.supervisor_pid_path == tmp_path / "supervisor.pid"
     assert paths.supervisor_lock_path == tmp_path / "supervisor.lock"
+
+
+def test_statefile_ownership_reports_managed_lifecycle_provenance(tmp_path: Path) -> None:
+    paths = build_background_paths(tmp_path)
+    paths.root_dir.mkdir(parents=True, exist_ok=True)
+    paths.active_path.write_text(
+        json.dumps({"state": "running", "run_id": "run-001", "pid": 4321, "active": True}),
+        encoding="utf-8",
+    )
+    paths.pid_path.write_text("4321\n", encoding="utf-8")
+
+    ownership = build_background_statefile_ownership(
+        paths,
+        control={"state": "running", "active": True, "pid": 4321},
+        pid_is_alive=lambda pid: pid == 4321,
+    )
+
+    assert ownership["status"] == "owned_active"
+    assert ownership["managed_lifecycle"] == {
+        "schema_version": "tdx.managed_process_lifecycle.provenance.v1",
+        "module": "tdxquant.managed_lifecycle",
+        "adapter": "subscription_watch_background",
+        "primitives": ["pid_coercion", "process_liveness", "statefile_ownership"],
+        "boundary": "diagnostic_provenance_only; no_lifecycle_control",
+    }
 
 
 def test_reconcile_marks_missing_pid_as_failed(tmp_path: Path) -> None:
@@ -1991,6 +2017,13 @@ def test_status_view_returns_explicit_empty_watch_status_when_no_run_is_active(t
         "owned_pid": None,
         "pid_matches_owned_state": False,
         "process_alive": False,
+        "managed_lifecycle": {
+            "schema_version": "tdx.managed_process_lifecycle.provenance.v1",
+            "module": "tdxquant.managed_lifecycle",
+            "adapter": "subscription_watch_background",
+            "primitives": ["pid_coercion", "process_liveness", "statefile_ownership"],
+            "boundary": "diagnostic_provenance_only; no_lifecycle_control",
+        },
         "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
     }
     assert status_view["status_summary"]["statefile_ownership"] == status_view["statefile_ownership"]
@@ -2658,6 +2691,13 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
         "owned_pid": pid,
         "pid_matches_owned_state": True,
         "process_alive": True,
+        "managed_lifecycle": {
+            "schema_version": "tdx.managed_process_lifecycle.provenance.v1",
+            "module": "tdxquant.managed_lifecycle",
+            "adapter": "subscription_watch_background",
+            "primitives": ["pid_coercion", "process_liveness", "statefile_ownership"],
+            "boundary": "diagnostic_provenance_only; no_lifecycle_control",
+        },
         "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
     }
     assert status_view["status_summary"]["state"] == "running"
@@ -2728,6 +2768,13 @@ def test_status_view_reports_statefile_ownership_mismatch_for_unowned_startup_st
         "owned_pid": None,
         "pid_matches_owned_state": False,
         "process_alive": True,
+        "managed_lifecycle": {
+            "schema_version": "tdx.managed_process_lifecycle.provenance.v1",
+            "module": "tdxquant.managed_lifecycle",
+            "adapter": "subscription_watch_background",
+            "primitives": ["pid_coercion", "process_liveness", "statefile_ownership"],
+            "boundary": "diagnostic_provenance_only; no_lifecycle_control",
+        },
         "boundary": "local_statefile_pidfile_only;does_not_claim_provider_readiness_or_lifecycle_control",
     }
     assert status_view["status_summary"]["governance"]["decision"] == "observe"

@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from .models import ErrorCode
+from .managed_lifecycle import build_process_ownership_diagnostics, process_pid_alive
 from .replay_fixtures import list_provider_replay_fixtures
 from .replay_provider import (
     execute_sync_replay,
@@ -549,17 +550,7 @@ def build_provider_replay_managed_daemon_command(
 
 
 def _provider_replay_process_running(pid: int) -> bool:
-    if not isinstance(pid, int) or pid < 1:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
+    return process_pid_alive(pid)
 
 
 def read_provider_replay_process_command(pid: int) -> list[str] | None:
@@ -589,89 +580,14 @@ def build_provider_replay_process_ownership_diagnostics(
     expected_command: list[str] | None = None,
     process_identity_matches: Any | None = None,
 ) -> dict[str, Any]:
-    pid = statefile_check.get("pid") if isinstance(statefile_check, dict) else None
-    owner_token = statefile_check.get("owner_token") if isinstance(statefile_check, dict) else None
-    owner_token_present = isinstance(owner_token, str) and bool(owner_token)
-    expected_owner_token_present = isinstance(expected_owner_token, str) and bool(expected_owner_token)
-    owner_token_matches = None
-    if expected_owner_token_present:
-        owner_token_matches = owner_token == expected_owner_token
-
-    diagnostics: dict[str, Any] = {
-        "ownership_status": "unknown_process_identity",
-        "owned_process": False,
-        "pid": pid if isinstance(pid, int) else None,
-        "pid_live": None,
-        "owner_token_present": owner_token_present,
-        "owner_token_matches": owner_token_matches,
-        "config_hash_matches": statefile_check.get("config_hash_matches")
-        if isinstance(statefile_check, dict)
-        else None,
-        "process_identity_checked": False,
-        "process_identity_matches": None,
-        "control_allowed": False,
-        "boundary": "read_only_process_ownership_diagnostics; no_process_control",
-    }
-
-    if not isinstance(statefile_check, dict):
-        diagnostics["ownership_status"] = "invalid_statefile"
-        return diagnostics
-    if statefile_check.get("configured") is not True:
-        diagnostics["ownership_status"] = "not_configured"
-        return diagnostics
-    if statefile_check.get("check_status") == "missing":
-        diagnostics["ownership_status"] = "missing_statefile"
-        return diagnostics
-    if statefile_check.get("check_status") != "valid":
-        diagnostics["ownership_status"] = "invalid_statefile"
-        return diagnostics
-    if statefile_check.get("stale") is True:
-        diagnostics["ownership_status"] = "stale_statefile"
-        return diagnostics
-    if statefile_check.get("config_hash_matches") is not True:
-        diagnostics["ownership_status"] = "config_hash_mismatch"
-        return diagnostics
-    if expected_owner_token_present and owner_token_matches is not True:
-        diagnostics["ownership_status"] = "owner_token_mismatch"
-        return diagnostics
-    if not isinstance(pid, int):
-        diagnostics["ownership_status"] = "invalid_statefile"
-        return diagnostics
-
-    if callable(process_running):
-        try:
-            diagnostics["pid_live"] = bool(process_running(pid))
-        except OSError:
-            diagnostics["pid_live"] = None
-    if diagnostics["pid_live"] is False:
-        diagnostics["ownership_status"] = "process_not_running"
-        return diagnostics
-    if diagnostics["pid_live"] is not True:
-        diagnostics["ownership_status"] = "unknown_process_identity"
-        return diagnostics
-
-    if callable(process_identity_matches):
-        diagnostics["process_identity_checked"] = True
-        command = expected_command or []
-        try:
-            identity_matches = process_identity_matches(pid, command)
-        except OSError:
-            identity_matches = None
-        if identity_matches is True:
-            diagnostics["process_identity_matches"] = True
-        elif identity_matches is False:
-            diagnostics["process_identity_matches"] = False
-            diagnostics["ownership_status"] = "process_identity_mismatch"
-            return diagnostics
-        else:
-            diagnostics["process_identity_matches"] = None
-            diagnostics["ownership_status"] = "unknown_process_identity"
-            return diagnostics
-
-    diagnostics["ownership_status"] = "owned"
-    diagnostics["owned_process"] = True
-    diagnostics["control_allowed"] = True
-    return diagnostics
+    return build_process_ownership_diagnostics(
+        statefile_check,
+        expected_owner_token=expected_owner_token,
+        process_running=process_running,
+        expected_command=expected_command,
+        process_identity_matches=process_identity_matches,
+        adapter="provider_transport_replay",
+    )
 
 
 def _terminate_provider_replay_process(pid: int) -> None:

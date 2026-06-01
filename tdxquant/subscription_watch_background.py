@@ -15,6 +15,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
+from .managed_lifecycle import (
+    build_managed_lifecycle_provenance,
+    coerce_process_pid,
+    process_pid_alive,
+)
 from .subscription_watch_run import build_subscription_watch_run_paths
 
 DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
@@ -109,6 +114,7 @@ def build_statefile_ownership_projection(payload: dict[str, Any] | None) -> dict
         "owned_pid",
         "pid_matches_owned_state",
         "process_alive",
+        "managed_lifecycle",
         "boundary",
     ):
         if key in resolved:
@@ -861,18 +867,11 @@ def build_background_paths(root_dir: Path) -> SubscriptionWatchBackgroundPaths:
 
 
 def _pid_is_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
+    return process_pid_alive(pid)
 
 
 def _parse_pid(raw_pid: Any) -> int:
-    try:
-        return int(raw_pid or 0)
-    except (TypeError, ValueError):
-        return 0
+    return coerce_process_pid(raw_pid)
 
 
 def _cleanup_owned_state(paths: SubscriptionWatchBackgroundPaths) -> None:
@@ -972,6 +971,10 @@ def build_background_statefile_ownership(
         "owned_pid": owned_pid,
         "pid_matches_owned_state": pid_matches_owned_state,
         "process_alive": process_alive,
+        "managed_lifecycle": build_managed_lifecycle_provenance(
+            adapter="subscription_watch_background",
+            primitives=["pid_coercion", "process_liveness", "statefile_ownership"],
+        ),
         "boundary": SUBSCRIPTION_WATCH_STATEFILE_OWNERSHIP_BOUNDARY,
     }
 
