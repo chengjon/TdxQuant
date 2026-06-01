@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from ..models import ErrorCode, Result
-from .context import capture_trade_timing
+from .context import build_result_from_submission_ledger_row, capture_trade_timing
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,20 @@ class PingAnOrderExecutionHandlers:
     build_submission_key_conflict_result: Callable[[dict[str, Any]], Result]
     build_trade_risk_rejection_result: Callable[[dict[str, Any]], Result]
     finalize_result: Callable[..., Result]
+
+
+@dataclass(frozen=True)
+class PingAnOrderResultContext:
+    code: str
+    price: str
+    quantity: int
+
+    def input_payload(self) -> dict[str, Any]:
+        return {
+            "code": self.code,
+            "price": self.price,
+            "quantity": self.quantity,
+        }
 
 
 @dataclass(frozen=True)
@@ -248,6 +262,41 @@ def _conflict_risk_gate(
         "max_price": request.max_price,
         "rejection_reason": idempotency.get("conflict_reason"),
     }
+
+
+def build_pingan_order_risk_rejection_result(
+    risk_gate: dict[str, Any],
+    *,
+    context: PingAnOrderResultContext,
+) -> Result:
+    rejection_reason = str(risk_gate.get("rejection_reason") or "pre-trade risk gate rejected desktop trade request")
+    return Result(
+        ok=False,
+        code=ErrorCode.INVALID_REQUEST,
+        message=rejection_reason,
+        data={"input": context.input_payload()},
+        next_action="Adjust the order request or trade safety controls, then retry.",
+    )
+
+
+def build_pingan_order_submission_key_conflict_result(
+    idempotency: dict[str, Any],
+    *,
+    context: PingAnOrderResultContext,
+) -> Result:
+    return Result(
+        ok=False,
+        code=ErrorCode.INVALID_REQUEST,
+        message=str(idempotency.get("conflict_reason") or "submission_key conflict"),
+        data={"input": context.input_payload()},
+        next_action="Use a new submission_key for a new desktop trade attempt.",
+    )
+
+
+def build_pingan_order_duplicate_submission_result(prior_row: dict[str, Any] | None) -> Result:
+    result = build_result_from_submission_ledger_row(prior_row or {})
+    result.warnings.append("duplicate submission_key skipped; returning prior outcome")
+    return result
 
 
 def execute_pingan_order(

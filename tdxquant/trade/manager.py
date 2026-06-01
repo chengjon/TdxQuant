@@ -34,7 +34,6 @@ from .context import (
     attach_trade_metadata,
     attach_trade_audit_metadata,
     attach_trade_safety_metadata,
-    build_result_from_submission_ledger_row,
     capture_trade_timing,
     evaluate_trade_risk_gate,
     evaluate_trade_submission_idempotency,
@@ -53,8 +52,12 @@ from .pingan_execution import (
     PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
     PingAnOrderExecutionHandlers,
+    PingAnOrderResultContext,
     build_pingan_confirm_current_boundary_rejection_result,
     build_pingan_confirm_current_dispatch_result,
+    build_pingan_order_duplicate_submission_result,
+    build_pingan_order_risk_rejection_result,
+    build_pingan_order_submission_key_conflict_result,
     execute_pingan_confirm_current,
     execute_pingan_order,
 )
@@ -3420,11 +3423,9 @@ class _PingAnTradeProxy:
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
         )
         if not risk_gate["passed"]:
-            result = self._manager._build_trade_risk_rejection_result(
-                code=code,
-                price=price,
-                quantity=quantity,
+            result = build_pingan_order_risk_rejection_result(
                 risk_gate=risk_gate,
+                context=PingAnOrderResultContext(code=code, price=price, quantity=quantity),
             )
             attach_trade_metadata(
                 result,
@@ -3984,56 +3985,6 @@ class TdxTradeManager:
         result.data["trade_audit_gate_status"] = _build_pingan_trade_audit_gate_status(result)
         return result
 
-    def _build_trade_risk_rejection_result(
-        self,
-        *,
-        code: str,
-        price: str,
-        quantity: int,
-        risk_gate: dict[str, Any],
-    ) -> Result:
-        rejection_reason = str(risk_gate.get("rejection_reason") or "pre-trade risk gate rejected desktop trade request")
-        return Result(
-            ok=False,
-            code=ErrorCode.INVALID_REQUEST,
-            message=rejection_reason,
-            data={
-                "input": {
-                    "code": code,
-                    "price": price,
-                    "quantity": quantity,
-                }
-            },
-            next_action="Adjust the order request or trade safety controls, then retry.",
-        )
-
-    def _build_submission_key_conflict_result(
-        self,
-        *,
-        code: str,
-        price: str,
-        quantity: int,
-        idempotency: dict[str, Any],
-    ) -> Result:
-        return Result(
-            ok=False,
-            code=ErrorCode.INVALID_REQUEST,
-            message=str(idempotency.get("conflict_reason") or "submission_key conflict"),
-            data={
-                "input": {
-                    "code": code,
-                    "price": price,
-                    "quantity": quantity,
-                }
-            },
-            next_action="Use a new submission_key for a new desktop trade attempt.",
-        )
-
-    def _build_duplicate_submission_result(self, *, prior_row: dict[str, Any] | None) -> Result:
-        result = build_result_from_submission_ledger_row(prior_row or {})
-        result.warnings.append("duplicate submission_key skipped; returning prior outcome")
-        return result
-
     def _build_pingan_order_execution_handlers(
         self,
         *,
@@ -4041,21 +3992,16 @@ class TdxTradeManager:
         price: str,
         quantity: int,
     ) -> PingAnOrderExecutionHandlers:
+        context = PingAnOrderResultContext(code=code, price=price, quantity=quantity)
         return PingAnOrderExecutionHandlers(
-            build_duplicate_submission_result=lambda prior_row: self._build_duplicate_submission_result(
-                prior_row=prior_row
+            build_duplicate_submission_result=build_pingan_order_duplicate_submission_result,
+            build_submission_key_conflict_result=lambda idempotency: build_pingan_order_submission_key_conflict_result(
+                idempotency,
+                context=context,
             ),
-            build_submission_key_conflict_result=lambda idempotency: self._build_submission_key_conflict_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                idempotency=idempotency,
-            ),
-            build_trade_risk_rejection_result=lambda risk_gate: self._build_trade_risk_rejection_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                risk_gate=risk_gate,
+            build_trade_risk_rejection_result=lambda risk_gate: build_pingan_order_risk_rejection_result(
+                risk_gate,
+                context=context,
             ),
             finalize_result=self._finalize_result,
         )

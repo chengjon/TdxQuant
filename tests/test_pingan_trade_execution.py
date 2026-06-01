@@ -9,8 +9,12 @@ from tdxquant.trade.pingan_execution import (
     PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
     PingAnOrderExecutionHandlers,
+    PingAnOrderResultContext,
     build_pingan_confirm_current_dispatch_result,
     build_pingan_confirm_current_boundary_rejection_result,
+    build_pingan_order_duplicate_submission_result,
+    build_pingan_order_risk_rejection_result,
+    build_pingan_order_submission_key_conflict_result,
     execute_pingan_confirm_current,
     execute_pingan_order,
 )
@@ -250,6 +254,60 @@ class PingAnTradeExecutionTests(unittest.TestCase):
         self.assertEqual(result.data["finalized"]["method"], "buy_submit_once")
         self.assertEqual(result.data["finalized"]["submission_key"], "submit-once-001")
         self.assertEqual(result.data["finalized"]["request_context"], {"code": "000001", "price": "10.00", "quantity": 100})
+
+    def _order_result_context(self) -> PingAnOrderResultContext:
+        return PingAnOrderResultContext(code="000001", price="10.00", quantity=100)
+
+    def test_build_pingan_order_risk_rejection_result_uses_order_context(self) -> None:
+        result = build_pingan_order_risk_rejection_result(
+            {
+                "passed": False,
+                "rejection_reason": "requested price exceeds max_price",
+            },
+            context=self._order_result_context(),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "requested price exceeds max_price")
+        self.assertEqual(result.data["input"], {"code": "000001", "price": "10.00", "quantity": 100})
+        self.assertEqual(result.next_action, "Adjust the order request or trade safety controls, then retry.")
+
+    def test_build_pingan_order_submission_key_conflict_result_uses_order_context(self) -> None:
+        result = build_pingan_order_submission_key_conflict_result(
+            {"conflict_reason": "submission_key reused with different payload"},
+            context=self._order_result_context(),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "submission_key reused with different payload")
+        self.assertEqual(result.data["input"], {"code": "000001", "price": "10.00", "quantity": 100})
+        self.assertEqual(result.next_action, "Use a new submission_key for a new desktop trade attempt.")
+
+    def test_build_pingan_order_duplicate_submission_result_marks_replayed_outcome(self) -> None:
+        result = build_pingan_order_duplicate_submission_result(
+            {
+                "result": {
+                    "ok": True,
+                    "code": ErrorCode.OK.value,
+                    "message": "submitted",
+                    "input": {"code": "000001"},
+                    "result_dialog": {"contract_no": "B001"},
+                    "warnings": ["existing warning"],
+                }
+            }
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.code, ErrorCode.OK)
+        self.assertEqual(result.message, "submitted")
+        self.assertEqual(result.data["input"], {"code": "000001"})
+        self.assertEqual(result.data["result_dialog"], {"contract_no": "B001"})
+        self.assertEqual(
+            result.warnings,
+            ["existing warning", "duplicate submission_key skipped; returning prior outcome"],
+        )
 
     def _confirm_request(self):
         return PingAnConfirmCurrentExecutionRequest(

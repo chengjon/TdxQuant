@@ -150,6 +150,8 @@ TdxQuant
 
 > D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderExecutionHandlers` 现将 `execute_pingan_order` 的 duplicate/conflict/risk rejection/finalize callback bundle 收敛为内部 handler 对象，buy/sell/submit-once manager callsite 通过 `handlers=` 传递统一 handler；证据为 `tests/test_pingan_trade_execution.py` 的 `test_execute_pingan_order_accepts_handler_bundle`、既有 buy/sell/submit-once manager route tests 与 OpenSpec `pingan-order-seam-handler-bundle`。边界：这是 D-08 order seam 内部 call-shape/locality refactor，不是生产行为变更，不移除 legacy callback 参数，不新增公开 API、CLI/task/catalog entry、workflow builder 或桌面 primitive；仍不证明 live broker readiness 或 production trading readiness。
 
+> D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderResultContext` 与 `build_pingan_order_*_result` 现将 duplicate submission、submission-key conflict 与 risk rejection 的 order result envelope construction 下沉到 `tdxquant/trade/pingan_execution.py`，manager 只组装 handler/context 并复用同一 risk rejection builder；证据为 `tests/test_pingan_trade_execution.py` 的 `test_build_pingan_order_*_result_*`、既有 PingAn manager focused tests 与 OpenSpec `pingan-order-result-builders-locality`。边界：这是 D-08 order seam 内部 result-builder locality/refactor，不是生产行为变更，不改变公开 manager/CLI/task/catalog 参数，不新增 workflow builder、桌面 primitive、broker readiness 或 production trading readiness。
+
 ### E. 已设计/待实现能力
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
