@@ -50,6 +50,7 @@ from .pingan_execution import (
     PingAnConfirmCurrentDispatchContext,
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentRejectionContext,
+    PingAnOrderExecutionPreparation,
     PingAnExecutionRequest,
     PingAnOrderExecutionHandlers,
     PingAnOrderResultContext,
@@ -2191,30 +2192,7 @@ class _PingAnTradeProxy:
         require_lifecycle_owner_lock: bool = False,
         require_broker_readiness: bool = False,
     ) -> Result:
-        effective_profile = self._manager._build_effective_profile({})
-        idempotency = self._manager._evaluate_idempotency(
-            broker="pingan",
-            method="buy",
-            code=code,
-            price=price,
-            quantity=quantity,
-            submission_key=submission_key,
-        )
-        risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
-        risk_gate = _apply_pingan_broker_readiness_required_guard(
-            risk_gate,
-            title_keyword=self._manager.title_keyword,
-            exe_path=self._manager.exe_path,
-            require_broker_readiness=require_broker_readiness,
-        )
-        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
-            risk_gate,
-            lifecycle_statefile_path=lifecycle_statefile_path,
-            lifecycle_owner_token=lifecycle_owner_token,
-            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
-            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
-        )
-        request = PingAnExecutionRequest(
+        prepared = self._manager._prepare_pingan_order_execution(
             method="buy",
             timing_label="pingan.buy",
             code=code,
@@ -2222,12 +2200,17 @@ class _PingAnTradeProxy:
             quantity=quantity,
             submission_key=submission_key,
             max_price=max_price,
-            profile_options=effective_profile,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            require_broker_readiness=require_broker_readiness,
         )
+        effective_profile = prepared.profile_options
         return execute_pingan_order(
-            request,
-            idempotency=idempotency,
-            risk_gate=risk_gate,
+            prepared.request,
+            idempotency=prepared.idempotency,
+            risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_buy_fast(
                 self._manager.title_keyword,
                 port=port,
@@ -2249,11 +2232,7 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            handlers=self._manager._build_pingan_order_execution_handlers(
-                code=code,
-                price=price,
-                quantity=quantity,
-            ),
+            handlers=prepared.handlers,
         )
 
     def buy_submit_once(
@@ -2275,30 +2254,7 @@ class _PingAnTradeProxy:
         require_lifecycle_owner_lock: bool = False,
         require_broker_readiness: bool = False,
     ) -> Result:
-        effective_profile = self._manager._build_effective_profile({})
-        idempotency = self._manager._evaluate_idempotency(
-            broker="pingan",
-            method="buy_submit_once",
-            code=code,
-            price=price,
-            quantity=quantity,
-            submission_key=submission_key,
-        )
-        risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
-        risk_gate = _apply_pingan_broker_readiness_required_guard(
-            risk_gate,
-            title_keyword=self._manager.title_keyword,
-            exe_path=self._manager.exe_path,
-            require_broker_readiness=require_broker_readiness,
-        )
-        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
-            risk_gate,
-            lifecycle_statefile_path=lifecycle_statefile_path,
-            lifecycle_owner_token=lifecycle_owner_token,
-            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
-            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
-        )
-        request = PingAnExecutionRequest(
+        prepared = self._manager._prepare_pingan_order_execution(
             method="buy_submit_once",
             timing_label="pingan.buy_submit_once",
             code=code,
@@ -2306,12 +2262,17 @@ class _PingAnTradeProxy:
             quantity=quantity,
             submission_key=submission_key,
             max_price=max_price,
-            profile_options=effective_profile,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            require_broker_readiness=require_broker_readiness,
         )
+        effective_profile = prepared.profile_options
         return execute_pingan_order(
-            request,
-            idempotency=idempotency,
-            risk_gate=risk_gate,
+            prepared.request,
+            idempotency=prepared.idempotency,
+            risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_buy_submit_once(
                 self._manager.title_keyword,
                 port=port,
@@ -2331,11 +2292,7 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            handlers=self._manager._build_pingan_order_execution_handlers(
-                code=code,
-                price=price,
-                quantity=quantity,
-            ),
+            handlers=prepared.handlers,
         )
 
     def sell(
@@ -2357,30 +2314,7 @@ class _PingAnTradeProxy:
         require_lifecycle_owner_lock: bool = False,
         require_broker_readiness: bool = False,
     ) -> Result:
-        effective_profile = self._manager._build_effective_profile({})
-        idempotency = self._manager._evaluate_idempotency(
-            broker="pingan",
-            method="sell",
-            code=code,
-            price=price,
-            quantity=quantity,
-            submission_key=submission_key,
-        )
-        risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
-        risk_gate = _apply_pingan_broker_readiness_required_guard(
-            risk_gate,
-            title_keyword=self._manager.title_keyword,
-            exe_path=self._manager.exe_path,
-            require_broker_readiness=require_broker_readiness,
-        )
-        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
-            risk_gate,
-            lifecycle_statefile_path=lifecycle_statefile_path,
-            lifecycle_owner_token=lifecycle_owner_token,
-            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
-            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
-        )
-        request = PingAnExecutionRequest(
+        prepared = self._manager._prepare_pingan_order_execution(
             method="sell",
             timing_label="pingan.sell",
             code=code,
@@ -2388,12 +2322,17 @@ class _PingAnTradeProxy:
             quantity=quantity,
             submission_key=submission_key,
             max_price=max_price,
-            profile_options=effective_profile,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            require_broker_readiness=require_broker_readiness,
         )
+        effective_profile = prepared.profile_options
         return execute_pingan_order(
-            request,
-            idempotency=idempotency,
-            risk_gate=risk_gate,
+            prepared.request,
+            idempotency=prepared.idempotency,
+            risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_sell_fast(
                 self._manager.title_keyword,
                 port=port,
@@ -2415,11 +2354,7 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            handlers=self._manager._build_pingan_order_execution_handlers(
-                code=code,
-                price=price,
-                quantity=quantity,
-            ),
+            handlers=prepared.handlers,
         )
 
     def sell_submit_once(
@@ -2441,30 +2376,7 @@ class _PingAnTradeProxy:
         require_lifecycle_owner_lock: bool = False,
         require_broker_readiness: bool = False,
     ) -> Result:
-        effective_profile = self._manager._build_effective_profile({})
-        idempotency = self._manager._evaluate_idempotency(
-            broker="pingan",
-            method="sell_submit_once",
-            code=code,
-            price=price,
-            quantity=quantity,
-            submission_key=submission_key,
-        )
-        risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
-        risk_gate = _apply_pingan_broker_readiness_required_guard(
-            risk_gate,
-            title_keyword=self._manager.title_keyword,
-            exe_path=self._manager.exe_path,
-            require_broker_readiness=require_broker_readiness,
-        )
-        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
-            risk_gate,
-            lifecycle_statefile_path=lifecycle_statefile_path,
-            lifecycle_owner_token=lifecycle_owner_token,
-            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
-            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
-        )
-        request = PingAnExecutionRequest(
+        prepared = self._manager._prepare_pingan_order_execution(
             method="sell_submit_once",
             timing_label="pingan.sell_submit_once",
             code=code,
@@ -2472,12 +2384,17 @@ class _PingAnTradeProxy:
             quantity=quantity,
             submission_key=submission_key,
             max_price=max_price,
-            profile_options=effective_profile,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            require_broker_readiness=require_broker_readiness,
         )
+        effective_profile = prepared.profile_options
         return execute_pingan_order(
-            request,
-            idempotency=idempotency,
-            risk_gate=risk_gate,
+            prepared.request,
+            idempotency=prepared.idempotency,
+            risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_sell_fast(
                 self._manager.title_keyword,
                 port=port,
@@ -2499,11 +2416,7 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-            handlers=self._manager._build_pingan_order_execution_handlers(
-                code=code,
-                price=price,
-                quantity=quantity,
-            ),
+            handlers=prepared.handlers,
         )
 
     def health(
@@ -4004,6 +3917,67 @@ class TdxTradeManager:
                 context=context,
             ),
             finalize_result=self._finalize_result,
+        )
+
+    def _prepare_pingan_order_execution(
+        self,
+        *,
+        method: str,
+        timing_label: str,
+        code: str,
+        price: str,
+        quantity: int,
+        submission_key: str | None,
+        max_price: float | None,
+        lifecycle_statefile_path: str | None,
+        lifecycle_owner_token: str | None,
+        lifecycle_stale_after_seconds: float,
+        require_lifecycle_owner_lock: bool,
+        require_broker_readiness: bool,
+    ) -> PingAnOrderExecutionPreparation:
+        profile_options = self._build_effective_profile({})
+        idempotency = self._evaluate_idempotency(
+            broker="pingan",
+            method=method,
+            code=code,
+            price=price,
+            quantity=quantity,
+            submission_key=submission_key,
+        )
+        risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
+        risk_gate = _apply_pingan_broker_readiness_required_guard(
+            risk_gate,
+            title_keyword=self.title_keyword,
+            exe_path=self.exe_path,
+            require_broker_readiness=require_broker_readiness,
+        )
+        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
+        request = PingAnExecutionRequest(
+            method=method,
+            timing_label=timing_label,
+            code=code,
+            price=price,
+            quantity=quantity,
+            submission_key=submission_key,
+            max_price=max_price,
+            profile_options=profile_options,
+        )
+        return PingAnOrderExecutionPreparation(
+            request=request,
+            idempotency=idempotency,
+            risk_gate=risk_gate,
+            profile_options=profile_options,
+            handlers=self._build_pingan_order_execution_handlers(
+                code=code,
+                price=price,
+                quantity=quantity,
+            ),
         )
 
     def _evaluate_idempotency(

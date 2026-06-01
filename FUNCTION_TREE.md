@@ -152,6 +152,8 @@ TdxQuant
 
 > D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderResultContext` 与 `build_pingan_order_*_result` 现将 duplicate submission、submission-key conflict 与 risk rejection 的 order result envelope construction 下沉到 `tdxquant/trade/pingan_execution.py`，manager 只组装 handler/context 并复用同一 risk rejection builder；证据为 `tests/test_pingan_trade_execution.py` 的 `test_build_pingan_order_*_result_*`、既有 PingAn manager focused tests 与 OpenSpec `pingan-order-result-builders-locality`。边界：这是 D-08 order seam 内部 result-builder locality/refactor，不是生产行为变更，不改变公开 manager/CLI/task/catalog 参数，不新增 workflow builder、桌面 primitive、broker readiness 或 production trading readiness。
 
+> D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderExecutionPreparation` 与 `TdxTradeManager._prepare_pingan_order_execution` 现集中 buy/sell/submit-once 的 effective profile、submission idempotency、max-price risk gate、broker-readiness guard、lifecycle owner-lock guard、`PingAnExecutionRequest` 与 handler bundle 准备；证据为 `tests/test_trade_manager.py` 的 `test_pingan_order_execution_preparation_builds_request_guards_and_handlers`、既有 buy/sell/submit-once route tests 与 OpenSpec `pingan-order-execution-preparation-helper`。边界：这是 D-08 order seam 内部 preparation locality/refactor，method-specific desktop dispatch 仍留在 manager callsite；不改变公开 manager/CLI/task/catalog 参数，不新增 workflow builder、桌面 primitive、broker readiness 或 production trading readiness。
+
 ### E. 已设计/待实现能力
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |

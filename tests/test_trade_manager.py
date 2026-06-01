@@ -353,6 +353,41 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertTrue(mocked_execute.call_args.kwargs["risk_gate"]["passed"])
         mocked_desktop.assert_not_called()
 
+    def test_pingan_order_execution_preparation_builds_request_guards_and_handlers(self) -> None:
+        broker_health = Result(ok=True, code=ErrorCode.OK, message="broker ready", data={"window": {"ok": True}})
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTradeManager(
+                profile="balanced",
+                state_path=str(Path(temp_dir) / "state.json"),
+                event_log_path=str(Path(temp_dir) / "events.jsonl"),
+                submission_ledger_path=str(Path(temp_dir) / "submission-ledger.jsonl"),
+            )
+            with patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health):
+                prepared = manager._prepare_pingan_order_execution(
+                    method="buy",
+                    timing_label="pingan.buy",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="buy-preparation-001",
+                    max_price=10.50,
+                    lifecycle_statefile_path=None,
+                    lifecycle_owner_token=None,
+                    lifecycle_stale_after_seconds=300.0,
+                    require_lifecycle_owner_lock=False,
+                    require_broker_readiness=True,
+                )
+
+        self.assertEqual(prepared.request.method, "buy")
+        self.assertEqual(prepared.request.timing_label, "pingan.buy")
+        self.assertEqual(prepared.request.request_context(), {"code": "000001", "price": "10.00", "quantity": 100})
+        self.assertEqual(prepared.idempotency["decision"], "execute")
+        self.assertTrue(prepared.risk_gate["passed"])
+        self.assertEqual(prepared.risk_gate["broker_readiness_required_status"]["requirement_status"], "passed")
+        self.assertIn("hid_pre_delay", prepared.profile_options)
+        self.assertIs(prepared.handlers.finalize_result.__self__, manager)
+        self.assertIs(prepared.handlers.finalize_result.__func__, manager._finalize_result.__func__)
+
     def test_pingan_buy_submit_once_uses_submit_once_profile(self) -> None:
         expected = Result(
             ok=True,

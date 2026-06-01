@@ -36,6 +36,15 @@ class PingAnOrderExecutionHandlers:
 
 
 @dataclass(frozen=True)
+class PingAnOrderExecutionPreparation:
+    request: PingAnExecutionRequest
+    idempotency: dict[str, Any]
+    risk_gate: dict[str, Any]
+    profile_options: dict[str, Any]
+    handlers: PingAnOrderExecutionHandlers
+
+
+@dataclass(frozen=True)
 class PingAnOrderResultContext:
     code: str
     price: str
