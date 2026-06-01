@@ -3,7 +3,12 @@ from __future__ import annotations
 import unittest
 
 from tdxquant.models import ErrorCode, Result
-from tdxquant.trade.pingan_execution import PingAnExecutionRequest, execute_pingan_order
+from tdxquant.trade.pingan_execution import (
+    PingAnConfirmCurrentExecutionRequest,
+    PingAnExecutionRequest,
+    execute_pingan_confirm_current,
+    execute_pingan_order,
+)
 
 
 class PingAnTradeExecutionTests(unittest.TestCase):
@@ -143,3 +148,112 @@ class PingAnTradeExecutionTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(result.data["finalized"]["risk_gate"]["passed"], True)
         self.assertIsNone(result.data["finalized"]["risk_gate"]["requested_price"])
+
+    def _confirm_request(self):
+        return PingAnConfirmCurrentExecutionRequest(
+            method="confirm_current",
+            timing_label="pingan.confirm_current",
+            profile_options={"profile": "balanced"},
+        )
+
+    def test_execute_pingan_confirm_current_rejects_failed_gate_without_dispatch(self) -> None:
+        request = self._confirm_request()
+        calls: list[str] = []
+        attached_safety: dict[str, object] = {}
+
+        result = execute_pingan_confirm_current(
+            request,
+            risk_gate={"passed": False, "checks": ["owner_lock"], "rejection_reason": "owner_lock_missing"},
+            dispatch=lambda: calls.append("dispatch") or Result(ok=True, code=ErrorCode.OK, message="advanced"),
+            build_rejected_result=lambda _risk_gate: Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="rejected",
+                data={},
+            ),
+            attach_metadata=lambda result, timing: calls.append(f"metadata:{timing}") or result,
+            attach_safety_metadata=lambda result, risk_gate, idempotency, side_effect_level: attached_safety.update(
+                {"risk_gate": risk_gate, "idempotency": idempotency, "side_effect_level": side_effect_level}
+            )
+            or result,
+            finalize_result=lambda result, **_kwargs: calls.append("finalize") or result,
+            capture_timing=lambda label, runner: calls.append(label) or (runner(), {}),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.message, "rejected")
+        self.assertEqual(calls, ["metadata:{}"])
+        self.assertFalse(attached_safety["risk_gate"]["passed"])
+        self.assertEqual(attached_safety["idempotency"]["decision"], "not_applicable")
+        self.assertEqual(attached_safety["side_effect_level"], "none")
+
+    def test_execute_pingan_confirm_current_attaches_metadata_without_finalize_when_not_advanced(self) -> None:
+        request = self._confirm_request()
+        calls: list[str] = []
+        attached_metadata: dict[str, object] = {}
+        attached_safety: dict[str, object] = {}
+
+        def dispatch() -> Result:
+            calls.append("dispatch")
+            return Result(
+                ok=False,
+                code=ErrorCode.CONTROL_NOT_FOUND,
+                message="confirm dialog not found",
+                data={"confirm_current": {"confirmation_advanced": False}},
+            )
+
+        result = execute_pingan_confirm_current(
+            request,
+            risk_gate={"passed": True, "checks": ["confirm_boundary"]},
+            dispatch=dispatch,
+            build_rejected_result=lambda _risk_gate: Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="rejected"),
+            attach_metadata=lambda result, timing: attached_metadata.update({"timing": timing}) or result,
+            attach_safety_metadata=lambda result, risk_gate, idempotency, side_effect_level: attached_safety.update(
+                {"risk_gate": risk_gate, "idempotency": idempotency, "side_effect_level": side_effect_level}
+            )
+            or result,
+            finalize_result=lambda result, **_kwargs: calls.append("finalize") or result,
+            capture_timing=lambda label, runner: calls.append(label) or (runner(), {"manager_call": {"elapsed_ms": 1.0}}),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(calls, ["pingan.confirm_current", "dispatch"])
+        self.assertEqual(attached_metadata["timing"], {"manager_call": {"elapsed_ms": 1.0}})
+        self.assertTrue(attached_safety["risk_gate"]["passed"])
+        self.assertEqual(attached_safety["idempotency"]["decision"], "not_applicable")
+        self.assertIsNone(attached_safety["side_effect_level"])
+
+    def test_execute_pingan_confirm_current_finalizes_when_confirmation_advanced(self) -> None:
+        request = self._confirm_request()
+        calls: list[str] = []
+        finalized: dict[str, object] = {}
+
+        def dispatch() -> Result:
+            calls.append("dispatch")
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="advanced",
+                data={"confirm_current": {"confirmation_advanced": True}},
+            )
+
+        result = execute_pingan_confirm_current(
+            request,
+            risk_gate={"passed": True, "checks": ["confirm_boundary"]},
+            dispatch=dispatch,
+            build_rejected_result=lambda _risk_gate: Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="rejected"),
+            attach_metadata=lambda result, _timing: calls.append("metadata") or result,
+            attach_safety_metadata=lambda result, _risk_gate, _idempotency, _side_effect_level: calls.append("safety")
+            or result,
+            finalize_result=lambda result, **kwargs: finalized.update(kwargs)
+            or Result(ok=result.ok, code=result.code, message=result.message, data={"finalized": kwargs}),
+            capture_timing=lambda label, runner: calls.append(label) or (runner(), {"manager_call": {"elapsed_ms": 2.0}}),
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(calls, ["pingan.confirm_current", "dispatch"])
+        self.assertEqual(finalized["method"], "confirm_current")
+        self.assertEqual(finalized["timing"], {"manager_call": {"elapsed_ms": 2.0}})
+        self.assertEqual(finalized["idempotency"]["decision"], "not_applicable")
+        self.assertIsNone(finalized["submission_key"])
+        self.assertIsNone(finalized["request_context"])
