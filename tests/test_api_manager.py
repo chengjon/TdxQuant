@@ -4,10 +4,11 @@ import unittest
 from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tdxquant.api import TdxApiManager, TdxTaskManager
 from tdxquant.api.context import get_api_profile_path, load_api_profiles, resolve_api_profile
+from tdxquant.api.readonly_task import ReadOnlyTaskBoundary
 from tdxquant.api.task import get_task_profile_path, load_task_profiles, resolve_task_profile
 from tdxquant.catalog import (
     get_command_bundle_path,
@@ -5206,6 +5207,39 @@ class TdxTaskManagerTests(unittest.TestCase):
             result = manager.watchlist_overview(stock_list=["000001", "000002"])
         mocked_gp_one.assert_called_once_with(stock_list=["000001", "000002"], fields=["Now", "Volume"])
         self.assertEqual(result.data["task"]["name"], "watchlist_overview")
+
+    def test_readonly_task_boundary_watchlist_overview_uses_profile_fields(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
+        api_manager = MagicMock()
+        api_manager.meta.gp_one_data.return_value = expected
+        boundary = ReadOnlyTaskBoundary(
+            api_manager=api_manager,
+            profile_name="watchlist_overview",
+            profile_options={"gp_one_fields": ["Now", "Volume"]},
+        )
+
+        result = boundary.watchlist_overview(stock_list=["000001", "000002"])
+
+        api_manager.meta.gp_one_data.assert_called_once_with(stock_list=["000001", "000002"], fields=["Now", "Volume"])
+        self.assertEqual(result.data["task"]["name"], "watchlist_overview")
+        self.assertEqual(result.data["task_profile"]["name"], "watchlist_overview")
+        self.assertNotIn("trade", result.data)
+
+    def test_task_watchlist_overview_delegates_to_readonly_boundary(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"task": {"name": "watchlist_overview"}})
+        manager = TdxTaskManager(profile="watchlist_overview", strategy_path="strategy.py")
+        with patch("tdxquant.api.task.ReadOnlyTaskBoundary") as mocked_boundary_type:
+            mocked_boundary = mocked_boundary_type.return_value
+            mocked_boundary.watchlist_overview.return_value = expected
+            result = manager.watchlist_overview(stock_list=["000001"], fields=["Now"])
+
+        self.assertIs(result, expected)
+        mocked_boundary_type.assert_called_once_with(
+            api_manager=manager.api_manager,
+            profile_name="watchlist_overview",
+            profile_options=manager.profile_options,
+        )
+        mocked_boundary.watchlist_overview.assert_called_once_with(stock_list=["000001"], fields=["Now"])
 
     def test_task_block_read_watchlist_uses_provider_snapshot_and_attaches_task_metadata(self) -> None:
         expected = Result(

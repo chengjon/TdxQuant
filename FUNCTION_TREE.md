@@ -68,7 +68,7 @@ TdxQuant
 | --- | --- | --- | --- | --- |
 | A-01 | CLI 命令面 | `[已实现]` | `tdxquant/cli.py` 注册约 `204` 个 parser；`tdxquant/cli_catalog.py` 承载 catalog parser/handler 边界；`tests/test_api_cli.py`、`tests/test_trader_cli.py` | 命令存在不等于每个命令都可在非 Windows 环境完成真实外部调用；外设/TDX 客户端相关命令依赖本机环境；catalog 边界迁移不代表所有 CLI command group 均已拆分。 |
 | A-02 | API Manager 统一入口 | `[已实现]` | `tdxquant/api/manager.py`：`TdxApiManager` 与 market/meta/formula/financial/transaction/runtime/block proxy | 统一入口主要封装本地/bridge 调用；不声明覆盖 TDX 原始接口全集。 |
-| A-03 | Task Manager 统一入口 | `[已实现]` | `tdxquant/api/task.py`：`TdxTaskManager`；`runtime/task-profiles.json` 约 `22` 个 profile；`runtime/task-presets.json` 约 `11` 个 preset | 已有日常任务入口，但更厚的组合任务仍按具体节点登记为待实现。 |
+| A-03 | Task Manager 统一入口 | `[已实现]` | `tdxquant/api/task.py`：`TdxTaskManager`；`tdxquant/api/readonly_task.py` 承载只读 task boundary tracer；`runtime/task-profiles.json` 约 `22` 个 profile；`runtime/task-presets.json` 约 `11` 个 preset | 已有日常任务入口；只读边界当前先覆盖 `watchlist_overview` tracer，不代表所有 task/report 方法均已迁出；更厚的组合任务仍按具体节点登记。 |
 | A-04 | Trade Manager 统一入口 | `[已实现]` | `tdxquant/trade/manager.py`：`TdxTradeManager`；`tdxquant/trader/service.py`：`TradeService`；`tests/test_trade_manager.py` | 当前重点是平安证券桌面链路；不等于多券商全量交易平台。 |
 | A-05 | runtime profiles / presets | `[已实现]` | `runtime/api-profiles.json`、`runtime/task-profiles.json`、`runtime/trade-profiles.json`、`runtime/report-presets.json`、`runtime/command-catalog.json` | JSON 配置是本地入口编排层；外部服务或真实交易环境仍需对应 runtime 前置条件。 |
 | A-06 | command catalog | `[已实现]` | `tdxquant/catalog.py`；`runtime/command-catalog.json` 约 `115` 个 entry；`runtime/TdxQuant_Command_Catalog_Usage.md` | catalog 描述可运行命令和参数编排，不替代能力状态判断；状态以本文件为准。 |
@@ -103,9 +103,9 @@ TdxQuant
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
 | --- | --- | --- | --- | --- |
-| C-01 | TdxTaskManager | `[已实现]` | `tdxquant/api/task.py`：`TdxTaskManager`；`runtime/TdxQuant_Task_Layer_Usage.md` | 提供任务编排层；单个任务的真实能力仍受对应 B/D 节点边界约束。 |
+| C-01 | TdxTaskManager | `[已实现]` | `tdxquant/api/task.py`：`TdxTaskManager`；`tdxquant/api/readonly_task.py`；`runtime/TdxQuant_Task_Layer_Usage.md`；OpenSpec `deepen-task-manager-readonly-boundary` | 提供任务编排层；只读 task boundary 不执行桌面交易写入、broker lifecycle 或 provider mutation；单个任务的真实能力仍受对应 B/D 节点边界约束。 |
 | C-02 | task profiles / presets | `[已实现]` | `runtime/task-profiles.json` 约 `21` 个 profile；`runtime/task-presets.json` 约 `13` 个 preset | profiles/presets 是默认参数和组合入口，不保证所有环境一键完成。 |
-| C-03 | watchlist task/report 入口 | `[已实现]` | CLI parser 包含 `watchlist-overview`、`watchlist-export`、`block-read-watchlist`、`block-read-full`、`block-read-watchlist-export`；`docs/TdxQuant_Project_Function_Map.md` 记录 `block-read-full` 完成态 | 以当前 block 读取/同步能力为基础；文件导入式 watchlist 以 E-03 的 import-only 边界为准。 |
+| C-03 | watchlist task/report 入口 | `[已实现]` | CLI parser 包含 `watchlist-overview`、`watchlist-export`、`block-read-watchlist`、`block-read-full`、`block-read-watchlist-export`；`tdxquant/api/readonly_task.py` 覆盖 `watchlist_overview` 只读边界；`docs/TdxQuant_Project_Function_Map.md` 记录 `block-read-full` 完成态 | 以当前 block 读取/同步能力为基础；`watchlist_overview` 只读边界不代表 block write/import 已迁入同一边界；文件导入式 watchlist 以 E-03 的 import-only 边界为准。 |
 | C-04 | subscription-watch task 入口 | `[已实现]` | CLI parser 包含 `subscription-watch`；`tdxquant/subscription_watch_run.py`；`tests/test_subscription_watch_run.py` | 前台 run 和 artifact 契约已可用；更高层 long-running product wrapper 仍按 E-06 登记。 |
 | C-05 | report presets | `[已实现]` | `runtime/report-presets.json` 约 `101` 个 preset；`tdxquant/reporting.py` | 报表是本地 artifact 汇总/查询入口；数据完整性取决于对应 runtime/trade/task artifact 是否已生成。 |
 | C-06 | trade report / audit report 入口 | `[已实现]` | CLI parser 包含 `daily-trade-report`、`trade-report-lookup`、`trade-audit-lookup`、`trade-audit-daily-report`、`trade-audit-period-report`、`trade-period-report` | 已有日常诊断和回看入口；更高阶跨 ledger 组合查询仍按 E-07 待实现。 |

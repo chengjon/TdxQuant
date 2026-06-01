@@ -30,6 +30,7 @@ from ..subscription_watch_run import (
 from ..trade import TdxTradeManager, get_pingan_submission_ledger_path
 from ..trade_audit_index import query_trade_audit_cross_ledger
 from .manager import TdxApiManager
+from .readonly_task import ReadOnlyTaskBoundary
 
 
 def get_task_profile_path() -> Path:
@@ -2632,19 +2633,11 @@ class TdxTaskManager:
         return self._attach_task_metadata(result, task_name="formula_scan", timing=timing)
 
     def watchlist_overview(self, *, stock_list: list[str], fields: list[str] | None = None) -> Result:
-        resolved_fields = list(fields) if fields is not None else list(self.profile_options.get("gp_one_fields", []))
-        result, timing = _capture_task_timing(
-            "task.watchlist_overview",
-            lambda: self.api_manager.meta.gp_one_data(stock_list=stock_list, fields=resolved_fields),
-        )
-        result.data.setdefault(
-            "input",
-            {
-                "stock_list": stock_list,
-                "fields": resolved_fields,
-            },
-        )
-        return self._attach_task_metadata(result, task_name="watchlist_overview", timing=timing)
+        return ReadOnlyTaskBoundary(
+            api_manager=self.api_manager,
+            profile_name=self.profile_name,
+            profile_options=self.profile_options,
+        ).watchlist_overview(stock_list=stock_list, fields=fields)
 
     def block_sync(
         self,
