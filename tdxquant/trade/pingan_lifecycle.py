@@ -9,6 +9,7 @@ from ..models import ErrorCode, Result
 
 
 PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_supervisor.v1"
+PINGAN_LIFECYCLE_PROCESS_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_process.v1"
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,216 @@ class PingAnSupervisorRestartDecision:
     process_restart_requested: bool
 
 
+@dataclass(frozen=True)
+class PingAnProcessOwnerGateDecision:
+    owner_ok: bool
+    owner_payload: dict[str, Any] | None
+    owner_status: str
+    owner_token_matches: bool
+    owner_pid_alive: bool | None
+    stale_detected: bool
+    rejection_result: Result | None = None
+
+
+@dataclass(frozen=True)
+class PingAnProcessRecordedPidGuardDecision:
+    allowed: bool
+    status: str
+    rejection_result: Result | None = None
+
+
 class PingAnLifecycleController:
+    def build_process_result(
+        self,
+        *,
+        action: str,
+        status: str,
+        statefile_path: Path,
+        lock_path: Path,
+        owner_token: str,
+        exe_path: str | None,
+        owner_lock_status: dict[str, Any] | None,
+        process_pid: int | None = None,
+        previous_process_pid: int | None = None,
+        process_command: list[str] | None = None,
+        process_alive: bool | None = None,
+        process_start_executed: bool = False,
+        process_stop_executed: bool = False,
+        process_kill_executed: bool = False,
+        statefile_write_executed: bool = False,
+        pid_ownership_claimed: bool = False,
+        side_effect_level: str = "none",
+        error: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "schema_version": PINGAN_LIFECYCLE_PROCESS_SCHEMA,
+            "action": action,
+            "status": status,
+            "execution_mode": "explicit_operator_process_lifecycle_control",
+            "statefile_path": str(statefile_path),
+            "lock_path": str(lock_path),
+            "owner_token": owner_token,
+            "current_owner_token": owner_lock_status.get("current_owner_token") if isinstance(owner_lock_status, dict) else None,
+            "owner_lock_status": owner_lock_status,
+            "exe_path": exe_path,
+            "process_pid": process_pid,
+            "previous_process_pid": previous_process_pid,
+            "process_command": process_command,
+            "process_alive": process_alive,
+            "process_start_executed": process_start_executed,
+            "process_stop_executed": process_stop_executed,
+            "process_kill_executed": process_kill_executed,
+            "restart_executed": process_start_executed
+            and (process_stop_executed or previous_process_pid is not None)
+            and action == "restart",
+            "statefile_write_executed": statefile_write_executed,
+            "pid_ownership_claimed": pid_ownership_claimed,
+            "order_submitted": False,
+            "workflow_dispatch_executed": False,
+            "side_effect_level": side_effect_level,
+            "error": error,
+            "boundary": (
+                "Explicit owner-locked local PingAn process lifecycle control only; start records a spawned "
+                "PID, stop/restart target only the lifecycle statefile recorded PID for the same owner and "
+                "command. This does not submit orders, execute catalog/task/report/bundle workflows, prove "
+                "broker readiness, prove UI login readiness, or provide production trading readiness."
+            ),
+        }
+
+    def read_process_state(self, state_payload: dict[str, Any] | None) -> dict[str, Any]:
+        process_state = state_payload.get("process") if isinstance(state_payload, dict) else None
+        return process_state if isinstance(process_state, dict) else {}
+
+    def evaluate_process_owner_gate(
+        self,
+        *,
+        owner_status_result: Result,
+        action: str,
+        statefile_path: Path,
+        lock_path: Path,
+        owner_token: str,
+        exe_path: str | None,
+        process_pid: int | None = None,
+        process_command: list[str] | None = None,
+        process_alive: bool | None = None,
+    ) -> PingAnProcessOwnerGateDecision:
+        owner_payload = (
+            owner_status_result.data.get("lifecycle_owner_lock")
+            if isinstance(owner_status_result.data, dict)
+            else None
+        )
+        owner_payload = owner_payload if isinstance(owner_payload, dict) else None
+        owner_status = str(owner_payload.get("status") or "status_check_failed") if owner_payload else "status_check_failed"
+        owner_token_matches = bool(owner_payload and owner_payload.get("current_owner_token") == owner_token)
+        owner_pid_alive = owner_payload.get("owner_pid_alive") if owner_payload else None
+        stale_detected = bool(owner_payload.get("stale_detected")) if owner_payload else False
+        owner_ok = (
+            owner_status_result.ok
+            and owner_status == "owned"
+            and owner_token_matches
+            and not stale_detected
+            and owner_pid_alive is True
+        )
+        if owner_ok:
+            return PingAnProcessOwnerGateDecision(
+                owner_ok=True,
+                owner_payload=owner_payload,
+                owner_status=owner_status,
+                owner_token_matches=owner_token_matches,
+                owner_pid_alive=owner_pid_alive,
+                stale_detected=stale_detected,
+            )
+
+        if owner_payload is None or not owner_status_result.ok:
+            status = "owner_lock_status_failed"
+        elif owner_status != "owned":
+            status = "owner_lock_not_owned"
+        elif not owner_token_matches:
+            status = "owner_token_mismatch"
+        elif stale_detected:
+            status = "owner_lock_stale"
+        else:
+            status = "owner_pid_not_alive"
+        payload = self.build_process_result(
+            action=action,
+            status=status,
+            statefile_path=statefile_path,
+            lock_path=lock_path,
+            owner_token=owner_token,
+            exe_path=exe_path,
+            owner_lock_status=owner_payload,
+            process_pid=process_pid,
+            process_command=process_command,
+            process_alive=process_alive,
+        )
+        return PingAnProcessOwnerGateDecision(
+            owner_ok=False,
+            owner_payload=owner_payload,
+            owner_status=owner_status,
+            owner_token_matches=owner_token_matches,
+            owner_pid_alive=owner_pid_alive,
+            stale_detected=stale_detected,
+            rejection_result=Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="PingAn lifecycle process control requires an owned lifecycle owner lock",
+                data={"lifecycle_process": payload},
+            ),
+        )
+
+    def evaluate_process_recorded_pid_guard(
+        self,
+        *,
+        action: str,
+        statefile_path: Path,
+        lock_path: Path,
+        owner_token: str,
+        exe_path: str | None,
+        owner_lock_status: dict[str, Any] | None,
+        process_pid: int | None,
+        process_command: list[str] | None,
+        process_alive: bool | None,
+        recorded_owner_matches: bool,
+        recorded_command_matches: bool,
+    ) -> PingAnProcessRecordedPidGuardDecision:
+        if action not in {"stop", "restart"}:
+            return PingAnProcessRecordedPidGuardDecision(allowed=True, status="allowed")
+
+        if process_pid is None:
+            status = "process_not_recorded"
+            message = "PingAn lifecycle process PID is not recorded"
+        elif not recorded_owner_matches:
+            status = "process_owner_token_mismatch"
+            message = "PingAn lifecycle process control requires the recorded process owner token"
+        elif exe_path and not recorded_command_matches:
+            status = "process_command_mismatch"
+            message = "PingAn lifecycle process command does not match the recorded process"
+        else:
+            return PingAnProcessRecordedPidGuardDecision(allowed=True, status="allowed")
+
+        payload = self.build_process_result(
+            action=action,
+            status=status,
+            statefile_path=statefile_path,
+            lock_path=lock_path,
+            owner_token=owner_token,
+            exe_path=exe_path,
+            owner_lock_status=owner_lock_status,
+            process_pid=process_pid,
+            process_command=process_command,
+            process_alive=process_alive,
+        )
+        return PingAnProcessRecordedPidGuardDecision(
+            allowed=False,
+            status=status,
+            rejection_result=Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message=message,
+                data={"lifecycle_process": payload},
+            ),
+        )
+
     def evaluate_supervisor_owner_gate(
         self,
         *,

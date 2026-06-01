@@ -47,7 +47,7 @@ from .context import (
     resolve_trade_profile,
 )
 from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
-from .pingan_lifecycle import PingAnLifecycleController
+from .pingan_lifecycle import PINGAN_LIFECYCLE_PROCESS_SCHEMA, PingAnLifecycleController
 
 
 def _build_trade_health_check(
@@ -92,7 +92,6 @@ PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_trade_audit_ga
 PINGAN_LIFECYCLE_OWNER_LOCK_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_lock.v1"
 PINGAN_LIFECYCLE_OWNER_STATE_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_state.v1"
 PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_supervisor.v1"
-PINGAN_LIFECYCLE_PROCESS_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_process.v1"
 PINGAN_REQUIRED_AUDIT_GATE_STATUSES = ("confirmed", "rejected", "failed", "exception")
 PINGAN_EXCEPTION_POPUP_KEYWORDS = (
     "异常",
@@ -960,93 +959,6 @@ def _process_pid_alive(pid: int | None) -> bool | None:
     return True
 
 
-def _build_pingan_lifecycle_process_result(
-    *,
-    action: str,
-    status: str,
-    statefile_path: Path,
-    lock_path: Path,
-    owner_token: str,
-    exe_path: str | None,
-    owner_lock_status: dict[str, Any] | None,
-    process_pid: int | None = None,
-    previous_process_pid: int | None = None,
-    process_command: list[str] | None = None,
-    process_alive: bool | None = None,
-    process_start_executed: bool = False,
-    process_stop_executed: bool = False,
-    process_kill_executed: bool = False,
-    statefile_write_executed: bool = False,
-    pid_ownership_claimed: bool = False,
-    side_effect_level: str = "none",
-    error: str | None = None,
-) -> dict[str, Any]:
-    return {
-        "schema_version": PINGAN_LIFECYCLE_PROCESS_SCHEMA,
-        "action": action,
-        "status": status,
-        "execution_mode": "explicit_operator_process_lifecycle_control",
-        "statefile_path": str(statefile_path),
-        "lock_path": str(lock_path),
-        "owner_token": owner_token,
-        "current_owner_token": owner_lock_status.get("current_owner_token") if isinstance(owner_lock_status, dict) else None,
-        "owner_lock_status": owner_lock_status,
-        "exe_path": exe_path,
-        "process_pid": process_pid,
-        "previous_process_pid": previous_process_pid,
-        "process_command": process_command,
-        "process_alive": process_alive,
-        "process_start_executed": process_start_executed,
-        "process_stop_executed": process_stop_executed,
-        "process_kill_executed": process_kill_executed,
-        "restart_executed": process_start_executed and (process_stop_executed or previous_process_pid is not None) and action == "restart",
-        "statefile_write_executed": statefile_write_executed,
-        "pid_ownership_claimed": pid_ownership_claimed,
-        "order_submitted": False,
-        "workflow_dispatch_executed": False,
-        "side_effect_level": side_effect_level,
-        "error": error,
-        "boundary": (
-            "Explicit owner-locked local PingAn process lifecycle control only; start records a spawned "
-            "PID, stop/restart target only the lifecycle statefile recorded PID for the same owner and "
-            "command. This does not submit orders, execute catalog/task/report/bundle workflows, prove "
-            "broker readiness, prove UI login readiness, or provide production trading readiness."
-        ),
-    }
-
-
-def _resolve_pingan_lifecycle_process_owner_gate(
-    *,
-    statefile_path: Path,
-    owner_token: str,
-    stale_after_seconds: float,
-) -> tuple[bool, dict[str, Any] | None, str]:
-    status_result = _run_pingan_lifecycle_owner_lock(
-        action="status",
-        statefile_path=str(statefile_path),
-        owner_token=owner_token,
-        stale_after_seconds=stale_after_seconds,
-    )
-    owner_payload = status_result.data.get("lifecycle_owner_lock") if isinstance(status_result.data, dict) else None
-    if not isinstance(owner_payload, dict):
-        return False, None, "owner_lock_status_failed"
-    owner_status = str(owner_payload.get("status") or "")
-    if owner_status != "owned":
-        return False, owner_payload, "owner_lock_not_owned"
-    if owner_payload.get("current_owner_token") != owner_token:
-        return False, owner_payload, "owner_token_mismatch"
-    if owner_payload.get("stale_detected") is True:
-        return False, owner_payload, "owner_lock_stale"
-    if owner_payload.get("owner_pid_alive") is not True:
-        return False, owner_payload, "owner_pid_not_alive"
-    return True, owner_payload, "owned"
-
-
-def _read_pingan_lifecycle_process_state(state_payload: dict[str, Any] | None) -> dict[str, Any]:
-    process_state = state_payload.get("process") if isinstance(state_payload, dict) else None
-    return process_state if isinstance(process_state, dict) else {}
-
-
 def _run_pingan_lifecycle_process(
     *,
     action: str,
@@ -1070,21 +982,36 @@ def _run_pingan_lifecycle_process(
 
     resolved_statefile_path = Path(statefile_path)
     resolved_lock_path = Path(f"{resolved_statefile_path}.lock")
+    lifecycle_controller = PingAnLifecycleController()
     state_payload = _read_json_object(resolved_statefile_path) or {}
-    process_state = _read_pingan_lifecycle_process_state(state_payload)
+    process_state = lifecycle_controller.read_process_state(state_payload)
     recorded_pid = _coerce_owner_pid(process_state.get("process_pid"))
     recorded_command = process_state.get("process_command") if isinstance(process_state.get("process_command"), list) else None
     expected_command = [normalized_exe_path] if normalized_exe_path else recorded_command
     process_alive = _process_pid_alive(recorded_pid)
-    owner_ok, owner_payload, owner_gate_status = _resolve_pingan_lifecycle_process_owner_gate(
-        statefile_path=resolved_statefile_path,
+    owner_status_result = _run_pingan_lifecycle_owner_lock(
+        action="status",
+        statefile_path=str(resolved_statefile_path),
         owner_token=normalized_owner_token,
         stale_after_seconds=float(stale_after_seconds),
     )
+    owner_gate = lifecycle_controller.evaluate_process_owner_gate(
+        owner_status_result=owner_status_result,
+        action=normalized_action,
+        statefile_path=resolved_statefile_path,
+        lock_path=resolved_lock_path,
+        owner_token=normalized_owner_token,
+        exe_path=normalized_exe_path,
+        process_pid=recorded_pid,
+        process_command=recorded_command,
+        process_alive=process_alive,
+    )
+    owner_ok = owner_gate.owner_ok
+    owner_payload = owner_gate.owner_payload
 
     if normalized_action == "status":
         status = "running" if process_alive is True else "stopped" if recorded_pid is not None else "not_recorded"
-        payload = _build_pingan_lifecycle_process_result(
+        payload = lifecycle_controller.build_process_result(
             action=normalized_action,
             status=status,
             statefile_path=resolved_statefile_path,
@@ -1100,19 +1027,11 @@ def _run_pingan_lifecycle_process(
         return Result(ok=True, code=ErrorCode.OK, message="completed PingAn lifecycle process status", data={"lifecycle_process": payload})
 
     if not owner_ok:
-        payload = _build_pingan_lifecycle_process_result(
-            action=normalized_action,
-            status=owner_gate_status,
-            statefile_path=resolved_statefile_path,
-            lock_path=resolved_lock_path,
-            owner_token=normalized_owner_token,
-            exe_path=normalized_exe_path,
-            owner_lock_status=owner_payload,
-            process_pid=recorded_pid,
-            process_command=recorded_command,
-            process_alive=process_alive,
+        return owner_gate.rejection_result or Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message="PingAn lifecycle process control requires an owned lifecycle owner lock",
         )
-        return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle process control requires an owned lifecycle owner lock", data={"lifecycle_process": payload})
 
     recorded_owner_matches = process_state.get("process_owner_token") == normalized_owner_token
     recorded_command_matches = expected_command is not None and recorded_command == expected_command
@@ -1149,47 +1068,25 @@ def _run_pingan_lifecycle_process(
         _write_json_object(resolved_statefile_path, updated)
 
     if normalized_action in {"stop", "restart"}:
-        if recorded_pid is None:
-            payload = _build_pingan_lifecycle_process_result(
-                action=normalized_action,
-                status="process_not_recorded",
-                statefile_path=resolved_statefile_path,
-                lock_path=resolved_lock_path,
-                owner_token=normalized_owner_token,
-                exe_path=normalized_exe_path,
-                owner_lock_status=owner_payload,
-                process_command=recorded_command,
-                process_alive=process_alive,
+        recorded_pid_guard = lifecycle_controller.evaluate_process_recorded_pid_guard(
+            action=normalized_action,
+            statefile_path=resolved_statefile_path,
+            lock_path=resolved_lock_path,
+            owner_token=normalized_owner_token,
+            exe_path=normalized_exe_path,
+            owner_lock_status=owner_payload,
+            process_pid=recorded_pid,
+            process_command=recorded_command,
+            process_alive=process_alive,
+            recorded_owner_matches=recorded_owner_matches,
+            recorded_command_matches=recorded_command_matches,
+        )
+        if not recorded_pid_guard.allowed:
+            return recorded_pid_guard.rejection_result or Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="PingAn lifecycle process recorded PID guard rejected the request",
             )
-            return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle process PID is not recorded", data={"lifecycle_process": payload})
-        if not recorded_owner_matches:
-            payload = _build_pingan_lifecycle_process_result(
-                action=normalized_action,
-                status="process_owner_token_mismatch",
-                statefile_path=resolved_statefile_path,
-                lock_path=resolved_lock_path,
-                owner_token=normalized_owner_token,
-                exe_path=normalized_exe_path,
-                owner_lock_status=owner_payload,
-                process_pid=recorded_pid,
-                process_command=recorded_command,
-                process_alive=process_alive,
-            )
-            return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle process control requires the recorded process owner token", data={"lifecycle_process": payload})
-        if normalized_exe_path and not recorded_command_matches:
-            payload = _build_pingan_lifecycle_process_result(
-                action=normalized_action,
-                status="process_command_mismatch",
-                statefile_path=resolved_statefile_path,
-                lock_path=resolved_lock_path,
-                owner_token=normalized_owner_token,
-                exe_path=normalized_exe_path,
-                owner_lock_status=owner_payload,
-                process_pid=recorded_pid,
-                process_command=recorded_command,
-                process_alive=process_alive,
-            )
-            return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message="PingAn lifecycle process command does not match the recorded process", data={"lifecycle_process": payload})
         previous_process_pid = recorded_pid
         process_stop_executed = True
         if process_alive is True:
@@ -1197,7 +1094,7 @@ def _run_pingan_lifecycle_process(
                 os.kill(recorded_pid, signal.SIGTERM)
                 process_kill_executed = True
             except OSError as exc:
-                payload = _build_pingan_lifecycle_process_result(
+                payload = lifecycle_controller.build_process_result(
                     action=normalized_action,
                     status="process_stop_failed",
                     statefile_path=resolved_statefile_path,
@@ -1214,7 +1111,7 @@ def _run_pingan_lifecycle_process(
                 return Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message="failed to stop PingAn lifecycle process", data={"lifecycle_process": payload})
         if normalized_action == "stop":
             write_process_state(status="stopped", pid=None, command=recorded_command, stopped_at=_format_timestamp(now))
-            payload = _build_pingan_lifecycle_process_result(
+            payload = lifecycle_controller.build_process_result(
                 action=normalized_action,
                 status="stopped",
                 statefile_path=resolved_statefile_path,
@@ -1233,7 +1130,7 @@ def _run_pingan_lifecycle_process(
             return Result(ok=True, code=ErrorCode.OK, message="stopped PingAn lifecycle process", data={"lifecycle_process": payload})
 
     if normalized_action == "start" and recorded_pid is not None and process_alive is True and not force_restart:
-        payload = _build_pingan_lifecycle_process_result(
+        payload = lifecycle_controller.build_process_result(
             action=normalized_action,
             status="recorded_process_running",
             statefile_path=resolved_statefile_path,
@@ -1251,7 +1148,7 @@ def _run_pingan_lifecycle_process(
     try:
         spawned = subprocess.Popen(command, start_new_session=True)
     except OSError as exc:
-        payload = _build_pingan_lifecycle_process_result(
+        payload = lifecycle_controller.build_process_result(
             action=normalized_action,
             status="process_start_failed",
             statefile_path=resolved_statefile_path,
@@ -1270,7 +1167,7 @@ def _run_pingan_lifecycle_process(
     spawned_pid = _coerce_owner_pid(getattr(spawned, "pid", None))
     status = "restarted" if normalized_action == "restart" or previous_process_pid is not None else "started"
     write_process_state(status=status, pid=spawned_pid, command=command)
-    payload = _build_pingan_lifecycle_process_result(
+    payload = lifecycle_controller.build_process_result(
         action=normalized_action,
         status=status,
         statefile_path=resolved_statefile_path,

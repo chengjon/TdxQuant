@@ -138,6 +138,76 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertFalse(second.process_restart_requested)
         self.assertEqual(second.restart_attempt_count, 1)
 
+    def test_pingan_lifecycle_controller_rejects_process_owner_gate_without_process_side_effects(self) -> None:
+        controller = PingAnLifecycleController()
+        owner_status = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="checked owner lock",
+            data={
+                "lifecycle_owner_lock": {
+                    "status": "not_acquired",
+                    "current_owner_token": None,
+                    "owner_pid_alive": None,
+                    "owner_pid_status": "missing",
+                    "stale_detected": False,
+                }
+            },
+        )
+
+        decision = controller.evaluate_process_owner_gate(
+            owner_status_result=owner_status,
+            action="start",
+            statefile_path=Path("runtime/pingan/lifecycle.json"),
+            lock_path=Path("runtime/pingan/lifecycle.json.lock"),
+            owner_token="operator-a",
+            exe_path="TdxW.exe",
+            process_pid=None,
+            process_command=None,
+            process_alive=None,
+        )
+
+        self.assertFalse(decision.owner_ok)
+        self.assertIsNotNone(decision.rejection_result)
+        payload = decision.rejection_result.data["lifecycle_process"]
+        self.assertEqual(payload["status"], "owner_lock_not_owned")
+        self.assertFalse(payload["process_start_executed"])
+        self.assertFalse(payload["process_stop_executed"])
+        self.assertFalse(payload["process_kill_executed"])
+        self.assertFalse(payload["statefile_write_executed"])
+        self.assertFalse(payload["order_submitted"])
+        self.assertFalse(payload["pid_ownership_claimed"])
+        self.assertEqual(payload["side_effect_level"], "none")
+
+    def test_pingan_lifecycle_controller_rejects_recorded_pid_guard_without_process_side_effects(self) -> None:
+        controller = PingAnLifecycleController()
+
+        decision = controller.evaluate_process_recorded_pid_guard(
+            action="restart",
+            statefile_path=Path("runtime/pingan/lifecycle.json"),
+            lock_path=Path("runtime/pingan/lifecycle.json.lock"),
+            owner_token="operator-a",
+            exe_path="TdxW.exe",
+            owner_lock_status={"status": "owned", "current_owner_token": "operator-a"},
+            process_pid=None,
+            process_command=None,
+            process_alive=None,
+            recorded_owner_matches=False,
+            recorded_command_matches=False,
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertIsNotNone(decision.rejection_result)
+        payload = decision.rejection_result.data["lifecycle_process"]
+        self.assertEqual(payload["status"], "process_not_recorded")
+        self.assertFalse(payload["process_start_executed"])
+        self.assertFalse(payload["process_stop_executed"])
+        self.assertFalse(payload["process_kill_executed"])
+        self.assertFalse(payload["statefile_write_executed"])
+        self.assertFalse(payload["order_submitted"])
+        self.assertFalse(payload["pid_ownership_claimed"])
+        self.assertEqual(payload["side_effect_level"], "none")
+
     def test_public_import_is_available(self) -> None:
         manager = TdxTradeManager(profile="balanced")
         self.assertEqual(manager.profile_name, "balanced")
