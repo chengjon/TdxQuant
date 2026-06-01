@@ -1152,6 +1152,9 @@ _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA = (
 _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_RECORD_SCHEMA = (
     "tdx.desktop_trade.pingan_implemented_status_review_result_record.v1"
 )
+_PINGAN_IMPLEMENTED_STATUS_TRANSITION_GATE_SCHEMA = (
+    "tdx.desktop_trade.pingan_implemented_status_transition_gate.v1"
+)
 _PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_evidence_contract.v1"
 )
@@ -1739,6 +1742,137 @@ def _build_pingan_implemented_status_review_result_artifact(
             "Records a maintainer review result for an existing PingAn implemented-status review packet only; "
             "does not execute PingAn workflows, submit orders, prove production readiness, prove implemented "
             "status, or promote D-07/D-08."
+        ),
+    }
+
+
+def _load_pingan_implemented_status_review_result(
+    path: str | None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    payload, error = _load_json_evidence(path)
+    if error is not None:
+        return None, error
+    if payload is None:
+        return None, "review result JSON is missing"
+    if payload.get("schema") != _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA:
+        return None, "review result has unsupported schema"
+    return copy.deepcopy(payload), None
+
+
+def _build_pingan_review_result_artifact_provenance_status(payload: dict[str, Any]) -> dict[str, Any]:
+    provenance = payload.get("artifact_provenance")
+    provenance = provenance if isinstance(provenance, dict) else None
+    observed_schema = provenance.get("schema") if provenance else None
+    observed_source_kind = provenance.get("source_kind") if provenance else None
+    observed_producer = provenance.get("producer") if provenance else None
+    observed_evidence_schema = provenance.get("evidence_schema") if provenance else None
+
+    invalid_reasons: list[str] = []
+    if provenance is None:
+        invalid_reasons.append("missing_artifact_provenance")
+    elif observed_schema != _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA:
+        invalid_reasons.append("invalid_artifact_provenance_schema")
+    if provenance is not None and observed_source_kind != "implemented_status_review_result":
+        invalid_reasons.append("source_kind_mismatch")
+    if provenance is not None and observed_evidence_schema != _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA:
+        invalid_reasons.append("evidence_schema_mismatch")
+    if provenance is not None and observed_producer != "task pingan-implemented-status-review-result":
+        invalid_reasons.append("unsupported_producer")
+
+    verified = not invalid_reasons
+    return {
+        "status": "verified" if verified else "unverified",
+        "schema": observed_schema,
+        "expected_schema": _PINGAN_READINESS_EVIDENCE_ARTIFACT_PROVENANCE_SCHEMA,
+        "source_kind": observed_source_kind,
+        "expected_source_kind": "implemented_status_review_result",
+        "producer": observed_producer,
+        "expected_producer": "task pingan-implemented-status-review-result",
+        "evidence_schema": observed_evidence_schema,
+        "expected_evidence_schema": _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA,
+        "invalid_reasons": invalid_reasons,
+    }
+
+
+def _build_pingan_implemented_status_transition_gate(
+    *,
+    review_result: dict[str, Any],
+    review_result_path: str,
+) -> dict[str, Any]:
+    completed_checks: list[str] = []
+    blocked_reasons: list[str] = []
+    provenance_status = _build_pingan_review_result_artifact_provenance_status(review_result)
+    if provenance_status.get("status") == "verified":
+        completed_checks.append("verified_review_result_artifact_provenance")
+    else:
+        blocked_reasons.append("unverified_review_result_artifact_provenance")
+
+    outcome = str(review_result.get("outcome") or "").strip().lower()
+    if outcome == "approve":
+        completed_checks.append("approved_review_result")
+    else:
+        blocked_reasons.append("review_result_not_approved")
+
+    target_nodes = _list_from_json(review_result.get("target_nodes"))
+    if target_nodes == ["D-07", "D-08"]:
+        completed_checks.append("target_nodes_d07_d08")
+    else:
+        blocked_reasons.append("unexpected_target_nodes")
+
+    packet_ready = (
+        review_result.get("packet_review_status") == "ready_for_manual_review"
+        and review_result.get("packet_decision") == "eligible_for_review"
+        and review_result.get("implemented_status_eligible") is True
+        and review_result.get("current_function_tree_status") == "[部分实现]"
+        and not _list_from_json(review_result.get("incomplete_gates"))
+        and not _list_from_json(review_result.get("blocked_reasons"))
+    )
+    if packet_ready:
+        completed_checks.append("eligible_review_packet")
+    else:
+        blocked_reasons.append("review_packet_not_ready_for_transition")
+
+    non_transition_flags_confirmed = (
+        review_result.get("function_tree_status_transition_executed") is False
+        and review_result.get("automatic_status_transition_allowed") is False
+        and review_result.get("order_submitted") is False
+        and review_result.get("control_dispatch_executed") is False
+    )
+    if non_transition_flags_confirmed:
+        completed_checks.append("non_transition_flags_confirmed")
+    else:
+        blocked_reasons.append("review_result_transition_flags_invalid")
+
+    blocked_reasons = sorted(set(blocked_reasons))
+    eligible = not blocked_reasons
+    return {
+        "schema": _PINGAN_IMPLEMENTED_STATUS_TRANSITION_GATE_SCHEMA,
+        "review_result_path": review_result_path,
+        "gate_status": "eligible_for_status_transition_review" if eligible else "blocked",
+        "eligible_for_status_transition_review": eligible,
+        "completed_checks": completed_checks,
+        "blocked_reasons": blocked_reasons,
+        "artifact_provenance_status": provenance_status,
+        "review_result_outcome": outcome,
+        "reviewer": review_result.get("reviewer"),
+        "reviewed_at": review_result.get("reviewed_at"),
+        "target_nodes": target_nodes,
+        "current_function_tree_status": review_result.get("current_function_tree_status"),
+        "packet_review_status": review_result.get("packet_review_status"),
+        "packet_decision": review_result.get("packet_decision"),
+        "implemented_status_eligible": review_result.get("implemented_status_eligible") is True,
+        "manual_status_transition_required": True,
+        "automatic_status_transition_allowed": False,
+        "function_tree_status_transition_executed": False,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "promotion_status_transition_executed": False,
+        "execution_mode": "readonly_status_transition_gate",
+        "side_effect_level": "none",
+        "boundary": (
+            "Read-only pre-transition gate over a PingAn implemented-status review result; does not execute "
+            "PingAn workflows, submit orders, prove production readiness, prove implemented status, or modify "
+            "FUNCTION_TREE status."
         ),
     }
 
@@ -4118,6 +4252,57 @@ class TdxTaskManager:
         return self._attach_task_metadata(
             result,
             task_name="pingan_implemented_status_review_result",
+            timing=timing,
+        )
+
+    def pingan_implemented_status_transition_gate(
+        self,
+        *,
+        review_result_path: str | None,
+    ) -> Result:
+        def run() -> Result:
+            normalized_review_result_path = str(review_result_path or "").strip()
+            if not normalized_review_result_path:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="review_result_path is required",
+                    data={"missing_fields": ["review_result_path"]},
+                )
+
+            review_result, review_result_error = _load_pingan_implemented_status_review_result(
+                normalized_review_result_path
+            )
+            if review_result_error is not None or review_result is None:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="invalid implemented-status review result artifact",
+                    data={"review_result_path": normalized_review_result_path, "error": review_result_error},
+                )
+
+            gate = _build_pingan_implemented_status_transition_gate(
+                review_result=review_result,
+                review_result_path=normalized_review_result_path,
+            )
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message=(
+                    "PingAn implemented-status transition gate is eligible for manual review"
+                    if gate["eligible_for_status_transition_review"]
+                    else "PingAn implemented-status transition gate is blocked"
+                ),
+                data={
+                    "input": {"review_result_path": normalized_review_result_path},
+                    "implemented_status_transition_gate": gate,
+                },
+            )
+
+        result, timing = _capture_task_timing("task.pingan_implemented_status_transition_gate", run)
+        return self._attach_task_metadata(
+            result,
+            task_name="pingan_implemented_status_transition_gate",
             timing=timing,
         )
 

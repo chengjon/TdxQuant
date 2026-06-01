@@ -4151,6 +4151,40 @@ class TdxTaskManagerTests(unittest.TestCase):
         )
         return packet
 
+    @classmethod
+    def _pingan_approved_review_result(cls) -> dict:
+        packet = cls._pingan_ready_review_packet()
+        return {
+            "schema": "tdx.desktop_trade.pingan_implemented_status_review_result.v1",
+            "artifact_provenance": cls._pingan_artifact_provenance(
+                "implemented_status_review_result",
+                "task pingan-implemented-status-review-result",
+                "tdx.desktop_trade.pingan_implemented_status_review_result.v1",
+            ),
+            "reviewer": "maintainer-a",
+            "outcome": "approve",
+            "reason": "manual evidence gates reviewed for D-07/D-08 status consideration",
+            "reviewed_at": "2026-06-01T10:00:00Z",
+            "review_packet_path": "implemented-status-review-packet.json",
+            "packet_schema": packet["schema"],
+            "packet_review_status": packet["review_status"],
+            "packet_decision": packet["decision"],
+            "implemented_status_eligible": True,
+            "target_nodes": packet["target_nodes"],
+            "current_function_tree_status": packet["current_function_tree_status"],
+            "completed_gates": packet["completed_gates"],
+            "incomplete_gates": [],
+            "blocked_reasons": [],
+            "manual_status_review_required": True,
+            "automatic_status_transition_allowed": False,
+            "function_tree_status_transition_executed": False,
+            "order_submitted": False,
+            "control_dispatch_executed": False,
+            "promotion_status_transition_executed": False,
+            "execution_mode": "manual_status_review_result_record",
+            "side_effect_level": "file_write",
+        }
+
     def test_public_import_is_available(self) -> None:
         manager = TdxTaskManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
@@ -4434,6 +4468,74 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["packet_review_status"], "blocked")
         self.assertFalse(result.data["implemented_status_eligible"])
         self.assertIn("blocked_packet_not_approvable", result.data["blocked_reasons"])
+
+    def test_task_pingan_implemented_status_transition_gate_allows_approved_review_result(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            review_result_path = root / "implemented-status-review-result.json"
+            review_result_path.write_text(json.dumps(self._pingan_approved_review_result()), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+
+            result = manager.pingan_implemented_status_transition_gate(
+                review_result_path=str(review_result_path),
+            )
+
+        self.assertTrue(result.ok)
+        gate = result.data["implemented_status_transition_gate"]
+        self.assertEqual(gate["schema"], "tdx.desktop_trade.pingan_implemented_status_transition_gate.v1")
+        self.assertEqual(gate["gate_status"], "eligible_for_status_transition_review")
+        self.assertTrue(gate["eligible_for_status_transition_review"])
+        self.assertEqual(gate["target_nodes"], ["D-07", "D-08"])
+        self.assertIn("approved_review_result", gate["completed_checks"])
+        self.assertIn("verified_review_result_artifact_provenance", gate["completed_checks"])
+        self.assertEqual(gate["blocked_reasons"], [])
+        self.assertTrue(gate["manual_status_transition_required"])
+        self.assertFalse(gate["automatic_status_transition_allowed"])
+        self.assertFalse(gate["function_tree_status_transition_executed"])
+        self.assertFalse(gate["order_submitted"])
+        self.assertFalse(gate["control_dispatch_executed"])
+        self.assertEqual(gate["execution_mode"], "readonly_status_transition_gate")
+        self.assertEqual(gate["side_effect_level"], "none")
+
+    def test_task_pingan_implemented_status_transition_gate_blocks_non_approved_review_result(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            review_result = self._pingan_approved_review_result()
+            review_result["outcome"] = "defer"
+            review_result_path = root / "implemented-status-review-result.json"
+            review_result_path.write_text(json.dumps(review_result), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+
+            result = manager.pingan_implemented_status_transition_gate(
+                review_result_path=str(review_result_path),
+            )
+
+        self.assertTrue(result.ok)
+        gate = result.data["implemented_status_transition_gate"]
+        self.assertEqual(gate["gate_status"], "blocked")
+        self.assertFalse(gate["eligible_for_status_transition_review"])
+        self.assertIn("review_result_not_approved", gate["blocked_reasons"])
+        self.assertFalse(gate["function_tree_status_transition_executed"])
+
+    def test_task_pingan_implemented_status_transition_gate_blocks_unverified_review_result_provenance(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            review_result = self._pingan_approved_review_result()
+            review_result["artifact_provenance"]["producer"] = "manual edit"
+            review_result_path = root / "implemented-status-review-result.json"
+            review_result_path.write_text(json.dumps(review_result), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+
+            result = manager.pingan_implemented_status_transition_gate(
+                review_result_path=str(review_result_path),
+            )
+
+        self.assertTrue(result.ok)
+        gate = result.data["implemented_status_transition_gate"]
+        self.assertEqual(gate["gate_status"], "blocked")
+        self.assertFalse(gate["eligible_for_status_transition_review"])
+        self.assertIn("unverified_review_result_artifact_provenance", gate["blocked_reasons"])
+        self.assertFalse(gate["function_tree_status_transition_executed"])
 
     def test_task_pingan_promotion_readiness_rollup_blocks_unverified_live_manual_acceptance_provenance(self) -> None:
         with TemporaryDirectory() as temp_dir:

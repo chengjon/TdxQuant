@@ -682,6 +682,10 @@ def _add_pingan_implemented_status_review_result_arguments(subparser: argparse.A
     subparser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
 
 
+def _add_pingan_implemented_status_transition_gate_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--review-result-path")
+
+
 def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--audit-id")
     subparser.add_argument("--contract-no")
@@ -1569,6 +1573,12 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     )
     _add_pingan_implemented_status_review_result_arguments(task_pingan_implemented_status_review_result_parser)
     _add_task_common_arguments(task_pingan_implemented_status_review_result_parser)
+
+    task_pingan_implemented_status_transition_gate_parser = task_subparsers.add_parser(
+        "pingan-implemented-status-transition-gate"
+    )
+    _add_pingan_implemented_status_transition_gate_arguments(task_pingan_implemented_status_transition_gate_parser)
+    _add_task_common_arguments(task_pingan_implemented_status_transition_gate_parser)
 
     task_trade_audit_cross_ledger_query_parser = task_subparsers.add_parser("trade-audit-cross-ledger-query")
     _add_trade_audit_cross_ledger_query_arguments(task_trade_audit_cross_ledger_query_parser)
@@ -5871,6 +5881,10 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
             reviewed_at=args.reviewed_at,
             dry_run=args.dry_run,
             overwrite=args.overwrite,
+        )
+    if command_name == "pingan-implemented-status-transition-gate":
+        return manager.pingan_implemented_status_transition_gate(
+            review_result_path=args.review_result_path,
         )
     if command_name == "trade-audit-cross-ledger-query":
         return manager.trade_audit_cross_ledger_query(

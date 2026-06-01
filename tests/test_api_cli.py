@@ -1930,6 +1930,20 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.reviewed_at, "2026-06-01T10:00:00Z")
         self.assertTrue(args.dry_run)
 
+    def test_task_pingan_implemented_status_transition_gate_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-implemented-status-transition-gate",
+                "--review-result-path",
+                "runtime/pingan/implemented-status-review-result.json",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "pingan-implemented-status-transition-gate")
+        self.assertEqual(args.review_result_path, "runtime/pingan/implemented-status-review-result.json")
+
     def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -11023,6 +11037,26 @@ class TaskCliDispatchTests(unittest.TestCase):
             reviewed_at="2026-06-01T10:00:00Z",
             dry_run=True,
             overwrite=False,
+        )
+
+    def test_handle_task_pingan_implemented_status_transition_gate_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-implemented-status-transition-gate",
+                "--review-result-path",
+                "runtime/pingan/implemented-status-review-result.json",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.pingan_implemented_status_transition_gate.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.pingan_implemented_status_transition_gate.assert_called_once_with(
+            review_result_path="runtime/pingan/implemented-status-review-result.json",
         )
 
     def test_handle_task_trade_audit_daily_report_rejects_mixed_status_filters(self) -> None:
