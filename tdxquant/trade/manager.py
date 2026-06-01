@@ -47,6 +47,7 @@ from .context import (
     resolve_trade_profile,
 )
 from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
+from .pingan_execution import PingAnExecutionRequest, execute_pingan_order
 from .pingan_lifecycle import PINGAN_LIFECYCLE_PROCESS_SCHEMA, PingAnLifecycleController
 
 
@@ -2313,37 +2314,6 @@ class _PingAnTradeProxy:
             quantity=quantity,
             submission_key=submission_key,
         )
-        if idempotency["decision"] == "skip_duplicate":
-            result = self._manager._build_duplicate_submission_result(prior_row=idempotency["prior_row"])
-            return self._manager._finalize_result(
-                result,
-                broker="pingan",
-                method="buy_submit_once",
-                profile_options=effective_profile,
-                timing={},
-                submission_key=submission_key,
-                risk_gate={"passed": True, "checks": [], "requested_price": None, "max_price": max_price, "rejection_reason": None},
-                idempotency=idempotency,
-                request_context={"code": code, "price": price, "quantity": quantity},
-            )
-        if idempotency["decision"] == "reject_conflict":
-            result = self._manager._build_submission_key_conflict_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                idempotency=idempotency,
-            )
-            return self._manager._finalize_result(
-                result,
-                broker="pingan",
-                method="buy_submit_once",
-                profile_options=effective_profile,
-                timing={},
-                submission_key=submission_key,
-                risk_gate={"passed": False, "checks": [], "requested_price": None, "max_price": max_price, "rejection_reason": idempotency["conflict_reason"]},
-                idempotency=idempotency,
-                request_context={"code": code, "price": price, "quantity": quantity},
-            )
         risk_gate = evaluate_trade_risk_gate(code=code, price=price, quantity=quantity, max_price=max_price)
         risk_gate = _apply_pingan_broker_readiness_required_guard(
             risk_gate,
@@ -2358,27 +2328,21 @@ class _PingAnTradeProxy:
             lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
         )
-        if not risk_gate["passed"]:
-            result = self._manager._build_trade_risk_rejection_result(
-                code=code,
-                price=price,
-                quantity=quantity,
-                risk_gate=risk_gate,
-            )
-            return self._manager._finalize_result(
-                result,
-                broker="pingan",
-                method="buy_submit_once",
-                profile_options=effective_profile,
-                timing={},
-                submission_key=submission_key,
-                risk_gate=risk_gate,
-                idempotency=idempotency,
-                request_context={"code": code, "price": price, "quantity": quantity},
-            )
-        result, timing = capture_trade_timing(
-            "pingan.buy_submit_once",
-            lambda: run_pingan_buy_submit_once(
+        request = PingAnExecutionRequest(
+            method="buy_submit_once",
+            timing_label="pingan.buy_submit_once",
+            code=code,
+            price=price,
+            quantity=quantity,
+            submission_key=submission_key,
+            max_price=max_price,
+            profile_options=effective_profile,
+        )
+        return execute_pingan_order(
+            request,
+            idempotency=idempotency,
+            risk_gate=risk_gate,
+            dispatch=lambda: run_pingan_buy_submit_once(
                 self._manager.title_keyword,
                 port=port,
                 baudrate=baudrate,
@@ -2397,17 +2361,22 @@ class _PingAnTradeProxy:
                 result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
                 capture_final_uia=bool(effective_profile["capture_final_uia"]),
             ),
-        )
-        return self._manager._finalize_result(
-            result,
-            broker="pingan",
-            method="buy_submit_once",
-            profile_options=effective_profile,
-            timing=timing,
-            submission_key=submission_key,
-            risk_gate=risk_gate,
-            idempotency=idempotency,
-            request_context={"code": code, "price": price, "quantity": quantity},
+            build_duplicate_submission_result=lambda prior_row: self._manager._build_duplicate_submission_result(
+                prior_row=prior_row
+            ),
+            build_submission_key_conflict_result=lambda conflict_idempotency: self._manager._build_submission_key_conflict_result(
+                code=code,
+                price=price,
+                quantity=quantity,
+                idempotency=conflict_idempotency,
+            ),
+            build_trade_risk_rejection_result=lambda failed_risk_gate: self._manager._build_trade_risk_rejection_result(
+                code=code,
+                price=price,
+                quantity=quantity,
+                risk_gate=failed_risk_gate,
+            ),
+            finalize_result=self._manager._finalize_result,
         )
 
     def sell(
