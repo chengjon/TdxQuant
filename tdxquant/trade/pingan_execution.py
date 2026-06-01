@@ -27,6 +27,21 @@ class PingAnExecutionRequest:
         }
 
 
+@dataclass(frozen=True)
+class PingAnConfirmCurrentExecutionRequest:
+    method: str
+    timing_label: str
+    profile_options: dict[str, Any]
+    broker: str = "pingan"
+
+    def request_context(self) -> None:
+        return None
+
+
+def _not_applicable_idempotency() -> dict[str, Any]:
+    return {"decision": "not_applicable", "fingerprint": None, "ledger_consulted": False}
+
+
 def _duplicate_risk_gate(request: PingAnExecutionRequest) -> dict[str, Any]:
     return {
         "passed": True,
@@ -85,6 +100,46 @@ def execute_pingan_order(
         timing=timing,
         submission_key=request.submission_key,
         risk_gate=final_risk_gate,
+        idempotency=idempotency,
+        request_context=request.request_context(),
+    )
+
+
+def execute_pingan_confirm_current(
+    request: PingAnConfirmCurrentExecutionRequest,
+    *,
+    risk_gate: dict[str, Any],
+    dispatch: Callable[[], Result],
+    build_rejected_result: Callable[[dict[str, Any]], Result],
+    attach_metadata: Callable[[Result, dict[str, Any]], Result],
+    attach_safety_metadata: Callable[[Result, dict[str, Any], dict[str, Any], str | None], Result],
+    finalize_result: Callable[..., Result],
+    capture_timing: Callable[[str, Callable[[], Result]], tuple[Result, dict[str, Any]]] = capture_trade_timing,
+) -> Result:
+    idempotency = _not_applicable_idempotency()
+
+    if not bool(risk_gate.get("passed")):
+        result = build_rejected_result(risk_gate)
+        attach_metadata(result, {})
+        attach_safety_metadata(result, risk_gate, idempotency, "none")
+        return result
+
+    result, timing = capture_timing(request.timing_label, dispatch)
+    confirm_current = result.data.get("confirm_current", {}) if isinstance(result.data, dict) else {}
+    confirmation_advanced = bool(confirm_current.get("confirmation_advanced"))
+    if not confirmation_advanced:
+        attach_metadata(result, timing)
+        attach_safety_metadata(result, risk_gate, idempotency, None)
+        return result
+
+    return finalize_result(
+        result,
+        broker=request.broker,
+        method=request.method,
+        profile_options=request.profile_options,
+        timing=timing,
+        submission_key=None,
+        risk_gate=risk_gate,
         idempotency=idempotency,
         request_context=request.request_context(),
     )

@@ -47,7 +47,12 @@ from .context import (
     resolve_trade_profile,
 )
 from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
-from .pingan_execution import PingAnExecutionRequest, execute_pingan_order
+from .pingan_execution import (
+    PingAnConfirmCurrentExecutionRequest,
+    PingAnExecutionRequest,
+    execute_pingan_confirm_current,
+    execute_pingan_order,
+)
 from .pingan_lifecycle import PINGAN_LIFECYCLE_PROCESS_SCHEMA, PingAnLifecycleController
 
 
@@ -3650,9 +3655,9 @@ class _PingAnTradeProxy:
             lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
         )
-        if not boundary_risk_gate["passed"]:
-            broker_readiness_status = boundary_risk_gate.get("broker_readiness_required_status", {})
-            owner_lock_status = boundary_risk_gate.get("lifecycle_owner_lock_required_status", {})
+        def build_boundary_rejection_result(failed_risk_gate: dict[str, Any]) -> Result:
+            broker_readiness_status = failed_risk_gate.get("broker_readiness_required_status", {})
+            owner_lock_status = failed_risk_gate.get("lifecycle_owner_lock_required_status", {})
             failed_broker_readiness = (
                 isinstance(broker_readiness_status, dict)
                 and broker_readiness_status.get("requirement_status") == "failed"
@@ -3680,7 +3685,7 @@ class _PingAnTradeProxy:
                 and broker_readiness_status.get("broker_health", {}).get("code") in ErrorCode._value2member_map_
                 else ErrorCode.INVALID_REQUEST
             )
-            result = Result(
+            return Result(
                 ok=False,
                 code=failed_code,
                 message=failed_message,
@@ -3730,24 +3735,6 @@ class _PingAnTradeProxy:
                 },
                 next_action=failed_next_action,
             )
-            attach_trade_metadata(
-                result,
-                profile_name=self._manager.profile_name,
-                profile_options=effective_profile,
-                broker="pingan",
-                method="confirm_current",
-                title_keyword=self._manager.title_keyword,
-                exe_path=self._manager.exe_path,
-                timing={},
-            )
-            attach_trade_safety_metadata(
-                result,
-                submission_key=None,
-                risk_gate=boundary_risk_gate,
-                idempotency={"decision": "not_applicable", "fingerprint": None, "ledger_consulted": False},
-                side_effect_level="none",
-            )
-            return result
 
         def run() -> Result:
             checks: list[dict[str, Any]] = []
@@ -3979,10 +3966,14 @@ class _PingAnTradeProxy:
                 next_action=next_action,
             )
 
-        result, timing = capture_trade_timing("pingan.confirm_current", run)
-        confirmation_advanced = bool(result.data.get("confirm_current", {}).get("confirmation_advanced"))
-        if not confirmation_advanced:
-            attach_trade_metadata(
+        request = PingAnConfirmCurrentExecutionRequest(
+            method="confirm_current",
+            timing_label="pingan.confirm_current",
+            profile_options=effective_profile,
+        )
+
+        def attach_confirm_metadata(result: Result, timing: dict[str, Any]) -> Result:
+            return attach_trade_metadata(
                 result,
                 profile_name=self._manager.profile_name,
                 profile_options=effective_profile,
@@ -3992,23 +3983,30 @@ class _PingAnTradeProxy:
                 exe_path=self._manager.exe_path,
                 timing=timing,
             )
-            attach_trade_safety_metadata(
-                result,
-                submission_key=None,
-                risk_gate=boundary_risk_gate,
-                idempotency={"decision": "not_applicable", "fingerprint": None, "ledger_consulted": False},
-            )
-            return result
-        return self._manager._finalize_result(
-            result,
-            broker="pingan",
-            method="confirm_current",
-            profile_options=effective_profile,
-            timing=timing,
-            submission_key=None,
+
+        def attach_confirm_safety_metadata(
+            result: Result,
+            risk_gate: dict[str, Any],
+            idempotency: dict[str, Any],
+            side_effect_level: str | None,
+        ) -> Result:
+            kwargs: dict[str, Any] = {
+                "submission_key": None,
+                "risk_gate": risk_gate,
+                "idempotency": idempotency,
+            }
+            if side_effect_level is not None:
+                kwargs["side_effect_level"] = side_effect_level
+            return attach_trade_safety_metadata(result, **kwargs)
+
+        return execute_pingan_confirm_current(
+            request,
             risk_gate=boundary_risk_gate,
-            idempotency={"decision": "not_applicable", "fingerprint": None, "ledger_consulted": False},
-            request_context=None,
+            dispatch=run,
+            build_rejected_result=build_boundary_rejection_result,
+            attach_metadata=attach_confirm_metadata,
+            attach_safety_metadata=attach_confirm_safety_metadata,
+            finalize_result=self._manager._finalize_result,
         )
 
 

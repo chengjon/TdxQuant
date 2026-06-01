@@ -2697,6 +2697,31 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertNotIn("submission_ledger_path", result.data.get("artifacts", {}))
         self.assertEqual(mocked_click.call_count, 2)
 
+    def test_pingan_confirm_current_routes_through_execution_module(self) -> None:
+        manager = TdxTradeManager(profile="balanced")
+        delegated = Result(ok=True, code=ErrorCode.OK, message="delegated", data={"delegated": True})
+        with (
+            patch(
+                "tdxquant.trade.manager.execute_pingan_confirm_current",
+                return_value=delegated,
+                create=True,
+            ) as mocked_execute,
+            patch(
+                "tdxquant.trade.manager._find_confirm_target_for_lookup",
+                return_value={"ok": False, "lookup_mode": "uia", "last_error": "confirm dialog not found"},
+            ) as mocked_lookup,
+        ):
+            result = manager.pingan.confirm_current(close_result_dialog=False)
+
+        self.assertEqual(result, delegated)
+        mocked_execute.assert_called_once()
+        request = mocked_execute.call_args.args[0]
+        self.assertEqual(request.method, "confirm_current")
+        self.assertEqual(request.timing_label, "pingan.confirm_current")
+        self.assertIsNone(request.request_context())
+        self.assertTrue(mocked_execute.call_args.kwargs["risk_gate"]["passed"])
+        mocked_lookup.assert_not_called()
+
     def test_pingan_confirm_current_requires_owner_lock_before_ui_side_effects(self) -> None:
         with TemporaryDirectory() as temp_dir:
             lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
