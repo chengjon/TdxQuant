@@ -94,7 +94,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("catalog plan --entry task-buy --view summary", combined)
         self.assertIn("catalog plan --entry task-sell --view summary", combined)
         self.assertIn("catalog plan --entry task-confirm-current --view summary", combined)
@@ -110,7 +110,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("catalog plan --bundle buy-pingan-complete-review --view summary", combined)
         self.assertIn("catalog preview --bundle buy-pingan-complete-review --view summary", combined)
         self.assertIn("catalog plan --bundle sell-pingan-complete-review --view summary", combined)
@@ -129,7 +129,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("catalog plan --bundle buy-pingan-complete-review --from-step success --view summary", combined)
         self.assertIn("catalog preview --bundle buy-pingan-complete-review --from-step success --view summary", combined)
         self.assertIn("catalog plan --bundle buy-pingan-complete-review --to-step trade --view summary", combined)
@@ -144,7 +144,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("trade_plan_boundary_input_coverage_status_counts", combined)
         self.assertIn("missing_required_inputs", combined)
         self.assertIn("no_required_inputs", combined)
@@ -157,7 +157,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("trade_plan_boundary_input_kind_counts", combined)
         self.assertIn("order", combined)
         self.assertIn("confirmation", combined)
@@ -169,14 +169,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("交易安全审批", combined)
         self.assertIn("production readiness", combined)
 
-    def test_pingan_live_manual_acceptance_evidence_is_registered_without_status_change(self) -> None:
+    def test_pingan_live_manual_acceptance_evidence_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-live-manual-acceptance-evidence", combined)
                 self.assertIn("live_manual_acceptance_complete", combined)
                 self.assertIn("acceptance_complete", combined)
@@ -186,14 +186,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 UI login readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_live_manual_acceptance_recorder_is_registered_without_status_change(self) -> None:
+    def test_pingan_live_manual_acceptance_recorder_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-live-manual-acceptance-recorder", combined)
                 self.assertIn("task pingan-live-manual-acceptance", combined)
                 self.assertIn("tdx.desktop_trade.pingan_live_manual_acceptance.v1", combined)
@@ -203,14 +203,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_readiness_manifest_sample_registry_evidence_is_registered_without_status_change(self) -> None:
+    def test_pingan_readiness_manifest_sample_registry_evidence_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-promotion-readiness-manifest-sample-registry", combined)
                 self.assertIn("runtime/pingan/promotion-readiness-manifest.example.json", combined)
                 self.assertIn("plan-pingan-promotion-readiness", combined)
@@ -226,7 +226,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("catalog plan --entry task-buy-submit-once --view summary", combined)
         self.assertIn("catalog preview --entry task-buy-submit-once --view summary", combined)
         self.assertIn("catalog plan --entry task-sell-submit-once --view summary", combined)
@@ -242,7 +242,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("catalog plan --bundle buy-submit-once-pingan-complete-review --view summary", combined)
         self.assertIn("catalog preview --bundle buy-submit-once-pingan-complete-review --view summary", combined)
         self.assertIn("catalog plan --bundle sell-submit-once-pingan-complete-review --view summary", combined)
@@ -258,7 +258,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("trade_plan_boundary_input_coverage_status_counts", combined)
         self.assertIn("missing_required_inputs", combined)
         self.assertIn("has_trade_plan_boundary", combined)
@@ -275,7 +275,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("trade_plan_boundary_input_kind_counts", combined)
         self.assertIn("submit_once_order", combined)
         self.assertIn("catalog preview --bundle sell-submit-once-pingan-complete-review --view summary", combined)
@@ -290,11 +290,11 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("production readiness", combined)
         self.assertIn("桌面执行原语", combined)
 
-    def test_pingan_submit_once_broker_readiness_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_submit_once_broker_readiness_guard_is_registered_with_transitioned_status(self) -> None:
         row = _current_function_tree_rows()["D-08"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("pingan-submit-once-broker-readiness-guard", combined)
         self.assertIn("trade submit-once --require-broker-readiness", combined)
         self.assertIn("task trade-submit-once --require-broker-readiness", combined)
@@ -304,14 +304,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("不 retry/backoff/recovery", combined)
         self.assertIn("production trading readiness", combined)
 
-    def test_pingan_trading_implemented_promotion_plan_is_registered_without_status_change(self) -> None:
+    def test_pingan_trading_implemented_promotion_plan_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-trading-implemented-promotion-plan", combined)
                 self.assertIn("provider/broker ownership", combined)
                 self.assertIn("safety gates", combined)
@@ -323,14 +323,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("交易安全审批", combined)
                 self.assertIn("production readiness", combined)
 
-    def test_pingan_preflight_owner_lock_status_gate_is_registered_without_status_change(self) -> None:
+    def test_pingan_preflight_owner_lock_status_gate_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-preflight-owner-lock-status-gate", combined)
                 self.assertIn("promotion_gate_status.lifecycle_owner_lock_status", combined)
                 self.assertIn("owner_pid_status/owner_pid_alive", combined)
@@ -341,14 +341,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("broker readiness", combined)
                 self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_preflight_owner_lock_required_gate_is_registered_without_status_change(self) -> None:
+    def test_pingan_preflight_owner_lock_required_gate_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-preflight-owner-lock-required-gate", combined)
                 self.assertIn("trade preflight --require-lifecycle-owner-lock", combined)
                 self.assertIn("lifecycle_owner_lock_status.required=true", combined)
@@ -360,14 +360,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("broker readiness", combined)
                 self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_execution_owner_lock_required_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_execution_owner_lock_required_guard_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-execution-owner-lock-required-guard", combined)
                 self.assertIn("trade buy/sell/submit-once --require-lifecycle-owner-lock", combined)
                 self.assertIn("require_lifecycle_owner_lock=true", combined)
@@ -381,14 +381,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("broker readiness", combined)
                 self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_task_execution_owner_lock_required_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_task_execution_owner_lock_required_guard_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-task-execution-owner-lock-required-guard", combined)
                 self.assertIn("task trade-buy/trade-sell/trade-submit-once --require-lifecycle-owner-lock", combined)
                 self.assertIn("TdxTaskManager.trade_buy/trade_sell/trade_submit_once", combined)
@@ -406,7 +406,7 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-task-run-owner-lock-guard-overrides", combined)
                 self.assertIn("task run --preset", combined)
                 self.assertIn("lifecycle owner-lock preset/CLI override", combined)
@@ -417,12 +417,12 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("broker readiness", combined)
                 self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_guarded_trade_owner_lock_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_guarded_trade_owner_lock_guard_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
         row = rows["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("pingan-guarded-trade-owner-lock-guard", combined)
         self.assertIn("task guarded-trade-buy --require-lifecycle-owner-lock", combined)
         self.assertIn("guarded_trade_buy", combined)
@@ -433,12 +433,12 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("broker readiness", combined)
         self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_confirm_current_owner_lock_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_confirm_current_owner_lock_guard_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
         row = rows["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("pingan-confirm-current-owner-lock-guard", combined)
         self.assertIn("trade confirm-current --require-lifecycle-owner-lock", combined)
         self.assertIn("task trade-confirm-current --require-lifecycle-owner-lock", combined)
@@ -449,12 +449,12 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("broker readiness", combined)
         self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_submit_ready_owner_lock_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_submit_ready_owner_lock_guard_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
         row = rows["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("pingan-submit-ready-owner-lock-guard", combined)
         self.assertIn("trade submit-ready --require-lifecycle-owner-lock", combined)
         self.assertIn("task trade-submit-ready --require-lifecycle-owner-lock", combined)
@@ -465,14 +465,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("broker readiness", combined)
         self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_exception_popup_manual_close_control_is_registered_without_status_change(self) -> None:
+    def test_pingan_exception_popup_manual_close_control_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-exception-popup-manual-close-control", combined)
                 self.assertIn("TdxTradeManager.pingan.exception_popup", combined)
                 self.assertIn("trade exception-popup --action inspect", combined)
@@ -483,12 +483,12 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("live/manual acceptance", combined)
                 self.assertIn("workflow/lifecycle governance", combined)
 
-    def test_pingan_confirm_current_broker_readiness_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_confirm_current_broker_readiness_guard_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
         row = rows["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("pingan-confirm-current-broker-readiness-guard", combined)
         self.assertIn("trade confirm-current --require-broker-readiness", combined)
         self.assertIn("task trade-confirm-current --require-broker-readiness", combined)
@@ -498,12 +498,12 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("不 retry/backoff/recovery", combined)
         self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_buy_sell_broker_readiness_guard_is_registered_without_status_change(self) -> None:
+    def test_pingan_buy_sell_broker_readiness_guard_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
         row = rows["D-07"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
         self.assertIn("pingan-buy-sell-broker-readiness-guard", combined)
         self.assertIn("trade buy --require-broker-readiness", combined)
         self.assertIn("trade sell --require-broker-readiness", combined)
@@ -515,14 +515,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
         self.assertIn("不 retry/backoff/recovery", combined)
         self.assertIn("production trading readiness", combined)
 
-    def test_pingan_lifecycle_supervisor_control_is_registered_without_status_change(self) -> None:
+    def test_pingan_lifecycle_supervisor_control_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-lifecycle-supervisor-control", combined)
                 self.assertIn("TdxTradeManager.pingan.lifecycle_supervisor_tick", combined)
                 self.assertIn("TdxTradeManager.pingan.lifecycle_supervisor_run", combined)
@@ -535,14 +535,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不 own/kill/start 真实 PingAn 进程", combined)
                 self.assertIn("production trading readiness", combined)
 
-    def test_pingan_process_lifecycle_control_is_registered_without_status_change(self) -> None:
+    def test_pingan_process_lifecycle_control_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-process-lifecycle-control", combined)
                 self.assertIn("TdxTradeManager.pingan.lifecycle_process", combined)
                 self.assertIn("trade lifecycle-process", combined)
@@ -554,14 +554,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 UI login readiness", combined)
                 self.assertIn("production trading readiness", combined)
 
-    def test_pingan_supervisor_process_restart_control_is_registered_without_status_change(self) -> None:
+    def test_pingan_supervisor_process_restart_control_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-supervisor-process-restart-control", combined)
                 self.assertIn("process_restart_enabled", combined)
                 self.assertIn("trade lifecycle-supervisor-tick --process-restart", combined)
@@ -574,14 +574,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 UI login readiness", combined)
                 self.assertIn("production trading readiness", combined)
 
-    def test_pingan_supervisor_restart_readiness_summary_is_registered_without_status_change(self) -> None:
+    def test_pingan_supervisor_restart_readiness_summary_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-supervisor-restart-readiness-summary", combined)
                 self.assertIn("process_restart_recheck_enabled", combined)
                 self.assertIn("lifecycle_recovery_status", combined)
@@ -592,14 +592,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 UI login readiness", combined)
                 self.assertIn("live/manual acceptance", combined)
 
-    def test_pingan_promotion_readiness_rollup_is_registered_without_status_change(self) -> None:
+    def test_pingan_promotion_readiness_rollup_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-promotion-readiness-rollup", combined)
                 self.assertIn("promotion_readiness_rollup", combined)
                 self.assertIn("completed_gates", combined)
@@ -609,14 +609,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_implemented_status_promotion_decision_is_registered_without_status_change(self) -> None:
+    def test_pingan_implemented_status_promotion_decision_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-implemented-status-promotion-decision", combined)
                 self.assertIn("implemented_status_promotion_decision", combined)
                 self.assertIn("eligible_for_review", combined)
@@ -627,14 +627,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_implemented_status_review_packet_is_registered_without_status_change(self) -> None:
+    def test_pingan_implemented_status_review_packet_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-implemented-status-review-packet", combined)
                 self.assertIn("implemented_status_review_packet", combined)
                 self.assertIn("ready_for_manual_review", combined)
@@ -643,14 +643,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_implemented_status_review_result_recorder_is_registered_without_status_change(self) -> None:
+    def test_pingan_implemented_status_review_result_recorder_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-implemented-status-review-result-recorder", combined)
                 self.assertIn("implemented_status_review_result", combined)
                 self.assertIn("approve/reject/defer", combined)
@@ -660,14 +660,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_review_result_transition_gate_is_registered_without_status_change(self) -> None:
+    def test_pingan_review_result_transition_gate_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-review-result-transition-gate", combined)
                 self.assertIn("implemented_status_transition_gate", combined)
                 self.assertIn("eligible_for_status_transition_review", combined)
@@ -677,14 +677,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_implemented_status_transition_writer_is_registered_without_status_change(self) -> None:
+    def test_pingan_implemented_status_transition_writer_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-implemented-status-transition-writer", combined)
                 self.assertIn("pingan_implemented_status_transition", combined)
                 self.assertIn("implemented_status_transition_record", combined)
@@ -694,14 +694,29 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_evidence_provenance_gate_is_registered_without_status_change(self) -> None:
+    def test_pingan_function_tree_status_transition_is_registered_as_implemented(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
+                self.assertIn("pingan-function-tree-status-transition", combined)
+                self.assertIn("runtime/pingan/d07-d08-implemented-status-transition-record.json", combined)
+                self.assertIn("function_tree_status_transition_executed=true", combined)
+                self.assertIn("task pingan-implemented-status-transition", combined)
+                self.assertIn("不执行 PingAn workflow", combined)
+                self.assertIn("不提交订单", combined)
+
+    def test_pingan_evidence_provenance_gate_is_registered_with_transitioned_status(self) -> None:
+        rows = _current_function_tree_rows()
+
+        for node_id in ("D-07", "D-08"):
+            with self.subTest(node_id=node_id):
+                row = rows[node_id]
+                combined = f"{row['evidence']} {row['boundary']}"
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-evidence-provenance-promotion-gate", combined)
                 self.assertIn("evidence_contract_status", combined)
                 self.assertIn("unverified_evidence_contract", combined)
@@ -711,14 +726,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_artifact_provenance_gate_is_registered_without_status_change(self) -> None:
+    def test_pingan_artifact_provenance_gate_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-artifact-provenance-promotion-gate", combined)
                 self.assertIn("artifact_provenance_status", combined)
                 self.assertIn("unverified_artifact_provenance", combined)
@@ -728,14 +743,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_live_manual_acceptance_provenance_rollup_is_registered_without_status_change(self) -> None:
+    def test_pingan_live_manual_acceptance_provenance_rollup_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-live-manual-acceptance-provenance-rollup", combined)
                 self.assertIn("live_manual_acceptance_provenance_status", combined)
                 self.assertIn("unverified_live_manual_acceptance_artifact_provenance", combined)
@@ -744,14 +759,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_readiness_evidence_producer_provenance_is_registered_without_status_change(self) -> None:
+    def test_pingan_readiness_evidence_producer_provenance_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-readiness-evidence-producer-provenance", combined)
                 self.assertIn("trade preflight", combined)
                 self.assertIn("trade dialog-readiness", combined)
@@ -762,14 +777,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_promotion_readiness_freshness_gate_is_registered_without_status_change(self) -> None:
+    def test_pingan_promotion_readiness_freshness_gate_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-promotion-readiness-freshness-gate", combined)
                 self.assertIn("max_evidence_age_seconds", combined)
                 self.assertIn("evidence_freshness_status", combined)
@@ -780,14 +795,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_promotion_readiness_artifact_output_is_registered_without_status_change(self) -> None:
+    def test_pingan_promotion_readiness_artifact_output_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-promotion-readiness-artifact-output", combined)
                 self.assertIn("json_output_path", combined)
                 self.assertIn("promotion_readiness_rollup_artifact", combined)
@@ -797,14 +812,14 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_pingan_promotion_readiness_manifest_input_is_registered_without_status_change(self) -> None:
+    def test_pingan_promotion_readiness_manifest_input_is_registered_with_transitioned_status(self) -> None:
         rows = _current_function_tree_rows()
 
         for node_id in ("D-07", "D-08"):
             with self.subTest(node_id=node_id):
                 row = rows[node_id]
                 combined = f"{row['evidence']} {row['boundary']}"
-                self.assertEqual(row["status"], "`[部分实现]`")
+                self.assertEqual(row["status"], "`[已实现]`")
                 self.assertIn("pingan-promotion-readiness-manifest-input", combined)
                 self.assertIn("evidence_manifest_path", combined)
                 self.assertIn("evidence_manifest", combined)

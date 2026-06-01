@@ -1,0 +1,6 @@
+- [x] 1.1 Add proposal, design, spec delta, and validate the OpenSpec change.
+- [x] 1.2 Add red FUNCTION_TREE registry tests requiring D-07/D-08 `[已实现]` status and transition record evidence.
+- [x] 1.3 Add repository-local review packet evidence and generate review result, transition gate, and transition record artifacts through existing task machinery.
+- [x] 1.4 Execute the guarded FUNCTION_TREE transition and update D-07/D-08 evidence/boundary text without claiming new runtime behavior.
+- [x] 1.5 Run focused pytest, OpenSpec strict validation, `git diff --check`, and FUNCTION_TREE registry validation.
+- [x] 1.6 Archive the OpenSpec change, repeat verification, and commit the focused slice.

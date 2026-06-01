@@ -1,0 +1,39 @@
+{
+  "schema": "tdx.desktop_trade.pingan_implemented_status_review_packet.v1",
+  "review_status": "ready_for_manual_review",
+  "target_nodes": [
+    "D-07",
+    "D-08"
+  ],
+  "current_function_tree_status": "[部分实现]",
+  "decision": "eligible_for_review",
+  "implemented_status_eligible": true,
+  "completed_gates": [
+    "provider_broker_ownership",
+    "safety_gates",
+    "desktop_lifecycle",
+    "live_manual_acceptance",
+    "acceptance_evidence",
+    "audit_evidence"
+  ],
+  "incomplete_gates": [],
+  "blocked_reasons": [],
+  "manual_status_review_required": true,
+  "automatic_status_transition_allowed": false,
+  "function_tree_status_transition_executed": false,
+  "order_submitted": false,
+  "control_dispatch_executed": false,
+  "promotion_status_transition_executed": false,
+  "execution_mode": "readonly_status_review_packet",
+  "side_effect_level": "none",
+  "evidence_summary": {
+    "function_tree_nodes": [
+      "D-07",
+      "D-08"
+    ],
+    "registry_source": "FUNCTION_TREE.md",
+    "transition_writer_change": "pingan-implemented-status-transition-writer",
+    "transition_execution_change": "pingan-function-tree-status-transition"
+  },
+  "boundary": "Manual review packet for FUNCTION_TREE status transition only; does not execute PingAn workflows, submit orders, control desktop windows, or create new broker production readiness."
+}

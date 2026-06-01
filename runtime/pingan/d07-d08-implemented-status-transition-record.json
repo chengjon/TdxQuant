@@ -1,0 +1,44 @@
+{
+  "schema": "tdx.desktop_trade.pingan_implemented_status_transition_record.v1",
+  "artifact_provenance": {
+    "schema": "tdx.desktop_trade.pingan_readiness_evidence_artifact.v1",
+    "source_kind": "implemented_status_transition_record",
+    "producer": "task pingan-implemented-status-transition",
+    "evidence_schema": "tdx.desktop_trade.pingan_implemented_status_transition_record.v1"
+  },
+  "operator": "codex-agent",
+  "reason": "Execute user-approved D-07/D-08 FUNCTION_TREE status transition with eligible transition gate.",
+  "transitioned_at": "2026-06-01T02:39:15.172529Z",
+  "transition_gate_path": "/opt/iflow/TdxQuant/runtime/pingan/d07-d08-implemented-status-transition-gate.json",
+  "function_tree_path": "/opt/iflow/TdxQuant/FUNCTION_TREE.md",
+  "target_nodes": [
+    "D-07",
+    "D-08"
+  ],
+  "status_changes": {
+    "D-07": {
+      "from": "[部分实现]",
+      "to": "[已实现]"
+    },
+    "D-08": {
+      "from": "[部分实现]",
+      "to": "[已实现]"
+    }
+  },
+  "gate_status": "eligible_for_status_transition_review",
+  "eligible_for_status_transition_review": true,
+  "completed_checks": [
+    "verified_review_result_artifact_provenance",
+    "approved_review_result",
+    "target_nodes_d07_d08",
+    "eligible_review_packet",
+    "non_transition_flags_confirmed"
+  ],
+  "function_tree_status_transition_executed": true,
+  "order_submitted": false,
+  "control_dispatch_executed": false,
+  "promotion_status_transition_executed": true,
+  "execution_mode": "function_tree_status_transition",
+  "side_effect_level": "function_tree_write",
+  "boundary": "Records an explicit FUNCTION_TREE status transition only; does not execute PingAn workflows, submit orders, control the desktop, or prove production readiness by itself."
+}
