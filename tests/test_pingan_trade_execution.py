@@ -5,7 +5,9 @@ import unittest
 from tdxquant.models import ErrorCode, Result
 from tdxquant.trade.pingan_execution import (
     PingAnConfirmCurrentExecutionRequest,
+    PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
+    build_pingan_confirm_current_boundary_rejection_result,
     execute_pingan_confirm_current,
     execute_pingan_order,
 )
@@ -257,3 +259,76 @@ class PingAnTradeExecutionTests(unittest.TestCase):
         self.assertEqual(finalized["idempotency"]["decision"], "not_applicable")
         self.assertIsNone(finalized["submission_key"])
         self.assertIsNone(finalized["request_context"])
+
+    def _confirm_rejection_context(self):
+        return PingAnConfirmCurrentRejectionContext(
+            close_result_dialog=True,
+            dialog_lookup_mode="uia",
+            confirm_timeout=3.0,
+            result_timeout=2.0,
+            result_close_pre_delay=0.1,
+            lifecycle_statefile_path="/tmp/pingan-lifecycle.json",
+            lifecycle_owner_token="owner-token",
+            lifecycle_stale_after_seconds=60.0,
+            require_lifecycle_owner_lock=True,
+            require_broker_readiness=False,
+        )
+
+    def test_build_pingan_confirm_current_boundary_rejection_result_for_owner_lock(self) -> None:
+        result = build_pingan_confirm_current_boundary_rejection_result(
+            {
+                "passed": False,
+                "lifecycle_owner_lock_required_status": {
+                    "required": True,
+                    "requirement_status": "failed",
+                    "requirement_reason": "owner token mismatch",
+                    "status": "not_acquired",
+                },
+            },
+            context=self._confirm_rejection_context(),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+        self.assertEqual(result.message, "stable trade confirm-current rejected by lifecycle owner-lock requirement")
+        self.assertEqual(result.next_action, "Acquire the PingAn lifecycle owner lock and retry confirm-current.")
+        self.assertEqual(result.data["input"]["boundary"], "confirm_current")
+        self.assertEqual(result.data["input"]["lifecycle_owner_token"], "owner-token")
+        confirm_current = result.data["confirm_current"]
+        self.assertEqual(confirm_current["overall_status"], "failed")
+        self.assertFalse(confirm_current["confirmation_advanced"])
+        self.assertFalse(confirm_current["result_dialog_closed"])
+        check = confirm_current["checks"][0]
+        self.assertEqual(check["name"], "lifecycle_owner_lock_required")
+        self.assertEqual(check["status"], "failed")
+        self.assertTrue(check["critical"])
+        self.assertEqual(check["summary"], "owner token mismatch")
+        self.assertEqual(result.data["result_dialog"], {})
+
+    def test_build_pingan_confirm_current_boundary_rejection_result_for_broker_readiness(self) -> None:
+        result = build_pingan_confirm_current_boundary_rejection_result(
+            {
+                "passed": False,
+                "broker_readiness_required_status": {
+                    "required": True,
+                    "requirement_status": "failed",
+                    "requirement_reason": "broker window missing",
+                    "broker_health": {
+                        "code": ErrorCode.CONTROL_NOT_FOUND.value,
+                        "next_action": "Bring Ping An to the foreground.",
+                    },
+                },
+            },
+            context=self._confirm_rejection_context(),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.code, ErrorCode.CONTROL_NOT_FOUND)
+        self.assertEqual(result.message, "stable trade confirm-current rejected by broker readiness requirement")
+        self.assertEqual(result.next_action, "Bring Ping An to the foreground.")
+        self.assertTrue(result.data["input"]["require_lifecycle_owner_lock"])
+        confirm_current = result.data["confirm_current"]
+        check = confirm_current["checks"][0]
+        self.assertEqual(check["name"], "broker_readiness_required")
+        self.assertEqual(check["summary"], "broker window missing")
+        self.assertEqual(check["recommended_action"], "Bring Ping An to the foreground.")

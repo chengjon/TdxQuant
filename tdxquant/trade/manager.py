@@ -49,7 +49,9 @@ from .context import (
 from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
 from .pingan_execution import (
     PingAnConfirmCurrentExecutionRequest,
+    PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
+    build_pingan_confirm_current_boundary_rejection_result,
     execute_pingan_confirm_current,
     execute_pingan_order,
 )
@@ -3655,86 +3657,18 @@ class _PingAnTradeProxy:
             lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
         )
-        def build_boundary_rejection_result(failed_risk_gate: dict[str, Any]) -> Result:
-            broker_readiness_status = failed_risk_gate.get("broker_readiness_required_status", {})
-            owner_lock_status = failed_risk_gate.get("lifecycle_owner_lock_required_status", {})
-            failed_broker_readiness = (
-                isinstance(broker_readiness_status, dict)
-                and broker_readiness_status.get("requirement_status") == "failed"
-            )
-            failed_status = broker_readiness_status if failed_broker_readiness else owner_lock_status
-            failed_check_name = "broker_readiness_required" if failed_broker_readiness else "lifecycle_owner_lock_required"
-            failed_message = (
-                "stable trade confirm-current rejected by broker readiness requirement"
-                if failed_broker_readiness
-                else "stable trade confirm-current rejected by lifecycle owner-lock requirement"
-            )
-            failed_next_action = (
-                broker_readiness_status.get("broker_health", {}).get("next_action")
-                if failed_broker_readiness and isinstance(broker_readiness_status.get("broker_health"), dict)
-                else None
-            ) or (
-                "Bring Ping An to the foreground and retry confirm-current."
-                if failed_broker_readiness
-                else "Acquire the PingAn lifecycle owner lock and retry confirm-current."
-            )
-            failed_code = (
-                ErrorCode(str(broker_readiness_status.get("broker_health", {}).get("code")))
-                if failed_broker_readiness
-                and isinstance(broker_readiness_status.get("broker_health"), dict)
-                and broker_readiness_status.get("broker_health", {}).get("code") in ErrorCode._value2member_map_
-                else ErrorCode.INVALID_REQUEST
-            )
-            return Result(
-                ok=False,
-                code=failed_code,
-                message=failed_message,
-                data={
-                    "input": {
-                        "boundary": "confirm_current",
-                        "close_result_dialog": close_result_dialog,
-                        "dialog_lookup_mode": resolved_lookup_mode,
-                        "confirm_timeout": resolved_confirm_timeout,
-                        "result_timeout": resolved_result_timeout,
-                        "lifecycle_statefile_path": lifecycle_statefile_path,
-                        "lifecycle_owner_token": lifecycle_owner_token,
-                        "lifecycle_stale_after_seconds": lifecycle_stale_after_seconds,
-                        "require_lifecycle_owner_lock": require_lifecycle_owner_lock,
-                        "require_broker_readiness": require_broker_readiness,
-                    },
-                    "confirm_current": {
-                        "overall_status": "failed",
-                        "confirmation_advanced": False,
-                        "result_dialog_closed": False,
-                        "requested": {
-                            "close_result_dialog": close_result_dialog,
-                            "dialog_lookup_mode": resolved_lookup_mode,
-                            "confirm_timeout": resolved_confirm_timeout,
-                            "result_timeout": resolved_result_timeout,
-                            "result_close_pre_delay": resolved_result_close_pre_delay,
-                        },
-                        "checks": [
-                            _build_trade_health_check(
-                                failed_check_name,
-                                "failed",
-                                str(
-                                    failed_status.get("requirement_reason")
-                                    or (
-                                        "broker readiness requirement failed"
-                                        if failed_broker_readiness
-                                        else "lifecycle owner lock requirement failed"
-                                    )
-                                ),
-                                detail=failed_status,
-                                critical=True,
-                                recommended_action=failed_next_action,
-                            )
-                        ],
-                    },
-                    "result_dialog": {},
-                },
-                next_action=failed_next_action,
-            )
+        rejection_context = PingAnConfirmCurrentRejectionContext(
+            close_result_dialog=close_result_dialog,
+            dialog_lookup_mode=resolved_lookup_mode,
+            confirm_timeout=resolved_confirm_timeout,
+            result_timeout=resolved_result_timeout,
+            result_close_pre_delay=resolved_result_close_pre_delay,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            require_broker_readiness=require_broker_readiness,
+        )
 
         def run() -> Result:
             checks: list[dict[str, Any]] = []
@@ -4003,7 +3937,10 @@ class _PingAnTradeProxy:
             request,
             risk_gate=boundary_risk_gate,
             dispatch=run,
-            build_rejected_result=build_boundary_rejection_result,
+            build_rejected_result=lambda failed_risk_gate: build_pingan_confirm_current_boundary_rejection_result(
+                failed_risk_gate,
+                context=rejection_context,
+            ),
             attach_metadata=attach_confirm_metadata,
             attach_safety_metadata=attach_confirm_safety_metadata,
             finalize_result=self._manager._finalize_result,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from ..models import Result
+from ..models import ErrorCode, Result
 from .context import capture_trade_timing
 
 
@@ -38,8 +38,130 @@ class PingAnConfirmCurrentExecutionRequest:
         return None
 
 
+@dataclass(frozen=True)
+class PingAnConfirmCurrentRejectionContext:
+    close_result_dialog: bool
+    dialog_lookup_mode: str
+    confirm_timeout: float
+    result_timeout: float
+    result_close_pre_delay: float
+    lifecycle_statefile_path: str | None
+    lifecycle_owner_token: str | None
+    lifecycle_stale_after_seconds: float
+    require_lifecycle_owner_lock: bool
+    require_broker_readiness: bool
+
+
+def _confirm_health_check(
+    name: str,
+    status: str,
+    summary: str,
+    *,
+    detail: Any | None = None,
+    critical: bool = False,
+    recommended_action: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "name": name,
+        "status": status,
+        "summary": summary,
+        "critical": critical,
+    }
+    if detail is not None:
+        payload["detail"] = detail
+    if recommended_action:
+        payload["recommended_action"] = recommended_action
+    return payload
+
+
 def _not_applicable_idempotency() -> dict[str, Any]:
     return {"decision": "not_applicable", "fingerprint": None, "ledger_consulted": False}
+
+
+def build_pingan_confirm_current_boundary_rejection_result(
+    risk_gate: dict[str, Any],
+    *,
+    context: PingAnConfirmCurrentRejectionContext,
+) -> Result:
+    broker_readiness_status = risk_gate.get("broker_readiness_required_status", {})
+    owner_lock_status = risk_gate.get("lifecycle_owner_lock_required_status", {})
+    failed_broker_readiness = (
+        isinstance(broker_readiness_status, dict)
+        and broker_readiness_status.get("requirement_status") == "failed"
+    )
+    failed_status = broker_readiness_status if failed_broker_readiness else owner_lock_status
+    failed_check_name = "broker_readiness_required" if failed_broker_readiness else "lifecycle_owner_lock_required"
+    failed_message = (
+        "stable trade confirm-current rejected by broker readiness requirement"
+        if failed_broker_readiness
+        else "stable trade confirm-current rejected by lifecycle owner-lock requirement"
+    )
+    failed_next_action = (
+        broker_readiness_status.get("broker_health", {}).get("next_action")
+        if failed_broker_readiness and isinstance(broker_readiness_status.get("broker_health"), dict)
+        else None
+    ) or (
+        "Bring Ping An to the foreground and retry confirm-current."
+        if failed_broker_readiness
+        else "Acquire the PingAn lifecycle owner lock and retry confirm-current."
+    )
+    failed_code = (
+        ErrorCode(str(broker_readiness_status.get("broker_health", {}).get("code")))
+        if failed_broker_readiness
+        and isinstance(broker_readiness_status.get("broker_health"), dict)
+        and broker_readiness_status.get("broker_health", {}).get("code") in ErrorCode._value2member_map_
+        else ErrorCode.INVALID_REQUEST
+    )
+    return Result(
+        ok=False,
+        code=failed_code,
+        message=failed_message,
+        data={
+            "input": {
+                "boundary": "confirm_current",
+                "close_result_dialog": context.close_result_dialog,
+                "dialog_lookup_mode": context.dialog_lookup_mode,
+                "confirm_timeout": context.confirm_timeout,
+                "result_timeout": context.result_timeout,
+                "lifecycle_statefile_path": context.lifecycle_statefile_path,
+                "lifecycle_owner_token": context.lifecycle_owner_token,
+                "lifecycle_stale_after_seconds": context.lifecycle_stale_after_seconds,
+                "require_lifecycle_owner_lock": context.require_lifecycle_owner_lock,
+                "require_broker_readiness": context.require_broker_readiness,
+            },
+            "confirm_current": {
+                "overall_status": "failed",
+                "confirmation_advanced": False,
+                "result_dialog_closed": False,
+                "requested": {
+                    "close_result_dialog": context.close_result_dialog,
+                    "dialog_lookup_mode": context.dialog_lookup_mode,
+                    "confirm_timeout": context.confirm_timeout,
+                    "result_timeout": context.result_timeout,
+                    "result_close_pre_delay": context.result_close_pre_delay,
+                },
+                "checks": [
+                    _confirm_health_check(
+                        failed_check_name,
+                        "failed",
+                        str(
+                            failed_status.get("requirement_reason")
+                            or (
+                                "broker readiness requirement failed"
+                                if failed_broker_readiness
+                                else "lifecycle owner lock requirement failed"
+                            )
+                        ),
+                        detail=failed_status,
+                        critical=True,
+                        recommended_action=failed_next_action,
+                    )
+                ],
+            },
+            "result_dialog": {},
+        },
+        next_action=failed_next_action,
+    )
 
 
 def _duplicate_risk_gate(request: PingAnExecutionRequest) -> dict[str, Any]:
