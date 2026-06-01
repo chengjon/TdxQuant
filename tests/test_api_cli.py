@@ -2793,6 +2793,14 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.stale_after_seconds, 45.0)
         self.assertTrue(args.force_restart)
 
+    def test_trade_acceptance_evidence_summary_view_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "acceptance-evidence", "--broker", "pingan_desktop", "--view", "summary"])
+        self.assertEqual(args.command, "trade")
+        self.assertEqual(args.trade_command, "acceptance-evidence")
+        self.assertEqual(args.broker, "pingan_desktop")
+        self.assertEqual(args.view, "summary")
+
     def test_trade_submit_ready_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -12394,6 +12402,54 @@ class TradeCliDispatchTests(unittest.TestCase):
             result = _run_trade_acceptance_evidence(args)
         self.assertIs(result, expected)
         manager.pingan.acceptance_evidence.assert_called_once_with()
+
+    def test_run_trade_acceptance_evidence_summary_view_projects_stable_fields(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "acceptance-evidence", "--broker", "pingan_desktop", "--view", "summary"])
+        expected = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={
+                "acceptance_evidence": {
+                    "schema": "tdx.desktop_trade.pingan_trade_execution_acceptance_evidence.v1",
+                    "status": "summary_available",
+                    "target_nodes": ["D-07", "D-08"],
+                    "covered_trade_surfaces": [
+                        {"command": "trade buy", "method": "buy"},
+                        {"command": "trade submit-once --side buy", "method": "buy_submit_once"},
+                    ],
+                    "evidence_categories": [{"name": "trade_audit_artifacts"}, {"name": "manual_acceptance_artifacts"}],
+                    "artifact_targets": {"last_order_state_path": "runtime/pingan-last-order.json"},
+                    "dispatch_executed": False,
+                    "order_submitted": False,
+                    "workflow_dispatch_executed": False,
+                    "desktop_automation_executed": False,
+                    "process_control_executed": False,
+                    "status_transition_executed": False,
+                    "live_manual_acceptance_evaluated": False,
+                    "boundary": "read-only summary",
+                }
+            },
+        )
+        manager = MagicMock()
+        manager.pingan.acceptance_evidence.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_acceptance_evidence(args)
+        summary = result.data["summary_view"]
+        self.assertEqual(summary["schema"], "tdx.desktop_trade.pingan_trade_execution_acceptance_evidence_summary.v1")
+        self.assertEqual(summary["target_nodes"], ["D-07", "D-08"])
+        self.assertEqual(summary["covered_trade_commands"], ["trade buy", "trade submit-once --side buy"])
+        self.assertEqual(summary["covered_trade_methods"], ["buy", "buy_submit_once"])
+        self.assertEqual(summary["evidence_category_names"], ["manual_acceptance_artifacts", "trade_audit_artifacts"])
+        self.assertEqual(summary["artifact_target_keys"], ["last_order_state_path"])
+        self.assertFalse(summary["dispatch_executed"])
+        self.assertFalse(summary["order_submitted"])
+        self.assertFalse(summary["workflow_dispatch_executed"])
+        self.assertFalse(summary["desktop_automation_executed"])
+        self.assertFalse(summary["process_control_executed"])
+        self.assertFalse(summary["status_transition_executed"])
+        self.assertFalse(summary["live_manual_acceptance_evaluated"])
 
     def test_run_trade_preflight_forwards_trade_request(self) -> None:
         parser = build_parser()

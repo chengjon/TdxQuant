@@ -1721,6 +1721,7 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     trade_acceptance_evidence_parser = trade_subparsers.add_parser("acceptance-evidence")
     trade_acceptance_evidence_parser.add_argument("--broker", default="pingan_desktop")
     trade_acceptance_evidence_parser.add_argument("--profile", default="balanced")
+    trade_acceptance_evidence_parser.add_argument("--view", choices=["detailed", "summary"], default="detailed")
     trade_acceptance_evidence_parser.add_argument("--output", help="Optional path to write the JSON result")
 
     trade_buy_parser = trade_subparsers.add_parser("buy")
@@ -2624,6 +2625,40 @@ def _run_trade_broker_capabilities(args: argparse.Namespace) -> Result:
     return trade_manager.pingan.extended_broker_capabilities()
 
 
+def _build_trade_acceptance_evidence_summary_view(acceptance_evidence: dict[str, object]) -> dict[str, object]:
+    surfaces = acceptance_evidence.get("covered_trade_surfaces")
+    surface_rows = [row for row in surfaces if isinstance(row, dict)] if isinstance(surfaces, list) else []
+    categories = acceptance_evidence.get("evidence_categories")
+    category_rows = [row for row in categories if isinstance(row, dict)] if isinstance(categories, list) else []
+    artifact_targets = acceptance_evidence.get("artifact_targets")
+    artifact_target_keys = sorted(artifact_targets) if isinstance(artifact_targets, dict) else []
+    return {
+        "schema": "tdx.desktop_trade.pingan_trade_execution_acceptance_evidence_summary.v1",
+        "source_schema": acceptance_evidence.get("schema"),
+        "status": acceptance_evidence.get("status"),
+        "execution_mode": acceptance_evidence.get("execution_mode"),
+        "target_nodes": copy.deepcopy(acceptance_evidence.get("target_nodes", [])),
+        "covered_trade_commands": [
+            str(row["command"]) for row in surface_rows if row.get("command") is not None
+        ],
+        "covered_trade_methods": [
+            str(row["method"]) for row in surface_rows if row.get("method") is not None
+        ],
+        "evidence_category_names": sorted(
+            str(row["name"]) for row in category_rows if row.get("name") is not None
+        ),
+        "artifact_target_keys": artifact_target_keys,
+        "dispatch_executed": bool(acceptance_evidence.get("dispatch_executed")),
+        "order_submitted": bool(acceptance_evidence.get("order_submitted")),
+        "workflow_dispatch_executed": bool(acceptance_evidence.get("workflow_dispatch_executed")),
+        "desktop_automation_executed": bool(acceptance_evidence.get("desktop_automation_executed")),
+        "process_control_executed": bool(acceptance_evidence.get("process_control_executed")),
+        "status_transition_executed": bool(acceptance_evidence.get("status_transition_executed")),
+        "live_manual_acceptance_evaluated": bool(acceptance_evidence.get("live_manual_acceptance_evaluated")),
+        "boundary": acceptance_evidence.get("boundary"),
+    }
+
+
 def _run_trade_acceptance_evidence(args: argparse.Namespace) -> Result:
     broker = str(getattr(args, "broker", None) or "pingan_desktop")
     if broker != "pingan_desktop":
@@ -2640,7 +2675,12 @@ def _run_trade_acceptance_evidence(args: argparse.Namespace) -> Result:
         state_path=str(PINGAN_LAST_ORDER_STATE_PATH),
         submission_ledger_path=str(PINGAN_SUBMISSION_LEDGER_PATH),
     )
-    return trade_manager.pingan.acceptance_evidence()
+    result = trade_manager.pingan.acceptance_evidence()
+    if getattr(args, "view", "detailed") == "summary" and isinstance(result.data, dict):
+        acceptance_evidence = result.data.get("acceptance_evidence")
+        if isinstance(acceptance_evidence, dict):
+            result.data["summary_view"] = _build_trade_acceptance_evidence_summary_view(acceptance_evidence)
+    return result
 
 
 def _run_trade_preflight(args: argparse.Namespace) -> Result:
