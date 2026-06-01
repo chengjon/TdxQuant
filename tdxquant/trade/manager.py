@@ -5,7 +5,7 @@ import os
 import signal
 import subprocess
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +47,7 @@ from .context import (
     resolve_trade_profile,
 )
 from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
+from .pingan_lifecycle import PingAnLifecycleController
 
 
 def _build_trade_health_check(
@@ -1324,85 +1325,31 @@ def _run_pingan_lifecycle_supervisor_tick(
         owner_token=normalized_owner_token,
         stale_after_seconds=float(stale_after_seconds),
     )
-    owner_payload = status_result.data.get("lifecycle_owner_lock") if isinstance(status_result.data, dict) else None
-    owner_status = str(owner_payload.get("status") or "status_check_failed") if isinstance(owner_payload, dict) else "status_check_failed"
-    owner_token_matches = bool(
-        isinstance(owner_payload, dict) and owner_payload.get("current_owner_token") == normalized_owner_token
+    lifecycle_controller = PingAnLifecycleController()
+    owner_gate = lifecycle_controller.evaluate_supervisor_owner_gate(
+        owner_status_result=status_result,
+        statefile_path=resolved_statefile_path,
+        lock_path=resolved_lock_path,
+        owner_token=normalized_owner_token,
+        stale_after_seconds=float(stale_after_seconds),
+        max_restart_attempts=normalized_max_restart_attempts,
+        backoff_seconds=normalized_backoff_seconds,
+        process_restart_enabled=bool(process_restart_enabled),
+        process_restart_recheck_enabled=bool(process_restart_recheck_enabled),
+        process_restart_recheck_delay_seconds=normalized_process_restart_recheck_delay_seconds,
     )
-    owner_pid_alive = owner_payload.get("owner_pid_alive") if isinstance(owner_payload, dict) else None
-    stale_detected = bool(owner_payload.get("stale_detected")) if isinstance(owner_payload, dict) else False
-    supervisor_owned = (
-        status_result.ok
-        and owner_status == "owned"
-        and owner_token_matches
-        and not stale_detected
-        and owner_pid_alive is True
-    )
-
-    if not supervisor_owned:
-        if owner_status != "owned":
-            status = "owner_lock_not_owned"
-        elif not owner_token_matches:
-            status = "owner_token_mismatch"
-        elif stale_detected:
-            status = "owner_lock_stale"
-        else:
-            status = "owner_pid_not_alive"
-        payload = {
-            "schema_version": PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA,
-            "action": "tick",
-            "status": status,
-            "execution_mode": "explicit_operator_lifecycle_supervisor_control",
-            "statefile_path": str(resolved_statefile_path),
-            "lock_path": str(resolved_lock_path),
-            "owner_token": normalized_owner_token,
-            "current_owner_token": owner_payload.get("current_owner_token") if isinstance(owner_payload, dict) else None,
-            "owner_lock_status": owner_payload,
-            "owner_token_matches": owner_token_matches,
-            "owner_pid_alive": owner_pid_alive,
-            "owner_pid_status": owner_payload.get("owner_pid_status") if isinstance(owner_payload, dict) else "missing",
-            "stale_after_seconds": float(stale_after_seconds),
-            "stale_detected": stale_detected,
-            "supervisor_owned": False,
-            "broker_health_ok": None,
-            "control_dispatch_executed": False,
-            "statefile_write_executed": False,
-            "restart_executed": False,
-            "backoff_executed": False,
-            "process_restart_enabled": bool(process_restart_enabled),
-            "process_restart_requested": False,
-            "process_restart_executed": False,
-            "process_restart_status": None,
-            "process_restart_result": None,
-            "process_restart_recheck_enabled": bool(process_restart_recheck_enabled),
-            "process_restart_recheck_delay_seconds": normalized_process_restart_recheck_delay_seconds,
-            "process_restart_recheck_requested": False,
-            "process_restart_recheck_executed": False,
-            "post_restart_broker_health_ok": None,
-            "post_restart_broker_health_code": None,
-            "post_restart_broker_health_message": None,
-            "lifecycle_recovery_status": "not_requested",
-            "restart_attempt_count": 0,
-            "max_restart_attempts": normalized_max_restart_attempts,
-            "backoff_seconds": normalized_backoff_seconds,
-            "last_restart_attempt_at": None,
-            "next_allowed_restart_at": None,
-            "order_submitted": False,
-            "process_kill_executed": False,
-            "pid_ownership_claimed": False,
-            "side_effect_level": "none",
-            "boundary": (
-                "Explicit local PingAn lifecycle supervisor tick requires an owned lifecycle statefile; "
-                "this rejected tick does not observe broker health, write lifecycle state, submit orders, "
-                "execute workflows, kill/start processes, or claim real desktop PID ownership."
-            ),
-        }
-        return Result(
-            ok=False,
-            code=ErrorCode.INVALID_REQUEST,
-            message="PingAn lifecycle supervisor requires an owned lifecycle owner lock",
-            data={"lifecycle_supervisor": payload},
-        )
+    owner_payload = owner_gate.owner_payload
+    owner_token_matches = owner_gate.owner_token_matches
+    owner_pid_alive = owner_gate.owner_pid_alive
+    stale_detected = owner_gate.stale_detected
+    if not owner_gate.supervisor_owned:
+        if owner_gate.rejection_result is None:
+            return Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="PingAn lifecycle supervisor requires an owned lifecycle owner lock",
+            )
+        return owner_gate.rejection_result
 
     broker_health = PingAnBrokerAdapter(title_keyword=title_keyword, exe_path=exe_path).health_check()
     broker_health_ok = bool(broker_health.ok)
@@ -1428,30 +1375,22 @@ def _run_pingan_lifecycle_supervisor_tick(
     lifecycle_recovery_status = "not_requested"
     next_allowed_restart_at: datetime | None = None
 
-    if broker_health_ok:
-        status = "healthy"
-        restart_attempt_count = 0
-        last_restart_at = None
-    else:
-        if previous_last_restart_at is not None and normalized_backoff_seconds > 0:
-            next_allowed_restart_at = previous_last_restart_at + timedelta(seconds=normalized_backoff_seconds)
-        inside_backoff = (
-            next_allowed_restart_at is not None
-            and now < next_allowed_restart_at
-        )
-        if inside_backoff:
-            status = "backoff_waiting"
-            backoff_executed = True
-        elif restart_attempt_count >= normalized_max_restart_attempts:
-            status = "max_restart_attempts_reached"
-        else:
-            status = "restart_recorded"
-            restart_attempt_count += 1
-            restart_executed = True
-            last_restart_at = now
-            process_restart_requested = bool(process_restart_enabled)
-            if normalized_backoff_seconds > 0:
-                next_allowed_restart_at = now + timedelta(seconds=normalized_backoff_seconds)
+    restart_decision = lifecycle_controller.decide_restart_policy(
+        broker_health_ok=broker_health_ok,
+        restart_attempt_count=restart_attempt_count,
+        previous_last_restart_at=previous_last_restart_at,
+        now=now,
+        max_restart_attempts=normalized_max_restart_attempts,
+        backoff_seconds=normalized_backoff_seconds,
+        process_restart_enabled=bool(process_restart_enabled),
+    )
+    status = restart_decision.status
+    restart_attempt_count = restart_decision.restart_attempt_count
+    last_restart_at = restart_decision.last_restart_at
+    next_allowed_restart_at = restart_decision.next_allowed_restart_at
+    restart_executed = restart_decision.restart_executed
+    backoff_executed = restart_decision.backoff_executed
+    process_restart_requested = restart_decision.process_restart_requested
 
     supervisor_state = {
         "schema_version": PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA,

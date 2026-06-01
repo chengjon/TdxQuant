@@ -1,6 +1,7 @@
 import json
 import os
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -8,6 +9,7 @@ from unittest.mock import patch
 from tdxquant import TdxTradeManager
 from tdxquant.models import ErrorCode, Result
 from tdxquant.trade.context import get_trade_profile_path, load_trade_profiles, resolve_trade_profile
+from tdxquant.trade.pingan_lifecycle import PingAnLifecycleController
 from tdxquant.trade.preset import get_trade_preset_path, load_trade_presets, resolve_trade_preset
 
 
@@ -57,6 +59,85 @@ class TradeProfileTests(unittest.TestCase):
 
 
 class TdxTradeManagerTests(unittest.TestCase):
+    def test_pingan_lifecycle_controller_rejects_unowned_owner_gate_without_side_effects(self) -> None:
+        controller = PingAnLifecycleController()
+        owner_payload = {
+            "status": "not_acquired",
+            "current_owner_token": None,
+            "owner_pid_alive": None,
+            "owner_pid_status": "missing",
+            "stale_detected": False,
+        }
+        owner_status = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="checked owner lock",
+            data={"lifecycle_owner_lock": owner_payload},
+        )
+
+        decision = controller.evaluate_supervisor_owner_gate(
+            owner_status_result=owner_status,
+            statefile_path=Path("runtime/pingan/lifecycle.json"),
+            lock_path=Path("runtime/pingan/lifecycle.json.lock"),
+            owner_token="operator-a",
+            stale_after_seconds=300.0,
+            max_restart_attempts=2,
+            backoff_seconds=30.0,
+            process_restart_enabled=True,
+            process_restart_recheck_enabled=True,
+            process_restart_recheck_delay_seconds=0.0,
+        )
+
+        self.assertFalse(decision.supervisor_owned)
+        self.assertIsNotNone(decision.rejection_result)
+        payload = decision.rejection_result.data["lifecycle_supervisor"]
+        self.assertEqual(payload["status"], "owner_lock_not_owned")
+        self.assertFalse(payload["supervisor_owned"])
+        self.assertFalse(payload["control_dispatch_executed"])
+        self.assertFalse(payload["restart_executed"])
+        self.assertFalse(payload["backoff_executed"])
+        self.assertFalse(payload["statefile_write_executed"])
+        self.assertFalse(payload["order_submitted"])
+        self.assertFalse(payload["process_kill_executed"])
+        self.assertFalse(payload["pid_ownership_claimed"])
+        self.assertEqual(payload["side_effect_level"], "none")
+
+    def test_pingan_lifecycle_controller_decides_restart_then_backoff_without_process_execution(self) -> None:
+        controller = PingAnLifecycleController()
+        now = datetime(2026, 6, 1, 9, 30, tzinfo=UTC)
+
+        first = controller.decide_restart_policy(
+            broker_health_ok=False,
+            restart_attempt_count=0,
+            previous_last_restart_at=None,
+            now=now,
+            max_restart_attempts=2,
+            backoff_seconds=600.0,
+            process_restart_enabled=True,
+        )
+        self.assertEqual(first.status, "restart_recorded")
+        self.assertTrue(first.restart_executed)
+        self.assertFalse(first.backoff_executed)
+        self.assertTrue(first.process_restart_requested)
+        self.assertEqual(first.restart_attempt_count, 1)
+        self.assertEqual(first.last_restart_at, now)
+        self.assertEqual(first.next_allowed_restart_at, now + timedelta(seconds=600))
+
+        second = controller.decide_restart_policy(
+            broker_health_ok=False,
+            restart_attempt_count=first.restart_attempt_count,
+            previous_last_restart_at=first.last_restart_at,
+            now=now + timedelta(seconds=30),
+            max_restart_attempts=2,
+            backoff_seconds=600.0,
+            process_restart_enabled=True,
+        )
+        self.assertEqual(second.status, "backoff_waiting")
+        self.assertFalse(second.restart_executed)
+        self.assertTrue(second.backoff_executed)
+        self.assertFalse(second.process_restart_requested)
+        self.assertEqual(second.restart_attempt_count, 1)
+
     def test_public_import_is_available(self) -> None:
         manager = TdxTradeManager(profile="balanced")
         self.assertEqual(manager.profile_name, "balanced")
