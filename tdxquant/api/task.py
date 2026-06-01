@@ -1146,6 +1146,12 @@ _PINGAN_IMPLEMENTED_STATUS_PROMOTION_DECISION_SCHEMA = (
 _PINGAN_IMPLEMENTED_STATUS_REVIEW_PACKET_SCHEMA = (
     "tdx.desktop_trade.pingan_implemented_status_review_packet.v1"
 )
+_PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA = (
+    "tdx.desktop_trade.pingan_implemented_status_review_result.v1"
+)
+_PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_RECORD_SCHEMA = (
+    "tdx.desktop_trade.pingan_implemented_status_review_result_record.v1"
+)
 _PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_evidence_contract.v1"
 )
@@ -1662,6 +1668,77 @@ def _build_pingan_implemented_status_review_packet(
         "boundary": (
             "Read-only manual status review input derived from promotion readiness evidence; does not execute "
             "PingAn workflows, submit orders, prove production readiness, or modify FUNCTION_TREE status."
+        ),
+    }
+
+
+def _load_pingan_implemented_status_review_packet(
+    path: str | None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    payload, error = _load_json_evidence(path)
+    if error is not None:
+        return None, error
+    if payload is None:
+        return None, "review packet JSON is missing"
+    if payload.get("schema") == _PINGAN_IMPLEMENTED_STATUS_REVIEW_PACKET_SCHEMA:
+        return copy.deepcopy(payload), None
+    packet = _find_json_object(payload, "implemented_status_review_packet")
+    if packet is None:
+        return None, "implemented_status_review_packet not found"
+    if packet.get("schema") != _PINGAN_IMPLEMENTED_STATUS_REVIEW_PACKET_SCHEMA:
+        return None, "implemented_status_review_packet has unsupported schema"
+    return copy.deepcopy(packet), None
+
+
+def _list_from_json(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return copy.deepcopy(value)
+    return []
+
+
+def _build_pingan_implemented_status_review_result_artifact(
+    *,
+    packet: dict[str, Any],
+    review_packet_path: str,
+    reviewer: str,
+    outcome: str,
+    reason: str,
+    reviewed_at: str,
+    dry_run: bool,
+) -> dict[str, Any]:
+    return {
+        "schema": _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA,
+        "artifact_provenance": _build_pingan_readiness_evidence_artifact_provenance(
+            source_kind="implemented_status_review_result",
+            producer="task pingan-implemented-status-review-result",
+            evidence_schema=_PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA,
+        ),
+        "reviewer": reviewer,
+        "outcome": outcome,
+        "reason": reason,
+        "reviewed_at": reviewed_at,
+        "review_packet_path": review_packet_path,
+        "packet_schema": packet.get("schema"),
+        "packet_review_status": packet.get("review_status"),
+        "packet_decision": packet.get("decision"),
+        "implemented_status_eligible": packet.get("implemented_status_eligible") is True,
+        "target_nodes": _list_from_json(packet.get("target_nodes")),
+        "current_function_tree_status": packet.get("current_function_tree_status"),
+        "completed_gates": _list_from_json(packet.get("completed_gates")),
+        "incomplete_gates": _list_from_json(packet.get("incomplete_gates")),
+        "blocked_reasons": _list_from_json(packet.get("blocked_reasons")),
+        "manual_status_review_required": True,
+        "automatic_status_transition_allowed": False,
+        "function_tree_status_transition_executed": False,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "promotion_status_transition_executed": False,
+        "execution_mode": "manual_status_review_result_record",
+        "side_effect_level": "none" if dry_run else "file_write",
+        "boundary": (
+            "Records a maintainer review result for an existing PingAn implemented-status review packet only; "
+            "does not execute PingAn workflows, submit orders, prove production readiness, prove implemented "
+            "status, or promote D-07/D-08."
         ),
     }
 
@@ -3890,6 +3967,159 @@ class TdxTaskManager:
 
         result, timing = _capture_task_timing("task.pingan_live_manual_acceptance", run)
         return self._attach_task_metadata(result, task_name="pingan_live_manual_acceptance", timing=timing)
+
+    def pingan_implemented_status_review_result(
+        self,
+        *,
+        review_packet_path: str | None,
+        output_path: str | None,
+        reviewer: str | None,
+        outcome: str | None,
+        reason: str | None,
+        reviewed_at: str | None = None,
+        dry_run: bool = False,
+        overwrite: bool = False,
+    ) -> Result:
+        def run() -> Result:
+            normalized_review_packet_path = str(review_packet_path or "").strip()
+            normalized_output_path = str(output_path or "").strip()
+            normalized_reviewer = str(reviewer or "").strip()
+            normalized_outcome = str(outcome or "").strip().lower()
+            normalized_reason = str(reason or "").strip()
+            missing_fields = []
+            if not normalized_review_packet_path:
+                missing_fields.append("review_packet_path")
+            if not normalized_output_path:
+                missing_fields.append("output_path")
+            if not normalized_reviewer:
+                missing_fields.append("reviewer")
+            if not normalized_outcome:
+                missing_fields.append("outcome")
+            if not normalized_reason:
+                missing_fields.append("reason")
+            if missing_fields:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="missing implemented-status review result fields",
+                    data={"missing_fields": missing_fields},
+                )
+            supported_outcomes = ["approve", "reject", "defer"]
+            if normalized_outcome not in supported_outcomes:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="unsupported implemented-status review result outcome",
+                    data={"outcome": normalized_outcome, "supported_outcomes": supported_outcomes},
+                )
+
+            packet, packet_error = _load_pingan_implemented_status_review_packet(normalized_review_packet_path)
+            if packet_error is not None or packet is None:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="invalid implemented-status review packet",
+                    data={"review_packet_path": normalized_review_packet_path, "error": packet_error},
+                )
+
+            packet_review_status = str(packet.get("review_status") or "").strip()
+            packet_eligible = packet.get("implemented_status_eligible") is True
+            if normalized_outcome == "approve" and (
+                packet_review_status != "ready_for_manual_review" or not packet_eligible
+            ):
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="blocked implemented-status review packet cannot be approved",
+                    data={
+                        "review_packet_path": normalized_review_packet_path,
+                        "packet_review_status": packet_review_status,
+                        "implemented_status_eligible": packet_eligible,
+                        "blocked_reasons": [
+                            "blocked_packet_not_approvable",
+                            *_list_from_json(packet.get("blocked_reasons")),
+                        ],
+                    },
+                )
+
+            target_path = Path(normalized_output_path)
+            if target_path.exists() and not overwrite and not dry_run:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"implemented-status review result artifact already exists: {target_path}",
+                    data={"output_path": str(target_path), "overwrite": overwrite},
+                )
+
+            resolved_reviewed_at = reviewed_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            artifact = _build_pingan_implemented_status_review_result_artifact(
+                packet=packet,
+                review_packet_path=normalized_review_packet_path,
+                reviewer=normalized_reviewer,
+                outcome=normalized_outcome,
+                reason=normalized_reason,
+                reviewed_at=resolved_reviewed_at,
+                dry_run=dry_run,
+            )
+            artifact_written = False
+            if not dry_run:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(json.dumps(artifact, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                artifact_written = True
+
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message=(
+                    "planned PingAn implemented-status review result artifact"
+                    if dry_run
+                    else "wrote PingAn implemented-status review result artifact"
+                ),
+                data={
+                    "input": {
+                        "review_packet_path": normalized_review_packet_path,
+                        "output_path": str(target_path),
+                        "reviewer": normalized_reviewer,
+                        "outcome": normalized_outcome,
+                        "reason": normalized_reason,
+                        "reviewed_at": resolved_reviewed_at,
+                        "dry_run": dry_run,
+                        "overwrite": overwrite,
+                    },
+                    "implemented_status_review_result": artifact,
+                    "review_result_record": {
+                        "schema": _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_RECORD_SCHEMA,
+                        "artifact_schema": _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_SCHEMA,
+                        "review_packet_path": normalized_review_packet_path,
+                        "output_path": str(target_path),
+                        "artifact_written": artifact_written,
+                        "dry_run": dry_run,
+                        "overwrite": overwrite,
+                        "reviewer": normalized_reviewer,
+                        "outcome": normalized_outcome,
+                        "packet_review_status": packet_review_status,
+                        "packet_decision": packet.get("decision"),
+                        "implemented_status_eligible": packet_eligible,
+                        "function_tree_status_transition_executed": False,
+                        "automatic_status_transition_allowed": False,
+                        "order_submitted": False,
+                        "control_dispatch_executed": False,
+                        "execution_mode": "manual_status_review_result_record",
+                        "side_effect_level": "none" if dry_run else "file_write",
+                        "boundary": (
+                            "Records a maintainer review result only; does not execute PingAn workflows, submit "
+                            "orders, prove production readiness, prove implemented status, or promote D-07/D-08."
+                        ),
+                    },
+                },
+            )
+
+        result, timing = _capture_task_timing("task.pingan_implemented_status_review_result", run)
+        return self._attach_task_metadata(
+            result,
+            task_name="pingan_implemented_status_review_result",
+            timing=timing,
+        )
 
     def trade_audit_daily_report(
         self,

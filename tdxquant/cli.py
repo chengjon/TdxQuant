@@ -671,6 +671,17 @@ def _add_pingan_live_manual_acceptance_arguments(subparser: argparse.ArgumentPar
     subparser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
 
 
+def _add_pingan_implemented_status_review_result_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--review-packet-path")
+    subparser.add_argument("--output-path")
+    subparser.add_argument("--reviewer")
+    subparser.add_argument("--outcome", choices=["approve", "reject", "defer"])
+    subparser.add_argument("--reason")
+    subparser.add_argument("--reviewed-at")
+    subparser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
+
+
 def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--audit-id")
     subparser.add_argument("--contract-no")
@@ -1552,6 +1563,12 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     task_pingan_live_manual_acceptance_parser = task_subparsers.add_parser("pingan-live-manual-acceptance")
     _add_pingan_live_manual_acceptance_arguments(task_pingan_live_manual_acceptance_parser)
     _add_task_common_arguments(task_pingan_live_manual_acceptance_parser)
+
+    task_pingan_implemented_status_review_result_parser = task_subparsers.add_parser(
+        "pingan-implemented-status-review-result"
+    )
+    _add_pingan_implemented_status_review_result_arguments(task_pingan_implemented_status_review_result_parser)
+    _add_task_common_arguments(task_pingan_implemented_status_review_result_parser)
 
     task_trade_audit_cross_ledger_query_parser = task_subparsers.add_parser("trade-audit-cross-ledger-query")
     _add_trade_audit_cross_ledger_query_arguments(task_trade_audit_cross_ledger_query_parser)
@@ -5841,6 +5858,17 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
             outcomes=args.outcomes,
             accepted_at=args.accepted_at,
             evidence_ref=args.evidence_ref,
+            dry_run=args.dry_run,
+            overwrite=args.overwrite,
+        )
+    if command_name == "pingan-implemented-status-review-result":
+        return manager.pingan_implemented_status_review_result(
+            review_packet_path=args.review_packet_path,
+            output_path=args.output_path,
+            reviewer=args.reviewer,
+            outcome=args.outcome,
+            reason=args.reason,
+            reviewed_at=args.reviewed_at,
             dry_run=args.dry_run,
             overwrite=args.overwrite,
         )

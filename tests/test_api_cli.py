@@ -1899,6 +1899,37 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.evidence_ref, "ticket-123")
         self.assertTrue(args.dry_run)
 
+    def test_task_pingan_implemented_status_review_result_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-implemented-status-review-result",
+                "--review-packet-path",
+                "runtime/pingan/implemented-status-review-packet.json",
+                "--output-path",
+                "runtime/pingan/implemented-status-review-result.json",
+                "--reviewer",
+                "maintainer-a",
+                "--outcome",
+                "approve",
+                "--reason",
+                "manual evidence gates reviewed",
+                "--reviewed-at",
+                "2026-06-01T10:00:00Z",
+                "--dry-run",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "pingan-implemented-status-review-result")
+        self.assertEqual(args.review_packet_path, "runtime/pingan/implemented-status-review-packet.json")
+        self.assertEqual(args.output_path, "runtime/pingan/implemented-status-review-result.json")
+        self.assertEqual(args.reviewer, "maintainer-a")
+        self.assertEqual(args.outcome, "approve")
+        self.assertEqual(args.reason, "manual evidence gates reviewed")
+        self.assertEqual(args.reviewed_at, "2026-06-01T10:00:00Z")
+        self.assertTrue(args.dry_run)
+
     def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -10952,6 +10983,44 @@ class TaskCliDispatchTests(unittest.TestCase):
             outcomes=["confirmed", "rejected", "failed", "exception"],
             accepted_at="2026-05-31T10:00:00+00:00",
             evidence_ref="ticket-123",
+            dry_run=True,
+            overwrite=False,
+        )
+
+    def test_handle_task_pingan_implemented_status_review_result_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-implemented-status-review-result",
+                "--review-packet-path",
+                "runtime/pingan/implemented-status-review-packet.json",
+                "--output-path",
+                "runtime/pingan/implemented-status-review-result.json",
+                "--reviewer",
+                "maintainer-a",
+                "--outcome",
+                "approve",
+                "--reason",
+                "manual evidence gates reviewed",
+                "--reviewed-at",
+                "2026-06-01T10:00:00Z",
+                "--dry-run",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.pingan_implemented_status_review_result.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.pingan_implemented_status_review_result.assert_called_once_with(
+            review_packet_path="runtime/pingan/implemented-status-review-packet.json",
+            output_path="runtime/pingan/implemented-status-review-result.json",
+            reviewer="maintainer-a",
+            outcome="approve",
+            reason="manual evidence gates reviewed",
+            reviewed_at="2026-06-01T10:00:00Z",
             dry_run=True,
             overwrite=False,
         )
