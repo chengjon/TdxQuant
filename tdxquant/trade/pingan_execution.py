@@ -119,6 +119,15 @@ class PingAnConfirmCurrentExecutionRequest:
 
 
 @dataclass(frozen=True)
+class PingAnConfirmCurrentExecutionPreparation:
+    request: PingAnConfirmCurrentExecutionRequest
+    risk_gate: dict[str, Any]
+    profile_options: dict[str, Any]
+    rejection_context: "PingAnConfirmCurrentRejectionContext"
+    dispatch_context: "PingAnConfirmCurrentDispatchContext"
+
+
+@dataclass(frozen=True)
 class PingAnConfirmCurrentRejectionContext:
     close_result_dialog: bool
     dialog_lookup_mode: str

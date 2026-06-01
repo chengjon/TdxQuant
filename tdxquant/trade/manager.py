@@ -49,6 +49,7 @@ from .extended_capabilities import build_pingan_desktop_extended_broker_capabili
 from .pingan_execution import (
     PingAnConfirmCurrentDispatchContext,
     PingAnConfirmCurrentExecutionRequest,
+    PingAnConfirmCurrentExecutionPreparation,
     PingAnConfirmCurrentRejectionContext,
     PingAnOrderDispatchOptions,
     PingAnOrderExecutionPreparation,
@@ -3453,65 +3454,25 @@ class _PingAnTradeProxy:
         require_lifecycle_owner_lock: bool = False,
         require_broker_readiness: bool = False,
     ) -> Result:
-        effective_profile = self._manager._build_effective_profile({})
-        resolved_lookup_mode = str(dialog_lookup_mode or effective_profile["dialog_lookup_mode"])
-        resolved_confirm_timeout = float(
-            effective_profile["confirm_timeout"] if confirm_timeout is None else confirm_timeout
-        )
-        resolved_result_timeout = float(
-            effective_profile["result_timeout"] if result_timeout is None else result_timeout
-        )
-        resolved_result_close_pre_delay = float(
-            effective_profile["result_close_pre_delay"]
-            if result_close_pre_delay is None
-            else result_close_pre_delay
-        )
-        boundary_risk_gate = {
-            "passed": True,
-            "checks": [
-                {
-                    "name": "confirm_boundary",
-                    "passed": True,
-                    "issues": [],
-                    "mode": "current_confirm_dialog",
-                }
-            ],
-            "requested_price": None,
-            "max_price": None,
-            "rejection_reason": None,
-        }
-        boundary_risk_gate = _apply_pingan_broker_readiness_required_guard(
-            boundary_risk_gate,
-            title_keyword=self._manager.title_keyword,
-            exe_path=self._manager.exe_path,
-            require_broker_readiness=require_broker_readiness,
-        )
-        boundary_risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
-            boundary_risk_gate,
-            lifecycle_statefile_path=lifecycle_statefile_path,
-            lifecycle_owner_token=lifecycle_owner_token,
-            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
-            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
-        )
-        rejection_context = PingAnConfirmCurrentRejectionContext(
+        prepared = self._manager._prepare_pingan_confirm_current_execution(
+            dialog_lookup_mode=dialog_lookup_mode,
+            confirm_timeout=confirm_timeout,
+            result_timeout=result_timeout,
             close_result_dialog=close_result_dialog,
-            dialog_lookup_mode=resolved_lookup_mode,
-            confirm_timeout=resolved_confirm_timeout,
-            result_timeout=resolved_result_timeout,
-            result_close_pre_delay=resolved_result_close_pre_delay,
+            result_close_pre_delay=result_close_pre_delay,
             lifecycle_statefile_path=lifecycle_statefile_path,
             lifecycle_owner_token=lifecycle_owner_token,
             lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
             require_broker_readiness=require_broker_readiness,
         )
-        dispatch_context = PingAnConfirmCurrentDispatchContext(
-            close_result_dialog=close_result_dialog,
-            dialog_lookup_mode=resolved_lookup_mode,
-            confirm_timeout=resolved_confirm_timeout,
-            result_timeout=resolved_result_timeout,
-            result_close_pre_delay=resolved_result_close_pre_delay,
-        )
+        effective_profile = prepared.profile_options
+        dispatch_context = prepared.dispatch_context
+        rejection_context = prepared.rejection_context
+        resolved_lookup_mode = dispatch_context.dialog_lookup_mode
+        resolved_confirm_timeout = dispatch_context.confirm_timeout
+        resolved_result_timeout = dispatch_context.result_timeout
+        resolved_result_close_pre_delay = dispatch_context.result_close_pre_delay
 
         def run() -> Result:
             checks: list[dict[str, Any]] = []
@@ -3692,12 +3653,6 @@ class _PingAnTradeProxy:
                 next_action=next_action,
             )
 
-        request = PingAnConfirmCurrentExecutionRequest(
-            method="confirm_current",
-            timing_label="pingan.confirm_current",
-            profile_options=effective_profile,
-        )
-
         def attach_confirm_metadata(result: Result, timing: dict[str, Any]) -> Result:
             return attach_trade_metadata(
                 result,
@@ -3726,8 +3681,8 @@ class _PingAnTradeProxy:
             return attach_trade_safety_metadata(result, **kwargs)
 
         return execute_pingan_confirm_current(
-            request,
-            risk_gate=boundary_risk_gate,
+            prepared.request,
+            risk_gate=prepared.risk_gate,
             dispatch=run,
             build_rejected_result=lambda failed_risk_gate: build_pingan_confirm_current_boundary_rejection_result(
                 failed_risk_gate,
@@ -3969,6 +3924,92 @@ class TdxTradeManager:
             capture_final_uia=bool(profile_options["capture_final_uia"]),
             price_quantity_input_mode=str(profile_options["price_quantity_input_mode"]),
             dialog_lookup_mode=str(profile_options["dialog_lookup_mode"]),
+        )
+
+    def _prepare_pingan_confirm_current_execution(
+        self,
+        *,
+        dialog_lookup_mode: str | None,
+        confirm_timeout: float | None,
+        result_timeout: float | None,
+        close_result_dialog: bool,
+        result_close_pre_delay: float | None,
+        lifecycle_statefile_path: str | None,
+        lifecycle_owner_token: str | None,
+        lifecycle_stale_after_seconds: float,
+        require_lifecycle_owner_lock: bool,
+        require_broker_readiness: bool,
+    ) -> PingAnConfirmCurrentExecutionPreparation:
+        profile_options = self._build_effective_profile({})
+        resolved_lookup_mode = str(dialog_lookup_mode or profile_options["dialog_lookup_mode"])
+        resolved_confirm_timeout = float(
+            profile_options["confirm_timeout"] if confirm_timeout is None else confirm_timeout
+        )
+        resolved_result_timeout = float(
+            profile_options["result_timeout"] if result_timeout is None else result_timeout
+        )
+        resolved_result_close_pre_delay = float(
+            profile_options["result_close_pre_delay"]
+            if result_close_pre_delay is None
+            else result_close_pre_delay
+        )
+        risk_gate: dict[str, Any] = {
+            "passed": True,
+            "checks": [
+                {
+                    "name": "confirm_boundary",
+                    "passed": True,
+                    "issues": [],
+                    "mode": "current_confirm_dialog",
+                }
+            ],
+            "requested_price": None,
+            "max_price": None,
+            "rejection_reason": None,
+        }
+        risk_gate = _apply_pingan_broker_readiness_required_guard(
+            risk_gate,
+            title_keyword=self.title_keyword,
+            exe_path=self.exe_path,
+            require_broker_readiness=require_broker_readiness,
+        )
+        risk_gate = _apply_pingan_lifecycle_owner_lock_required_guard(
+            risk_gate,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+        )
+        rejection_context = PingAnConfirmCurrentRejectionContext(
+            close_result_dialog=close_result_dialog,
+            dialog_lookup_mode=resolved_lookup_mode,
+            confirm_timeout=resolved_confirm_timeout,
+            result_timeout=resolved_result_timeout,
+            result_close_pre_delay=resolved_result_close_pre_delay,
+            lifecycle_statefile_path=lifecycle_statefile_path,
+            lifecycle_owner_token=lifecycle_owner_token,
+            lifecycle_stale_after_seconds=lifecycle_stale_after_seconds,
+            require_lifecycle_owner_lock=require_lifecycle_owner_lock,
+            require_broker_readiness=require_broker_readiness,
+        )
+        dispatch_context = PingAnConfirmCurrentDispatchContext(
+            close_result_dialog=close_result_dialog,
+            dialog_lookup_mode=resolved_lookup_mode,
+            confirm_timeout=resolved_confirm_timeout,
+            result_timeout=resolved_result_timeout,
+            result_close_pre_delay=resolved_result_close_pre_delay,
+        )
+        request = PingAnConfirmCurrentExecutionRequest(
+            method="confirm_current",
+            timing_label="pingan.confirm_current",
+            profile_options=profile_options,
+        )
+        return PingAnConfirmCurrentExecutionPreparation(
+            request=request,
+            risk_gate=risk_gate,
+            profile_options=profile_options,
+            rejection_context=rejection_context,
+            dispatch_context=dispatch_context,
         )
 
     def _evaluate_idempotency(

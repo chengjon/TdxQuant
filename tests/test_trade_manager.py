@@ -2800,6 +2800,37 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertTrue(mocked_execute.call_args.kwargs["risk_gate"]["passed"])
         mocked_lookup.assert_not_called()
 
+    def test_pingan_confirm_current_preparation_builds_request_guards_and_contexts(self) -> None:
+        broker_health = Result(ok=True, code=ErrorCode.OK, message="broker ready", data={"window": {"ok": True}})
+        manager = TdxTradeManager(profile="balanced")
+        with patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health):
+            prepared = manager._prepare_pingan_confirm_current_execution(
+                dialog_lookup_mode="win32",
+                confirm_timeout=2.5,
+                result_timeout=3.5,
+                close_result_dialog=False,
+                result_close_pre_delay=0.4,
+                lifecycle_statefile_path=None,
+                lifecycle_owner_token=None,
+                lifecycle_stale_after_seconds=300.0,
+                require_lifecycle_owner_lock=False,
+                require_broker_readiness=True,
+            )
+
+        self.assertEqual(prepared.request.method, "confirm_current")
+        self.assertEqual(prepared.request.timing_label, "pingan.confirm_current")
+        self.assertIsNone(prepared.request.request_context())
+        self.assertTrue(prepared.risk_gate["passed"])
+        self.assertEqual(prepared.risk_gate["broker_readiness_required_status"]["requirement_status"], "passed")
+        self.assertIn("confirm_timeout", prepared.profile_options)
+        self.assertEqual(prepared.dispatch_context.dialog_lookup_mode, "win32")
+        self.assertEqual(prepared.dispatch_context.confirm_timeout, 2.5)
+        self.assertEqual(prepared.dispatch_context.result_timeout, 3.5)
+        self.assertFalse(prepared.dispatch_context.close_result_dialog)
+        self.assertEqual(prepared.dispatch_context.result_close_pre_delay, 0.4)
+        self.assertEqual(prepared.rejection_context.lifecycle_stale_after_seconds, 300.0)
+        self.assertTrue(prepared.rejection_context.require_broker_readiness)
+
     def test_pingan_confirm_current_requires_owner_lock_before_ui_side_effects(self) -> None:
         with TemporaryDirectory() as temp_dir:
             lifecycle_statefile_path = Path(temp_dir) / "pingan-lifecycle-owner.json"
