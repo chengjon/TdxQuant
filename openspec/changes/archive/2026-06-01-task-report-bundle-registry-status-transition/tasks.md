@@ -1,0 +1,6 @@
+- [x] 1.1 Add proposal, design, spec delta, and validate the OpenSpec change.
+- [x] 1.2 Add red FUNCTION_TREE registry test requiring E-11 `[已实现]` status and final catalog evidence artifact.
+- [x] 1.3 Generate the read-only task/report bundle registry status artifact from existing catalog validation.
+- [x] 1.4 Update `FUNCTION_TREE.md` E-11 status, evidence, and boundary without claiming workflow execution.
+- [x] 1.5 Run focused pytest, OpenSpec strict validation, `git diff --check`, and FUNCTION_TREE registry validation.
+- [x] 1.6 Archive the OpenSpec change, repeat verification, and commit the focused slice.

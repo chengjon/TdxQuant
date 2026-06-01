@@ -831,12 +831,15 @@ class FunctionTreeRegistryValidatorTests(unittest.TestCase):
                 self.assertIn("不证明 production readiness", combined)
                 self.assertIn("不证明 implemented status", combined)
 
-    def test_task_report_bundle_source_label_evidence_is_registered(self) -> None:
+    def test_task_report_bundle_source_label_evidence_is_registered_as_implemented(self) -> None:
         row = _current_function_tree_rows()["E-11"]
         combined = f"{row['evidence']} {row['boundary']}"
 
-        self.assertEqual(row["status"], "`[部分实现]`")
+        self.assertEqual(row["status"], "`[已实现]`")
+        self.assertIn("runtime/catalog-evidence/e11-task-report-bundle-registry-status.json", combined)
+        self.assertIn("task-report-bundle-registry-status-transition", combined)
         self.assertIn("catalog validate --kind bundle --label followup --view summary", combined)
+        self.assertIn("task_report_bundle_count", combined)
         self.assertIn("bundle_step_source_label_counts", combined)
         self.assertIn("task_report_bundle_step_source_label_counts", combined)
         self.assertIn("task:followup", combined)
