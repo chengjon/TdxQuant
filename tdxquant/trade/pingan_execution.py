@@ -45,6 +45,55 @@ class PingAnOrderExecutionPreparation:
 
 
 @dataclass(frozen=True)
+class PingAnOrderDispatchOptions:
+    port: str
+    baudrate: int
+    timeout: float
+    hid_pre_delay: float
+    post_delay: float
+    max_depth: int
+    dialog_timeout: float
+    confirm_timeout: float
+    confirm_post_delay: float
+    result_timeout: float
+    close_result_dialog: bool
+    result_close_pre_delay: float
+    capture_final_uia: bool
+    price_quantity_input_mode: str
+    dialog_lookup_mode: str
+
+    def base_kwargs(self, *, code: str, price: str, quantity: int) -> dict[str, Any]:
+        return {
+            "port": self.port,
+            "baudrate": self.baudrate,
+            "timeout": self.timeout,
+            "hid_pre_delay": self.hid_pre_delay,
+            "code": code,
+            "price": price,
+            "quantity": quantity,
+            "post_delay": self.post_delay,
+            "max_depth": self.max_depth,
+            "dialog_timeout": self.dialog_timeout,
+            "confirm_timeout": self.confirm_timeout,
+            "confirm_post_delay": self.confirm_post_delay,
+            "result_timeout": self.result_timeout,
+            "close_result_dialog": self.close_result_dialog,
+            "result_close_pre_delay": self.result_close_pre_delay,
+            "capture_final_uia": self.capture_final_uia,
+        }
+
+    def fast_kwargs(self, *, code: str, price: str, quantity: int) -> dict[str, Any]:
+        kwargs = self.base_kwargs(code=code, price=price, quantity=quantity)
+        kwargs.update(
+            {
+                "price_quantity_input_mode": self.price_quantity_input_mode,
+                "dialog_lookup_mode": self.dialog_lookup_mode,
+            }
+        )
+        return kwargs
+
+
+@dataclass(frozen=True)
 class PingAnOrderResultContext:
     code: str
     price: str

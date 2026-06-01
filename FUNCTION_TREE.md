@@ -154,6 +154,8 @@ TdxQuant
 
 > D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderExecutionPreparation` 与 `TdxTradeManager._prepare_pingan_order_execution` 现集中 buy/sell/submit-once 的 effective profile、submission idempotency、max-price risk gate、broker-readiness guard、lifecycle owner-lock guard、`PingAnExecutionRequest` 与 handler bundle 准备；证据为 `tests/test_trade_manager.py` 的 `test_pingan_order_execution_preparation_builds_request_guards_and_handlers`、既有 buy/sell/submit-once route tests 与 OpenSpec `pingan-order-execution-preparation-helper`。边界：这是 D-08 order seam 内部 preparation locality/refactor，method-specific desktop dispatch 仍留在 manager callsite；不改变公开 manager/CLI/task/catalog 参数，不新增 workflow builder、桌面 primitive、broker readiness 或 production trading readiness。
 
+> D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderDispatchOptions` 与 `TdxTradeManager._build_pingan_order_dispatch_options` 现集中 buy/sell/submit-once 的 profile-derived desktop runner kwargs（delay、timeout、result close、final UIA capture 与 fast input-mode fields）构造，order callsite 只选择 runner 并传递 `base_kwargs` / `fast_kwargs`；证据为 `tests/test_trade_manager.py` 的 `test_pingan_order_dispatch_options_build_base_and_fast_runner_kwargs`、既有 buy/sell/submit-once route tests 与 OpenSpec `pingan-order-dispatch-options-locality`。边界：这是 D-08 order dispatch 参数 locality/refactor，真实 UIA/HID runner 仍由 manager callsite 显式选择；不改变公开 manager/CLI/task/catalog 参数，不新增 workflow builder、桌面 primitive、broker readiness 或 production trading readiness。
+
 ### E. 已设计/待实现能力
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |

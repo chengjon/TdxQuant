@@ -50,6 +50,7 @@ from .pingan_execution import (
     PingAnConfirmCurrentDispatchContext,
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentRejectionContext,
+    PingAnOrderDispatchOptions,
     PingAnOrderExecutionPreparation,
     PingAnExecutionRequest,
     PingAnOrderExecutionHandlers,
@@ -2206,31 +2207,21 @@ class _PingAnTradeProxy:
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
             require_broker_readiness=require_broker_readiness,
         )
-        effective_profile = prepared.profile_options
+        dispatch_options = self._manager._build_pingan_order_dispatch_options(
+            profile_options=prepared.profile_options,
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,
+            max_depth=max_depth,
+            close_result_dialog=close_result_dialog,
+        )
         return execute_pingan_order(
             prepared.request,
             idempotency=prepared.idempotency,
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_buy_fast(
                 self._manager.title_keyword,
-                port=port,
-                baudrate=baudrate,
-                timeout=timeout,
-                hid_pre_delay=float(effective_profile["hid_pre_delay"]),
-                code=code,
-                price=price,
-                quantity=quantity,
-                post_delay=float(effective_profile["post_delay"]),
-                max_depth=max_depth,
-                dialog_timeout=float(effective_profile["dialog_timeout"]),
-                confirm_timeout=float(effective_profile["confirm_timeout"]),
-                confirm_post_delay=float(effective_profile["confirm_post_delay"]),
-                result_timeout=float(effective_profile["result_timeout"]),
-                price_quantity_input_mode=str(effective_profile["price_quantity_input_mode"]),
-                dialog_lookup_mode=str(effective_profile["dialog_lookup_mode"]),
-                close_result_dialog=close_result_dialog,
-                result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
-                capture_final_uia=bool(effective_profile["capture_final_uia"]),
+                **dispatch_options.fast_kwargs(code=code, price=price, quantity=quantity),
             ),
             handlers=prepared.handlers,
         )
@@ -2268,29 +2259,21 @@ class _PingAnTradeProxy:
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
             require_broker_readiness=require_broker_readiness,
         )
-        effective_profile = prepared.profile_options
+        dispatch_options = self._manager._build_pingan_order_dispatch_options(
+            profile_options=prepared.profile_options,
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,
+            max_depth=max_depth,
+            close_result_dialog=close_result_dialog,
+        )
         return execute_pingan_order(
             prepared.request,
             idempotency=prepared.idempotency,
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_buy_submit_once(
                 self._manager.title_keyword,
-                port=port,
-                baudrate=baudrate,
-                timeout=timeout,
-                hid_pre_delay=float(effective_profile["hid_pre_delay"]),
-                code=code,
-                price=price,
-                quantity=quantity,
-                post_delay=float(effective_profile["post_delay"]),
-                max_depth=max_depth,
-                dialog_timeout=float(effective_profile["dialog_timeout"]),
-                confirm_timeout=float(effective_profile["confirm_timeout"]),
-                confirm_post_delay=float(effective_profile["confirm_post_delay"]),
-                result_timeout=float(effective_profile["result_timeout"]),
-                close_result_dialog=close_result_dialog,
-                result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
-                capture_final_uia=bool(effective_profile["capture_final_uia"]),
+                **dispatch_options.base_kwargs(code=code, price=price, quantity=quantity),
             ),
             handlers=prepared.handlers,
         )
@@ -2328,31 +2311,21 @@ class _PingAnTradeProxy:
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
             require_broker_readiness=require_broker_readiness,
         )
-        effective_profile = prepared.profile_options
+        dispatch_options = self._manager._build_pingan_order_dispatch_options(
+            profile_options=prepared.profile_options,
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,
+            max_depth=max_depth,
+            close_result_dialog=close_result_dialog,
+        )
         return execute_pingan_order(
             prepared.request,
             idempotency=prepared.idempotency,
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_sell_fast(
                 self._manager.title_keyword,
-                port=port,
-                baudrate=baudrate,
-                timeout=timeout,
-                hid_pre_delay=float(effective_profile["hid_pre_delay"]),
-                code=code,
-                price=price,
-                quantity=quantity,
-                post_delay=float(effective_profile["post_delay"]),
-                max_depth=max_depth,
-                dialog_timeout=float(effective_profile["dialog_timeout"]),
-                confirm_timeout=float(effective_profile["confirm_timeout"]),
-                confirm_post_delay=float(effective_profile["confirm_post_delay"]),
-                result_timeout=float(effective_profile["result_timeout"]),
-                price_quantity_input_mode=str(effective_profile["price_quantity_input_mode"]),
-                dialog_lookup_mode=str(effective_profile["dialog_lookup_mode"]),
-                close_result_dialog=close_result_dialog,
-                result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
-                capture_final_uia=bool(effective_profile["capture_final_uia"]),
+                **dispatch_options.fast_kwargs(code=code, price=price, quantity=quantity),
             ),
             handlers=prepared.handlers,
         )
@@ -2390,31 +2363,21 @@ class _PingAnTradeProxy:
             require_lifecycle_owner_lock=require_lifecycle_owner_lock,
             require_broker_readiness=require_broker_readiness,
         )
-        effective_profile = prepared.profile_options
+        dispatch_options = self._manager._build_pingan_order_dispatch_options(
+            profile_options=prepared.profile_options,
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,
+            max_depth=max_depth,
+            close_result_dialog=close_result_dialog,
+        )
         return execute_pingan_order(
             prepared.request,
             idempotency=prepared.idempotency,
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_sell_fast(
                 self._manager.title_keyword,
-                port=port,
-                baudrate=baudrate,
-                timeout=timeout,
-                hid_pre_delay=float(effective_profile["hid_pre_delay"]),
-                code=code,
-                price=price,
-                quantity=quantity,
-                post_delay=float(effective_profile["post_delay"]),
-                max_depth=max_depth,
-                dialog_timeout=float(effective_profile["dialog_timeout"]),
-                confirm_timeout=float(effective_profile["confirm_timeout"]),
-                confirm_post_delay=float(effective_profile["confirm_post_delay"]),
-                result_timeout=float(effective_profile["result_timeout"]),
-                price_quantity_input_mode=str(effective_profile["price_quantity_input_mode"]),
-                dialog_lookup_mode=str(effective_profile["dialog_lookup_mode"]),
-                close_result_dialog=close_result_dialog,
-                result_close_pre_delay=float(effective_profile["result_close_pre_delay"]),
-                capture_final_uia=bool(effective_profile["capture_final_uia"]),
+                **dispatch_options.fast_kwargs(code=code, price=price, quantity=quantity),
             ),
             handlers=prepared.handlers,
         )
@@ -3978,6 +3941,34 @@ class TdxTradeManager:
                 price=price,
                 quantity=quantity,
             ),
+        )
+
+    def _build_pingan_order_dispatch_options(
+        self,
+        *,
+        profile_options: dict[str, Any],
+        port: str,
+        baudrate: int,
+        timeout: float,
+        max_depth: int,
+        close_result_dialog: bool,
+    ) -> PingAnOrderDispatchOptions:
+        return PingAnOrderDispatchOptions(
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,
+            hid_pre_delay=float(profile_options["hid_pre_delay"]),
+            post_delay=float(profile_options["post_delay"]),
+            max_depth=max_depth,
+            dialog_timeout=float(profile_options["dialog_timeout"]),
+            confirm_timeout=float(profile_options["confirm_timeout"]),
+            confirm_post_delay=float(profile_options["confirm_post_delay"]),
+            result_timeout=float(profile_options["result_timeout"]),
+            close_result_dialog=close_result_dialog,
+            result_close_pre_delay=float(profile_options["result_close_pre_delay"]),
+            capture_final_uia=bool(profile_options["capture_final_uia"]),
+            price_quantity_input_mode=str(profile_options["price_quantity_input_mode"]),
+            dialog_lookup_mode=str(profile_options["dialog_lookup_mode"]),
         )
 
     def _evaluate_idempotency(

@@ -388,6 +388,49 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertIs(prepared.handlers.finalize_result.__self__, manager)
         self.assertIs(prepared.handlers.finalize_result.__func__, manager._finalize_result.__func__)
 
+    def test_pingan_order_dispatch_options_build_base_and_fast_runner_kwargs(self) -> None:
+        manager = TdxTradeManager(profile="balanced")
+        options = manager._build_pingan_order_dispatch_options(
+            profile_options={
+                "hid_pre_delay": "0.11",
+                "post_delay": "0.22",
+                "dialog_timeout": "3.3",
+                "confirm_timeout": "4.4",
+                "confirm_post_delay": "0.55",
+                "result_timeout": "6.6",
+                "result_close_pre_delay": "0.77",
+                "capture_final_uia": False,
+                "price_quantity_input_mode": "tab_enter",
+                "dialog_lookup_mode": "win32",
+            },
+            port="COM3",
+            baudrate=57600,
+            timeout=1.25,
+            max_depth=9,
+            close_result_dialog=False,
+        )
+
+        base_kwargs = options.base_kwargs(code="000001", price="10.00", quantity=100)
+        self.assertEqual(base_kwargs["port"], "COM3")
+        self.assertEqual(base_kwargs["baudrate"], 57600)
+        self.assertEqual(base_kwargs["timeout"], 1.25)
+        self.assertEqual(base_kwargs["hid_pre_delay"], 0.11)
+        self.assertEqual(base_kwargs["post_delay"], 0.22)
+        self.assertEqual(base_kwargs["max_depth"], 9)
+        self.assertEqual(base_kwargs["dialog_timeout"], 3.3)
+        self.assertEqual(base_kwargs["confirm_timeout"], 4.4)
+        self.assertEqual(base_kwargs["confirm_post_delay"], 0.55)
+        self.assertEqual(base_kwargs["result_timeout"], 6.6)
+        self.assertFalse(base_kwargs["close_result_dialog"])
+        self.assertEqual(base_kwargs["result_close_pre_delay"], 0.77)
+        self.assertFalse(base_kwargs["capture_final_uia"])
+        self.assertNotIn("price_quantity_input_mode", base_kwargs)
+        self.assertNotIn("dialog_lookup_mode", base_kwargs)
+
+        fast_kwargs = options.fast_kwargs(code="000001", price="10.00", quantity=100)
+        self.assertEqual(fast_kwargs["price_quantity_input_mode"], "tab_enter")
+        self.assertEqual(fast_kwargs["dialog_lookup_mode"], "win32")
+
     def test_pingan_buy_submit_once_uses_submit_once_profile(self) -> None:
         expected = Result(
             ok=True,
