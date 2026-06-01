@@ -459,6 +459,38 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(result.data["trade_safety"]["submission_key"], "sell-submit-once-20260428-001")
         self.assertTrue(result.data["trade_safety"]["risk_gate"]["passed"])
 
+    def test_pingan_sell_submit_once_routes_through_execution_module(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTradeManager(
+                profile="submit_once",
+                state_path=str(Path(temp_dir) / "state.json"),
+                event_log_path=str(Path(temp_dir) / "events.jsonl"),
+                submission_ledger_path=str(Path(temp_dir) / "submission-ledger.jsonl"),
+            )
+            delegated = Result(ok=True, code=ErrorCode.OK, message="delegated", data={"delegated": True})
+            with (
+                patch("tdxquant.trade.manager.execute_pingan_order", return_value=delegated) as mocked_execute,
+                patch("tdxquant.trade.manager.run_pingan_sell_fast") as mocked_desktop,
+            ):
+                result = manager.pingan.sell_submit_once(
+                    port="COM3",
+                    code="000001",
+                    price="10.00",
+                    quantity=100,
+                    submission_key="sell-submit-once-routing-001",
+                    max_price=10.50,
+                )
+
+        self.assertEqual(result, delegated)
+        mocked_execute.assert_called_once()
+        request = mocked_execute.call_args.args[0]
+        self.assertEqual(request.method, "sell_submit_once")
+        self.assertEqual(request.timing_label, "pingan.sell_submit_once")
+        self.assertEqual(request.request_context(), {"code": "000001", "price": "10.00", "quantity": 100})
+        self.assertEqual(mocked_execute.call_args.kwargs["idempotency"]["decision"], "execute")
+        self.assertTrue(mocked_execute.call_args.kwargs["risk_gate"]["passed"])
+        mocked_desktop.assert_not_called()
+
     def test_pingan_sell_submit_once_requires_broker_readiness_before_desktop_execution(self) -> None:
         broker_health = Result(
             ok=False,

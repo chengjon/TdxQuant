@@ -132,6 +132,8 @@ TdxQuant
 
 > D-08 增量登记（状态仍为 `[已实现]`）：`tdxquant/trade/pingan_execution.py` 提供 `PingAnExecutionRequest` / `execute_pingan_order` 内部执行 seam，`buy_submit_once` 作为 tracer bullet 通过该 seam 保留 idempotency、risk gate、lifecycle/broker gate、desktop dispatch 与 finalize/audit 行为；证据为 `tests/test_pingan_trade_execution.py`、`tests/test_trade_manager.py` 与 OpenSpec `pingan-trade-execution-module`。边界：这是 D-08 的内部 locality/refactor seam，不是新的公开 API，不改变 CLI/task/catalog 参数，不新增桌面 UIA/Win32/HID 执行原语，不表示所有 PingAn 方法已迁移，也不证明 live broker readiness 或 production trading readiness。
 
+> D-08 增量登记（状态仍为 `[已实现]`）：`sell_submit_once` 现与 `buy_submit_once` 对齐，通过 `PingAnExecutionRequest` / `execute_pingan_order` 内部 seam 保留 idempotency、risk gate、lifecycle/broker gate、desktop dispatch 与 finalize/audit 行为；证据为 `tests/test_trade_manager.py` 的 `test_pingan_sell_submit_once_routes_through_execution_module`、既有 sell submit-once focused tests 与 OpenSpec `pingan-sell-submit-once-execution-seam`。边界：这是 D-08 submit-once 两侧内部 seam 对齐，不是新的公开 API，不改变 CLI/task/catalog 参数；`sell_submit_once` 仍复用既有 `run_pingan_sell_fast` 桌面流，不代表存在独立 `run_pingan_sell_submit_once` 原语，不证明 live broker readiness 或 production trading readiness。
+
 ### E. 已设计/待实现能力
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
