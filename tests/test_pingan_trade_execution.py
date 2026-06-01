@@ -153,6 +153,58 @@ class PingAnTradeExecutionTests(unittest.TestCase):
         self.assertEqual(result.data["finalized"]["risk_gate"]["passed"], True)
         self.assertIsNone(result.data["finalized"]["risk_gate"]["requested_price"])
 
+    def test_execute_pingan_order_rejects_conflict_without_desktop_dispatch(self) -> None:
+        request = self._request()
+        idempotency = {
+            "decision": "reject_conflict",
+            "submission_key": "submit-once-001",
+            "conflict_reason": "submission_key reused with different payload",
+        }
+        calls: list[str] = []
+        captured_conflict: dict[str, object] = {}
+
+        def finalize_result(result: Result, **kwargs: object) -> Result:
+            return Result(ok=result.ok, code=result.code, message=result.message, data={"finalized": kwargs})
+
+        result = execute_pingan_order(
+            request,
+            idempotency=idempotency,
+            risk_gate={"passed": True, "checks": ["max_price"]},
+            dispatch=lambda: calls.append("dispatch") or Result(ok=True, code=ErrorCode.OK, message="ok"),
+            build_duplicate_submission_result=lambda _prior_row: Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="duplicate",
+            ),
+            build_submission_key_conflict_result=lambda conflict_idempotency: captured_conflict.update(
+                conflict_idempotency
+            )
+            or Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="conflict rejected",
+            ),
+            build_trade_risk_rejection_result=lambda _risk_gate: Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="risk",
+            ),
+            finalize_result=finalize_result,
+            capture_timing=lambda _label, runner: (runner(), {}),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.message, "conflict rejected")
+        self.assertEqual(calls, [])
+        self.assertEqual(captured_conflict, idempotency)
+        finalized = result.data["finalized"]
+        self.assertEqual(finalized["risk_gate"]["passed"], False)
+        self.assertEqual(finalized["risk_gate"]["max_price"], 10.50)
+        self.assertEqual(finalized["risk_gate"]["rejection_reason"], idempotency["conflict_reason"])
+        self.assertEqual(finalized["idempotency"], idempotency)
+        self.assertEqual(finalized["request_context"], {"code": "000001", "price": "10.00", "quantity": 100})
+        self.assertEqual(finalized["timing"], {})
+
     def _confirm_request(self):
         return PingAnConfirmCurrentExecutionRequest(
             method="confirm_current",
