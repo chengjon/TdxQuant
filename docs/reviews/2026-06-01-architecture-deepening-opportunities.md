@@ -15,7 +15,7 @@ Scope: TdxQuant codebase architecture review using the Matt Pocock `improve-code
   - `tdxquant/desktop/uia.py`: 3,287 lines, 91 definitions.
   - `tdxquant/provider_transport_replay.py`: 2,821 lines, 67 definitions.
   - `tdxquant/subscription_watch_background.py`: 2,768 lines, 102 definitions.
-  - `tdxquant/provider_discovery.py`: 862 lines, with `_capability` spanning most of the file.
+  - `tdxquant/provider_discovery.py`: 862 lines, with `_capability` starting near the top of the file and spanning roughly 95% of the module body.
 
 ## Current Shape
 
@@ -100,6 +100,12 @@ The codebase now has at least three lifecycle implementations with similar conce
 
 They all contain statefile, owner PID, lock, supervisor, restart, backoff, heartbeat/stale, and ownership logic. This is a real seam by the "two adapters" rule: there are already three adapters with the same lifecycle language.
 
+The overlap is role-level rather than byte-for-byte duplication. Concrete examples:
+
+- PingAn lifecycle: `_validate_pingan_lifecycle_owner_pid`, `_process_pid_alive`, `_run_pingan_lifecycle_supervisor_tick`, `_run_pingan_lifecycle_supervisor_run`, and `_build_pingan_statefile_lock_status`.
+- Provider replay lifecycle: `write_provider_replay_lifecycle_statefile`, `build_provider_replay_process_ownership_diagnostics`, `check_provider_replay_lifecycle_statefile`, and `run_provider_replay_managed_daemon_supervisor`.
+- Subscription watch lifecycle: `_pid_is_alive`, `build_background_statefile_ownership`, `_acquire_control_lock`, `_build_restart_backoff`, `supervisor_tick`, and `supervisor_run`.
+
 The current duplication reduces locality. Bugs in owner validation, stale process detection, lock cleanup, or restart/backoff policy can be fixed in one line but remain subtly different in two other modules.
 
 **Solution**
@@ -175,6 +181,14 @@ This makes the provider interface harder to audit. A capability's live-provider 
 
 Create a provider capability registry module that owns structured capability definitions and projection helpers. Discovery, replay fixture manifest, result contract diagnostics, and provider transport replay can consume the same definitions instead of duplicating field semantics.
 
+The proposed interface should be explicit enough for tests and callers:
+
+- `CapabilityDefinition`: a structured definition containing capability key, domain, provider mode, live-readiness status, replay fixture status, result-contract status, transport-replay status, and risk/boundary metadata.
+- `list_capability_definitions()`: returns the canonical ordered definitions.
+- `get_capability_definition(key)`: returns one definition or a typed missing-capability error.
+- `build_capability_discovery_payload(definitions, provider_context)`: projects definitions into the existing discovery shape.
+- `build_capability_contract_projection(definition, projection_kind)`: derives replay/result/transport-facing views without re-encoding capability semantics in each caller.
+
 **Benefits**
 
 - Locality: capability status changes have one primary implementation location.
@@ -188,3 +202,5 @@ Start with Candidate 3, the managed process lifecycle module. It has the cleares
 Second priority is Candidate 2. It is the best follow-up if the goal is to reduce risk around D-07/D-08 trading behavior after their current implementation status.
 
 Candidate 1 is the best low-risk cleanup if the next cycle should avoid broker-side execution risk and keep working in read-only catalog space, but it should not be the default next step if the priority is mainline trading hardening.
+
+Candidates 4 and 5 should follow after the first three unless a task/report or provider-capability change becomes the immediate product priority. Candidate 4 is a medium-risk locality refactor around an already useful facade. Candidate 5 is valuable when provider capability semantics start changing again, but it should be driven by a concrete provider/replay/result-contract slice rather than by registry cleanup alone.
