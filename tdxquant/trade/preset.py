@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 TRADE_COMMAND_DEFAULT_PROFILES: dict[str, str] = {
+    "acceptance-evidence": "balanced",
     "broker-capabilities": "balanced",
     "buy": "balanced",
     "health": "balanced",

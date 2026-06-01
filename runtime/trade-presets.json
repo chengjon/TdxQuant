@@ -71,5 +71,14 @@
     "options": {
       "broker": "pingan_desktop"
     }
+  },
+  "acceptance-evidence-default": {
+    "command": "acceptance-evidence",
+    "description": "平安证券交易执行验收证据只读摘要入口。",
+    "profile": "balanced",
+    "title_key": "平安证券",
+    "options": {
+      "broker": "pingan_desktop"
+    }
   }
 }

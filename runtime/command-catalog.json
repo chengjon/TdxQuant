@@ -665,6 +665,12 @@
     "description": "统一入口下的平安桌面扩展 broker capability 只读边界探针。",
     "labels": ["trade", "broker", "capability", "desktop", "diagnostics"]
   },
+  "trade-acceptance-evidence": {
+    "source": "trade",
+    "preset": "acceptance-evidence-default",
+    "description": "统一入口下的平安交易执行验收证据只读摘要入口。",
+    "labels": ["trade", "pingan", "acceptance", "evidence", "readonly", "diagnostics"]
+  },
   "trade-preflight-pingan-readiness": {
     "source": "trade",
     "preset": "preflight-pingan-readiness",

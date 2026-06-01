@@ -5873,6 +5873,19 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertIn("manual-acceptance", labels)
         self.assertIn("dry-run", labels)
 
+    def test_handle_catalog_list_includes_trade_acceptance_evidence_entry(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "acceptance"])
+        result = _handle_catalog_subcommand(args)
+        self.assertTrue(result.ok)
+        entries = {row["name"]: row for row in result.data["entries"]}
+        self.assertIn("trade-acceptance-evidence", entries)
+        labels = entries["trade-acceptance-evidence"]["labels"]
+        self.assertIn("trade", labels)
+        self.assertIn("pingan", labels)
+        self.assertIn("acceptance", labels)
+        self.assertIn("readonly", labels)
+
     def test_handle_catalog_list_includes_block_sync_write_policy_entry(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--kind", "entry", "--label", "sync"])
@@ -9406,6 +9419,27 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["resolved_args"]["broker"], "pingan_desktop")
         self.assertEqual(output_payload["target"]["name"], "broker-capabilities")
         self.assertEqual(output_payload["resolved_args"]["broker"], "pingan_desktop")
+        self.assertFalse(output_payload["constraints"]["dispatch_executed"])
+        mocked_dispatch.assert_not_called()
+
+    def test_handle_catalog_plan_trade_acceptance_evidence_entry_without_execution(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["catalog", "plan", "--entry", "trade-acceptance-evidence", "--view", "summary"])
+        with patch("tdxquant.cli._dispatch_catalog_resolved_entry") as mocked_dispatch:
+            result = _handle_catalog_subcommand(args)
+        output_payload = _select_catalog_output_payload(args, result)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["catalog_entry"]["source"], "trade")
+        self.assertEqual(result.data["catalog_entry"]["preset"], "acceptance-evidence-default")
+        self.assertEqual(result.data["dispatch"]["command_name"], "acceptance-evidence")
+        self.assertEqual(result.data["resolved_args"]["broker"], "pingan_desktop")
+        boundary = output_payload["trade_plan_boundary"]
+        self.assertEqual(boundary["trade_command"], "acceptance-evidence")
+        self.assertEqual(boundary["input_kind"], "acceptance_evidence")
+        self.assertEqual(boundary["execution_mode"], "non_executing_catalog_plan")
+        self.assertEqual(boundary["dispatch_executed"], False)
+        self.assertEqual(boundary["required_input_fields"], [])
+        self.assertEqual(boundary["input_coverage_status"], "no_required_inputs")
         self.assertFalse(output_payload["constraints"]["dispatch_executed"])
         mocked_dispatch.assert_not_called()
 

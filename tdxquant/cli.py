@@ -2936,6 +2936,7 @@ def _build_trade_preset_namespace(args: argparse.Namespace) -> argparse.Namespac
     merged["trade_command"] = command_name
 
     required_fields_by_command = {
+        "acceptance-evidence": (),
         "broker-capabilities": (),
         "buy": ("port", "code", "price", "quantity"),
         "health": ("port",),
@@ -3464,6 +3465,7 @@ CATALOG_TRADE_PLAN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
     "health": ("port",),
     "preflight": ("port", "code", "price", "quantity"),
     "trade-confirm-current": (),
+    "acceptance-evidence": (),
 }
 CATALOG_TRADE_PLAN_INPUT_KIND: dict[str, str] = {
     "trade-buy": "order",
@@ -3475,6 +3477,7 @@ CATALOG_TRADE_PLAN_INPUT_KIND: dict[str, str] = {
     "health": "desktop_health_readiness",
     "preflight": "preflight_order_readiness",
     "trade-confirm-current": "confirmation",
+    "acceptance-evidence": "acceptance_evidence",
 }
 
 
