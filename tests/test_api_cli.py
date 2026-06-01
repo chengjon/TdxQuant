@@ -19,6 +19,7 @@ from tdxquant.cli import (
     _handle_task_subcommand,
     _handle_trade_subcommand,
     _build_trader_service,
+    _run_trade_acceptance_evidence,
     _run_trade_buy,
     _run_trade_broker_capabilities,
     _run_trade_confirm_current,
@@ -12136,6 +12137,15 @@ class TradeCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         mocked.assert_called_once_with(args)
 
+    def test_handle_trade_acceptance_evidence_uses_trade_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "acceptance-evidence", "--broker", "pingan_desktop"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"acceptance_evidence": {"status": "summary"}})
+        with patch("tdxquant.cli._run_trade_acceptance_evidence", return_value=expected) as mocked:
+            result = _handle_trade_subcommand(args)
+        self.assertIs(result, expected)
+        mocked.assert_called_once_with(args)
+
     def test_handle_trade_confirm_current_uses_trade_manager(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["trade", "confirm-current"])
@@ -12339,6 +12349,17 @@ class TradeCliDispatchTests(unittest.TestCase):
             timeout=1.5,
             pre_delay=0.2,
         )
+
+    def test_run_trade_acceptance_evidence_forwards_readonly_request(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["trade", "acceptance-evidence", "--broker", "pingan_desktop", "--profile", "balanced"])
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"acceptance_evidence": {"status": "summary"}})
+        manager = MagicMock()
+        manager.pingan.acceptance_evidence.return_value = expected
+        with patch("tdxquant.cli.TdxTradeManager", return_value=manager):
+            result = _run_trade_acceptance_evidence(args)
+        self.assertIs(result, expected)
+        manager.pingan.acceptance_evidence.assert_called_once_with()
 
     def test_run_trade_preflight_forwards_trade_request(self) -> None:
         parser = build_parser()

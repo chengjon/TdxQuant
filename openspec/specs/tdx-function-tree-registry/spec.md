@@ -725,3 +725,13 @@ FUNCTION_TREE SHALL record the evidence manifest input as a reproducibility aid 
 - **WHEN** process lifecycle controller-boundary evidence is registered
 - **THEN** D-07 and D-08 MUST NOT be promoted solely from architecture boundary extraction
 - **AND** their boundaries MUST continue to distinguish lifecycle governance evidence from broker readiness, order acceptance, production readiness, and full trading workflow completion.
+
+### Requirement: FUNCTION_TREE SHALL register PingAn trade acceptance evidence summary without over-claiming
+
+`FUNCTION_TREE.md` SHALL register the read-only PingAn trade execution acceptance evidence summary as a D-07/D-08-linked feature node while preserving explicit boundaries.
+
+#### Scenario: Registry cites acceptance evidence summary as a bounded D-07/D-08-linked node
+
+- **WHEN** `trade acceptance-evidence` and `TdxTradeManager.pingan.acceptance_evidence` exist
+- **THEN** `FUNCTION_TREE.md` MUST cite the code, tests, and this OpenSpec change in the PingAn trade execution acceptance evidence summary node
+- **AND** the boundary MUST state that the summary is read-only and does not execute trades, prove broker production readiness, complete live/manual acceptance, or automatically transition status.

@@ -212,6 +212,46 @@ class TdxTradeManagerTests(unittest.TestCase):
         manager = TdxTradeManager(profile="balanced")
         self.assertEqual(manager.profile_name, "balanced")
 
+    def test_pingan_acceptance_evidence_summarizes_trade_surface_without_execution(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            manager = TdxTradeManager(
+                profile="balanced",
+                state_path=str(Path(temp_dir) / "last-order.json"),
+                event_log_path=str(Path(temp_dir) / "events.jsonl"),
+                submission_ledger_path=str(Path(temp_dir) / "ledger.jsonl"),
+                trade_audit_dir=str(Path(temp_dir) / "audits"),
+            )
+            with (
+                patch("tdxquant.trade.manager.run_pingan_buy_fast") as mocked_buy,
+                patch("tdxquant.trade.manager.run_pingan_sell_fast") as mocked_sell,
+                patch("tdxquant.trade.manager.run_pingan_buy_submit_once") as mocked_submit_once,
+                patch("tdxquant.trade.manager.run_pingan_hid_submit_probe") as mocked_submit_ready,
+                patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check") as mocked_health,
+            ):
+                result = manager.pingan.acceptance_evidence()
+
+        self.assertTrue(result.ok)
+        evidence = result.data["acceptance_evidence"]
+        self.assertEqual(evidence["schema"], "tdx.desktop_trade.pingan_trade_execution_acceptance_evidence.v1")
+        self.assertEqual(evidence["execution_mode"], "readonly_trade_acceptance_evidence")
+        self.assertEqual(evidence["target_nodes"], ["D-07", "D-08"])
+        self.assertEqual(
+            {item["method"] for item in evidence["covered_trade_surfaces"]},
+            {"buy", "sell", "confirm_current", "buy_submit_once", "sell_submit_once"},
+        )
+        self.assertFalse(evidence["dispatch_executed"])
+        self.assertFalse(evidence["order_submitted"])
+        self.assertFalse(evidence["workflow_dispatch_executed"])
+        self.assertFalse(evidence["desktop_automation_executed"])
+        self.assertFalse(evidence["status_transition_executed"])
+        self.assertIn("trade_audit_artifacts", {item["name"] for item in evidence["evidence_categories"]})
+        self.assertIn("last_order_state_path", evidence["artifact_targets"])
+        mocked_buy.assert_not_called()
+        mocked_sell.assert_not_called()
+        mocked_submit_once.assert_not_called()
+        mocked_submit_ready.assert_not_called()
+        mocked_health.assert_not_called()
+
     def test_pingan_buy_attaches_metadata_and_writes_artifacts(self) -> None:
         expected = Result(
             ok=True,

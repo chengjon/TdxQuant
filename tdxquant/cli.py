@@ -1718,6 +1718,11 @@ def _build_trade_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     trade_broker_capabilities_parser.add_argument("--profile", default="balanced")
     trade_broker_capabilities_parser.add_argument("--output", help="Optional path to write the JSON result")
 
+    trade_acceptance_evidence_parser = trade_subparsers.add_parser("acceptance-evidence")
+    trade_acceptance_evidence_parser.add_argument("--broker", default="pingan_desktop")
+    trade_acceptance_evidence_parser.add_argument("--profile", default="balanced")
+    trade_acceptance_evidence_parser.add_argument("--output", help="Optional path to write the JSON result")
+
     trade_buy_parser = trade_subparsers.add_parser("buy")
     _add_trade_common_arguments(trade_buy_parser)
     _add_trade_lifecycle_owner_guard_arguments(trade_buy_parser)
@@ -2617,6 +2622,25 @@ def _run_trade_broker_capabilities(args: argparse.Namespace) -> Result:
         exe_path=args.exe_path,
     )
     return trade_manager.pingan.extended_broker_capabilities()
+
+
+def _run_trade_acceptance_evidence(args: argparse.Namespace) -> Result:
+    broker = str(getattr(args, "broker", None) or "pingan_desktop")
+    if broker != "pingan_desktop":
+        return Result(
+            ok=False,
+            code=ErrorCode.INVALID_REQUEST,
+            message=f"unsupported broker for trade acceptance evidence: {broker}",
+            data={"supported_brokers": ["pingan_desktop"]},
+        )
+    trade_manager = TdxTradeManager(
+        profile=getattr(args, "profile", None) or "balanced",
+        title_keyword=args.title_key,
+        exe_path=args.exe_path,
+        state_path=str(PINGAN_LAST_ORDER_STATE_PATH),
+        submission_ledger_path=str(PINGAN_SUBMISSION_LEDGER_PATH),
+    )
+    return trade_manager.pingan.acceptance_evidence()
 
 
 def _run_trade_preflight(args: argparse.Namespace) -> Result:
@@ -6338,6 +6362,8 @@ def _handle_trade_subcommand(args: argparse.Namespace) -> Result:
         return _run_trade_lifecycle_supervisor_run(args)
     if args.trade_command == "broker-capabilities":
         return _run_trade_broker_capabilities(args)
+    if args.trade_command == "acceptance-evidence":
+        return _run_trade_acceptance_evidence(args)
     return Result(ok=False, code=ErrorCode.INVALID_REQUEST, message=f"unsupported trade subcommand: {args.trade_command}")
 
 

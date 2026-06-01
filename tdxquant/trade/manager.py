@@ -92,6 +92,9 @@ PINGAN_TRADE_AUDIT_GATE_STATUS_SCHEMA = "tdx.desktop_trade.pingan_trade_audit_ga
 PINGAN_LIFECYCLE_OWNER_LOCK_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_lock.v1"
 PINGAN_LIFECYCLE_OWNER_STATE_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_owner_state.v1"
 PINGAN_LIFECYCLE_SUPERVISOR_SCHEMA = "tdx.desktop_trade.pingan_lifecycle_supervisor.v1"
+PINGAN_TRADE_EXECUTION_ACCEPTANCE_EVIDENCE_SCHEMA = (
+    "tdx.desktop_trade.pingan_trade_execution_acceptance_evidence.v1"
+)
 PINGAN_REQUIRED_AUDIT_GATE_STATUSES = ("confirmed", "rejected", "failed", "exception")
 PINGAN_EXCEPTION_POPUP_KEYWORDS = (
     "异常",
@@ -1870,6 +1873,123 @@ class _PingAnTradeProxy:
             profile_options=effective_profile,
             broker="pingan",
             method="extended_broker_capabilities",
+            title_keyword=self._manager.title_keyword,
+            exe_path=self._manager.exe_path,
+            timing=timing,
+        )
+        return result
+
+    def acceptance_evidence(self) -> Result:
+        effective_profile = self._manager._build_effective_profile({})
+
+        def run() -> Result:
+            payload = {
+                "schema": PINGAN_TRADE_EXECUTION_ACCEPTANCE_EVIDENCE_SCHEMA,
+                "status": "summary_available",
+                "execution_mode": "readonly_trade_acceptance_evidence",
+                "target_nodes": ["D-07", "D-08"],
+                "covered_trade_surfaces": [
+                    {
+                        "node": "D-07",
+                        "command": "trade buy",
+                        "method": "buy",
+                        "execution_required_for_summary": False,
+                    },
+                    {
+                        "node": "D-07",
+                        "command": "trade sell",
+                        "method": "sell",
+                        "execution_required_for_summary": False,
+                    },
+                    {
+                        "node": "D-07",
+                        "command": "trade confirm-current",
+                        "method": "confirm_current",
+                        "execution_required_for_summary": False,
+                    },
+                    {
+                        "node": "D-08",
+                        "command": "trade submit-once --side buy",
+                        "method": "buy_submit_once",
+                        "execution_required_for_summary": False,
+                    },
+                    {
+                        "node": "D-08",
+                        "command": "trade submit-once --side sell",
+                        "method": "sell_submit_once",
+                        "execution_required_for_summary": False,
+                    },
+                ],
+                "evidence_categories": [
+                    {
+                        "name": "preflight_readiness",
+                        "status": "registered",
+                        "evidence": ["TdxTradeManager.pingan.preflight", "trade preflight"],
+                    },
+                    {
+                        "name": "risk_gate_and_idempotency",
+                        "status": "registered",
+                        "evidence": ["evaluate_trade_risk_gate", "submission_key idempotency ledger"],
+                    },
+                    {
+                        "name": "broker_readiness_guard",
+                        "status": "registered",
+                        "evidence": ["require_broker_readiness guarded buy/sell/submit-once/confirm-current paths"],
+                    },
+                    {
+                        "name": "lifecycle_owner_lock_guard",
+                        "status": "registered",
+                        "evidence": ["require_lifecycle_owner_lock guarded trade paths"],
+                    },
+                    {
+                        "name": "trade_audit_artifacts",
+                        "status": "registered",
+                        "evidence": ["last order state", "order event log", "submission ledger", "trade audit artifact"],
+                    },
+                    {
+                        "name": "manual_acceptance_artifacts",
+                        "status": "registered",
+                        "evidence": [
+                            "task pingan-live-manual-acceptance",
+                            "acceptance outcome coverage",
+                            "promotion readiness review packet",
+                        ],
+                    },
+                ],
+                "artifact_targets": self._manager._artifact_targets(),
+                "review_required": True,
+                "live_manual_acceptance_evaluated": False,
+                "acceptance_complete_claimed": False,
+                "broker_readiness_claimed": False,
+                "production_readiness_claimed": False,
+                "dispatch_executed": False,
+                "order_submitted": False,
+                "workflow_dispatch_executed": False,
+                "desktop_automation_executed": False,
+                "process_control_executed": False,
+                "status_transition_executed": False,
+                "side_effect_level": "none",
+                "boundary": (
+                    "Read-only PingAn trade execution acceptance evidence summary for D-07/D-08 review. "
+                    "It does not execute buy/sell/submit-once/confirm-current, run task/report/catalog workflows, "
+                    "probe broker readiness, operate UIA/HID, control processes, complete live/manual acceptance, "
+                    "or automatically change FUNCTION_TREE status."
+                ),
+            }
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="completed PingAn trade execution acceptance evidence summary",
+                data={"acceptance_evidence": payload},
+            )
+
+        result, timing = capture_trade_timing("pingan.acceptance_evidence", run)
+        attach_trade_metadata(
+            result,
+            profile_name=self._manager.profile_name,
+            profile_options=effective_profile,
+            broker="pingan",
+            method="acceptance_evidence",
             title_keyword=self._manager.title_keyword,
             exe_path=self._manager.exe_path,
             timing=timing,
