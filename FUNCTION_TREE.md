@@ -66,7 +66,7 @@ TdxQuant
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |
 | --- | --- | --- | --- | --- |
-| A-01 | CLI 命令面 | `[已实现]` | `tdxquant/cli.py` 注册约 `204` 个 parser；`tests/test_api_cli.py`、`tests/test_trader_cli.py` | 命令存在不等于每个命令都可在非 Windows 环境完成真实外部调用；外设/TDX 客户端相关命令依赖本机环境。 |
+| A-01 | CLI 命令面 | `[已实现]` | `tdxquant/cli.py` 注册约 `204` 个 parser；`tdxquant/cli_catalog.py` 承载 catalog parser/handler 边界；`tests/test_api_cli.py`、`tests/test_trader_cli.py` | 命令存在不等于每个命令都可在非 Windows 环境完成真实外部调用；外设/TDX 客户端相关命令依赖本机环境；catalog 边界迁移不代表所有 CLI command group 均已拆分。 |
 | A-02 | API Manager 统一入口 | `[已实现]` | `tdxquant/api/manager.py`：`TdxApiManager` 与 market/meta/formula/financial/transaction/runtime/block proxy | 统一入口主要封装本地/bridge 调用；不声明覆盖 TDX 原始接口全集。 |
 | A-03 | Task Manager 统一入口 | `[已实现]` | `tdxquant/api/task.py`：`TdxTaskManager`；`runtime/task-profiles.json` 约 `22` 个 profile；`runtime/task-presets.json` 约 `11` 个 preset | 已有日常任务入口，但更厚的组合任务仍按具体节点登记为待实现。 |
 | A-04 | Trade Manager 统一入口 | `[已实现]` | `tdxquant/trade/manager.py`：`TdxTradeManager`；`tdxquant/trader/service.py`：`TradeService`；`tests/test_trade_manager.py` | 当前重点是平安证券桌面链路；不等于多券商全量交易平台。 |
@@ -109,7 +109,7 @@ TdxQuant
 | C-04 | subscription-watch task 入口 | `[已实现]` | CLI parser 包含 `subscription-watch`；`tdxquant/subscription_watch_run.py`；`tests/test_subscription_watch_run.py` | 前台 run 和 artifact 契约已可用；更高层 long-running product wrapper 仍按 E-06 登记。 |
 | C-05 | report presets | `[已实现]` | `runtime/report-presets.json` 约 `101` 个 preset；`tdxquant/reporting.py` | 报表是本地 artifact 汇总/查询入口；数据完整性取决于对应 runtime/trade/task artifact 是否已生成。 |
 | C-06 | trade report / audit report 入口 | `[已实现]` | CLI parser 包含 `daily-trade-report`、`trade-report-lookup`、`trade-audit-lookup`、`trade-audit-daily-report`、`trade-audit-period-report`、`trade-period-report` | 已有日常诊断和回看入口；更高阶跨 ledger 组合查询仍按 E-07 待实现。 |
-| C-07 | command catalog list/plan/run | `[已实现]` | CLI parser 包含 `catalog`、`list`、`plan`、`run`；`tdxquant/catalog.py` | catalog/bundle 的 plan/run 不绕过底层能力边界；失败原因需回到具体节点诊断。 |
+| C-07 | command catalog list/plan/run | `[已实现]` | CLI parser 包含 `catalog`、`list`、`plan`、`preview`、`validate`、`run`；`tdxquant/catalog.py`；`tdxquant/cli_catalog.py`；`tests/test_api_cli.py::test_catalog_boundary_*`；OpenSpec `deepen-cli-catalog-command-boundary` | catalog/bundle 的 list/plan/preview/validate 为只读发现、校验和解析路径，不执行 task/report/trade/bundle step；`catalog run` 仍走既有执行路径且不绕过底层能力边界；边界迁移不代表 workflow builder。 |
 | C-08 | read-zxg-review-and-export bundle | `[已实现]` | `runtime/command-bundles.json` 包含 `read-zxg-review-and-export`；`docs/TdxQuant_Project_Function_Map.md` 记录该 bundle 完成态 | 以现有 watchlist/block 能力为基础；不是任意外部文件导入能力。 |
 
 ### D. 桌面自动化交易主线

@@ -36,6 +36,7 @@ from tdxquant.cli import (
     build_parser,
     main,
 )
+from tdxquant.cli_catalog import CatalogCommandBoundary, build_catalog_parser as build_catalog_command_parser
 from tdxquant.models import ErrorCode, Result
 from tdxquant.trader.models import OrderSide, OrderStatus, SecurityOrderSnapshot
 
@@ -2978,6 +2979,18 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.command, "catalog")
         self.assertEqual(args.catalog_command, "list")
 
+    def test_catalog_boundary_parser_registers_validate_command(self) -> None:
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+        build_catalog_command_parser(subparsers)
+
+        args = parser.parse_args(["catalog", "validate", "--kind", "all", "--view", "summary"])
+
+        self.assertEqual(args.command, "catalog")
+        self.assertEqual(args.catalog_command, "validate")
+        self.assertEqual(args.kind, "all")
+        self.assertEqual(args.view, "summary")
+
     def test_catalog_list_summary_view_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["catalog", "list", "--view", "summary"])
@@ -5720,6 +5733,78 @@ class ApiCliDispatchTests(unittest.TestCase):
         self.assertEqual(result.data["entries"][0]["command"], "daily")
         self.assertIsInstance(result.data["entries"][0]["labels"], list)
         self.assertIn("summary_view", result.data)
+
+    def test_catalog_boundary_validate_does_not_dispatch_execution(self) -> None:
+        args = argparse.Namespace(catalog_command="validate", view="summary")
+        validate_result = Result(ok=True, code=ErrorCode.OK, message="validated", data={"registry": "ok"})
+        boundary = CatalogCommandBoundary(
+            resolve_entry=MagicMock(),
+            list_entries=MagicMock(),
+            validate_registry=MagicMock(return_value=validate_result),
+            plan_entry=MagicMock(),
+            plan_bundle=MagicMock(),
+            run_entry=MagicMock(),
+            run_bundle=MagicMock(),
+            build_summary_view=MagicMock(),
+        )
+
+        result = boundary.handle(args)
+
+        self.assertIs(result, validate_result)
+        boundary.validate_registry.assert_called_once_with(args)
+        boundary.resolve_entry.assert_not_called()
+        boundary.run_entry.assert_not_called()
+        boundary.run_bundle.assert_not_called()
+        boundary.build_summary_view.assert_not_called()
+
+    def test_catalog_boundary_list_does_not_dispatch_execution(self) -> None:
+        args = argparse.Namespace(catalog_command="list", view="summary")
+        list_result = Result(ok=True, code=ErrorCode.OK, message="listed", data={"entries": []})
+        boundary = CatalogCommandBoundary(
+            resolve_entry=MagicMock(),
+            list_entries=MagicMock(return_value=list_result),
+            validate_registry=MagicMock(),
+            plan_entry=MagicMock(),
+            plan_bundle=MagicMock(),
+            run_entry=MagicMock(),
+            run_bundle=MagicMock(),
+            build_summary_view=MagicMock(),
+        )
+
+        result = boundary.handle(args)
+
+        self.assertIs(result, list_result)
+        boundary.list_entries.assert_called_once_with(args)
+        boundary.resolve_entry.assert_not_called()
+        boundary.run_entry.assert_not_called()
+        boundary.run_bundle.assert_not_called()
+
+    def test_catalog_boundary_plan_entry_resolves_without_execution(self) -> None:
+        args = argparse.Namespace(catalog_command="plan", entry="daily-review", bundle=None)
+        plan_result = Result(ok=True, code=ErrorCode.OK, message="planned", data={"dispatch": {"source": "report"}})
+        boundary = CatalogCommandBoundary(
+            resolve_entry=MagicMock(return_value={"source": "report", "preset": "daily-review"}),
+            list_entries=MagicMock(),
+            validate_registry=MagicMock(),
+            plan_entry=MagicMock(return_value=plan_result),
+            plan_bundle=MagicMock(),
+            run_entry=MagicMock(),
+            run_bundle=MagicMock(),
+            build_summary_view=MagicMock(),
+        )
+
+        result = boundary.handle(args)
+
+        self.assertIs(result, plan_result)
+        boundary.resolve_entry.assert_called_once_with("daily-review")
+        boundary.plan_entry.assert_called_once_with(
+            args=args,
+            entry_name="daily-review",
+            source="report",
+            preset_name="daily-review",
+        )
+        boundary.run_entry.assert_not_called()
+        boundary.run_bundle.assert_not_called()
 
     def test_handle_catalog_list_builds_summary_view(self) -> None:
         parser = build_parser()
