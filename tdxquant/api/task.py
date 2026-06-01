@@ -1143,6 +1143,9 @@ _PINGAN_PROMOTION_READINESS_MANIFEST_SCHEMA = "tdx.desktop_trade.pingan_promotio
 _PINGAN_IMPLEMENTED_STATUS_PROMOTION_DECISION_SCHEMA = (
     "tdx.desktop_trade.pingan_implemented_status_promotion_decision.v1"
 )
+_PINGAN_IMPLEMENTED_STATUS_REVIEW_PACKET_SCHEMA = (
+    "tdx.desktop_trade.pingan_implemented_status_review_packet.v1"
+)
 _PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_evidence_contract.v1"
 )
@@ -1566,6 +1569,103 @@ def _build_pingan_implemented_status_promotion_decision(
     }
 
 
+def _build_pingan_implemented_status_review_packet(
+    *,
+    gate_statuses: dict[str, dict[str, Any]],
+    completed_gates: list[str],
+    incomplete_gates: list[str],
+    evidence_contract_status: dict[str, Any],
+    artifact_provenance_status: dict[str, Any],
+    live_manual_acceptance_provenance_status: dict[str, Any],
+    evidence_freshness_status: dict[str, Any],
+    evidence_manifest: dict[str, Any],
+    decision: dict[str, Any],
+) -> dict[str, Any]:
+    review_status = (
+        "ready_for_manual_review"
+        if decision.get("decision") == "eligible_for_review"
+        and decision.get("implemented_status_eligible") is True
+        else "blocked"
+    )
+    gate_review_items = []
+    for gate_name in _PINGAN_PROMOTION_READINESS_GATE_ORDER:
+        gate_status = gate_statuses.get(gate_name, {})
+        gate_review_items.append(
+            {
+                "gate": gate_name,
+                "status": gate_status.get("status"),
+                "complete": bool(gate_status.get("complete")),
+                "source_kind": gate_status.get("source_kind"),
+                "source_path": gate_status.get("source_path"),
+                "reason": gate_status.get("reason"),
+            }
+        )
+
+    manual_confirmation_items = [
+        "Confirm provider/broker ownership evidence maps to the reviewed PingAn environment.",
+        "Confirm safety gates and desktop lifecycle evidence are current for the reviewed environment.",
+        "Confirm audit evidence and live/manual acceptance evidence represent the intended PingAn outcome set.",
+        "Apply any FUNCTION_TREE status transition explicitly in a separate reviewed change.",
+    ]
+    if review_status == "blocked":
+        manual_confirmation_items.insert(0, "Resolve blocked readiness reasons before manual status review.")
+
+    return {
+        "schema": _PINGAN_IMPLEMENTED_STATUS_REVIEW_PACKET_SCHEMA,
+        "review_status": review_status,
+        "target_nodes": ["D-07", "D-08"],
+        "current_function_tree_status": "[部分实现]",
+        "decision": decision.get("decision"),
+        "implemented_status_eligible": bool(decision.get("implemented_status_eligible")),
+        "completed_gates": completed_gates,
+        "incomplete_gates": incomplete_gates,
+        "blocked_reasons": decision.get("blocked_reasons", []),
+        "manual_status_review_required": True,
+        "automatic_status_transition_allowed": False,
+        "function_tree_status_transition_executed": False,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "promotion_status_transition_executed": False,
+        "execution_mode": "readonly_status_review_packet",
+        "side_effect_level": "none",
+        "gate_review_items": gate_review_items,
+        "evidence_summary": {
+            "completed_gates": completed_gates,
+            "incomplete_gates": incomplete_gates,
+            "missing_evidence_kinds": decision.get("missing_evidence_kinds", []),
+            "source_errors": decision.get("source_errors", {}),
+            "stale_evidence_kinds": decision.get("stale_evidence_kinds", []),
+            "stale_evidence_paths": decision.get("stale_evidence_paths", {}),
+            "evidence_contract_status": {
+                "status": evidence_contract_status.get("status"),
+                "invalid_source_kinds": evidence_contract_status.get("invalid_source_kinds", []),
+            },
+            "artifact_provenance_status": {
+                "status": artifact_provenance_status.get("status"),
+                "invalid_source_kinds": artifact_provenance_status.get("invalid_source_kinds", []),
+            },
+            "live_manual_acceptance_provenance_status": {
+                "status": live_manual_acceptance_provenance_status.get("status"),
+                "invalid_reasons": live_manual_acceptance_provenance_status.get("invalid_reasons", []),
+            },
+            "evidence_freshness_status": copy.deepcopy(evidence_freshness_status),
+            "evidence_manifest": {
+                "source_path": evidence_manifest.get("source_path"),
+                "expected_gates": evidence_manifest.get("expected_gates", []),
+                "missing_expected_gates": evidence_manifest.get("missing_expected_gates", []),
+                "sample_manifest": bool(
+                    evidence_manifest.get("example_only") is True or evidence_manifest.get("sample_only") is True
+                ),
+            },
+        },
+        "manual_confirmation_items": manual_confirmation_items,
+        "boundary": (
+            "Read-only manual status review input derived from promotion readiness evidence; does not execute "
+            "PingAn workflows, submit orders, prove production readiness, or modify FUNCTION_TREE status."
+        ),
+    }
+
+
 def _extract_live_manual_acceptance_provenance_status(
     acceptance_status: dict[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1786,6 +1886,17 @@ def _build_pingan_promotion_readiness_rollup(
         artifact_provenance_status=artifact_provenance_status,
         live_manual_acceptance_provenance_status=live_manual_acceptance_provenance_status,
     )
+    implemented_status_review_packet = _build_pingan_implemented_status_review_packet(
+        gate_statuses=gate_statuses,
+        completed_gates=completed_gates,
+        incomplete_gates=incomplete_gates,
+        evidence_contract_status=evidence_contract_status,
+        artifact_provenance_status=artifact_provenance_status,
+        live_manual_acceptance_provenance_status=live_manual_acceptance_provenance_status,
+        evidence_freshness_status=evidence_freshness_status,
+        evidence_manifest=evidence_manifest_status,
+        decision=implemented_status_promotion_decision,
+    )
     return {
         "schema": _PINGAN_PROMOTION_READINESS_ROLLUP_SCHEMA,
         "status": "complete" if not incomplete_gates else "partial",
@@ -1809,6 +1920,7 @@ def _build_pingan_promotion_readiness_rollup(
         "artifact_provenance_status": artifact_provenance_status,
         "live_manual_acceptance_provenance_status": live_manual_acceptance_provenance_status,
         "implemented_status_promotion_decision": implemented_status_promotion_decision,
+        "implemented_status_review_packet": implemented_status_review_packet,
         "boundary": (
             "Read-only evidence aggregation from caller-provided JSON artifacts; does not execute "
             "broker/desktop/trade/report/catalog workflows and does not prove production readiness "

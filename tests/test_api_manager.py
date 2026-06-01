@@ -4186,6 +4186,17 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(decision["target_nodes"], ["D-07", "D-08"])
         self.assertTrue(decision["manual_status_review_required"])
         self.assertFalse(decision["function_tree_status_transition_executed"])
+        packet = rollup["implemented_status_review_packet"]
+        self.assertEqual(packet["schema"], "tdx.desktop_trade.pingan_implemented_status_review_packet.v1")
+        self.assertEqual(packet["review_status"], "blocked")
+        self.assertEqual(packet["target_nodes"], ["D-07", "D-08"])
+        self.assertEqual(packet["current_function_tree_status"], "[部分实现]")
+        self.assertIn("incomplete_required_gates", packet["blocked_reasons"])
+        self.assertEqual(packet["incomplete_gates"], rollup["incomplete_gates"])
+        self.assertFalse(packet["automatic_status_transition_allowed"])
+        self.assertFalse(packet["function_tree_status_transition_executed"])
+        self.assertEqual(packet["execution_mode"], "readonly_status_review_packet")
+        self.assertEqual(packet["side_effect_level"], "none")
         self.assertEqual(
             rollup["source_paths"],
             {
@@ -4244,6 +4255,29 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertFalse(decision["sample_manifest"])
         self.assertTrue(decision["manual_status_review_required"])
         self.assertFalse(decision["function_tree_status_transition_executed"])
+        packet = rollup["implemented_status_review_packet"]
+        self.assertEqual(packet["schema"], "tdx.desktop_trade.pingan_implemented_status_review_packet.v1")
+        self.assertEqual(packet["review_status"], "ready_for_manual_review")
+        self.assertEqual(packet["target_nodes"], ["D-07", "D-08"])
+        self.assertEqual(packet["current_function_tree_status"], "[部分实现]")
+        self.assertEqual(packet["decision"], "eligible_for_review")
+        self.assertTrue(packet["implemented_status_eligible"])
+        self.assertEqual(packet["completed_gates"], list(rollup["gate_statuses"]))
+        self.assertEqual(packet["incomplete_gates"], [])
+        self.assertEqual(packet["blocked_reasons"], [])
+        self.assertFalse(packet["automatic_status_transition_allowed"])
+        self.assertTrue(packet["manual_status_review_required"])
+        self.assertFalse(packet["function_tree_status_transition_executed"])
+        self.assertFalse(packet["order_submitted"])
+        self.assertEqual(packet["execution_mode"], "readonly_status_review_packet")
+        self.assertEqual(packet["side_effect_level"], "none")
+        self.assertEqual(packet["evidence_summary"]["evidence_contract_status"]["status"], "verified")
+        self.assertEqual(packet["evidence_summary"]["artifact_provenance_status"]["status"], "verified")
+        self.assertEqual(packet["evidence_summary"]["live_manual_acceptance_provenance_status"]["status"], "verified")
+        self.assertIn(
+            "Apply any FUNCTION_TREE status transition explicitly",
+            " ".join(packet["manual_confirmation_items"]),
+        )
         self.assertFalse(rollup["promotion_status_transition_executed"])
         self.assertFalse(rollup["order_submitted"])
 
