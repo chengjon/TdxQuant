@@ -4185,6 +4185,51 @@ class TdxTaskManagerTests(unittest.TestCase):
             "side_effect_level": "file_write",
         }
 
+    @staticmethod
+    def _minimal_pingan_function_tree() -> str:
+        return "\n".join(
+            [
+                "| ID | 功能 | 状态 | 证据 | 边界 |",
+                "| --- | --- | --- | --- | --- |",
+                "| D-07 | PingAn buy / sell / confirm_current |`[部分实现]`|existing evidence|existing boundary|",
+                "| D-08 | PingAn submit_once |`[部分实现]`|existing evidence|existing boundary|",
+                "",
+            ]
+        )
+
+    @staticmethod
+    def _pingan_eligible_transition_gate() -> dict:
+        return {
+            "schema": "tdx.desktop_trade.pingan_implemented_status_transition_gate.v1",
+            "review_result_path": "implemented-status-review-result.json",
+            "gate_status": "eligible_for_status_transition_review",
+            "eligible_for_status_transition_review": True,
+            "completed_checks": [
+                "verified_review_result_artifact_provenance",
+                "approved_review_result",
+                "target_nodes_d07_d08",
+                "eligible_review_packet",
+                "non_transition_flags_confirmed",
+            ],
+            "blocked_reasons": [],
+            "review_result_outcome": "approve",
+            "reviewer": "maintainer-a",
+            "reviewed_at": "2026-06-01T10:00:00Z",
+            "target_nodes": ["D-07", "D-08"],
+            "current_function_tree_status": "[部分实现]",
+            "packet_review_status": "ready_for_manual_review",
+            "packet_decision": "eligible_for_review",
+            "implemented_status_eligible": True,
+            "manual_status_transition_required": True,
+            "automatic_status_transition_allowed": False,
+            "function_tree_status_transition_executed": False,
+            "order_submitted": False,
+            "control_dispatch_executed": False,
+            "promotion_status_transition_executed": False,
+            "execution_mode": "readonly_status_transition_gate",
+            "side_effect_level": "none",
+        }
+
     def test_public_import_is_available(self) -> None:
         manager = TdxTaskManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
@@ -4536,6 +4581,142 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertFalse(gate["eligible_for_status_transition_review"])
         self.assertIn("unverified_review_result_artifact_provenance", gate["blocked_reasons"])
         self.assertFalse(gate["function_tree_status_transition_executed"])
+
+    def test_task_pingan_implemented_status_transition_dry_run_returns_plan_without_writes(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tree_path = root / "FUNCTION_TREE.md"
+            gate_path = root / "transition-gate.json"
+            record_path = root / "transition-record.json"
+            tree_path.write_text(self._minimal_pingan_function_tree(), encoding="utf-8")
+            original_tree = tree_path.read_text(encoding="utf-8")
+            gate_path.write_text(json.dumps(self._pingan_eligible_transition_gate()), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+
+            result = manager.pingan_implemented_status_transition(
+                transition_gate_path=str(gate_path),
+                function_tree_path=str(tree_path),
+                output_path=str(record_path),
+                operator="maintainer-a",
+                reason="approved D-07/D-08 implemented status transition",
+                dry_run=True,
+                apply=False,
+                confirm_transition=False,
+            )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(tree_path.read_text(encoding="utf-8"), original_tree)
+            self.assertFalse(record_path.exists())
+
+        plan = result.data["implemented_status_transition_plan"]
+        self.assertFalse(plan["transition_executed"])
+        self.assertFalse(plan["record_written"])
+        self.assertEqual(plan["target_nodes"], ["D-07", "D-08"])
+        self.assertEqual(plan["status_changes"]["D-07"], {"from": "[部分实现]", "to": "[已实现]"})
+        self.assertEqual(plan["status_changes"]["D-08"], {"from": "[部分实现]", "to": "[已实现]"})
+        self.assertEqual(plan["execution_mode"], "function_tree_status_transition_dry_run")
+
+    def test_task_pingan_implemented_status_transition_apply_updates_tree_and_writes_record(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tree_path = root / "FUNCTION_TREE.md"
+            gate_path = root / "transition-gate.json"
+            record_path = root / "transition-record.json"
+            tree_path.write_text(self._minimal_pingan_function_tree(), encoding="utf-8")
+            gate_path.write_text(json.dumps(self._pingan_eligible_transition_gate()), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+
+            result = manager.pingan_implemented_status_transition(
+                transition_gate_path=str(gate_path),
+                function_tree_path=str(tree_path),
+                output_path=str(record_path),
+                operator="maintainer-a",
+                reason="approved D-07/D-08 implemented status transition",
+                dry_run=False,
+                apply=True,
+                confirm_transition=True,
+            )
+
+            self.assertTrue(result.ok)
+            updated_tree = tree_path.read_text(encoding="utf-8")
+            self.assertIn("| D-07 | PingAn buy / sell / confirm_current |`[已实现]`|", updated_tree)
+            self.assertIn("| D-08 | PingAn submit_once |`[已实现]`|", updated_tree)
+            self.assertTrue(record_path.exists())
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(record["schema"], "tdx.desktop_trade.pingan_implemented_status_transition_record.v1")
+        self.assertTrue(record["function_tree_status_transition_executed"])
+        self.assertEqual(record["operator"], "maintainer-a")
+        self.assertEqual(record["target_nodes"], ["D-07", "D-08"])
+        self.assertEqual(record["status_changes"]["D-07"], {"from": "[部分实现]", "to": "[已实现]"})
+        self.assertFalse(record["order_submitted"])
+        self.assertFalse(record["control_dispatch_executed"])
+        self.assertEqual(record["execution_mode"], "function_tree_status_transition")
+        plan = result.data["implemented_status_transition_plan"]
+        self.assertTrue(plan["transition_executed"])
+        self.assertTrue(plan["record_written"])
+
+    def test_task_pingan_implemented_status_transition_rejects_blocked_gate_without_writes(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tree_path = root / "FUNCTION_TREE.md"
+            gate_path = root / "transition-gate.json"
+            record_path = root / "transition-record.json"
+            tree_path.write_text(self._minimal_pingan_function_tree(), encoding="utf-8")
+            original_tree = tree_path.read_text(encoding="utf-8")
+            gate = self._pingan_eligible_transition_gate()
+            gate["gate_status"] = "blocked"
+            gate["eligible_for_status_transition_review"] = False
+            gate["blocked_reasons"] = ["review_result_not_approved"]
+            gate_path.write_text(json.dumps(gate), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+
+            result = manager.pingan_implemented_status_transition(
+                transition_gate_path=str(gate_path),
+                function_tree_path=str(tree_path),
+                output_path=str(record_path),
+                operator="maintainer-a",
+                reason="should not transition",
+                dry_run=False,
+                apply=True,
+                confirm_transition=True,
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+            self.assertEqual(tree_path.read_text(encoding="utf-8"), original_tree)
+            self.assertFalse(record_path.exists())
+
+        self.assertIn("review_result_not_approved", result.data["blocked_reasons"])
+
+    def test_task_pingan_implemented_status_transition_requires_confirmation_for_apply(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tree_path = root / "FUNCTION_TREE.md"
+            gate_path = root / "transition-gate.json"
+            record_path = root / "transition-record.json"
+            tree_path.write_text(self._minimal_pingan_function_tree(), encoding="utf-8")
+            original_tree = tree_path.read_text(encoding="utf-8")
+            gate_path.write_text(json.dumps(self._pingan_eligible_transition_gate()), encoding="utf-8")
+            manager = TdxTaskManager(profile="default", strategy_path="strategy.py")
+
+            result = manager.pingan_implemented_status_transition(
+                transition_gate_path=str(gate_path),
+                function_tree_path=str(tree_path),
+                output_path=str(record_path),
+                operator="maintainer-a",
+                reason="missing confirmation should fail",
+                dry_run=False,
+                apply=True,
+                confirm_transition=False,
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
+            self.assertEqual(tree_path.read_text(encoding="utf-8"), original_tree)
+            self.assertFalse(record_path.exists())
+
+        self.assertIn("confirm_transition", result.data["missing_fields"])
 
     def test_task_pingan_promotion_readiness_rollup_blocks_unverified_live_manual_acceptance_provenance(self) -> None:
         with TemporaryDirectory() as temp_dir:

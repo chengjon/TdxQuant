@@ -1,0 +1,6 @@
+- [x] 1.1 Add proposal, design, spec deltas, and validate the OpenSpec change.
+- [x] 1.2 Add red tests for dry-run plan, apply-mode file/record writing, blocked gate rejection, missing confirmation rejection, CLI dispatch, and FUNCTION_TREE registration.
+- [x] 1.3 Implement the PingAn implemented-status transition writer and CLI entry.
+- [x] 1.4 Update repository `FUNCTION_TREE.md` D-07/D-08 writer evidence while keeping `[部分实现]`.
+- [x] 1.5 Run focused pytest, OpenSpec strict validation, `git diff --check`, and FUNCTION_TREE registry validation.
+- [x] 1.6 Archive the OpenSpec change, repeat verification, and commit the focused slice.

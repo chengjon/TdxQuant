@@ -1155,6 +1155,9 @@ _PINGAN_IMPLEMENTED_STATUS_REVIEW_RESULT_RECORD_SCHEMA = (
 _PINGAN_IMPLEMENTED_STATUS_TRANSITION_GATE_SCHEMA = (
     "tdx.desktop_trade.pingan_implemented_status_transition_gate.v1"
 )
+_PINGAN_IMPLEMENTED_STATUS_TRANSITION_RECORD_SCHEMA = (
+    "tdx.desktop_trade.pingan_implemented_status_transition_record.v1"
+)
 _PINGAN_PROMOTION_READINESS_EVIDENCE_CONTRACT_SCHEMA = (
     "tdx.desktop_trade.pingan_promotion_readiness_evidence_contract.v1"
 )
@@ -1873,6 +1876,143 @@ def _build_pingan_implemented_status_transition_gate(
             "Read-only pre-transition gate over a PingAn implemented-status review result; does not execute "
             "PingAn workflows, submit orders, prove production readiness, prove implemented status, or modify "
             "FUNCTION_TREE status."
+        ),
+    }
+
+
+def _load_pingan_implemented_status_transition_gate(
+    path: str | None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    payload, error = _load_json_evidence(path)
+    if error is not None:
+        return None, error
+    if payload is None:
+        return None, "transition gate JSON is missing"
+    if payload.get("schema") == _PINGAN_IMPLEMENTED_STATUS_TRANSITION_GATE_SCHEMA:
+        return copy.deepcopy(payload), None
+    gate = _find_json_object(payload, "implemented_status_transition_gate")
+    if gate is None:
+        return None, "implemented_status_transition_gate not found"
+    if gate.get("schema") != _PINGAN_IMPLEMENTED_STATUS_TRANSITION_GATE_SCHEMA:
+        return None, "implemented_status_transition_gate has unsupported schema"
+    return copy.deepcopy(gate), None
+
+
+def _normalize_function_tree_status_cell(value: str) -> str:
+    return value.strip().strip("`")
+
+
+def _load_function_tree_transition_lines(
+    path: str,
+) -> tuple[list[str] | None, dict[str, str], str | None]:
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        return None, {}, str(exc)
+    lines = text.splitlines()
+    statuses: dict[str, str] = {}
+    for line in lines:
+        if not (line.startswith("| D-07 |") or line.startswith("| D-08 |")):
+            continue
+        cells = line.split("|")
+        if len(cells) < 6:
+            return None, statuses, "FUNCTION_TREE row shape is unsupported"
+        node_id = cells[1].strip()
+        statuses[node_id] = _normalize_function_tree_status_cell(cells[3])
+    for node_id in ("D-07", "D-08"):
+        if node_id not in statuses:
+            return None, statuses, f"FUNCTION_TREE row missing: {node_id}"
+    return lines, statuses, None
+
+
+def _apply_pingan_function_tree_status_transition(lines: list[str]) -> list[str]:
+    updated = list(lines)
+    for index, line in enumerate(updated):
+        if not (line.startswith("| D-07 |") or line.startswith("| D-08 |")):
+            continue
+        cells = line.split("|")
+        cells[3] = "`[已实现]`"
+        updated[index] = "|".join(cells)
+    return updated
+
+
+def _build_pingan_implemented_status_transition_plan(
+    *,
+    transition_gate: dict[str, Any],
+    transition_gate_path: str,
+    function_tree_path: str,
+    output_path: str,
+    operator: str,
+    reason: str,
+    dry_run: bool,
+    apply: bool,
+    confirm_transition: bool,
+    transition_executed: bool,
+    record_written: bool,
+) -> dict[str, Any]:
+    return {
+        "schema": "tdx.desktop_trade.pingan_implemented_status_transition_plan.v1",
+        "transition_gate_path": transition_gate_path,
+        "function_tree_path": function_tree_path,
+        "output_path": output_path,
+        "operator": operator,
+        "reason": reason,
+        "dry_run": dry_run,
+        "apply": apply,
+        "confirm_transition": confirm_transition,
+        "target_nodes": _list_from_json(transition_gate.get("target_nodes")),
+        "status_changes": {
+            "D-07": {"from": "[部分实现]", "to": "[已实现]"},
+            "D-08": {"from": "[部分实现]", "to": "[已实现]"},
+        },
+        "transition_executed": transition_executed,
+        "record_written": record_written,
+        "function_tree_status_transition_executed": transition_executed,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "execution_mode": (
+            "function_tree_status_transition" if transition_executed else "function_tree_status_transition_dry_run"
+        ),
+        "side_effect_level": "function_tree_write" if transition_executed else "none",
+        "boundary": (
+            "Guarded FUNCTION_TREE status transition machinery only; does not execute PingAn workflows, submit "
+            "orders, control the desktop, or prove production readiness by itself."
+        ),
+    }
+
+
+def _build_pingan_implemented_status_transition_record(
+    *,
+    plan: dict[str, Any],
+    transition_gate: dict[str, Any],
+    transitioned_at: str,
+) -> dict[str, Any]:
+    return {
+        "schema": _PINGAN_IMPLEMENTED_STATUS_TRANSITION_RECORD_SCHEMA,
+        "artifact_provenance": _build_pingan_readiness_evidence_artifact_provenance(
+            source_kind="implemented_status_transition_record",
+            producer="task pingan-implemented-status-transition",
+            evidence_schema=_PINGAN_IMPLEMENTED_STATUS_TRANSITION_RECORD_SCHEMA,
+        ),
+        "operator": plan["operator"],
+        "reason": plan["reason"],
+        "transitioned_at": transitioned_at,
+        "transition_gate_path": plan["transition_gate_path"],
+        "function_tree_path": plan["function_tree_path"],
+        "target_nodes": plan["target_nodes"],
+        "status_changes": copy.deepcopy(plan["status_changes"]),
+        "gate_status": transition_gate.get("gate_status"),
+        "eligible_for_status_transition_review": transition_gate.get("eligible_for_status_transition_review") is True,
+        "completed_checks": _list_from_json(transition_gate.get("completed_checks")),
+        "function_tree_status_transition_executed": True,
+        "order_submitted": False,
+        "control_dispatch_executed": False,
+        "promotion_status_transition_executed": True,
+        "execution_mode": "function_tree_status_transition",
+        "side_effect_level": "function_tree_write",
+        "boundary": (
+            "Records an explicit FUNCTION_TREE status transition only; does not execute PingAn workflows, submit "
+            "orders, control the desktop, or prove production readiness by itself."
         ),
     }
 
@@ -4303,6 +4443,197 @@ class TdxTaskManager:
         return self._attach_task_metadata(
             result,
             task_name="pingan_implemented_status_transition_gate",
+            timing=timing,
+        )
+
+    def pingan_implemented_status_transition(
+        self,
+        *,
+        transition_gate_path: str | None,
+        function_tree_path: str | None,
+        output_path: str | None,
+        operator: str | None,
+        reason: str | None,
+        dry_run: bool = True,
+        apply: bool = False,
+        confirm_transition: bool = False,
+        overwrite: bool = False,
+    ) -> Result:
+        def run() -> Result:
+            normalized_transition_gate_path = str(transition_gate_path or "").strip()
+            normalized_function_tree_path = str(function_tree_path or "").strip()
+            normalized_output_path = str(output_path or "").strip()
+            normalized_operator = str(operator or "").strip()
+            normalized_reason = str(reason or "").strip()
+            missing_fields = []
+            if not normalized_transition_gate_path:
+                missing_fields.append("transition_gate_path")
+            if not normalized_function_tree_path:
+                missing_fields.append("function_tree_path")
+            if not normalized_output_path:
+                missing_fields.append("output_path")
+            if not normalized_operator:
+                missing_fields.append("operator")
+            if not normalized_reason:
+                missing_fields.append("reason")
+            if apply and not dry_run and not confirm_transition:
+                missing_fields.append("confirm_transition")
+            if missing_fields:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="missing implemented-status transition fields",
+                    data={"missing_fields": missing_fields},
+                )
+            if not dry_run and not apply:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="apply=true is required when dry_run=false",
+                    data={"apply": apply, "dry_run": dry_run},
+                )
+
+            transition_gate, transition_gate_error = _load_pingan_implemented_status_transition_gate(
+                normalized_transition_gate_path
+            )
+            if transition_gate_error is not None or transition_gate is None:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="invalid implemented-status transition gate",
+                    data={"transition_gate_path": normalized_transition_gate_path, "error": transition_gate_error},
+                )
+            if transition_gate.get("eligible_for_status_transition_review") is not True:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="implemented-status transition gate is blocked",
+                    data={
+                        "transition_gate_path": normalized_transition_gate_path,
+                        "gate_status": transition_gate.get("gate_status"),
+                        "blocked_reasons": _list_from_json(transition_gate.get("blocked_reasons")),
+                    },
+                )
+            if transition_gate.get("gate_status") != "eligible_for_status_transition_review":
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="implemented-status transition gate status is not eligible",
+                    data={
+                        "transition_gate_path": normalized_transition_gate_path,
+                        "gate_status": transition_gate.get("gate_status"),
+                    },
+                )
+            if _list_from_json(transition_gate.get("target_nodes")) != ["D-07", "D-08"]:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="implemented-status transition gate target nodes are unsupported",
+                    data={"target_nodes": _list_from_json(transition_gate.get("target_nodes"))},
+                )
+            if transition_gate.get("function_tree_status_transition_executed") is not False:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="transition gate already reports a status transition",
+                    data={
+                        "function_tree_status_transition_executed": transition_gate.get(
+                            "function_tree_status_transition_executed"
+                        )
+                    },
+                )
+
+            lines, current_statuses, function_tree_error = _load_function_tree_transition_lines(
+                normalized_function_tree_path
+            )
+            if function_tree_error is not None or lines is None:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="invalid FUNCTION_TREE transition target",
+                    data={
+                        "function_tree_path": normalized_function_tree_path,
+                        "error": function_tree_error,
+                        "current_statuses": current_statuses,
+                    },
+                )
+            unexpected_statuses = {
+                node_id: status for node_id, status in current_statuses.items() if status != "[部分实现]"
+            }
+            if unexpected_statuses:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message="FUNCTION_TREE transition target is not partial",
+                    data={"current_statuses": current_statuses, "unexpected_statuses": unexpected_statuses},
+                )
+
+            target_path = Path(normalized_output_path)
+            if target_path.exists() and not overwrite and not dry_run:
+                return Result(
+                    ok=False,
+                    code=ErrorCode.INVALID_REQUEST,
+                    message=f"implemented-status transition record already exists: {target_path}",
+                    data={"output_path": str(target_path), "overwrite": overwrite},
+                )
+
+            plan = _build_pingan_implemented_status_transition_plan(
+                transition_gate=transition_gate,
+                transition_gate_path=normalized_transition_gate_path,
+                function_tree_path=normalized_function_tree_path,
+                output_path=str(target_path),
+                operator=normalized_operator,
+                reason=normalized_reason,
+                dry_run=dry_run,
+                apply=apply,
+                confirm_transition=confirm_transition,
+                transition_executed=False,
+                record_written=False,
+            )
+            record: dict[str, Any] | None = None
+            if apply and not dry_run:
+                updated_lines = _apply_pingan_function_tree_status_transition(lines)
+                Path(normalized_function_tree_path).write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
+                transitioned_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                plan = _build_pingan_implemented_status_transition_plan(
+                    transition_gate=transition_gate,
+                    transition_gate_path=normalized_transition_gate_path,
+                    function_tree_path=normalized_function_tree_path,
+                    output_path=str(target_path),
+                    operator=normalized_operator,
+                    reason=normalized_reason,
+                    dry_run=dry_run,
+                    apply=apply,
+                    confirm_transition=confirm_transition,
+                    transition_executed=True,
+                    record_written=True,
+                )
+                record = _build_pingan_implemented_status_transition_record(
+                    plan=plan,
+                    transition_gate=transition_gate,
+                    transitioned_at=transitioned_at,
+                )
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            data: dict[str, Any] = {"implemented_status_transition_plan": plan}
+            if record is not None:
+                data["implemented_status_transition_record"] = record
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message=(
+                    "planned PingAn implemented-status FUNCTION_TREE transition"
+                    if dry_run
+                    else "executed PingAn implemented-status FUNCTION_TREE transition"
+                ),
+                data=data,
+            )
+
+        result, timing = _capture_task_timing("task.pingan_implemented_status_transition", run)
+        return self._attach_task_metadata(
+            result,
+            task_name="pingan_implemented_status_transition",
             timing=timing,
         )
 

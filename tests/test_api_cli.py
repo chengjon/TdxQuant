@@ -1944,6 +1944,38 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.task_command, "pingan-implemented-status-transition-gate")
         self.assertEqual(args.review_result_path, "runtime/pingan/implemented-status-review-result.json")
 
+    def test_task_pingan_implemented_status_transition_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-implemented-status-transition",
+                "--transition-gate-path",
+                "runtime/pingan/implemented-status-transition-gate.json",
+                "--function-tree-path",
+                "FUNCTION_TREE.md",
+                "--output-path",
+                "runtime/pingan/implemented-status-transition-record.json",
+                "--operator",
+                "maintainer-a",
+                "--reason",
+                "approved D-07/D-08 implemented status transition",
+                "--apply",
+                "--confirm-transition",
+                "--no-dry-run",
+            ]
+        )
+        self.assertEqual(args.command, "task")
+        self.assertEqual(args.task_command, "pingan-implemented-status-transition")
+        self.assertEqual(args.transition_gate_path, "runtime/pingan/implemented-status-transition-gate.json")
+        self.assertEqual(args.function_tree_path, "FUNCTION_TREE.md")
+        self.assertEqual(args.output_path, "runtime/pingan/implemented-status-transition-record.json")
+        self.assertEqual(args.operator, "maintainer-a")
+        self.assertEqual(args.reason, "approved D-07/D-08 implemented status transition")
+        self.assertTrue(args.apply)
+        self.assertTrue(args.confirm_transition)
+        self.assertFalse(args.dry_run)
+
     def test_task_trade_audit_cross_ledger_query_command_parses(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -11057,6 +11089,45 @@ class TaskCliDispatchTests(unittest.TestCase):
         self.assertIs(result, expected)
         manager.pingan_implemented_status_transition_gate.assert_called_once_with(
             review_result_path="runtime/pingan/implemented-status-review-result.json",
+        )
+
+    def test_handle_task_pingan_implemented_status_transition_uses_task_manager(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "task",
+                "pingan-implemented-status-transition",
+                "--transition-gate-path",
+                "runtime/pingan/implemented-status-transition-gate.json",
+                "--function-tree-path",
+                "FUNCTION_TREE.md",
+                "--output-path",
+                "runtime/pingan/implemented-status-transition-record.json",
+                "--operator",
+                "maintainer-a",
+                "--reason",
+                "approved D-07/D-08 implemented status transition",
+                "--apply",
+                "--confirm-transition",
+                "--no-dry-run",
+            ]
+        )
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok")
+        manager = MagicMock()
+        manager.pingan_implemented_status_transition.return_value = expected
+        with patch("tdxquant.cli.TdxTaskManager", return_value=manager):
+            result = _handle_task_subcommand(args)
+        self.assertIs(result, expected)
+        manager.pingan_implemented_status_transition.assert_called_once_with(
+            transition_gate_path="runtime/pingan/implemented-status-transition-gate.json",
+            function_tree_path="FUNCTION_TREE.md",
+            output_path="runtime/pingan/implemented-status-transition-record.json",
+            operator="maintainer-a",
+            reason="approved D-07/D-08 implemented status transition",
+            dry_run=False,
+            apply=True,
+            confirm_transition=True,
+            overwrite=False,
         )
 
     def test_handle_task_trade_audit_daily_report_rejects_mixed_status_filters(self) -> None:

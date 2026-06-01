@@ -686,6 +686,18 @@ def _add_pingan_implemented_status_transition_gate_arguments(subparser: argparse
     subparser.add_argument("--review-result-path")
 
 
+def _add_pingan_implemented_status_transition_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--transition-gate-path")
+    subparser.add_argument("--function-tree-path")
+    subparser.add_argument("--output-path")
+    subparser.add_argument("--operator")
+    subparser.add_argument("--reason")
+    subparser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=True)
+    subparser.add_argument("--apply", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--confirm-transition", action=argparse.BooleanOptionalAction, default=False)
+    subparser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
+
+
 def _add_trade_audit_cross_ledger_query_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--audit-id")
     subparser.add_argument("--contract-no")
@@ -1579,6 +1591,12 @@ def _build_task_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     )
     _add_pingan_implemented_status_transition_gate_arguments(task_pingan_implemented_status_transition_gate_parser)
     _add_task_common_arguments(task_pingan_implemented_status_transition_gate_parser)
+
+    task_pingan_implemented_status_transition_parser = task_subparsers.add_parser(
+        "pingan-implemented-status-transition"
+    )
+    _add_pingan_implemented_status_transition_arguments(task_pingan_implemented_status_transition_parser)
+    _add_task_common_arguments(task_pingan_implemented_status_transition_parser)
 
     task_trade_audit_cross_ledger_query_parser = task_subparsers.add_parser("trade-audit-cross-ledger-query")
     _add_trade_audit_cross_ledger_query_arguments(task_trade_audit_cross_ledger_query_parser)
@@ -5885,6 +5903,18 @@ def _dispatch_report_workflow(manager: TdxTaskManager, args: argparse.Namespace,
     if command_name == "pingan-implemented-status-transition-gate":
         return manager.pingan_implemented_status_transition_gate(
             review_result_path=args.review_result_path,
+        )
+    if command_name == "pingan-implemented-status-transition":
+        return manager.pingan_implemented_status_transition(
+            transition_gate_path=args.transition_gate_path,
+            function_tree_path=args.function_tree_path,
+            output_path=args.output_path,
+            operator=args.operator,
+            reason=args.reason,
+            dry_run=args.dry_run,
+            apply=args.apply,
+            confirm_transition=args.confirm_transition,
+            overwrite=args.overwrite,
         )
     if command_name == "trade-audit-cross-ledger-query":
         return manager.trade_audit_cross_ledger_query(
