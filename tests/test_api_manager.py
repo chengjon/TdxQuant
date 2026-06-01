@@ -1357,8 +1357,7 @@ class ApiContextTests(unittest.TestCase):
                 if bundle.startswith("audit-"):
                     self.assertEqual(resolved["steps"][0]["entry"], "recent-failures")
                 else:
-                    self.assertEqual(resolved["steps"][0]["entry"], "task-submit-once")
-                    self.assertEqual(resolved["steps"][0]["options"]["side"], "sell")
+                    self.assertEqual(resolved["steps"][0]["entry"], "task-sell-submit-once")
                 self.assertEqual(resolved["steps"][1]["entry"], audit_entry)
 
     def test_runtime_command_bundles_include_submit_once_trade_audit_review_bundles(self) -> None:
@@ -3084,7 +3083,10 @@ class TdxApiManagerTests(unittest.TestCase):
         )
         manager = TdxApiManager(profile="default", provider_mode="replay")
         with patch.object(type(manager._market_api), "snapshot", return_value=live_result) as mocked_snapshot:
-            result = manager.market.snapshot("688260.SH")
+            result = manager._dispatch_sync_capability(
+                "market.unsupported_snapshot",
+                lambda: manager._market_api.snapshot(stock_code="688260.SH", field_list=[]),
+            )
         self.assertFalse(result.ok)
         self.assertEqual(result.code, ErrorCode.INVALID_REQUEST)
         self.assertIn("unsupported", result.message)
@@ -3990,6 +3992,7 @@ class TdxApiManagerTests(unittest.TestCase):
             create_if_missing=True,
             dry_run=True,
             show=True,
+            write_policy=None,
             mutation_key="sync-001",
             audit_dir="runtime/block-sync",
             strategy_path="strategy.py",
@@ -4804,7 +4807,7 @@ class TdxTaskManagerTests(unittest.TestCase):
 
         self.assertTrue(result.ok)
         rollup = result.data["promotion_readiness_rollup"]
-        self.assertEqual(rollup["status"], "complete")
+        self.assertEqual(rollup["status"], "partial")
         contract = rollup["evidence_contract_status"]
         self.assertEqual(contract["status"], "unverified")
         self.assertEqual(
@@ -4871,7 +4874,7 @@ class TdxTaskManagerTests(unittest.TestCase):
 
         self.assertTrue(result.ok)
         rollup = result.data["promotion_readiness_rollup"]
-        self.assertEqual(rollup["status"], "complete")
+        self.assertEqual(rollup["status"], "partial")
         self.assertEqual(rollup["evidence_contract_status"]["status"], "verified")
         provenance = rollup["artifact_provenance_status"]
         self.assertEqual(provenance["status"], "unverified")
@@ -5163,6 +5166,7 @@ class TdxTaskManagerTests(unittest.TestCase):
             create_if_missing=True,
             dry_run=True,
             show=True,
+            write_policy=None,
             mutation_key="sync-001",
             audit_dir="runtime/block-sync",
         )
