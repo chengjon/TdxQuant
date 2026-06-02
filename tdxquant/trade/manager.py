@@ -48,6 +48,7 @@ from .context import (
 from .extended_capabilities import build_pingan_desktop_extended_broker_capability_probe
 from .pingan_execution import (
     PingAnConfirmCurrentDispatchContext,
+    PingAnConfirmCurrentExecutionHandlers,
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentExecutionPreparation,
     PingAnConfirmCurrentRejectionContext,
@@ -3680,10 +3681,7 @@ class _PingAnTradeProxy:
                 kwargs["side_effect_level"] = side_effect_level
             return attach_trade_safety_metadata(result, **kwargs)
 
-        return execute_pingan_confirm_current(
-            prepared.request,
-            risk_gate=prepared.risk_gate,
-            dispatch=run,
+        handlers = PingAnConfirmCurrentExecutionHandlers(
             build_rejected_result=lambda failed_risk_gate: build_pingan_confirm_current_boundary_rejection_result(
                 failed_risk_gate,
                 context=rejection_context,
@@ -3691,6 +3689,13 @@ class _PingAnTradeProxy:
             attach_metadata=attach_confirm_metadata,
             attach_safety_metadata=attach_confirm_safety_metadata,
             finalize_result=self._manager._finalize_result,
+        )
+
+        return execute_pingan_confirm_current(
+            prepared.request,
+            risk_gate=prepared.risk_gate,
+            dispatch=run,
+            handlers=handlers,
         )
 
 

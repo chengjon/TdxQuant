@@ -119,6 +119,14 @@ class PingAnConfirmCurrentExecutionRequest:
 
 
 @dataclass(frozen=True)
+class PingAnConfirmCurrentExecutionHandlers:
+    build_rejected_result: Callable[[dict[str, Any]], Result]
+    attach_metadata: Callable[[Result, dict[str, Any]], Result]
+    attach_safety_metadata: Callable[[Result, dict[str, Any], dict[str, Any], str | None], Result]
+    finalize_result: Callable[..., Result]
+
+
+@dataclass(frozen=True)
 class PingAnConfirmCurrentExecutionPreparation:
     request: PingAnConfirmCurrentExecutionRequest
     risk_gate: dict[str, Any]
@@ -426,29 +434,44 @@ def execute_pingan_confirm_current(
     *,
     risk_gate: dict[str, Any],
     dispatch: Callable[[], Result],
-    build_rejected_result: Callable[[dict[str, Any]], Result],
-    attach_metadata: Callable[[Result, dict[str, Any]], Result],
-    attach_safety_metadata: Callable[[Result, dict[str, Any], dict[str, Any], str | None], Result],
-    finalize_result: Callable[..., Result],
+    handlers: PingAnConfirmCurrentExecutionHandlers | None = None,
+    build_rejected_result: Callable[[dict[str, Any]], Result] | None = None,
+    attach_metadata: Callable[[Result, dict[str, Any]], Result] | None = None,
+    attach_safety_metadata: Callable[[Result, dict[str, Any], dict[str, Any], str | None], Result] | None = None,
+    finalize_result: Callable[..., Result] | None = None,
     capture_timing: Callable[[str, Callable[[], Result]], tuple[Result, dict[str, Any]]] = capture_trade_timing,
 ) -> Result:
+    if handlers is None:
+        if (
+            build_rejected_result is None
+            or attach_metadata is None
+            or attach_safety_metadata is None
+            or finalize_result is None
+        ):
+            raise TypeError("execute_pingan_confirm_current requires handlers or all legacy result callbacks")
+        handlers = PingAnConfirmCurrentExecutionHandlers(
+            build_rejected_result=build_rejected_result,
+            attach_metadata=attach_metadata,
+            attach_safety_metadata=attach_safety_metadata,
+            finalize_result=finalize_result,
+        )
     idempotency = _not_applicable_idempotency()
 
     if not bool(risk_gate.get("passed")):
-        result = build_rejected_result(risk_gate)
-        attach_metadata(result, {})
-        attach_safety_metadata(result, risk_gate, idempotency, "none")
+        result = handlers.build_rejected_result(risk_gate)
+        handlers.attach_metadata(result, {})
+        handlers.attach_safety_metadata(result, risk_gate, idempotency, "none")
         return result
 
     result, timing = capture_timing(request.timing_label, dispatch)
     confirm_current = result.data.get("confirm_current", {}) if isinstance(result.data, dict) else {}
     confirmation_advanced = bool(confirm_current.get("confirmation_advanced"))
     if not confirmation_advanced:
-        attach_metadata(result, timing)
-        attach_safety_metadata(result, risk_gate, idempotency, None)
+        handlers.attach_metadata(result, timing)
+        handlers.attach_safety_metadata(result, risk_gate, idempotency, None)
         return result
 
-    return finalize_result(
+    return handlers.finalize_result(
         result,
         broker=request.broker,
         method=request.method,

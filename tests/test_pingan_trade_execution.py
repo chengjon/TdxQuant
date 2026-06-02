@@ -5,6 +5,7 @@ import unittest
 from tdxquant.models import ErrorCode, Result
 from tdxquant.trade.pingan_execution import (
     PingAnConfirmCurrentDispatchContext,
+    PingAnConfirmCurrentExecutionHandlers,
     PingAnConfirmCurrentExecutionRequest,
     PingAnConfirmCurrentRejectionContext,
     PingAnExecutionRequest,
@@ -414,6 +415,50 @@ class PingAnTradeExecutionTests(unittest.TestCase):
         self.assertEqual(calls, ["pingan.confirm_current", "dispatch"])
         self.assertEqual(finalized["method"], "confirm_current")
         self.assertEqual(finalized["timing"], {"manager_call": {"elapsed_ms": 2.0}})
+        self.assertEqual(finalized["idempotency"]["decision"], "not_applicable")
+        self.assertIsNone(finalized["submission_key"])
+        self.assertIsNone(finalized["request_context"])
+
+    def test_execute_pingan_confirm_current_accepts_handler_bundle(self) -> None:
+        request = self._confirm_request()
+        calls: list[str] = []
+        finalized: dict[str, object] = {}
+
+        def dispatch() -> Result:
+            calls.append("dispatch")
+            return Result(
+                ok=True,
+                code=ErrorCode.OK,
+                message="advanced",
+                data={"confirm_current": {"confirmation_advanced": True}},
+            )
+
+        handlers = PingAnConfirmCurrentExecutionHandlers(
+            build_rejected_result=lambda _risk_gate: Result(
+                ok=False,
+                code=ErrorCode.INVALID_REQUEST,
+                message="rejected",
+            ),
+            attach_metadata=lambda result, _timing: calls.append("metadata") or result,
+            attach_safety_metadata=lambda result, _risk_gate, _idempotency, _side_effect_level: calls.append("safety")
+            or result,
+            finalize_result=lambda result, **kwargs: finalized.update(kwargs)
+            or Result(ok=result.ok, code=result.code, message=result.message, data={"finalized": kwargs}),
+        )
+
+        result = execute_pingan_confirm_current(
+            request,
+            risk_gate={"passed": True, "checks": ["confirm_boundary"]},
+            dispatch=dispatch,
+            handlers=handlers,
+            capture_timing=lambda label, runner: calls.append(label) or (runner(), {"manager_call": {"elapsed_ms": 3.0}}),
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(calls, ["pingan.confirm_current", "dispatch"])
+        self.assertEqual(finalized["method"], "confirm_current")
+        self.assertEqual(finalized["timing"], {"manager_call": {"elapsed_ms": 3.0}})
+        self.assertTrue(finalized["risk_gate"]["passed"])
         self.assertEqual(finalized["idempotency"]["decision"], "not_applicable")
         self.assertIsNone(finalized["submission_key"])
         self.assertIsNone(finalized["request_context"])
