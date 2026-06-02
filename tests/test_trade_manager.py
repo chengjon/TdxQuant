@@ -430,6 +430,14 @@ class TdxTradeManagerTests(unittest.TestCase):
         fast_kwargs = options.fast_kwargs(code="000001", price="10.00", quantity=100)
         self.assertEqual(fast_kwargs["price_quantity_input_mode"], "tab_enter")
         self.assertEqual(fast_kwargs["dialog_lookup_mode"], "win32")
+        self.assertEqual(
+            options.runner_kwargs(code="000001", price="10.00", quantity=100, fast_inputs=False),
+            base_kwargs,
+        )
+        self.assertEqual(
+            options.runner_kwargs(code="000001", price="10.00", quantity=100, fast_inputs=True),
+            fast_kwargs,
+        )
 
     def test_pingan_buy_submit_once_uses_submit_once_profile(self) -> None:
         expected = Result(

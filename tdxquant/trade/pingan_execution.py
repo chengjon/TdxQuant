@@ -92,6 +92,11 @@ class PingAnOrderDispatchOptions:
         )
         return kwargs
 
+    def runner_kwargs(self, *, code: str, price: str, quantity: int, fast_inputs: bool) -> dict[str, Any]:
+        if fast_inputs:
+            return self.fast_kwargs(code=code, price=price, quantity=quantity)
+        return self.base_kwargs(code=code, price=price, quantity=quantity)
+
 
 @dataclass(frozen=True)
 class PingAnOrderResultContext:

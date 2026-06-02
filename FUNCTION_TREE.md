@@ -162,6 +162,8 @@ TdxQuant
 
 > D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderDispatchOptions` 与 `TdxTradeManager._build_pingan_order_dispatch_options` 现集中 buy/sell/submit-once 的 profile-derived desktop runner kwargs（delay、timeout、result close、final UIA capture 与 fast input-mode fields）构造，order callsite 只选择 runner 并传递 `base_kwargs` / `fast_kwargs`；证据为 `tests/test_trade_manager.py` 的 `test_pingan_order_dispatch_options_build_base_and_fast_runner_kwargs`、既有 buy/sell/submit-once route tests 与 OpenSpec `pingan-order-dispatch-options-locality`。边界：这是 D-08 order dispatch 参数 locality/refactor，真实 UIA/HID runner 仍由 manager callsite 显式选择；不改变公开 manager/CLI/task/catalog 参数，不新增 workflow builder、桌面 primitive、broker readiness 或 production trading readiness。
 
+> D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderDispatchOptions.runner_kwargs(fast_inputs=...)` 现统一 buy/sell/submit-once order runner kwargs 的 base/fast 选择，manager callsite 仍显式选择 `run_pingan_buy_fast` / `run_pingan_buy_submit_once` / `run_pingan_sell_fast`，但通过同一 dispatch-options selector 取得 kwargs；证据为 `tests/test_trade_manager.py` 的 `test_pingan_order_dispatch_options_build_base_and_fast_runner_kwargs`、既有 buy/sell/submit-once route tests 与 OpenSpec `pingan-order-dispatch-runner-kwargs`。边界：这是 D-08 order dispatch kwargs selection locality/refactor，不是生产行为变更；不移除 `base_kwargs` / `fast_kwargs`，不改变公开 manager/CLI/task/catalog 参数、runner 选择、idempotency/risk/finalize/audit/result 语义，不新增 workflow builder、桌面 primitive、broker readiness、live acceptance 或 production trading readiness。
+
 ### E. 已设计/待实现能力
 
 | ID | 功能节点 | 状态 | 证据 | 边界 |

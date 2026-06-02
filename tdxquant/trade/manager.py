@@ -2223,7 +2223,7 @@ class _PingAnTradeProxy:
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_buy_fast(
                 self._manager.title_keyword,
-                **dispatch_options.fast_kwargs(code=code, price=price, quantity=quantity),
+                **dispatch_options.runner_kwargs(code=code, price=price, quantity=quantity, fast_inputs=True),
             ),
             handlers=prepared.handlers,
         )
@@ -2275,7 +2275,7 @@ class _PingAnTradeProxy:
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_buy_submit_once(
                 self._manager.title_keyword,
-                **dispatch_options.base_kwargs(code=code, price=price, quantity=quantity),
+                **dispatch_options.runner_kwargs(code=code, price=price, quantity=quantity, fast_inputs=False),
             ),
             handlers=prepared.handlers,
         )
@@ -2327,7 +2327,7 @@ class _PingAnTradeProxy:
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_sell_fast(
                 self._manager.title_keyword,
-                **dispatch_options.fast_kwargs(code=code, price=price, quantity=quantity),
+                **dispatch_options.runner_kwargs(code=code, price=price, quantity=quantity, fast_inputs=True),
             ),
             handlers=prepared.handlers,
         )
@@ -2379,7 +2379,7 @@ class _PingAnTradeProxy:
             risk_gate=prepared.risk_gate,
             dispatch=lambda: run_pingan_sell_fast(
                 self._manager.title_keyword,
-                **dispatch_options.fast_kwargs(code=code, price=price, quantity=quantity),
+                **dispatch_options.runner_kwargs(code=code, price=price, quantity=quantity, fast_inputs=True),
             ),
             handlers=prepared.handlers,
         )
