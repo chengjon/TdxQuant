@@ -156,6 +156,7 @@ class PingAnConfirmCurrentDispatchContext:
     confirm_timeout: float
     result_timeout: float
     result_close_pre_delay: float
+    confirm_post_delay: float = 0.0
 
 
 def _confirm_health_check(

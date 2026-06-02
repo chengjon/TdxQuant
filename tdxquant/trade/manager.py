@@ -3472,6 +3472,7 @@ class _PingAnTradeProxy:
         rejection_context = prepared.rejection_context
         resolved_lookup_mode = dispatch_context.dialog_lookup_mode
         resolved_confirm_timeout = dispatch_context.confirm_timeout
+        resolved_confirm_post_delay = dispatch_context.confirm_post_delay
         resolved_result_timeout = dispatch_context.result_timeout
         resolved_result_close_pre_delay = dispatch_context.result_close_pre_delay
 
@@ -3514,7 +3515,7 @@ class _PingAnTradeProxy:
                     next_action=next_action,
                 )
 
-            confirm_click = _click_lookup_target(confirm_target, post_delay=float(effective_profile["confirm_post_delay"]))
+            confirm_click = _click_lookup_target(confirm_target, post_delay=resolved_confirm_post_delay)
             checks.append(
                 _build_trade_health_check(
                     "confirm_click",
@@ -3950,6 +3951,7 @@ class TdxTradeManager:
         resolved_confirm_timeout = float(
             profile_options["confirm_timeout"] if confirm_timeout is None else confirm_timeout
         )
+        resolved_confirm_post_delay = float(profile_options["confirm_post_delay"])
         resolved_result_timeout = float(
             profile_options["result_timeout"] if result_timeout is None else result_timeout
         )
@@ -4003,6 +4005,7 @@ class TdxTradeManager:
             confirm_timeout=resolved_confirm_timeout,
             result_timeout=resolved_result_timeout,
             result_close_pre_delay=resolved_result_close_pre_delay,
+            confirm_post_delay=resolved_confirm_post_delay,
         )
         request = PingAnConfirmCurrentExecutionRequest(
             method="confirm_current",

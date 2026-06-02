@@ -2747,6 +2747,7 @@ class TdxTradeManagerTests(unittest.TestCase):
             ):
                 manager = TdxTradeManager(
                     profile="balanced",
+                    profile_overrides={"confirm_post_delay": 0.65},
                     state_path=str(state_path),
                     event_log_path=str(event_log_path),
                     submission_ledger_path=str(ledger_path),
@@ -2774,6 +2775,7 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertEqual(audit_payload["trade_audit"]["audit_id"], result.data["trade_audit"]["audit_id"])
         self.assertNotIn("submission_ledger_path", result.data.get("artifacts", {}))
         self.assertEqual(mocked_click.call_count, 2)
+        self.assertEqual(mocked_click.call_args_list[0].kwargs["post_delay"], 0.65)
 
     def test_pingan_confirm_current_routes_through_execution_module(self) -> None:
         manager = TdxTradeManager(profile="balanced")
@@ -2802,7 +2804,7 @@ class TdxTradeManagerTests(unittest.TestCase):
 
     def test_pingan_confirm_current_preparation_builds_request_guards_and_contexts(self) -> None:
         broker_health = Result(ok=True, code=ErrorCode.OK, message="broker ready", data={"window": {"ok": True}})
-        manager = TdxTradeManager(profile="balanced")
+        manager = TdxTradeManager(profile="balanced", profile_overrides={"confirm_post_delay": 0.65})
         with patch("tdxquant.trade.manager.PingAnBrokerAdapter.health_check", return_value=broker_health):
             prepared = manager._prepare_pingan_confirm_current_execution(
                 dialog_lookup_mode="win32",
@@ -2825,6 +2827,7 @@ class TdxTradeManagerTests(unittest.TestCase):
         self.assertIn("confirm_timeout", prepared.profile_options)
         self.assertEqual(prepared.dispatch_context.dialog_lookup_mode, "win32")
         self.assertEqual(prepared.dispatch_context.confirm_timeout, 2.5)
+        self.assertEqual(prepared.dispatch_context.confirm_post_delay, 0.65)
         self.assertEqual(prepared.dispatch_context.result_timeout, 3.5)
         self.assertFalse(prepared.dispatch_context.close_result_dialog)
         self.assertEqual(prepared.dispatch_context.result_close_pre_delay, 0.4)
