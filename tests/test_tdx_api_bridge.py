@@ -15,6 +15,7 @@ from tdxquant.api.bridge import (
     run_tdx_data_kline,
     run_tdx_data_snapshot,
     run_tdx_formula_screen,
+    run_tdx_gp_one_data,
     run_tdx_provider_capabilities,
     run_tdx_provider_doctor,
     run_tdx_provider_health,
@@ -153,6 +154,76 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
             },
         )
 
+    def test_run_tdx_data_snapshot_falls_back_to_market_snapshot_when_full_tick_missing(self) -> None:
+        class SnapshotOnlyTq:
+            @classmethod
+            def initialize(cls, path: str) -> None:
+                cls.path = path
+
+            @classmethod
+            def close(cls) -> None:
+                pass
+
+            @classmethod
+            def get_market_snapshot(cls, stock_code: str, field_list: list[str]) -> dict[str, object]:
+                return {"symbol": stock_code, "Now": "10.76", "Volume": "839727", "Amount": "90571.09"}
+
+        with patch(
+            "tdxquant.api.bridge._load_tqcenter",
+            return_value=(SnapshotOnlyTq, {"available": True, "module": "tqcenter"}),
+        ), patch("tdxquant.api.bridge.IS_WINDOWS", True):
+            result = run_tdx_data_snapshot(
+                stock_code="000001.SZ",
+                field_list=["Now", "Volume"],
+                strategy_path="strategy.py",
+            )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["rows"], [{"symbol": "000001.SZ", "Now": "10.76", "Volume": "839727"}])
+        self.assertEqual(result.data["query_meta"]["query_kind"], "market.snapshot")
+        self.assertEqual(result.data["query_meta"]["requested_fields"], ["Now", "Volume"])
+
+    def test_run_tdx_gp_one_data_uses_market_snapshot_for_quote_fields(self) -> None:
+        calls: list[tuple[str, tuple[str, ...]]] = []
+
+        class QuoteTq:
+            @classmethod
+            def initialize(cls, path: str) -> None:
+                pass
+
+            @classmethod
+            def close(cls) -> None:
+                pass
+
+            @classmethod
+            def get_market_snapshot(cls, stock_code: str, field_list: list[str]) -> dict[str, object]:
+                calls.append((stock_code, tuple(field_list)))
+                return {"Now": "10.76", "Volume": "839727"}
+
+            @classmethod
+            def get_gp_one_data(cls, stock_list: list[str], field_list: list[str]) -> dict[str, object]:
+                raise AssertionError("quote fields should not call get_gp_one_data")
+
+        with patch(
+            "tdxquant.api.bridge._load_tqcenter",
+            return_value=(QuoteTq, {"available": True, "module": "tqcenter"}),
+        ), patch("tdxquant.api.bridge.IS_WINDOWS", True):
+            result = run_tdx_gp_one_data(
+                stock_list=["000001.SZ", "000002.SZ"],
+                field_list=["Now", "Volume"],
+                strategy_path="strategy.py",
+            )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            result.data["result"],
+            {
+                "000001.SZ": {"Now": "10.76", "Volume": "839727"},
+                "000002.SZ": {"Now": "10.76", "Volume": "839727"},
+            },
+        )
+        self.assertEqual(calls, [("000001.SZ", ("Now", "Volume")), ("000002.SZ", ("Now", "Volume"))])
+
     def test_run_tdx_data_kline_normalizes_dataframe_payload(self) -> None:
         raw = Result(
             ok=True,
@@ -247,6 +318,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
                             {"Date": "20260203", "Value": "0"},
                         ]
                     },
+                    "ErrorId": "0",
                 }
             },
         )
@@ -281,6 +353,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
         self.assertEqual(result.data["matched_symbols"], ["000001.SZ"])
         self.assertEqual(result.data["unmatched_symbols"], ["600519.SH"])
         self.assertEqual(result.data["summary"]["matched_symbol_count"], 1)
+        self.assertEqual(result.data["summary"]["input_symbol_count"], 2)
         self.assertEqual(result.data["rows"][0]["symbol"], "000001.SZ")
         self.assertTrue(result.data["rows"][0]["matched"])
         self.assertEqual(result.data["rows"][0]["matched_dates"], ["20260204"])

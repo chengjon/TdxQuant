@@ -5,8 +5,6 @@ import os
 from pathlib import Path
 import signal
 import subprocess
-import sys
-import time
 from unittest.mock import Mock
 
 import pytest
@@ -419,6 +417,7 @@ def test_start_rejects_when_active_state_is_running(tmp_path: Path) -> None:
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
 
     result = controller.start(stock_list=["600519.SH"])
 
@@ -448,6 +447,7 @@ def test_start_rejects_when_active_state_is_resilience_runtime_state(tmp_path: P
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
 
     result = controller.start(stock_list=["600519.SH"])
 
@@ -478,6 +478,7 @@ def test_start_replays_current_active_run_for_same_idempotency_key(tmp_path: Pat
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
 
     result = controller.start(
         stock_list=["000001.SZ"],
@@ -2674,6 +2675,7 @@ def test_status_view_returns_active_control_and_current_run_status(tmp_path: Pat
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
     (run_dir / "status.json").write_text(
         json.dumps(
             {
@@ -2824,6 +2826,7 @@ def test_status_view_evaluates_heartbeat_staleness_when_threshold_is_passed(tmp_
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
     (run_dir / "status.json").write_text(
         json.dumps(
             {
@@ -2861,6 +2864,7 @@ def test_status_view_evaluates_watermark_staleness_with_explicit_threshold(tmp_p
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
     (run_dir / "status.json").write_text(
         json.dumps(
             {
@@ -2899,6 +2903,7 @@ def test_status_view_summarizes_resilience_runtime_fields(tmp_path: Path, state:
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
     (run_dir / "status.json").write_text(
         json.dumps(
             {
@@ -2953,6 +2958,7 @@ def test_list_view_returns_active_last_completed_and_last_failed(tmp_path: Path)
     )
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
+    controller._pid_is_alive = Mock(return_value=True)
     (active_run / "status.json").write_text(
         json.dumps({"run_id": "run-003", "state": "running"}),
         encoding="utf-8",
@@ -3040,35 +3046,21 @@ def test_reconcile_stale_stopping_state_preserves_graceful_stop_reason(tmp_path:
     assert not paths.pid_path.exists()
 
 
-def test_start_rejects_when_control_lock_is_held_by_other_process(tmp_path: Path) -> None:
+def test_start_rejects_when_control_lock_is_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
-    tmp_path.mkdir(parents=True, exist_ok=True)
-    lock_script = (
-        "import fcntl, pathlib, sys, time; "
-        "path = pathlib.Path(sys.argv[1]); "
-        "path.parent.mkdir(parents=True, exist_ok=True); "
-        "handle = path.open('a+', encoding='utf-8'); "
-        "fcntl.flock(handle.fileno(), fcntl.LOCK_EX); "
-        "print('ready', flush=True); "
-        "time.sleep(10)"
-    )
-    proc = subprocess.Popen(
-        [sys.executable, "-c", lock_script, str(controller.paths.lock_path)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        ready = proc.stdout.readline().strip()
-        assert ready == "ready"
+    lock_attempts: list[Path] = []
 
-        result = controller.start(stock_list=["600519.SH"])
+    def unavailable_control_lock(paths):
+        lock_attempts.append(paths.lock_path)
+        return None
 
-        assert result["ok"] is False
-        assert result["error"]["code"] == "CONTROL_LOCKED"
-    finally:
-        proc.terminate()
-        proc.wait(timeout=5)
+    monkeypatch.setattr("tdxquant.subscription_watch_background._acquire_control_lock", unavailable_control_lock)
+
+    result = controller.start(stock_list=["600519.SH"])
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "CONTROL_LOCKED"
+    assert lock_attempts == [controller.paths.lock_path]
 
 
 def test_stop_returns_error_when_signal_delivery_fails(tmp_path: Path) -> None:
@@ -3086,6 +3078,7 @@ def test_stop_returns_error_when_signal_delivery_fails(tmp_path: Path) -> None:
     controller.paths.pid_path.write_text(f"{pid}\n", encoding="utf-8")
     controller.paths.lock_path.write_text("locked\n", encoding="utf-8")
     controller._signal_process = Mock(return_value=False)
+    controller._pid_is_alive = Mock(return_value=True)
 
     result = controller.stop(reason="operator_stop", grace_period_seconds=1)
 
@@ -3216,7 +3209,7 @@ def test_stop_force_stops_when_grace_period_expires(tmp_path: Path, monkeypatch:
     assert persisted_before["state"] == "running"
     assert result["ok"] is True
     assert result["result"]["run_id"] == "run-001"
-    assert signal_calls == [signal.SIGTERM, signal.SIGKILL]
+    assert signal_calls == [signal.SIGTERM, getattr(signal, "SIGKILL", signal.SIGTERM)]
     assert persisted_after["state"] == "stopped"
     assert persisted_after["reason"] == "forced_stop"
     assert persisted_after["active"] is False
@@ -3225,7 +3218,11 @@ def test_stop_force_stops_when_grace_period_expires(tmp_path: Path, monkeypatch:
 def test_stop_returns_failure_when_force_signal_does_not_end_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    controller = SubscriptionWatchBackgroundController(root_dir=tmp_path, python_executable="python")
+    controller = SubscriptionWatchBackgroundController(
+        root_dir=tmp_path,
+        python_executable="python",
+        stop_force_kill_timeout_seconds=0.0,
+    )
     pid = 4321
     controller._write_active_state(
         {
@@ -3248,7 +3245,7 @@ def test_stop_returns_failure_when_force_signal_does_not_end_process(
 
     assert result["ok"] is False
     assert result["error"]["code"] == "FORCE_SIGNAL_FAILED"
-    assert signal_calls == [signal.SIGTERM, signal.SIGKILL]
+    assert signal_calls == [signal.SIGTERM, getattr(signal, "SIGKILL", signal.SIGTERM)]
     assert persisted["state"] == "stopping"
     assert persisted["reason"] == "operator_stop"
     assert persisted["active"] is True

@@ -5,6 +5,8 @@
 > 当前可用能力、部分实现能力、已设计/待实现能力和非目标边界，以根目录 [`FUNCTION_TREE.md`](../FUNCTION_TREE.md) 为唯一注册表。
 >
 > 本文中的“已实现 / 部分覆盖 / 未实现 / 下一步”等描述如与 `FUNCTION_TREE.md` 不一致，以 `FUNCTION_TREE.md` 为准。
+>
+> `D:\MyCode3\tdx` 功能面合并矩阵见 [`TdxQuant_tdx_functional_surface_merge.md`](TdxQuant_tdx_functional_surface_merge.md)。该矩阵只记录外部材料采纳口径，不替代 `FUNCTION_TREE.md`。
 
 本文面向需要复用本项目的上层系统，用来说明：
 
@@ -403,6 +405,12 @@ TdxQuant
 ### 2.4 桌面自动化交易主线
 
 当前项目已经把桌面交易独立为单独 capability，不再混入查询 API 主线。
+
+`D:\MyCode3\tdx` 外部联调总结并入后的口径是：
+
+- 平安证券买入闭环采纳为已验证混合链路：UIA 填单、HID 触发首次确认、Win32 `WM_COMMAND` 推进确认、HID 关闭结果窗；它不是纯 Win32 或纯 UIA 后台自动化。
+- 通达信交易线路只采纳为探测/诊断能力：可发现控件、填值、读回、触发提示和切换主证券上下文，但完整自动下单仍受“证券代码输入未被交易业务层接受”阻塞。
+- 具体可用状态、证据和边界仍以 `FUNCTION_TREE.md` 的 D-07、D-08、D-12 等节点为准。
 
 已实现的能力锚点包括：
 

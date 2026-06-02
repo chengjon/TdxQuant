@@ -2937,6 +2937,16 @@ class _FakeTaskRuntimeSubscriptionSession:
 
 
 class TdxApiManagerTests(unittest.TestCase):
+    def test_manager_uses_strategy_path_from_api_profile_when_not_explicit(self) -> None:
+        with patch(
+            "tdxquant.api.manager.resolve_api_profile",
+            return_value={"strategy_path": "configured-strategy.py", "default_fields": {}},
+        ):
+            manager = TdxApiManager(profile="configured")
+
+        self.assertEqual(manager.strategy_path, "configured-strategy.py")
+        self.assertEqual(manager._market_api.strategy_path, "configured-strategy.py")
+
     def test_run_tdx_block_read_watchlist_snapshot_normalizes_custom_sector_members(self) -> None:
         bridge = import_module("tdxquant.api.bridge")
         sectors_result = Result(
@@ -3079,8 +3089,8 @@ class TdxApiManagerTests(unittest.TestCase):
         live_result = Result(
             ok=True,
             code=ErrorCode.OK,
-            message="live snapshot should not run in replay mode",
-            data={"rows": [{"symbol": "688260.SH"}]},
+            message="live user sectors should not run in replay mode",
+            data={"rows": [{"block_code": "ZXG"}]},
         )
         manager = TdxApiManager(profile="default", provider_mode="replay")
         with patch.object(type(manager._market_api), "snapshot", return_value=live_result) as mocked_snapshot:
@@ -4238,6 +4248,20 @@ class TdxTaskManagerTests(unittest.TestCase):
         manager = TdxTaskManager(profile="default")
         self.assertEqual(manager.profile_name, "default")
 
+    def test_task_manager_uses_strategy_path_from_task_profile_when_not_explicit(self) -> None:
+        with patch(
+            "tdxquant.api.task.resolve_task_profile",
+            return_value={
+                "api_profile": "default",
+                "trade_profile": "balanced",
+                "strategy_path": "task-configured-strategy.py",
+            },
+        ):
+            manager = TdxTaskManager(profile="configured")
+
+        self.assertEqual(manager.strategy_path, "task-configured-strategy.py")
+        self.assertEqual(manager.api_manager.strategy_path, "task-configured-strategy.py")
+
     def test_task_pingan_promotion_readiness_rollup_reports_partial_gates(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -5200,6 +5224,24 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.data["task"]["name"], "sector_research")
 
+    def test_task_sector_research_extracts_codes_from_provider_result_shape(self) -> None:
+        sector_result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="ok",
+            data={"result": ["000001.SZ", "600519.SH"]},
+        )
+        metrics_result = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": []})
+        manager = TdxTaskManager(profile="sector_research", strategy_path="strategy.py")
+        with (
+            patch.object(type(manager.api_manager.meta), "sector_stocks", return_value=sector_result),
+            patch.object(type(manager.api_manager.meta), "gp_one_data", return_value=metrics_result) as mocked_gp_one,
+        ):
+            result = manager.sector_research(block_code="880001.SH")
+        mocked_gp_one.assert_called_once_with(stock_list=["000001.SZ", "600519.SH"], fields=["Now", "Volume", "Amount"])
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["stock_codes"], ["000001.SZ", "600519.SH"])
+
     def test_task_watchlist_overview_uses_profile_fields(self) -> None:
         expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={})
         manager = TdxTaskManager(profile="watchlist_overview", strategy_path="strategy.py")
@@ -6043,6 +6085,111 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["entries"][0]["contract_no"], "B202604260001")
         self.assertEqual(result.data["task"]["name"], "ledger_summary")
 
+    def test_task_ledger_summary_falls_back_to_pingan_submission_ledger(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            ledger_path = Path(temp_dir) / "pingan-submission-ledger.jsonl"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-04-25T16:30:00+00:00",
+                        "submission_key": "submit-001",
+                        "normalized_request": {
+                            "broker": "pingan",
+                            "method": "buy_submit_once",
+                            "code": "000001",
+                            "price": "10.00",
+                            "quantity": 100,
+                        },
+                        "risk_gate_passed": True,
+                        "idempotency": {
+                            "decision": "execute",
+                            "prior_pre_trade_rows": [
+                                {
+                                    "timestamp": "2026-04-25T16:00:00+00:00",
+                                    "prior_pre_trade_rows": [{"timestamp": "2026-04-25T15:00:00+00:00"}],
+                                }
+                            ],
+                        },
+                        "result": {
+                            "ok": True,
+                            "code": "ok",
+                            "message": "ok",
+                            "contract_no": "B202604260901",
+                            "input": {"code": "000001", "price": "10.00", "quantity": 100},
+                            "result_dialog": {"contract_no": "B202604260901"},
+                            "manager": {"broker": "pingan", "method": "buy_submit_once"},
+                            "trade_safety": {
+                                "idempotency": {
+                                    "prior_pre_trade_rows": [{"timestamp": "2026-04-25T16:00:00+00:00"}]
+                                }
+                            },
+                        },
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="ledger_summary",
+                strategy_path="strategy.py",
+                profile_overrides={
+                    "export_dir": str(Path(temp_dir) / "exports"),
+                    "fallback_ledger_jsonl_path": str(ledger_path),
+                },
+            )
+            result = manager.ledger_summary(code="000001", trade_ok=True, limit=5)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["source"]["path"], str(ledger_path))
+        self.assertEqual(result.data["summary"]["matched_entries"], 1)
+        self.assertEqual(result.data["summary"]["latest_contract_no"], "B202604260901")
+        self.assertEqual(result.data["entries"][0]["task_name"], "buy_submit_once")
+        self.assertEqual(result.data["entries"][0]["broker"], "pingan")
+        self.assertEqual(result.data["entries"][0]["source_ledger"], "pingan_submission")
+
+    def test_task_ledger_summary_handles_large_recursive_submission_ledger_row(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            ledger_path = Path(temp_dir) / "pingan-submission-ledger.jsonl"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-04-25T16:30:00+00:00",
+                        "submission_key": "submit-large-001",
+                        "normalized_request": {
+                            "broker": "pingan",
+                            "method": "buy",
+                            "code": "000001",
+                            "price": "10.00",
+                            "quantity": 100,
+                        },
+                        "risk_gate_passed": True,
+                        "idempotency": {
+                            "decision": "execute",
+                            "prior_pre_trade_rows": [{"payload": "x" * 512}],
+                        },
+                        "result": {"ok": True, "contract_no": "B202604260903"},
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="ledger_summary",
+                strategy_path="strategy.py",
+                profile_overrides={
+                    "export_dir": str(Path(temp_dir) / "exports"),
+                    "fallback_ledger_jsonl_path": str(ledger_path),
+                },
+            )
+            with patch("tdxquant.api.task._MAX_FULL_JSONL_LINE_BYTES", 128):
+                result = manager.ledger_summary(limit=5)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["summary"]["matched_entries"], 1)
+        self.assertEqual(result.data["entries"][0]["code"], "000001")
+        self.assertEqual(result.data["entries"][0]["submission_key"], "submit-large-001")
+        self.assertIsNone(result.data["entries"][0]["trade_ok"])
+
     def test_task_ledger_summary_can_export_filtered_entries(self) -> None:
         with TemporaryDirectory() as temp_dir:
             ledger_path = Path(temp_dir) / "guarded-trade-buy-ledger.jsonl"
@@ -6078,7 +6225,7 @@ class TdxTaskManagerTests(unittest.TestCase):
             manager = TdxTaskManager(
                 profile="ledger_summary",
                 strategy_path="strategy.py",
-                profile_overrides={"export_dir": temp_dir},
+                profile_overrides={"export_dir": temp_dir, "fallback_ledger_jsonl_path": ""},
             )
             result = manager.ledger_summary()
         self.assertFalse(result.ok)
@@ -6131,6 +6278,53 @@ class TdxTaskManagerTests(unittest.TestCase):
         self.assertEqual(result.data["summary"]["report_entries"], 1)
         self.assertEqual(result.data["summary"]["unique_codes"], ["000001"])
         self.assertEqual(result.data["task"]["name"], "daily_trade_report")
+
+    def test_task_daily_trade_report_falls_back_to_pingan_submission_ledger(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            ledger_path = Path(temp_dir) / "pingan-submission-ledger.jsonl"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-04-25T16:30:00+00:00",
+                        "submission_key": "submit-002",
+                        "normalized_request": {
+                            "broker": "pingan",
+                            "method": "buy",
+                            "code": "000001",
+                            "price": "10.00",
+                            "quantity": 100,
+                        },
+                        "risk_gate_passed": True,
+                        "result": {
+                            "ok": True,
+                            "code": "ok",
+                            "message": "ok",
+                            "contract_no": "B202604260902",
+                            "input": {"code": "000001", "price": "10.00", "quantity": 100},
+                            "result_dialog": {"contract_no": "B202604260902"},
+                            "manager": {"broker": "pingan", "method": "buy"},
+                        },
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            manager = TdxTaskManager(
+                profile="daily_trade_report",
+                strategy_path="strategy.py",
+                profile_overrides={
+                    "export_dir": str(Path(temp_dir) / "exports"),
+                    "fallback_ledger_jsonl_path": str(ledger_path),
+                },
+            )
+            result = manager.daily_trade_report(report_date="2026-04-26", timezone_name="Asia/Shanghai")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["source"]["path"], str(ledger_path))
+        self.assertEqual(result.data["summary"]["report_entries"], 1)
+        self.assertEqual(result.data["summary"]["total_quantity"], 100)
+        self.assertEqual(result.data["summary"]["total_amount"], 1000.0)
+        self.assertEqual(result.data["entries"][0]["contract_no"], "B202604260902")
 
     def test_task_daily_trade_report_aggregates_explicit_date_and_exports(self) -> None:
         with TemporaryDirectory() as temp_dir:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
+
 import json
 import os
 from pathlib import Path
@@ -22,10 +23,21 @@ from .managed_lifecycle import (
 )
 from .subscription_watch_run import build_subscription_watch_run_paths
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on native Windows
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - exercised on non-Windows platforms
+    msvcrt = None
+
 DEFAULT_STOP_GRACE_PERIOD_SECONDS = 5
 DEFAULT_START_TIMEOUT_SECONDS = 10
 DEFAULT_STOP_FORCE_KILL_TIMEOUT_SECONDS = 2
 DEFAULT_RESTART_BACKOFF_SECONDS = 30.0
+FORCE_STOP_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
 ACTIVE_PROCESS_STATES = {"starting", "running", "reconnecting", "degraded", "stopping"}
 SUBSCRIPTION_WATCH_STATUS_SUMMARY_SCHEMA_VERSION = "tdx.subscription_watch.status_summary.v1"
 SUBSCRIPTION_WATCH_RESTART_OBSERVATION_SCHEMA_VERSION = "tdx.subscription_watch.restart_observation.v1"
@@ -1124,6 +1136,31 @@ def _release_control_lock(handle: Any) -> None:
     release_lifecycle_file_lock(handle)
 
 
+def _lock_control_file(handle: Any) -> None:
+    if fcntl is not None:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return
+    if msvcrt is None:
+        raise RuntimeError("file locking is unavailable on this platform")
+    handle.seek(0)
+    if not handle.read(1):
+        handle.seek(0)
+        handle.write("0")
+        handle.flush()
+    handle.seek(0)
+    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+
+
+def _unlock_control_file(handle: Any) -> None:
+    if fcntl is not None:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return
+    if msvcrt is None:
+        return
+    handle.seek(0)
+    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+
+
 def read_active_payload(paths: SubscriptionWatchBackgroundPaths) -> dict[str, Any] | None:
     if not paths.active_path.exists():
         return None
@@ -2079,7 +2116,7 @@ class SubscriptionWatchBackgroundController:
                         },
                     }
 
-                if not self._signal_process(pid, signal.SIGKILL) and self._pid_is_alive(pid):
+                if not self._signal_process(pid, FORCE_STOP_SIGNAL) and self._pid_is_alive(pid):
                     return {
                         "ok": False,
                         "error": {

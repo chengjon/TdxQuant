@@ -1489,7 +1489,10 @@ class _BlockManagerProxy:
         effective_profile = self._manager._build_effective_profile({})
         result, timing = capture_api_timing(
             "block.user_sectors",
-            lambda: self._manager._block_api.user_sectors(),
+            lambda: self._manager._dispatch_sync_capability(
+                "block.user_sectors",
+                lambda: self._manager._block_api.user_sectors(),
+            ),
         )
         return attach_manager_metadata(
             result,
@@ -1504,7 +1507,10 @@ class _BlockManagerProxy:
         effective_profile = self._manager._build_effective_profile({"block_code": block_code})
         result, timing = capture_api_timing(
             "block.read_watchlist_snapshot",
-            lambda: self._manager._block_api.read_watchlist_snapshot(block_code=block_code),
+            lambda: self._manager._dispatch_sync_capability(
+                "block.read_watchlist_snapshot",
+                lambda: self._manager._block_api.read_watchlist_snapshot(block_code=block_code),
+            ),
         )
         return attach_manager_metadata(
             result,
@@ -1537,10 +1543,13 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.create_sector",
-            lambda: self._manager._block_api.create_sector(
-                block_code=block_code,
-                block_name=block_name,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.create_sector",
+                lambda: self._manager._block_api.create_sector(
+                    block_code=block_code,
+                    block_name=block_name,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(
@@ -1572,9 +1581,12 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.delete_sector",
-            lambda: self._manager._block_api.delete_sector(
-                block_code=block_code,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.delete_sector",
+                lambda: self._manager._block_api.delete_sector(
+                    block_code=block_code,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(
@@ -1608,10 +1620,13 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.rename_sector",
-            lambda: self._manager._block_api.rename_sector(
-                block_code=block_code,
-                block_name=block_name,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.rename_sector",
+                lambda: self._manager._block_api.rename_sector(
+                    block_code=block_code,
+                    block_name=block_name,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(
@@ -1643,9 +1658,12 @@ class _BlockManagerProxy:
             options["audit_dir"] = audit_dir
         result, timing = capture_api_timing(
             "block.clear_sector",
-            lambda: self._manager._block_api.clear_sector(
-                block_code=block_code,
-                **options,
+            lambda: self._manager._dispatch_sync_capability(
+                "block.clear_sector",
+                lambda: self._manager._block_api.clear_sector(
+                    block_code=block_code,
+                    **options,
+                ),
             ),
         )
         return attach_manager_metadata(
@@ -1942,19 +1960,24 @@ class TdxApiManager:
     ) -> None:
         self.profile_name = profile
         self.profile_options = resolve_api_profile(profile, overrides=profile_overrides)
-        self.strategy_path = strategy_path
+        resolved_strategy_path = strategy_path
+        if resolved_strategy_path is None:
+            profile_strategy_path = self.profile_options.get("strategy_path")
+            if isinstance(profile_strategy_path, str) and profile_strategy_path.strip():
+                resolved_strategy_path = profile_strategy_path
+        self.strategy_path = resolved_strategy_path
         self.provider_mode = normalize_provider_mode(provider_mode)
         self.replay_fixture = replay_fixture
         self.replay_fixture_path = replay_fixture_path
         self.replay_fixture_map = dict(replay_fixture_map or {})
-        self._market_api = MarketApi(strategy_path=strategy_path)
-        self._meta_api = MetaApi(strategy_path=strategy_path)
-        self._financial_api = FinancialApi(strategy_path=strategy_path)
-        self._transaction_api = TransactionApi(strategy_path=strategy_path)
-        self._formula_api = FormulaApi(strategy_path=strategy_path)
-        self._runtime_api = RuntimeApi(strategy_path=strategy_path)
-        self._block_api = BlockApi(strategy_path=strategy_path)
-        self._trade_api = TradeApi(strategy_path=strategy_path)
+        self._market_api = MarketApi(strategy_path=resolved_strategy_path)
+        self._meta_api = MetaApi(strategy_path=resolved_strategy_path)
+        self._financial_api = FinancialApi(strategy_path=resolved_strategy_path)
+        self._transaction_api = TransactionApi(strategy_path=resolved_strategy_path)
+        self._formula_api = FormulaApi(strategy_path=resolved_strategy_path)
+        self._runtime_api = RuntimeApi(strategy_path=resolved_strategy_path)
+        self._block_api = BlockApi(strategy_path=resolved_strategy_path)
+        self._trade_api = TradeApi(strategy_path=resolved_strategy_path)
         self.market = _MarketManagerProxy(self)
         self.meta = _MetaManagerProxy(self)
         self.financial = _FinancialManagerProxy(self)

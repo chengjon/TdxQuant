@@ -36,6 +36,7 @@ from tdxquant.cli import (
     _run_trade_submit_once,
     build_parser,
     main,
+    _select_output_payload,
 )
 from tdxquant.cli_catalog import CatalogCommandBoundary, build_catalog_parser as build_catalog_command_parser
 from tdxquant.models import ErrorCode, Result
@@ -2915,6 +2916,14 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.command, "report")
         self.assertEqual(args.report_command, "daily")
         self.assertEqual(args.profile, "daily_trade_report")
+        self.assertEqual(args.view, "detailed")
+
+    def test_report_daily_summary_view_command_parses(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "daily", "--date", "2026-04-26", "--view", "summary"])
+        self.assertEqual(args.command, "report")
+        self.assertEqual(args.report_command, "daily")
+        self.assertEqual(args.view, "summary")
 
     def test_report_lookup_command_parses(self) -> None:
         parser = build_parser()
@@ -2967,6 +2976,26 @@ class ApiCliParserTests(unittest.TestCase):
         self.assertEqual(args.command, "report")
         self.assertEqual(args.report_command, "ledger")
         self.assertEqual(args.profile, "ledger_summary")
+
+    def test_report_summary_view_selects_reduced_payload(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["report", "ledger", "--view", "summary"])
+        result = Result(
+            ok=True,
+            code=ErrorCode.OK,
+            message="completed ledger summary task",
+            data={
+                "summary": {"total_entries": 2, "matched_entries": 2},
+                "source": {"path": "runtime/exports/guarded-trade-buy-ledger.jsonl", "format": "jsonl"},
+                "input": {"limit": 20},
+                "entries": [{"id": "a"}, {"id": "b"}],
+            },
+        )
+        payload = _select_output_payload(args, result)
+        self.assertEqual(payload["mode"], "report")
+        self.assertEqual(payload["command"], "ledger")
+        self.assertEqual(payload["summary"]["matched_entries"], 2)
+        self.assertEqual(payload["entry_count"], 2)
 
     def test_report_presets_command_parses(self) -> None:
         parser = build_parser()

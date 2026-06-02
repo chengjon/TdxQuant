@@ -3,7 +3,6 @@
 ## Purpose
 
 定义 TongDaXin HID 交易桥接基线能力，包括买页探测、前台校验、HID 辅助买入探针和低风险验证模式。
-
 ## Requirements
 ### Requirement: Trading bridge SHALL probe TongDaXin buy-page prerequisites
 The system SHALL expose a bridge command that detects whether the TongDaXin buy page, code input, price input, quantity input, and submit button are available before any trading automation attempt.
@@ -48,3 +47,21 @@ The system SHALL support low-risk verification workflows in which operators use 
 #### Scenario: Bridge captures post-submit prompt
 - **WHEN** a buy probe reaches a post-submit prompt or confirmation dialog
 - **THEN** the bridge returns the captured prompt text and available actions in structured JSON
+
+### Requirement: TongDaXin HID trading bridge SHALL remain probe-scoped until business input acceptance is evidenced
+
+The TongDaXin HID trading bridge SHALL be represented as a probe and diagnostic capability unless evidence shows that the TongDaXin trading business layer accepts the automated security-code input chain.
+
+#### Scenario: TongDaXin bridge can fill and trigger controls
+- **WHEN** TongDaXin bridge evidence shows code, price, quantity, submit control discovery, field write/read, or post-submit prompt capture
+- **THEN** the capability MAY be registered as probing, prerequisite validation, or diagnostic automation
+- **AND** it MUST NOT be registered as full order submission solely from those control-level observations
+
+#### Scenario: Security-code business acceptance is missing
+- **WHEN** TongDaXin evidence still produces a prompt equivalent to missing security code after automated input
+- **THEN** the capability MUST remain unavailable for full live order submission
+- **AND** operator-facing documentation MUST name security-code business-layer acceptance as the blocker
+
+#### Scenario: Future evidence resolves the blocker
+- **WHEN** future validation proves that TongDaXin accepts automated security-code input and completes the confirmation/result loop
+- **THEN** a separate OpenSpec change MUST update the capability boundary before documentation claims full live TongDaXin order submission

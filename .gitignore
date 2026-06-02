@@ -7,6 +7,7 @@ __pycache__/
 
 runtime/trader/
 runtime/trade-audits/
+runtime/block-sync/
 runtime/pingan-last-order.json
 runtime/pingan-order-events.jsonl
 runtime/pingan-submission-ledger.jsonl

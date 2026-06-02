@@ -411,6 +411,9 @@ def materialize_subscription_watch_replay(
     replay_fixture: str | None = None,
     replay_fixture_path: str | None = None,
 ) -> MaterializedSubscriptionWatchReplay:
+    def _path_value(path: Path) -> str:
+        return path.as_posix()
+
     source = load_subscription_watch_replay_source(
         replay_fixture=replay_fixture,
         replay_fixture_path=replay_fixture_path,
@@ -423,45 +426,45 @@ def materialize_subscription_watch_replay(
 
     manifest["run_id"] = paths.run_id
     manifest["provider_mode"] = "replay"
-    manifest["output_dir"] = str(paths.run_dir)
+    manifest["output_dir"] = _path_value(paths.run_dir)
     manifest["artifacts"] = {
-        "manifest_path": str(paths.manifest_path),
-        "status_path": str(paths.status_path),
-        "summary_path": str(paths.summary_path),
-        "events_jsonl_path": str(paths.events_jsonl_path),
-        "events_csv_path": str(paths.events_csv_path),
+        "manifest_path": _path_value(paths.manifest_path),
+        "status_path": _path_value(paths.status_path),
+        "summary_path": _path_value(paths.summary_path),
+        "events_jsonl_path": _path_value(paths.events_jsonl_path),
+        "events_csv_path": _path_value(paths.events_csv_path),
     }
 
     status["run_id"] = paths.run_id
     status["state"] = "completed"
     status["output_paths"] = {
-        "run_dir": str(paths.run_dir),
-        "manifest_path": str(paths.manifest_path),
-        "status_path": str(paths.status_path),
-        "summary_path": str(paths.summary_path),
-        "events_jsonl_path": str(paths.events_jsonl_path),
-        "events_csv_path": str(paths.events_csv_path),
+        "run_dir": _path_value(paths.run_dir),
+        "manifest_path": _path_value(paths.manifest_path),
+        "status_path": _path_value(paths.status_path),
+        "summary_path": _path_value(paths.summary_path),
+        "events_jsonl_path": _path_value(paths.events_jsonl_path),
+        "events_csv_path": _path_value(paths.events_csv_path),
     }
     status["artifacts"] = {
-        "run_dir": str(paths.run_dir),
-        "manifest_path": str(paths.manifest_path),
-        "status_path": str(paths.status_path),
-        "summary_path": str(paths.summary_path),
-        "events_jsonl_path": str(paths.events_jsonl_path),
-        "events_csv_path": str(paths.events_csv_path),
-        "jsonl_output_path": str(paths.events_jsonl_path),
-        "csv_output_path": str(paths.events_csv_path),
-        "status_output_path": str(paths.status_path),
+        "run_dir": _path_value(paths.run_dir),
+        "manifest_path": _path_value(paths.manifest_path),
+        "status_path": _path_value(paths.status_path),
+        "summary_path": _path_value(paths.summary_path),
+        "events_jsonl_path": _path_value(paths.events_jsonl_path),
+        "events_csv_path": _path_value(paths.events_csv_path),
+        "jsonl_output_path": _path_value(paths.events_jsonl_path),
+        "csv_output_path": _path_value(paths.events_csv_path),
+        "status_output_path": _path_value(paths.status_path),
     }
 
     summary["run_id"] = paths.run_id
     summary["final_state"] = "completed"
     summary["artifacts"] = {
-        "manifest_path": str(paths.manifest_path),
-        "status_path": str(paths.status_path),
-        "summary_path": str(paths.summary_path),
-        "events_jsonl_path": str(paths.events_jsonl_path),
-        "events_csv_path": str(paths.events_csv_path),
+        "manifest_path": _path_value(paths.manifest_path),
+        "status_path": _path_value(paths.status_path),
+        "summary_path": _path_value(paths.summary_path),
+        "events_jsonl_path": _path_value(paths.events_jsonl_path),
+        "events_csv_path": _path_value(paths.events_csv_path),
     }
 
     for row in events:

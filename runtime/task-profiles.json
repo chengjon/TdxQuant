@@ -115,6 +115,7 @@
     "export_dir": "runtime/exports",
     "export_stem": "ledger-summary",
     "ledger_stem": "guarded-trade-buy-ledger",
+    "fallback_ledger_jsonl_path": "runtime/pingan-submission-ledger.jsonl",
     "default_limit": 20
   },
   "daily_trade_report": {
@@ -123,6 +124,7 @@
     "export_dir": "runtime/exports",
     "export_stem": "daily-trade-report",
     "ledger_stem": "guarded-trade-buy-ledger",
+    "fallback_ledger_jsonl_path": "runtime/pingan-submission-ledger.jsonl",
     "default_recent_limit": 10,
     "default_timezone": "Asia/Shanghai"
   },
@@ -132,6 +134,7 @@
     "export_dir": "runtime/exports",
     "export_stem": "trade-report-lookup",
     "ledger_stem": "guarded-trade-buy-ledger",
+    "fallback_ledger_jsonl_path": "runtime/pingan-submission-ledger.jsonl",
     "default_limit": 10,
     "default_timezone": "Asia/Shanghai"
   },
@@ -177,6 +180,7 @@
     "export_dir": "runtime/exports",
     "export_stem": "trade-period-report",
     "ledger_stem": "guarded-trade-buy-ledger",
+    "fallback_ledger_jsonl_path": "runtime/pingan-submission-ledger.jsonl",
     "default_recent_limit": 20,
     "default_timezone": "Asia/Shanghai"
   },
@@ -186,5 +190,13 @@
     "gp_one_fields": ["Now"],
     "refresh_market": "AG",
     "refresh_force": false
+  },
+  "tdx_quant_live": {
+    "api_profile": "tdx_quant_live",
+    "output_format": "json",
+    "gp_one_fields": ["Now", "Volume"],
+    "refresh_market": "AG",
+    "refresh_force": false,
+    "strategy_path": "D:\\mystocks\\tdx\\tdx-quant\\PYPlugins\\user\\tdxdata_test.py"
   }
 }

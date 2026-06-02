@@ -31,10 +31,12 @@ TdxQuant
 │   ├── CLI 命令面 [已实现]
 │   ├── Manager API [已实现]
 │   ├── runtime profiles / presets [已实现]
-│   └── command catalog / bundle / report preset [已实现]
+│   ├── command catalog / bundle / report preset [已实现]
+│   └── external tdx merge audit [已实现]
 ├── B. 查询与运行时主线 [已实现为主]
 │   ├── market / meta / financial / transaction [已实现]
 │   ├── formula [已实现；更多 capability contract 部分覆盖]
+│   ├── TCalc plugin DLL example asset [非目标/边界]
 │   ├── block [部分实现]
 │   ├── runtime 基础能力 [已实现]
 │   ├── subscription session / watch / worker bridge [部分实现]
@@ -48,6 +50,7 @@ TdxQuant
 │   ├── desktop UIA / Win32 / HID primitives [已实现]
 │   ├── TdxTradeManager / TradeService / PingAn gateway [已实现]
 │   ├── PingAn buy / sell / submit_once / confirm [部分实现]
+│   ├── TongDaXin HID trade probe [部分实现；探测边界]
 │   └── trade audit / ledger / safety governance [部分实现]
 └── E. 待闭合与下一阶段能力 [分状态登记]
     ├── subscription query-style one-shot CLI
@@ -74,6 +77,7 @@ TdxQuant
 | A-06 | command catalog | `[已实现]` | `tdxquant/catalog.py`；`runtime/command-catalog.json` 约 `115` 个 entry；`runtime/TdxQuant_Command_Catalog_Usage.md` | catalog 描述可运行命令和参数编排，不替代能力状态判断；状态以本文件为准。 |
 | A-07 | command bundle | `[已实现]` | `runtime/command-bundles.json` 约 `144` 个 bundle；`tdxquant/catalog.py` 支持 bundle 解析 | bundle 是组合执行入口；单个 step 仍受底层功能节点边界约束。 |
 | A-08 | OpenSpec 生命周期材料 | `[已实现]` | `openspec/changes/archive/**`、`openspec/specs/**`；`docs/superpowers/plans/**`；`scripts/validate_function_tree_registry.py` 与 `tests/test_function_tree_registry.py` 校验 `FUNCTION_TREE.md` 状态/证据/边界列、重复 ID、待实现边界措辞、OpenSpec evidence id 是否存在 active/archive 材料、显式本地证据路径是否存在、根目录 `ROADMAP.md` 缺席，以及 `--json` 成功/失败机器可读报告；OpenSpec `function-tree-registry-validator` / `function-tree-openspec-evidence-validation` / `function-tree-evidence-path-validation` / `function-tree-validator-json-report` / `function-tree-lifecycle-status-registry` | `[已实现]` 仅指 OpenSpec lifecycle 材料与 FUNCTION_TREE registry validator/报告能力已经有源码、测试、spec 和边界；可作为设计、归档和单一功能注册表结构/报告校验证据，不直接证明当前代码可运行；validator 只校验 `FUNCTION_TREE.md` 的状态注册表形状、OpenSpec evidence 引用存在性、保守识别的显式本地证据路径存在性、“无 ROADMAP.md 抢真相”约束和 JSON 报告结构；不会执行证据路径、解释 glob/命令/符号/自由文本证据，也不证明对应功能可用，`--json` 只是同一校验结果的机器可读投影，其他功能节点实现状态仍以各自源码/测试/运行时配置为准。 |
+| A-09 | external tdx merge audit | `[已实现]` | `scripts/audit_external_tdx_merge.py`；`tests/test_external_tdx_merge_audit.py`；`docs/TdxQuant_tdx_functional_surface_merge.md` | 这是外部 `D:\MyCode3\tdx` 迁移闭环审计脚本，只校验受控类别：`tdxquant` Python 源文件名覆盖、已知排除测试、runtime 顶层文件覆盖、HID 固件 hash、plugin/DLL 示例资产、外部 active OpenSpec change 到当前 specs/archive 的覆盖，以及大型 JSON dump 的排除统计；它不读取或脱敏真实机 raw dump 内容，不证明外部历史文档全部等价，也不把排除项升级为当前可用能力。 |
 
 ### B. 查询与运行时主线
 
@@ -98,6 +102,7 @@ TdxQuant
 | B-17 | provider result contract | `[已实现]` | `tdxquant/result_contract.py`、`tdxquant/query_contract.py`；provider fixture `provider-result-*.json`；`tests/test_provider_result_contract.py` | 约束 provider 返回结构；不保证外部 provider 永不返回业务异常。 |
 | B-18 | provider capability discovery / health / doctor | `[已实现]` | `tdxquant/provider_discovery.py`；`tdxquant/api/bridge.py`：`run_tdx_provider_capabilities`、`run_tdx_provider_health`、`run_tdx_provider_doctor`；fixture `runtime-capabilities-success.json`、`runtime-health-degraded.json`、`runtime-doctor-degraded.json` | 发现和诊断是可观测能力；不自动修复本机 TDX、COM、窗口或行情源问题。 |
 | B-19 | provider fixtures / in-process replay | `[已实现]` | `tdxquant/fixtures/provider/*` 共 `57` 个 fixture；`tdxquant/replay_fixtures.py`、`tdxquant/replay_provider.py`；`tests/test_replay_fixtures.py`、`tests/test_replay_provider.py` | fixture/replay 用于契约测试和离线验证；不能替代真实行情、公式或交易联调。 |
+| B-20 | TongDaXin TCalc 插件 DLL 示例资产 | `[非目标/边界]` | `docs/tdx-plugin-dll-function-reference.md`；`examples/tdx_plugin_tcalc/`；`tests/test_tdx_plugin_tcalc_asset.py`；OpenSpec `register-tdx-plugin-dll-example` | 当前只采纳外部 `D:\MyCode3\tdx\docs\TestPluginTCale` 的源码级 ABI 示例和边界文档，用于保留 `pPluginFUNC`、`PluginTCalcFuncInfo`、`RegisterTdxFunc`、`{0,NULL}` 哨兵等接口形状；不编译 DLL、不部署到通达信 `T0002/dlls/`、不自动绑定公式管理器、不从 Python/CLI 加载或执行原生插件，也不扩展当前公式 bridge/runtime 能力。 |
 
 ### C. 任务、报告、目录主线
 
@@ -118,7 +123,7 @@ TdxQuant
 | --- | --- | --- | --- | --- |
 | D-01 | desktop UIA primitives | `[已实现]` | `tdxquant/desktop/uia.py`、`tdxquant/uia_inspector.py`；CLI parser 包含 `uia-*` 命令 | 依赖 Windows 桌面、目标窗口和控件树稳定性；WSL 侧只能通过 bridge/JSON 消费结果。 |
 | D-02 | desktop Win32 primitives | `[已实现]` | `tdxquant/desktop/win32.py`、`tdxquant/win32_api.py`；CLI parser 包含 `win32-*` 命令 | 仅适用于 Windows 客户端自动化；窗口标题、权限、焦点和消息投递策略会影响结果。 |
-| D-03 | HID bridge primitives | `[已实现]` | `tdxquant/desktop/hid.py`、`tdxquant/hid_bridge.py`；CLI parser 包含 `hid-ping`、`hid-send`、`tdx-trade-hid-*`；`tests/test_hid_bridge.py` | 依赖 HID/串口设备和本机端口；测试可覆盖契约，不代表硬件永远在线。 |
+| D-03 | HID bridge primitives | `[已实现]` | `tdxquant/desktop/hid.py`、`tdxquant/hid_bridge.py`；Arduino 固件样例 `firmware/arduino/tdx_hid_keyboard/tdx_hid_keyboard.ino`；CLI parser 包含 `hid-ping`、`hid-send`、`tdx-trade-hid-*`；`tests/test_hid_bridge.py`、`tests/test_hid_firmware_asset.py` | 依赖 HID/串口设备和本机端口；测试可覆盖契约和固件资产路径，不代表硬件永远在线；TongDaXin 交易侧 HID 命令的完整下单边界单独按 D-12 登记。 |
 | D-04 | broker / gateway abstraction | `[已实现]` | `tdxquant/trader/gateway.py`、`tdxquant/trader/registry.py`、`tdxquant/trader/models.py`、`tdxquant/brokers/base.py` | 抽象已存在；实际可用 broker 以已接入 adapter 为准。 |
 | D-05 | PingAn desktop gateway | `[已实现]` | `tdxquant/trader/adapters/pingan_desktop.py`：`PingAnDesktopTraderGateway`；`tests/test_pingan_trader_gateway.py`、`tests/test_trader_gateway.py` | 当前主要服务平安证券桌面客户端；其他券商不能按此节点默认视为可用。 |
 | D-06 | PingAn health / preflight / readiness | `[已实现]` | `TdxTradeManager.pingan.health/preflight/submit_ready/dialog_readiness`；CLI parser 包含 `trade health`、`trade preflight`、`submit-ready`、`dialog-readiness` | 是交易前诊断与准备检查；通过检查不等于实际下单一定成功。 |
@@ -163,6 +168,8 @@ TdxQuant
 > D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderDispatchOptions` 与 `TdxTradeManager._build_pingan_order_dispatch_options` 现集中 buy/sell/submit-once 的 profile-derived desktop runner kwargs（delay、timeout、result close、final UIA capture 与 fast input-mode fields）构造，order callsite 只选择 runner 并传递 `base_kwargs` / `fast_kwargs`；证据为 `tests/test_trade_manager.py` 的 `test_pingan_order_dispatch_options_build_base_and_fast_runner_kwargs`、既有 buy/sell/submit-once route tests 与 OpenSpec `pingan-order-dispatch-options-locality`。边界：这是 D-08 order dispatch 参数 locality/refactor，真实 UIA/HID runner 仍由 manager callsite 显式选择；不改变公开 manager/CLI/task/catalog 参数，不新增 workflow builder、桌面 primitive、broker readiness 或 production trading readiness。
 
 > D-08 增量登记（状态仍为 `[已实现]`）：`PingAnOrderDispatchOptions.runner_kwargs(fast_inputs=...)` 现统一 buy/sell/submit-once order runner kwargs 的 base/fast 选择，manager callsite 仍显式选择 `run_pingan_buy_fast` / `run_pingan_buy_submit_once` / `run_pingan_sell_fast`，但通过同一 dispatch-options selector 取得 kwargs；证据为 `tests/test_trade_manager.py` 的 `test_pingan_order_dispatch_options_build_base_and_fast_runner_kwargs`、既有 buy/sell/submit-once route tests 与 OpenSpec `pingan-order-dispatch-runner-kwargs`。边界：这是 D-08 order dispatch kwargs selection locality/refactor，不是生产行为变更；不移除 `base_kwargs` / `fast_kwargs`，不改变公开 manager/CLI/task/catalog 参数、runner 选择、idempotency/risk/finalize/audit/result 语义，不新增 workflow builder、桌面 primitive、broker readiness、live acceptance 或 production trading readiness。
+
+> D-07 外部合并证据（状态仍为 `[已实现]`）：`docs/TdxQuant_tdx_functional_surface_merge.md` 采纳外部真实机结论，PingAn 买入闭环是 UIA 填单、HID 首次确认触发、Win32 `WM_COMMAND` 推进确认、HID 关闭结果窗的混合链路；该证据只用于界定既有 PingAn buy/sell/confirm_current 执行链路，不把 TongDaXin trading probe、catalog plan/preview、HID bridge 或外部 TDX 功能面提升为通用可交易能力，也不移除真实交易必须显式传入订单参数、submission key、HID/窗口/登录/人工环境安全约束的边界。
 
 ### E. 已设计/待实现能力
 

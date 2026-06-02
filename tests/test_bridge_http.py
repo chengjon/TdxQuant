@@ -250,8 +250,11 @@ class BridgeRequestHandlerTests(unittest.TestCase):
         config: BridgeConfig,
         *,
         controller: _FakeController | None = None,
+        pid_is_alive=None,
     ) -> tuple[BridgeHTTPServer, str, threading.Thread]:
         server = BridgeHTTPServer(config, controller=controller)
+        if pid_is_alive is not None and hasattr(server.bridge_controller, "_pid_is_alive"):
+            server.bridge_controller._pid_is_alive = pid_is_alive
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         return server, f"http://127.0.0.1:{server.server_address[1]}", thread
@@ -307,7 +310,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 with self.assertRaises(HTTPError) as ctx:
                     self._request(f"{base_url}/bridge/v1/health")
@@ -329,7 +332,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["10.0.0.10"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 with self.assertRaises(HTTPError) as ctx:
                     self._request(f"{base_url}/bridge/v1/health", token="secret-token")
@@ -351,7 +354,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/health", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -634,7 +637,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2276,7 +2279,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/health", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2308,7 +2311,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/health", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2334,7 +2337,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2361,7 +2364,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2395,7 +2398,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/status", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2428,7 +2431,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/status?run_id=run-001", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2474,7 +2477,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/list", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2638,12 +2641,13 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/artifacts", token="secret-token")
                 self.assertTrue(payload["ok"])
                 self.assertEqual(payload["result"]["run_id"], "run-001")
-                self.assertTrue(payload["result"]["artifacts"]["status_path"].endswith("run-001/status.json"))
+                status_path = str(payload["result"]["artifacts"]["status_path"]).replace("\\", "/")
+                self.assertTrue(status_path.endswith("run-001/status.json"))
             finally:
                 server.shutdown()
                 server.server_close()
@@ -2696,7 +2700,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/events", token="secret-token")
                 self.assertTrue(payload["ok"])
@@ -2754,7 +2758,7 @@ class BridgeRequestHandlerTests(unittest.TestCase):
                 master_allowlist=["127.0.0.1"],
                 run_root_dir=temp_dir,
             )
-            server, base_url, thread = self._start_server(config)
+            server, base_url, thread = self._start_server(config, pid_is_alive=lambda pid: True)
             try:
                 payload = self._request(f"{base_url}/bridge/v1/watch/logs", token="secret-token")
                 self.assertTrue(payload["ok"])

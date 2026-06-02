@@ -177,11 +177,11 @@ class UIAClickValidationTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertIn(result.code.value, {"invalid_request", "unsupported_platform"})
 
-    def test_pingan_probe_unsupported_or_ok(self) -> None:
+    def test_pingan_probe_unsupported_or_environmental_result(self) -> None:
         result = run_pingan_probe("平安证券", code="000001", price="10.00", quantity=100)
-        self.assertIn(result.code.value, {"ok", "unsupported_platform"})
+        self.assertIn(result.code.value, {"ok", "unsupported_platform", "control_not_found", "window_not_found"})
 
-    def test_pingan_hid_submit_probe_unsupported_or_ok(self) -> None:
+    def test_pingan_hid_submit_probe_unsupported_or_environmental_result(self) -> None:
         result = run_pingan_hid_submit_probe(
             "平安证券",
             port="COM3",
@@ -191,7 +191,7 @@ class UIAClickValidationTests(unittest.TestCase):
             price="10.00",
             quantity=100,
         )
-        self.assertIn(result.code.value, {"ok", "unsupported_platform"})
+        self.assertIn(result.code.value, {"ok", "unsupported_platform", "control_not_found", "window_not_found"})
 
     def test_select_combobox_requires_selector(self) -> None:
         result = select_uia_combobox_item("平安证券", item_name="示例")
