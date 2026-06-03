@@ -26,20 +26,12 @@ class _MarketManagerProxy:
     def snapshot(self, stock_code: str, fields: list[str] | None = None) -> Result:
         field_list = self._manager._resolve_fields("snapshot", fields)
         effective_profile = self._manager._build_effective_profile({"field_list": field_list})
-        result, timing = capture_api_timing(
-            "market.snapshot",
-            lambda: self._manager._dispatch_sync_capability(
-                "market.snapshot",
-                lambda: self._manager._market_api.snapshot(stock_code=stock_code, field_list=field_list),
-            ),
-        )
-        return attach_manager_metadata(
-            result,
-            profile_name=self._manager.profile_name,
-            profile_options=effective_profile,
+        return self._manager._call_with_envelope(
+            capability="market.snapshot",
             domain="market",
             method="snapshot",
-            timing=timing,
+            profile_options=effective_profile,
+            live_call=lambda: self._manager._market_api.snapshot(stock_code=stock_code, field_list=field_list),
         )
 
     def full_tick(self, stock_code: str, fields: list[str] | None = None) -> Result:
@@ -64,20 +56,12 @@ class _MarketManagerProxy:
     def market_snapshot(self, stock_code: str, fields: list[str] | None = None) -> Result:
         field_list = self._manager._resolve_fields("market_snapshot", fields)
         effective_profile = self._manager._build_effective_profile({"field_list": field_list})
-        result, timing = capture_api_timing(
-            "market.market_snapshot",
-            lambda: self._manager._dispatch_sync_capability(
-                "market.market_snapshot",
-                lambda: self._manager._market_api.market_snapshot(stock_code=stock_code, field_list=field_list),
-            ),
-        )
-        return attach_manager_metadata(
-            result,
-            profile_name=self._manager.profile_name,
-            profile_options=effective_profile,
+        return self._manager._call_with_envelope(
+            capability="market.market_snapshot",
             domain="market",
             method="market_snapshot",
-            timing=timing,
+            profile_options=effective_profile,
+            live_call=lambda: self._manager._market_api.market_snapshot(stock_code=stock_code, field_list=field_list),
         )
 
     def kline(
@@ -2023,6 +2007,28 @@ class TdxApiManager:
         if self._is_replay_mode():
             return self._execute_sync_replay(capability)
         return live_call()
+
+    def _call_with_envelope(
+        self,
+        *,
+        capability: str,
+        domain: str,
+        method: str,
+        profile_options: dict[str, Any],
+        live_call: Any,
+    ) -> Result:
+        result, timing = capture_api_timing(
+            capability,
+            lambda: self._dispatch_sync_capability(capability, live_call),
+        )
+        return attach_manager_metadata(
+            result,
+            profile_name=self.profile_name,
+            profile_options=profile_options,
+            domain=domain,
+            method=method,
+            timing=timing,
+        )
 
     def refresh_cache(self, market: str | None = None, force: bool | None = None) -> Result:
         resolved_market = market if market is not None else str(self.profile_options.get("refresh_market", "AG"))

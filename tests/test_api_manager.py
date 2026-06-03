@@ -3151,6 +3151,42 @@ class TdxApiManagerTests(unittest.TestCase):
         self.assertIsInstance(payload["data"], dict)
         self.assertEqual(payload["artifacts"], [])
 
+    def test_manager_call_envelope_live_invokes_live_call_once(self) -> None:
+        expected = Result(ok=True, code=ErrorCode.OK, message="ok", data={"rows": [{"symbol": "688260.SH"}]})
+        manager = TdxApiManager(profile="brief", strategy_path="strategy.py")
+
+        with patch.object(type(manager._market_api), "snapshot", return_value=expected) as mocked_snapshot:
+            result = manager.market.snapshot("688260.SH", fields=["Now"])
+
+        mocked_snapshot.assert_called_once_with(stock_code="688260.SH", field_list=["Now"])
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["manager"]["domain"], "market")
+        self.assertEqual(result.data["manager"]["method"], "snapshot")
+        self.assertEqual(result.data["api_profile"]["options"]["field_list"], ["Now"])
+        self.assertIn("manager_call", result.data["timing"])
+        self.assertEqual(result.to_dict()["capability"], "market.snapshot")
+
+    def test_manager_call_envelope_replay_dispatch_skips_live_call(self) -> None:
+        live_result = Result(
+            ok=False,
+            code=ErrorCode.EXECUTION_FAILED,
+            message="live snapshot should not run in replay mode",
+        )
+        manager = TdxApiManager(
+            profile="default",
+            provider_mode="replay",
+            replay_fixture="market-snapshot-success",
+        )
+
+        with patch.object(type(manager._market_api), "snapshot", return_value=live_result) as mocked_snapshot:
+            result = manager.market.snapshot("000001.SZ")
+
+        mocked_snapshot.assert_not_called()
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["replay_source"]["fixture"], "market-snapshot-success")
+        self.assertEqual(result.data["manager"]["method"], "snapshot")
+        self.assertEqual(result.to_dict()["capability"], "market.snapshot")
+
     def test_manager_snapshot_failure_uses_provider_result_envelope(self) -> None:
         expected = Result(
             ok=False,

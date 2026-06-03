@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import json
 import time
 from datetime import datetime
 from pathlib import Path
@@ -9,19 +8,17 @@ from typing import Any, Callable, TypeVar
 
 from ..models import Result
 from ..result_contract import DEFAULT_CAPABILITY_VERSION, DEFAULT_SCHEMA_VERSION, build_runtime_metadata, format_rfc3339, utc_now
+from ..runtime_config import get_runtime_config_path, load_runtime_config_object
 
 T = TypeVar("T")
 
 
 def get_api_profile_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "runtime" / "api-profiles.json"
+    return get_runtime_config_path("api_profiles")
 
 
 def load_api_profiles(path: Path | None = None) -> dict[str, dict[str, Any]]:
-    profile_path = path or get_api_profile_path()
-    payload = json.loads(profile_path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("api profile file must contain a JSON object")
+    payload = load_runtime_config_object("api_profiles", path=path)
     profiles: dict[str, dict[str, Any]] = {}
     for name, value in payload.items():
         if not isinstance(name, str) or not isinstance(value, dict):

@@ -1,26 +1,24 @@
 from __future__ import annotations
 
 import copy
-import json
 from pathlib import Path
 from typing import Any
+
+from .runtime_config import get_runtime_config_path, load_runtime_config_object
 
 SUPPORTED_COMMAND_CATALOG_SOURCES = frozenset({"report", "task", "trade"})
 
 
 def get_command_catalog_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "runtime" / "command-catalog.json"
+    return get_runtime_config_path("command_catalog")
 
 
 def get_command_bundle_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "runtime" / "command-bundles.json"
+    return get_runtime_config_path("command_bundles")
 
 
 def load_command_catalog(path: Path | None = None) -> dict[str, dict[str, Any]]:
-    catalog_path = path or get_command_catalog_path()
-    payload = json.loads(catalog_path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("command catalog file must contain a JSON object")
+    payload = load_runtime_config_object("command_catalog", path=path)
     entries: dict[str, dict[str, Any]] = {}
     for name, value in payload.items():
         if not isinstance(name, str) or not isinstance(value, dict):
@@ -30,10 +28,7 @@ def load_command_catalog(path: Path | None = None) -> dict[str, dict[str, Any]]:
 
 
 def load_command_bundles(path: Path | None = None) -> dict[str, dict[str, Any]]:
-    bundle_path = path or get_command_bundle_path()
-    payload = json.loads(bundle_path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("command bundle file must contain a JSON object")
+    payload = load_runtime_config_object("command_bundles", path=path)
     bundles: dict[str, dict[str, Any]] = {}
     for name, value in payload.items():
         if not isinstance(name, str) or not isinstance(value, dict):

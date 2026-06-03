@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import errno
-import fcntl
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+try:
+    import fcntl
+except ModuleNotFoundError:  # pragma: no cover - exercised on Windows
+    fcntl = None  # type: ignore[assignment]
 
 MANAGED_LIFECYCLE_MODULE = "tdxquant.managed_lifecycle"
 MANAGED_LIFECYCLE_PROVENANCE_SCHEMA_VERSION = "tdx.managed_process_lifecycle.provenance.v1"
@@ -167,6 +171,45 @@ def acquire_lifecycle_file_lock(
     if strategy != "advisory_flock":
         raise ValueError(f"unsupported lifecycle file lock strategy: {strategy}")
 
+    if fcntl is None:
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return ManagedLifecycleFileLock(
+                path=path,
+                strategy=strategy,
+                adapter=adapter,
+                lock_acquired=False,
+                reason_code="LOCK_HELD",
+            )
+        except OSError as exc:
+            return ManagedLifecycleFileLock(
+                path=path,
+                strategy=strategy,
+                adapter=adapter,
+                lock_acquired=False,
+                reason_code=f"LOCK_UNAVAILABLE:{exc.__class__.__name__}",
+            )
+        try:
+            handle = os.fdopen(fd, "w", encoding="utf-8")
+        except OSError as exc:
+            os.close(fd)
+            return ManagedLifecycleFileLock(
+                path=path,
+                strategy=strategy,
+                adapter=adapter,
+                lock_acquired=False,
+                reason_code=f"LOCK_UNAVAILABLE:{exc.__class__.__name__}",
+            )
+        return ManagedLifecycleFileLock(
+            path=path,
+            strategy=strategy,
+            adapter=adapter,
+            handle=handle,
+            lock_acquired=True,
+            reason_code="LOCK_ACQUIRED",
+        )
+
     handle = path.open("a+", encoding="utf-8")
     try:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -204,7 +247,8 @@ def release_lifecycle_file_lock(lock: ManagedLifecycleFileLock) -> dict[str, Any
         try:
             if lock.strategy == "advisory_flock":
                 if lock.handle is not None:
-                    fcntl.flock(lock.handle.fileno(), fcntl.LOCK_UN)
+                    if fcntl is not None:
+                        fcntl.flock(lock.handle.fileno(), fcntl.LOCK_UN)
                     released = True
             elif lock.strategy == "exclusive_lockfile":
                 released = True
@@ -219,7 +263,7 @@ def release_lifecycle_file_lock(lock: ManagedLifecycleFileLock) -> dict[str, Any
             except OSError as exc:
                 reason_code = f"LOCK_RELEASE_FAILED:{exc.__class__.__name__}"
                 released = False
-            if lock.strategy == "exclusive_lockfile":
+            if lock.strategy == "exclusive_lockfile" or (lock.strategy == "advisory_flock" and fcntl is None):
                 try:
                     lock.path.unlink()
                 except FileNotFoundError:
