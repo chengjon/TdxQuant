@@ -18,6 +18,7 @@ from ..models import ErrorCode, Result
 from ..provider_discovery import build_capability_discovery_payload
 from ..serialization import serialize_value
 from ..desktop.win32 import IS_WINDOWS
+from .provider_pytdx import PytdxProvider, is_pytdx_available, run_pytdx_call
 
 try:
     import numpy as np
@@ -510,6 +511,64 @@ def _require_tq_method(tq_class, method_name: str):
     return method
 
 
+# ---------------------------------------------------------------------------
+# Dual-source dispatch: DLL first (Windows), pytdx fallback (any platform)
+# ---------------------------------------------------------------------------
+
+# Provider mode: "dll" (explicit DLL), "pytdx" (explicit pytdx), "auto" (try DLL then pytdx)
+_PROVIDER_MODE: str | None = None  # None means auto
+
+
+def set_provider_mode(mode: str | None) -> None:
+    """Set the data provider mode: 'dll', 'pytdx', or None (auto-detect)."""
+    global _PROVIDER_MODE
+    if mode not in ("dll", "pytdx", None):
+        raise ValueError(f"Invalid provider mode: {mode!r} (expected 'dll', 'pytdx', or None)")
+    _PROVIDER_MODE = mode
+
+
+def get_provider_mode() -> str:
+    """Return the effective provider mode."""
+    return _PROVIDER_MODE or "auto"
+
+
+def _run_dispatch(action: str, dll_callback, pytdx_callback, strategy_path: str | None = None) -> Result:
+    """Try DLL first (if Windows), then fall back to pytdx.
+
+    * dll_callback(tq_class) — called when DLL is available
+    * pytdx_callback(provider: PytdxProvider) — called when pytdx is available
+    """
+    mode = _PROVIDER_MODE
+
+    if mode == "pytdx":
+        return run_pytdx_call(action, pytdx_callback)
+
+    if mode == "dll":
+        return _run_tq_call(action, dll_callback, strategy_path=strategy_path)
+
+    # Auto: try DLL first on Windows, then pytdx
+    if IS_WINDOWS:
+        result = _run_tq_call(action, dll_callback, strategy_path=strategy_path)
+        if result.ok:
+            return result
+        # DLL failed on Windows, try pytdx as fallback
+        if is_pytdx_available():
+            pytdx_result = run_pytdx_call(action, pytdx_callback)
+            if pytdx_result.ok:
+                return pytdx_result
+
+    # Non-Windows or DLL failed: try pytdx
+    if is_pytdx_available():
+        return run_pytdx_call(action, pytdx_callback)
+
+    return Result(
+        ok=False,
+        code=ErrorCode.UNSUPPORTED_PLATFORM,
+        message=f"{action}: no data provider available (DLL requires Windows, pytdx not installed)",
+        next_action="Install pytdx (pip install pytdx) or run on Windows with DLL.",
+    )
+
+
 def _attach_runtime_hints(result: Result, **hints: Any) -> Result:
     runtime_hints = result.data.setdefault("runtime_hints", {})
     runtime_hints.update(hints)
@@ -807,10 +866,17 @@ def run_tdx_full_tick(stock_code: str, field_list: list[str], strategy_path: str
         market_snapshot = _require_tq_method(tq_class, "get_market_snapshot")
         return _filter_payload_fields(market_snapshot(stock_code=stock_code, field_list=field_list), field_list)
 
-    return _run_tq_call("fetched TongDaXin full tick data", callback, strategy_path=strategy_path)
+    def pytdx_cb(provider):
+        quotes = provider.get_quote([stock_code])
+        if not quotes:
+            raise ValueError(f"No quote data for {stock_code}")
+        payload = quotes[0]
+        if field_list:
+            from .provider_pytdx import _filter_payload_fields as _fpf
+            payload = {k: v for k, v in payload.items() if k.lower() in {f.lower() for f in field_list} or k == "code"}
+        return payload
 
-
-def _query_rows_from_payload(payload: Any) -> list[dict[str, Any]]:
+    return _run_dispatch("fetched TongDaXin full tick data", callback, pytdx_cb, strategy_path=strategy_path)(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, dict) and payload.get("type") == "dataframe" and isinstance(payload.get("records"), list):
         return [dict(item) for item in payload["records"] if isinstance(item, dict)]
     if isinstance(payload, list):
@@ -900,7 +966,13 @@ def run_tdx_data_kline(
             fill_data=fill_data,
         )
 
-    result = _run_tq_call("fetched TongDaXin kline data", callback, strategy_path=strategy_path)
+    def pytdx_cb(provider):
+        results = {}
+        for stock in stock_list:
+            results[stock] = provider.get_kline(stock, period=period, start_time=start_time, end_time=end_time, count=count)
+        return results
+
+    result = _run_dispatch("fetched TongDaXin kline data", callback, pytdx_cb, strategy_path=strategy_path)
     return _attach_query_rows(
         result,
         query_kind="market.kline",
@@ -953,7 +1025,10 @@ def run_tdx_stock_list(market: str | None, list_type: int, strategy_path: str | 
         method = _require_tq_method(tq_class, "get_stock_list")
         return method(market=market, list_type=list_type)
 
-    result = _run_tq_call("fetched TongDaXin stock list", callback, strategy_path=strategy_path)
+    def pytdx_cb(provider):
+        return provider.get_stock_list(market=market)
+
+    result = _run_dispatch("fetched TongDaXin stock list", callback, pytdx_cb, strategy_path=strategy_path)
     return _attach_query_rows(
         result,
         query_kind="meta.stock_list",
@@ -1194,7 +1269,10 @@ def run_tdx_data_sector_list(list_type: int = 0, strategy_path: str | None = Non
         method = _require_tq_method(tq_class, "get_sector_list")
         return method(list_type=list_type)
 
-    return _run_tq_call("fetched TongDaXin sector list", callback, strategy_path=strategy_path)
+    def pytdx_cb(provider):
+        return provider.get_sector_list()
+
+    return _run_dispatch("fetched TongDaXin sector list", callback, pytdx_cb, strategy_path=strategy_path)
 
 
 def run_tdx_data_sector_stocks(
@@ -1207,7 +1285,10 @@ def run_tdx_data_sector_stocks(
         method = _require_tq_method(tq_class, "get_stock_list_in_sector")
         return method(block_code=block_code, block_type=block_type, list_type=list_type)
 
-    return _run_tq_call("fetched TongDaXin sector constituents", callback, strategy_path=strategy_path)
+    def pytdx_cb(provider):
+        return provider.get_sector_stocks(block_code)
+
+    return _run_dispatch("fetched TongDaXin sector constituents", callback, pytdx_cb, strategy_path=strategy_path)
 
 
 def run_tdx_refresh_cache(market: str, force: bool, strategy_path: str | None = None) -> Result:
