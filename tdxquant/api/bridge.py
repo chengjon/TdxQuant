@@ -19,6 +19,7 @@ from ..provider_discovery import build_capability_discovery_payload
 from ..serialization import serialize_value
 from ..desktop.win32 import IS_WINDOWS
 from .provider_pytdx import PytdxProvider, is_pytdx_available, run_pytdx_call
+from .provider_tdxapi import TdxApiProvider, is_tdxapi_available, run_tdxapi_call
 
 try:
     import numpy as np
@@ -520,10 +521,10 @@ _PROVIDER_MODE: str | None = None  # None means auto
 
 
 def set_provider_mode(mode: str | None) -> None:
-    """Set the data provider mode: 'dll', 'pytdx', or None (auto-detect)."""
+    """Set the data provider mode: 'dll', 'pytdx', 'tdxapi', or None (auto-detect)."""
     global _PROVIDER_MODE
-    if mode not in ("dll", "pytdx", None):
-        raise ValueError(f"Invalid provider mode: {mode!r} (expected 'dll', 'pytdx', or None)")
+    if mode not in ("dll", "pytdx", "tdxapi", None):
+        raise ValueError(f"Invalid provider mode: {mode!r} (expected 'dll', 'pytdx', 'tdxapi', or None)")
     _PROVIDER_MODE = mode
 
 
@@ -532,40 +533,45 @@ def get_provider_mode() -> str:
     return _PROVIDER_MODE or "auto"
 
 
-def _run_dispatch(action: str, dll_callback, pytdx_callback, strategy_path: str | None = None) -> Result:
-    """Try DLL first (if Windows), then fall back to pytdx.
+def _run_dispatch(action: str, dll_callback, pytdx_callback, tdxapi_callback=None, strategy_path: str | None = None) -> Result:
+    """Try DLL → pytdx → tdx-api in order.
 
-    * dll_callback(tq_class) — called when DLL is available
-    * pytdx_callback(provider: PytdxProvider) — called when pytdx is available
+    * dll_callback(tq_class) — DLL path
+    * pytdx_callback(provider: PytdxProvider) — pytdx path
+    * tdxapi_callback(provider: TdxApiProvider) — tdx-api HTTP path (optional)
     """
     mode = _PROVIDER_MODE
 
     if mode == "pytdx":
         return run_pytdx_call(action, pytdx_callback)
 
+    if mode == "tdxapi":
+        if tdxapi_callback and is_tdxapi_available():
+            return run_tdxapi_call(action, tdxapi_callback)
+        return Result(ok=False, code=ErrorCode.EXECUTION_FAILED, message=f"{action}: tdx-api provider unavailable")
+
     if mode == "dll":
         return _run_tq_call(action, dll_callback, strategy_path=strategy_path)
 
-    # Auto: try DLL first on Windows, then pytdx
+    # Auto: DLL → pytdx → tdx-api
     if IS_WINDOWS:
         result = _run_tq_call(action, dll_callback, strategy_path=strategy_path)
         if result.ok:
             return result
-        # DLL failed on Windows, try pytdx as fallback
-        if is_pytdx_available():
-            pytdx_result = run_pytdx_call(action, pytdx_callback)
-            if pytdx_result.ok:
-                return pytdx_result
 
-    # Non-Windows or DLL failed: try pytdx
     if is_pytdx_available():
-        return run_pytdx_call(action, pytdx_callback)
+        pytdx_result = run_pytdx_call(action, pytdx_callback)
+        if pytdx_result.ok:
+            return pytdx_result
+
+    if tdxapi_callback and is_tdxapi_available():
+        return run_tdxapi_call(action, tdxapi_callback)
 
     return Result(
         ok=False,
         code=ErrorCode.UNSUPPORTED_PLATFORM,
-        message=f"{action}: no data provider available (DLL requires Windows, pytdx not installed)",
-        next_action="Install pytdx (pip install pytdx) or run on Windows with DLL.",
+        message=f"{action}: no data provider available",
+        next_action="Install pytdx, enable tdx-api Docker, or run on Windows with DLL.",
     )
 
 
@@ -872,11 +878,19 @@ def run_tdx_full_tick(stock_code: str, field_list: list[str], strategy_path: str
             raise ValueError(f"No quote data for {stock_code}")
         payload = quotes[0]
         if field_list:
-            from .provider_pytdx import _filter_payload_fields as _fpf
             payload = {k: v for k, v in payload.items() if k.lower() in {f.lower() for f in field_list} or k == "code"}
         return payload
 
-    return _run_dispatch("fetched TongDaXin full tick data", callback, pytdx_cb, strategy_path=strategy_path)
+    def tdxapi_cb(provider):
+        quotes = provider.get_quote([stock_code])
+        if not quotes:
+            raise ValueError(f"No quote data for {stock_code}")
+        payload = quotes[0]
+        if field_list:
+            payload = {k: v for k, v in payload.items() if k.lower() in {f.lower() for f in field_list} or k == "code"}
+        return payload
+
+    return _run_dispatch("fetched TongDaXin full tick data", callback, pytdx_cb, tdxapi_callback=tdxapi_cb, strategy_path=strategy_path)
 
 
 def _query_rows_from_payload(payload: Any) -> list[dict[str, Any]]:
@@ -946,7 +960,12 @@ def run_tdx_market_snapshot(stock_code: str, field_list: list[str], strategy_pat
     def _pytdx_cb(provider):
         quotes = provider.get_quote([stock_code])
         return quotes[0] if quotes else {}
-    return _run_dispatch("fetched TongDaXin market snapshot via get_market_snapshot", callback, _pytdx_cb, strategy_path=strategy_path)
+
+    def _tdxapi_cb(provider):
+        quotes = provider.get_quote([stock_code])
+        return quotes[0] if quotes else {}
+
+    return _run_dispatch("fetched TongDaXin market snapshot via get_market_snapshot", callback, _pytdx_cb, tdxapi_callback=_tdxapi_cb, strategy_path=strategy_path)
 
 
 def run_tdx_data_kline(
@@ -978,7 +997,14 @@ def run_tdx_data_kline(
             results[stock] = provider.get_kline(stock, period=period, start_time=start_time, end_time=end_time, count=count)
         return results
 
-    result = _run_dispatch("fetched TongDaXin kline data", callback, pytdx_cb, strategy_path=strategy_path)
+    def tdxapi_cb(provider):
+        results = {}
+        kline_type_map = {"1d": "day", "1w": "week", "1mon": "month", "1m": "minute1", "5m": "5", "15m": "15", "30m": "30", "1h": "hour"}
+        for stock in stock_list:
+            results[stock] = provider.get_kline(stock, kline_type=kline_type_map.get(period, period), start_time=start_time, end_time=end_time, count=count)
+        return results
+
+    result = _run_dispatch("fetched TongDaXin kline data", callback, pytdx_cb, tdxapi_callback=tdxapi_cb, strategy_path=strategy_path)
     return _attach_query_rows(
         result,
         query_kind="market.kline",
@@ -1013,6 +1039,7 @@ def run_tdx_divid_factors(
 
     def _pytdx_cb(provider):
         return provider.get_divid_factors(stock_code)
+
     return _run_dispatch("fetched TongDaXin dividend factors", callback, _pytdx_cb, strategy_path=strategy_path)
 
 
@@ -1036,7 +1063,15 @@ def run_tdx_stock_list(market: str | None, list_type: int, strategy_path: str | 
     def pytdx_cb(provider):
         return provider.get_stock_list(market=market)
 
-    result = _run_dispatch("fetched TongDaXin stock list", callback, pytdx_cb, strategy_path=strategy_path)
+    def tdxapi_cb(provider):
+        exchange = "all"
+        if market == "SH" or market == "1":
+            exchange = "sh"
+        elif market == "SZ" or market == "0":
+            exchange = "sz"
+        return provider.get_stock_list(exchange=exchange)
+
+    result = _run_dispatch("fetched TongDaXin stock list", callback, pytdx_cb, tdxapi_callback=tdxapi_cb, strategy_path=strategy_path)
     return _attach_query_rows(
         result,
         query_kind="meta.stock_list",
@@ -1145,6 +1180,7 @@ def run_tdx_financial_data(
         for stock in stock_list:
             results[stock] = provider.get_financial_info(stock)
         return results
+
     return _run_dispatch("fetched TongDaXin professional financial data", callback, _pytdx_cb, strategy_path=strategy_path)
 
 
@@ -1325,7 +1361,11 @@ def run_tdx_get_trading_dates(
 
     def _pytdx_cb(provider):
         return provider.get_trading_dates(start_time, end_time)
-    return _run_dispatch("fetched TongDaXin trading dates", callback, _pytdx_cb, strategy_path=strategy_path)
+
+    def _tdxapi_cb(provider):
+        return provider.get_trading_dates(start=start_time, end=end_time)
+
+    return _run_dispatch("fetched TongDaXin trading dates", callback, _pytdx_cb, tdxapi_callback=_tdxapi_cb, strategy_path=strategy_path)
 
 
 def run_tdx_refresh_kline(

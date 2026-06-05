@@ -137,7 +137,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
             message="ok",
             data={"result": {"symbol": "688260.SH", "Now": 10.5, "Volume": 1000}},
         )
-        with patch("tdxquant.api.bridge._run_tq_call", return_value=raw):
+        with patch("tdxquant.api.bridge._run_dispatch", return_value=raw):
             result = run_tdx_data_snapshot(stock_code="688260.SH", field_list=["Now", "Volume"])
 
         self.assertTrue(result.ok)
@@ -237,7 +237,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
                 }
             },
         )
-        with patch("tdxquant.api.bridge._run_tq_call", return_value=raw):
+        with patch("tdxquant.api.bridge._run_dispatch", return_value=raw):
             result = run_tdx_data_kline(
                 stock_list=["688260.SH", "600519.SH"],
                 period="1d",
@@ -262,7 +262,7 @@ class TdxApiBridgePlatformGuardTests(unittest.TestCase):
 
     def test_run_tdx_stock_list_normalizes_query_params_and_empty_rows(self) -> None:
         raw = Result(ok=True, code=ErrorCode.OK, message="ok", data={"result": []})
-        with patch("tdxquant.api.bridge._run_tq_call", return_value=raw):
+        with patch("tdxquant.api.bridge._run_dispatch", return_value=raw):
             result = run_tdx_stock_list(market="16", list_type=1)
 
         self.assertEqual(result.data["rows"], [])

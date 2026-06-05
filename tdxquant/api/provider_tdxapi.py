@@ -53,14 +53,14 @@ class TdxApiProvider:
 
     def health(self) -> bool:
         try:
-            resp = _http_get(f"{self.base_url}/api/health")
-            return resp.get("code") == 0 or "success" in str(resp.get("message", ""))
+            _http_get(f"{self.base_url}/api/health")
+            return True
         except Exception:
             return False
 
     # -- data methods --
 
-    def get_kline(self, code: str, kline_type: str = "day") -> list[dict[str, Any]]:
+    def get_kline(self, code: str, kline_type: str = "day", start_time: str = "", end_time: str = "", count: int = 0) -> list[dict[str, Any]]:
         """Fetch K-line data. code='600000.SH', kline_type='day'/'week'/'month'/'minute1'/'5'/'15'/'30'/'hour'."""
         raw_code = _strip_code_suffix(code)
         resp = _http_get(f"{self.base_url}/api/kline?code={raw_code}&type={kline_type}")
@@ -69,9 +69,17 @@ class TdxApiProvider:
         data = resp.get("data", {})
         items = data.get("List", [])
         results = []
+        start_compact = start_time.replace("-", "") if start_time else ""
+        end_compact = end_time.replace("-", "") if end_time else ""
         for item in items:
+            dt = item.get("Time", "")
+            dt_compact = dt[:10].replace("-", "")
+            if start_compact and dt_compact < start_compact:
+                continue
+            if end_compact and dt_compact > end_compact:
+                continue
             results.append({
-                "datetime": item.get("Time", ""),
+                "datetime": dt,
                 "open": _price_from_li(item.get("Open", 0)),
                 "high": _price_from_li(item.get("High", 0)),
                 "low": _price_from_li(item.get("Low", 0)),
@@ -79,6 +87,8 @@ class TdxApiProvider:
                 "vol": item.get("Volume", 0),
                 "amount": item.get("Amount", 0),
             })
+        if count > 0 and len(results) > count:
+            results = results[-count:]
         return results
 
     def get_quote(self, codes: list[str]) -> list[dict[str, Any]]:
