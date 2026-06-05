@@ -876,7 +876,10 @@ def run_tdx_full_tick(stock_code: str, field_list: list[str], strategy_path: str
             payload = {k: v for k, v in payload.items() if k.lower() in {f.lower() for f in field_list} or k == "code"}
         return payload
 
-    return _run_dispatch("fetched TongDaXin full tick data", callback, pytdx_cb, strategy_path=strategy_path)(payload: Any) -> list[dict[str, Any]]:
+    return _run_dispatch("fetched TongDaXin full tick data", callback, pytdx_cb, strategy_path=strategy_path)
+
+
+def _query_rows_from_payload(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, dict) and payload.get("type") == "dataframe" and isinstance(payload.get("records"), list):
         return [dict(item) for item in payload["records"] if isinstance(item, dict)]
     if isinstance(payload, list):
@@ -940,7 +943,10 @@ def run_tdx_market_snapshot(stock_code: str, field_list: list[str], strategy_pat
         method = _require_tq_method(tq_class, "get_market_snapshot")
         return method(stock_code=stock_code, field_list=field_list)
 
-    return _run_tq_call("fetched TongDaXin market snapshot via get_market_snapshot", callback, strategy_path=strategy_path)
+    def _pytdx_cb(provider):
+        quotes = provider.get_quote([stock_code])
+        return quotes[0] if quotes else {}
+    return _run_dispatch("fetched TongDaXin market snapshot via get_market_snapshot", callback, _pytdx_cb, strategy_path=strategy_path)
 
 
 def run_tdx_data_kline(
@@ -1005,7 +1011,9 @@ def run_tdx_divid_factors(
         method = _require_tq_method(tq_class, "get_divid_factors")
         return method(stock_code=stock_code, start_time=start_time, end_time=end_time)
 
-    return _run_tq_call("fetched TongDaXin dividend factors", callback, strategy_path=strategy_path)
+    def _pytdx_cb(provider):
+        return provider.get_divid_factors(stock_code)
+    return _run_dispatch("fetched TongDaXin dividend factors", callback, _pytdx_cb, strategy_path=strategy_path)
 
 
 def run_tdx_ipo_info(
@@ -1132,7 +1140,12 @@ def run_tdx_financial_data(
             report_type=report_type,
         )
 
-    return _run_tq_call("fetched TongDaXin professional financial data", callback, strategy_path=strategy_path)
+    def _pytdx_cb(provider):
+        results = {}
+        for stock in stock_list:
+            results[stock] = provider.get_financial_info(stock)
+        return results
+    return _run_dispatch("fetched TongDaXin professional financial data", callback, _pytdx_cb, strategy_path=strategy_path)
 
 
 def run_tdx_financial_data_by_date(
@@ -1310,7 +1323,9 @@ def run_tdx_get_trading_dates(
         method = _require_tq_method(tq_class, "get_trading_dates")
         return method(market=market, start_time=start_time, end_time=end_time, count=count)
 
-    return _run_tq_call("fetched TongDaXin trading dates", callback, strategy_path=strategy_path)
+    def _pytdx_cb(provider):
+        return provider.get_trading_dates(start_time, end_time)
+    return _run_dispatch("fetched TongDaXin trading dates", callback, _pytdx_cb, strategy_path=strategy_path)
 
 
 def run_tdx_refresh_kline(
