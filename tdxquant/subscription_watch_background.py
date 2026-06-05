@@ -1422,6 +1422,44 @@ class SubscriptionWatchBackgroundController:
             result["replayed"] = True
         return {"ok": True, "result": result}
 
+    def _active_start_conflict_result(
+        self,
+        current: dict[str, Any],
+        *,
+        idempotency_key: str | None,
+    ) -> dict[str, Any]:
+        if idempotency_key and idempotency_key == current.get("idempotency_key"):
+            return self._current_start_result(current, replayed=True)
+        return {
+            "ok": False,
+            "error": {
+                "code": "ALREADY_RUNNING",
+                "message": "subscription-watch background run is already active",
+                "details": current,
+            },
+        }
+
+    def _read_active_start_state_without_control_lock(self) -> dict[str, Any] | None:
+        try:
+            current = read_active_payload(self.paths)
+        except Exception:
+            return None
+        if not isinstance(current, dict) or current.get("state") not in ACTIVE_PROCESS_STATES:
+            return None
+        state = str(current.get("state") or "")
+        pid = _parse_pid(current.get("pid"))
+        if (
+            state == "starting"
+            and str(current.get("reason") or "") == "startup_persistence_failed"
+            and pid > 0
+            and self._pid_is_alive(pid)
+        ):
+            return current
+        owned_pid = _read_owned_pid(self.paths)
+        if pid <= 0 or owned_pid != pid or not self._pid_is_alive(pid):
+            return None
+        return current
+
     def _restart_preflight_state(self) -> dict[str, Any]:
         try:
             payload = read_active_payload(self.paths)
@@ -1944,6 +1982,12 @@ class SubscriptionWatchBackgroundController:
         with self._control_lock:
             control_lock = _acquire_control_lock(self.paths)
             if control_lock is None:
+                current = self._read_active_start_state_without_control_lock()
+                if current is not None:
+                    return self._active_start_conflict_result(
+                        current,
+                        idempotency_key=idempotency_key,
+                    )
                 return {
                     "ok": False,
                     "error": {
@@ -1953,16 +1997,10 @@ class SubscriptionWatchBackgroundController:
             try:
                 current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
                 if current.get("state") in ACTIVE_PROCESS_STATES:
-                    if idempotency_key and idempotency_key == current.get("idempotency_key"):
-                        return self._current_start_result(current, replayed=True)
-                    return {
-                        "ok": False,
-                        "error": {
-                            "code": "ALREADY_RUNNING",
-                            "message": "subscription-watch background run is already active",
-                            "details": current,
-                        },
-                    }
+                    return self._active_start_conflict_result(
+                        current,
+                        idempotency_key=idempotency_key,
+                    )
 
                 previous_active_payload = read_active_payload(self.paths)
                 run_paths = build_subscription_watch_run_paths(self.paths.root_dir)
@@ -2042,15 +2080,21 @@ class SubscriptionWatchBackgroundController:
     def stop(self, *, reason: str | None = None, grace_period_seconds: int | None = None) -> dict[str, Any]:
         with self._control_lock:
             control_lock = _acquire_control_lock(self.paths)
+            current_without_control_lock = None
             if control_lock is None:
-                return {
-                    "ok": False,
-                    "error": {
-                        "code": "CONTROL_LOCKED",
-                    },
-                }
+                current_without_control_lock = self._read_active_start_state_without_control_lock()
+                if current_without_control_lock is None:
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "CONTROL_LOCKED",
+                        },
+                    }
             try:
-                current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)
+                current = current_without_control_lock or reconcile_background_state(
+                    self.paths,
+                    pid_is_alive=self._pid_is_alive,
+                )
                 if current.get("state") not in ACTIVE_PROCESS_STATES:
                     return {
                         "ok": True,
@@ -2148,7 +2192,8 @@ class SubscriptionWatchBackgroundController:
                     },
                 }
             finally:
-                _release_control_lock(control_lock)
+                if control_lock is not None:
+                    _release_control_lock(control_lock)
 
     def restart(self, *, reason: str | None = None, grace_period_seconds: int | None = None) -> dict[str, Any]:
         current = reconcile_background_state(self.paths, pid_is_alive=self._pid_is_alive)

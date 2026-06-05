@@ -1518,6 +1518,15 @@ def test_supervisor_daemon_start_launches_process_and_writes_owned_state(tmp_pat
     assert result["result"]["pid"] == 4321
     assert result["result"]["owner_token"] == "owner-1"
     assert result["result"]["boundary"] == "explicit_supervisor_daemon_lifecycle;does_not_enable_default_policy"
+    expected_popen_kwargs = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        expected_popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        expected_popen_kwargs["start_new_session"] = True
     assert launches == [
         (
             [
@@ -1535,12 +1544,7 @@ def test_supervisor_daemon_start_launches_process_and_writes_owned_state(tmp_pat
                 "--reason",
                 "daemon_supervise",
             ],
-            {
-                "stdin": subprocess.DEVNULL,
-                "stdout": subprocess.DEVNULL,
-                "stderr": subprocess.DEVNULL,
-                "start_new_session": True,
-            },
+            expected_popen_kwargs,
         )
     ]
     assert persisted["schema_version"] == "tdx.subscription_watch.supervisor_daemon.v1"

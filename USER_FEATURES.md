@@ -1,5 +1,7 @@
 # USER_FEATURES
 
+> 最新全面测试报告：[`FULL_CAPABILITY_TEST_REPORT_2026-06-04.md`](FULL_CAPABILITY_TEST_REPORT_2026-06-04.md)。本轮覆盖 live TDX 只读查询、COM3 HID 安全检查、catalog/report/task/provider-replay 入口、OpenSpec/FUNCTION_TREE 校验，并确认未执行真实交易或非 dry-run 写入。
+
 > 本文件面向使用者，回答“当前拿这个项目能直接做什么”。
 >
 > 工程级实现状态、证据和边界仍以 [`FUNCTION_TREE.md`](FUNCTION_TREE.md) 为准；本文件只做用户视角的功能导航。
