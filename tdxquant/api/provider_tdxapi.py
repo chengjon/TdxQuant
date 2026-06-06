@@ -6,6 +6,7 @@ import logging
 from typing import Any
 from urllib.request import Request, urlopen
 from urllib.error import URLError
+from urllib.parse import quote
 import json
 
 from ..models import ErrorCode, Result
@@ -157,7 +158,18 @@ class TdxApiProvider:
         resp = _http_get(url)
         if resp.get("code") != 0:
             return []
-        return resp.get("data", [])
+        data = resp.get("data", {})
+        if isinstance(data, list):
+            return data
+        items = data.get("List") or []
+        return [
+            {
+                "time": item.get("Time", ""),
+                "price": _price_from_li(item.get("Price", 0)),
+                "vol": item.get("Number", 0),
+            }
+            for item in items
+        ]
 
     def get_trade(self, code: str, date: str = "") -> list[dict[str, Any]]:
         """Fetch tick-by-tick trade data."""
@@ -168,11 +180,23 @@ class TdxApiProvider:
         resp = _http_get(url)
         if resp.get("code") != 0:
             return []
-        return resp.get("data", [])
+        data = resp.get("data", {})
+        if isinstance(data, list):
+            return data
+        items = data.get("List") or []
+        return [
+            {
+                "time": item.get("Time", ""),
+                "price": _price_from_li(item.get("Price", 0)),
+                "vol": item.get("Volume", 0),
+                "buyorsell": item.get("Status", 0),
+            }
+            for item in items
+        ]
 
     def search(self, keyword: str) -> list[dict[str, Any]]:
         """Search stocks by name/code."""
-        resp = _http_get(f"{self.base_url}/api/search?keyword={keyword}")
+        resp = _http_get(f"{self.base_url}/api/search?keyword={quote(keyword)}")
         if resp.get("code") != 0:
             return []
         return resp.get("data", [])

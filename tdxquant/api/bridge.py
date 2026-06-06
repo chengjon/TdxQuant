@@ -2104,3 +2104,82 @@ def run_tdx_query_stock_asset(account_id: int, strategy_path: str | None = None)
         return method(account_id=account_id)
 
     return _run_tq_call("queried TongDaXin stock asset", callback, strategy_path=strategy_path)
+
+
+# ---------------------------------------------------------------------------
+# Extended data functions (pytdx + tdx-api, no DLL equivalent)
+# ---------------------------------------------------------------------------
+
+def run_tdx_minute_data(
+    stock_code: str,
+    date: str = "",
+    strategy_path: str | None = None,
+) -> Result:
+    """Fetch minute-level (分时) data for a stock."""
+    def _pytdx_cb(provider):
+        date_int = int(date.replace("-", "")) if date else None
+        return provider.get_minute_data(stock_code, date=date_int)
+
+    def _tdxapi_cb(provider):
+        return provider.get_minute(stock_code, date=date)
+
+    result = _run_dispatch("fetched TongDaXin minute data", lambda tq: None, _pytdx_cb, tdxapi_callback=_tdxapi_cb, strategy_path=strategy_path)
+    return _attach_query_rows(
+        result,
+        query_kind="market.minute",
+        requested_fields=[],
+        query_params={"date": date},
+        symbol=stock_code,
+    )
+
+
+def run_tdx_tick_data(
+    stock_code: str,
+    date: str = "",
+    count: int = 2000,
+    strategy_path: str | None = None,
+) -> Result:
+    """Fetch tick-by-tick (逐笔成交) data for a stock."""
+    def _pytdx_cb(provider):
+        date_int = int(date.replace("-", "")) if date else None
+        return provider.get_tick_data(stock_code, date=date_int, count=count)
+
+    def _tdxapi_cb(provider):
+        return provider.get_trade(stock_code, date=date)
+
+    result = _run_dispatch("fetched TongDaXin tick data", lambda tq: None, _pytdx_cb, tdxapi_callback=_tdxapi_cb, strategy_path=strategy_path)
+    return _attach_query_rows(
+        result,
+        query_kind="market.tick",
+        requested_fields=[],
+        query_params={"date": date, "count": count},
+        symbol=stock_code,
+    )
+
+
+def run_tdx_search(keyword: str, strategy_path: str | None = None) -> Result:
+    """Search stocks by name or code (tdx-api only)."""
+    def _tdxapi_cb(provider):
+        return provider.search(keyword)
+
+    result = _run_dispatch("searched TongDaXin stocks", lambda tq: None, lambda p: [], tdxapi_callback=_tdxapi_cb, strategy_path=strategy_path)
+    return _attach_query_rows(
+        result,
+        query_kind="meta.search",
+        requested_fields=[],
+        query_params={"keyword": keyword},
+    )
+
+
+def run_tdx_market_stats(strategy_path: str | None = None) -> Result:
+    """Get market statistics — up/down/flat counts (tdx-api only)."""
+    def _tdxapi_cb(provider):
+        return provider.get_market_stats()
+
+    result = _run_dispatch("fetched TongDaXin market statistics", lambda tq: None, lambda p: {}, tdxapi_callback=_tdxapi_cb, strategy_path=strategy_path)
+    return _attach_query_rows(
+        result,
+        query_kind="market.stats",
+        requested_fields=[],
+        query_params={},
+    )
